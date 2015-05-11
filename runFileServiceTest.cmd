@@ -1,0 +1,1 @@
+java -classpath "bin;lib;lib/apache-log4j/log4j-api-2.0-rc1.jar;lib/apache-log4j/log4j-core-2.0-rc1.jar" com.macbackpackers.services.FileServiceTest
