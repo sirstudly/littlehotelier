@@ -16,8 +16,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
@@ -29,7 +32,6 @@ import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.dao.WordPressDAO;
-import com.macbackpackers.services.Config;
 
 /**
  * Scrapes the allocations page for the specified dates.
@@ -51,29 +53,26 @@ import com.macbackpackers.services.Config;
  * Each job id will have an associated table job_id, calendar_date_loaded (date) which will hold which job updated the
  * calendar for a particular date
  */
+@Component
 public class AllocationsPageScraper {
 
-    private Logger logger = LogManager.getLogger( getClass() );
+    private final Logger LOGGER = LogManager.getLogger( getClass() );
 
     private static final SimpleDateFormat DATE_FORMAT_YYYY_MM_DD = new SimpleDateFormat( "yyyy-MM-dd" );
 
     // current session
     private WebClient webClient;
 
+    @Autowired
     private WordPressDAO dao;
 
-    public WordPressDAO getWordPressDAO() {
-        return dao;
-    }
-
-    public void setWordPressDAO( WordPressDAO dao ) {
-        this.dao = dao;
-    }
-
+    @Autowired
+    private Environment env;
+    
     public void doLogin() throws Exception {
 
         webClient = new WebClient();
-        HtmlPage loginPage = webClient.getPage( Config.getProperty( "lilhotelier.url.login" ) );
+        HtmlPage loginPage = webClient.getPage( env.getProperty( "lilhotelier.url.login" ) );
 
         // The form doesn't have a name so just take the only one on the page
         List<HtmlForm> forms = loginPage.getForms();
@@ -84,22 +83,22 @@ public class AllocationsPageScraper {
         HtmlPasswordInput passwordField = form.getInputByName( "user_session[password]" );
 
         // Change the value of the text field
-        usernameField.setValueAttribute( Config.getProperty( "lilhotelier.username" ) );
-        passwordField.setValueAttribute( Config.getProperty( "lilhotelier.password" ) );
+        usernameField.setValueAttribute( env.getProperty( "lilhotelier.username" ) );
+        passwordField.setValueAttribute( env.getProperty( "lilhotelier.password" ) );
 
         HtmlPage nextPage = button.click();
-        logger.info( "Finished logging in" );
-        logger.info( nextPage.asXml() );
+        LOGGER.info( "Finished logging in" );
+        LOGGER.info( nextPage.asXml() );
     }
 
     public HtmlPage goToCalendarPage( Date date ) throws Exception {
         String dateAsString = DATE_FORMAT_YYYY_MM_DD.format( date );
         HtmlPage nextPage = webClient
-                .getPage( Config.getProperty( "lilhotelier.url.calendar" ) + "?start_date=" + dateAsString );
-        logger.info( "Calendar page" );
+                .getPage( env.getProperty( "lilhotelier.url.calendar" ) + "?start_date=" + dateAsString );
+        LOGGER.info( "Calendar page" );
 
         serialiseToDisk( nextPage, getCalendarPageSerialisedObjectFilename( date ) );
-        logger.info( nextPage.asXml() );
+        LOGGER.info( nextPage.asXml() );
         return nextPage;
     }
 
@@ -130,22 +129,22 @@ public class AllocationsPageScraper {
                 }
 
                 if ( StringUtils.isNotBlank( div.getAttribute( "data-room_id" ) ) ) {
-                    logger.info( "data-room_id: " + dataRoomId );
-                    logger.info( "data-room_type_id: " + div.getAttribute( "data-room_type_id" ) );
+                    LOGGER.info( "data-room_id: " + dataRoomId );
+                    LOGGER.info( "data-room_type_id: " + div.getAttribute( "data-room_type_id" ) );
 
                     if ( false == div.hasChildNodes() ) {
-                        logger.warn( "no child nodes for " + div.asText() );
+                        LOGGER.warn( "no child nodes for " + div.asText() );
                     } else {
                         DomElement label = div.getFirstElementChild();
                         if ( false == "label".equals( label.getTagName() ) ) {
-                            logger.info( "not a label? " + label.asText() );
+                            LOGGER.info( "not a label? " + label.asText() );
                         } else {
-                            logger.info( "Bed Name: " + label.getAttribute( "title" ) );
+                            LOGGER.info( "Bed Name: " + label.getAttribute( "title" ) );
                             currentBedName = label.getAttribute( "title" );
                         }
                     }
                 } else if ( StringUtils.isNotBlank( dataDate ) ) {
-                    logger.info( "data-date: " + dataDate );
+                    LOGGER.info( "data-date: " + dataDate );
 
                     // first entry after the data-date div is not always correct
                     // it could be one day off screen
@@ -156,11 +155,11 @@ public class AllocationsPageScraper {
                         }
                     }
                     if ( div.hasChildNodes() == false ) {
-                        logger.info( "no records for " + dataDate );
+                        LOGGER.info( "no records for " + dataDate );
                     }
                 }
             } catch ( Exception ex ) {
-                logger.error( "Exception handled.", ex );
+                LOGGER.error( "Exception handled.", ex );
             }
         }
     }
@@ -192,28 +191,28 @@ public class AllocationsPageScraper {
         // 2) the guest name (displayed in table)
         // 3) a resizable arrow on the right
         if ( currentBedName == null ) {
-            logger.error( "No current bed name, skipping record..." );
+            LOGGER.error( "No current bed name, skipping record..." );
             return;
         }
 
-        logger.info( "  class: " + span.getAttribute( "class" ) );
-        logger.info( "  style: " + span.getAttribute( "style" ) );
-        logger.info( "  data-reservation_payment_total: " + span.getAttribute( "data-reservation_payment_total" ) );
-        logger.info( "  data-reservation_payment_oustanding: "
+        LOGGER.info( "  class: " + span.getAttribute( "class" ) );
+        LOGGER.info( "  style: " + span.getAttribute( "style" ) );
+        LOGGER.info( "  data-reservation_payment_total: " + span.getAttribute( "data-reservation_payment_total" ) );
+        LOGGER.info( "  data-reservation_payment_oustanding: "
                 + span.getAttribute( "data-reservation_payment_oustanding" ) );
-        logger.info( "  data-reservation_id: " + span.getAttribute( "data-reservation_id" ) );
-        logger.info( "  data-rate_plan_name: " + span.getAttribute( "data-rate_plan_name" ) );
-        logger.info( "  data-payment_status: " + span.getAttribute( "data-payment_status" ) );
-        logger.info( "  data-occupancy: " + span.getAttribute( "data-occupancy" ) );
-        logger.info( "  data-href: " + span.getAttribute( "data-href" ) );
-        logger.info( "  data-guest_name: " + span.getAttribute( "data-guest_name" ) );
+        LOGGER.info( "  data-reservation_id: " + span.getAttribute( "data-reservation_id" ) );
+        LOGGER.info( "  data-rate_plan_name: " + span.getAttribute( "data-rate_plan_name" ) );
+        LOGGER.info( "  data-payment_status: " + span.getAttribute( "data-payment_status" ) );
+        LOGGER.info( "  data-occupancy: " + span.getAttribute( "data-occupancy" ) );
+        LOGGER.info( "  data-href: " + span.getAttribute( "data-href" ) );
+        LOGGER.info( "  data-guest_name: " + span.getAttribute( "data-guest_name" ) );
 
         // split room/bed name
         Pattern p = Pattern.compile( "([^\\-]*)-(.*)$" ); // anything but dash for room #, everything else for bed
         Matcher m = p.matcher( currentBedName );
         String room = null, bed = null;
         if ( m.find() == false ) {
-            logger.warn( "Couldn't determine bed name from '" + currentBedName + "'. Is it a private?" );
+            LOGGER.warn( "Couldn't determine bed name from '" + currentBedName + "'. Is it a private?" );
             room = currentBedName;
         } else {
             room = m.group( 1 );
@@ -231,10 +230,10 @@ public class AllocationsPageScraper {
         if ( StringUtils.contains( span.getAttribute( "class" ), "room_closure" ) ) {
             DomElement closedRoom = span.getFirstElementChild();
             if ( false == "span".equals( closedRoom.getTagName() ) ) {
-                logger.info( "not a span? " );
-                logger.info( closedRoom.asText() );
+                LOGGER.info( "not a span? " );
+                LOGGER.info( closedRoom.asText() );
             } else {
-                logger.info( "closed room?: " + closedRoom.getTextContent() );
+                LOGGER.info( "closed room?: " + closedRoom.getTextContent() );
                 alloc.setGuestName( closedRoom.getTextContent() );
             }
         } else {
@@ -250,8 +249,8 @@ public class AllocationsPageScraper {
 
         alloc.setDataHref( span.getAttribute( "data-href" ) );
 
-        logger.info( "Done allocation!" );
-        logger.info( alloc );
+        LOGGER.info( "Done allocation!" );
+        LOGGER.info( alloc );
         dao.insertAllocation( alloc );
     }
 
@@ -283,7 +282,7 @@ public class AllocationsPageScraper {
     private int calculateNumberOfGuests( String occupancy ) {
         String values[] = occupancy.split( "/" );
         if ( values.length != 3 ) {
-            logger.error( "unexpected occupancy " + occupancy );
+            LOGGER.error( "unexpected occupancy " + occupancy );
         }
         int count = 0;
         for( int i = 0; i < values.length; i++ ) {
@@ -313,11 +312,11 @@ public class AllocationsPageScraper {
         int daysToSubtract = 0;
         if ( leftOffset < 0 ) {
 
-            logger.info( "offscreen record found" );
+            LOGGER.info( "offscreen record found" );
             // check if my calculation is correct
             // this should be a multiple of 61
             if ( (leftOffset - 30) % 61 != 0 ) {
-                logger.warn( "leftOffset has unexpected value " + leftOffset );
+                LOGGER.warn( "leftOffset has unexpected value " + leftOffset );
             }
 
             daysToSubtract = (leftOffset - 30) / 61;
@@ -335,14 +334,14 @@ public class AllocationsPageScraper {
         int numberNights = 0;
         // width (minus first night) should be divisible by 61
         if ( (width - 56) % 61 != 0 ) {
-            logger.error( "unexpected width of record " + width );
+            LOGGER.error( "unexpected width of record " + width );
         }
         if ( width == 56 ) {
             numberNights = 1;
         } else {
             numberNights = 1 + ((width - 56) / 61); // number of additional nights
         }
-        logger.info( "Number of nights: " + numberNights );
+        LOGGER.info( "Number of nights: " + numberNights );
 
         // adjust checkout date by number of nights
         Calendar checkoutDate = Calendar.getInstance();
@@ -359,9 +358,9 @@ public class AllocationsPageScraper {
             oos.close();
 
         } catch ( FileNotFoundException e ) {
-            logger.error( e );
+            LOGGER.error( e );
         } catch ( IOException e ) {
-            logger.error( e );
+            LOGGER.error( e );
         }
     }
 
@@ -371,7 +370,7 @@ public class AllocationsPageScraper {
 
     public String getPageAsXml() throws Exception {
         final WebClient webClient = new WebClient();
-        final HtmlPage page = webClient.getPage( Config.getProperty( "lilhotelier.url.login" ) );
+        final HtmlPage page = webClient.getPage( env.getProperty( "lilhotelier.url.login" ) );
         final String pageAsXml = page.asXml();
         webClient.closeAllWindows();
         return pageAsXml;
@@ -379,7 +378,7 @@ public class AllocationsPageScraper {
 
     public String getPageAsText() throws Exception {
         final WebClient webClient = new WebClient();
-        final HtmlPage page = webClient.getPage( Config.getProperty( "lilhotelier.url.login" ) );
+        final HtmlPage page = webClient.getPage( env.getProperty( "lilhotelier.url.login" ) );
         final String pageAsText = page.asText();
         webClient.closeAllWindows();
         return pageAsText;

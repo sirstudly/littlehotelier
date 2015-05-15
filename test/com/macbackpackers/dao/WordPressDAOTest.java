@@ -4,55 +4,53 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.List;
 
-import org.apache.commons.dbutils.QueryRunner;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.junit.After;
+import javax.sql.DataSource;
+
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.BedChange;
 import com.macbackpackers.beans.BedSheetEntry;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.config.LittleHotelierConfig;
 
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(classes = LittleHotelierConfig.class)
 public class WordPressDAOTest {
 
-    Logger logger = LogManager.getLogger( getClass() );
+    final Logger LOGGER = LogManager.getLogger( getClass() );
+    
+    @Autowired
     WordPressDAO dao;
 
-    static final String username = "root";
-    static final String password = "system??";
+    @Autowired
+    @Qualifier("txnDataSource")
+    DataSource dataSource;
 
-    private static final SimpleDateFormat DATE_FORMAT_YYYY_MM_DD = new SimpleDateFormat( "yyyy-MM-dd" );
+    static final SimpleDateFormat DATE_FORMAT_YYYY_MM_DD = new SimpleDateFormat( "yyyy-MM-dd" );
 
     @Before
     public void setUp() throws Exception {
-        dao = getTestWordPressDAO();
         setupTestEntries();
-    }
-
-    /**
-     * Creates and connects to the wordpress db.
-     * 
-     * @return initialised DAO
-     */
-    public static WordPressDAO getTestWordPressDAO() {
-        WordPressDAO result = new WordPressDAO( "jdbc:mysql://", "localhost", "3306", "wordpress701" );
-        result.connect( username, password );
-        return result;
-    }
-
-    @After
-    public void tearDown() throws Exception {
-        QueryRunner runner = new QueryRunner( dao.getDataSource() );
-        runner.update( "TRUNCATE TABLE wp_bedsheets" );
     }
 
     // this indirectly tests the insert methods
     private void setupTestEntries() throws Exception {
+
+        // clear out existing data
+        getJdbcTemplate().update( "TRUNCATE TABLE wp_bedsheets" );
+
         dao.insertBedSheetEntry( createBedSheetEntry( 3, "forty five", "Dollar", 2014, 4, 18,
                 BedChange.THREE_DAY_CHANGE ) );
         dao.insertBedSheetEntry( createBedSheetEntry( 3, "42", "Boxers", 2014, 4, 18, BedChange.YES ) );
@@ -178,7 +176,7 @@ public class WordPressDAOTest {
         Assert.assertEquals( j.getName(), jobView.getName() );
         Assert.assertEquals( j.getStatus(), jobView.getStatus() );
         Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
-        Assert.assertNull( "last updated date not null", jobView.getLastUpdatedDate() );
+        Assert.assertNotNull( "last updated date not null", jobView.getLastUpdatedDate() );
     }
 
     @Test
@@ -191,7 +189,7 @@ public class WordPressDAOTest {
         j.setStatus( JobStatus.submitted );
         int jobId = dao.insertJob( j );
 
-        logger.info( "created job " + jobId );
+        LOGGER.info( "created job " + jobId );
         Assert.assertEquals( true, jobId > 0 );
 
         // create a job that isn't complete
@@ -199,7 +197,7 @@ public class WordPressDAOTest {
         j2.setName( "completed job" );
         j2.setStatus( JobStatus.completed );
         int jobId2 = dao.insertJob( j2 );
-        logger.info( "created job " + jobId2 );
+        LOGGER.info( "created job " + jobId2 );
 
         // now verify the results
         // returns the first job created
@@ -208,7 +206,7 @@ public class WordPressDAOTest {
         Assert.assertEquals( j.getName(), jobView.getName() );
         Assert.assertEquals( j.getStatus(), jobView.getStatus() );
         Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
-        Assert.assertNull( "last updated date not null", jobView.getLastUpdatedDate() );
+        Assert.assertNotNull( "last updated date not null", jobView.getLastUpdatedDate() );
     }
 
     @Test
@@ -225,8 +223,17 @@ public class WordPressDAOTest {
         Job jobView = dao.getJobById( jobId );
         Assert.assertEquals( jobId, jobView.getId() );
         Assert.assertEquals( j.getName(), jobView.getName() );
-        Assert.assertEquals( "processing", jobView.getStatus() );
+        Assert.assertEquals( JobStatus.processing, jobView.getStatus() );
         Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
         Assert.assertNotNull( "last updated date not found", jobView.getLastUpdatedDate() );
     }
+
+    private JdbcTemplate getJdbcTemplate() {
+        return new JdbcTemplate( getDataSource() );
+    }
+
+    public DataSource getDataSource() {
+        return dataSource;
+    }
+    
 }

@@ -1,22 +1,32 @@
 package com.macbackpackers.scrapers;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.macbackpackers.config.LittleHotelierConfig;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(classes = LittleHotelierConfig.class)
 public class BookingsPageScraperTest {
 
-	Logger logger = LogManager.getLogger(getClass());
-	BookingsPageScraper scraper = new BookingsPageScraper();
+	private final Logger LOGGER = LogManager.getLogger(getClass());
+	
+	@Autowired
+	BookingsPageScraper scraper;
 
 	@Test
 	public void testGetPageAsText() throws Exception {
-		logger.info(scraper.getPageAsText());
+	    LOGGER.info(scraper.getPageAsText());
 	}
 
 	@Test
 	public void testGetPageAsXml() throws Exception {
-		logger.info(scraper.getPageAsXml());
+	    LOGGER.info(scraper.getPageAsXml());
 	}
 
 }

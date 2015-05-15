@@ -1,13 +1,15 @@
 package com.macbackpackers.scrapers;
 
+import org.springframework.stereotype.Component;
+
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 
 /**
  * Scrapes the bookings page
- * 
  *
  */
+@Component
 public class BookingsPageScraper {
 	
 	public String getPageAsXml() throws Exception {

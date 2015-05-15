@@ -3,16 +3,25 @@ package com.macbackpackers.services;
 import java.io.File;
 import java.nio.channels.FileLock;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.macbackpackers.config.LittleHotelierConfig;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(classes = LittleHotelierConfig.class)
 public class FileServiceTest {
 
-    private static Logger logger = LogManager.getLogger( FileServiceTest.class );
+    private static final Logger LOGGER = LogManager.getLogger( FileServiceTest.class );
 
-    FileService fs = new FileService();
+    @Autowired
+    FileService fs;
 
     @Test
     public void testLockFileSingleProcess() throws Exception {
@@ -56,15 +65,15 @@ public class FileServiceTest {
 
         // if we didn't get the lock, a process is already running
         if ( lock == null ) {
-            logger.error( "Process is already running" );
+            LOGGER.error( "Process is already running" );
             throw new Exception( "Process ia already running" );
         }
 
-        logger.info( "lock is valid: " + lock.isValid() );
-        logger.info( "lock is shared: " + lock.isShared() );
+        LOGGER.info( "lock is valid: " + lock.isValid() );
+        LOGGER.info( "lock is shared: " + lock.isShared() );
 
         // if lock is acquired, hold for 10 seconds
-        sleep( 6000 );
+        sleep( 10000 );
 
         // release file lock
         lock.release();

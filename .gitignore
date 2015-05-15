@@ -1,2 +1,5 @@
 /bin
 /*log
+/conf/config.properties
+/test.lock
+/target

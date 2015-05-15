@@ -4,36 +4,33 @@ import java.util.Calendar;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
-import com.macbackpackers.dao.WordPressDAOTest;
 
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(classes = LittleHotelierConfig.class)
 public class AllocationsPageScraperTest {
 
-	Logger logger = LogManager.getLogger(getClass());
-	AllocationsPageScraper scraper = new AllocationsPageScraper();
+	private final Logger LOGGER = LogManager.getLogger(getClass());
 	
-	static WordPressDAO dao;
+	@Autowired
+	AllocationsPageScraper scraper;
 	
-	@BeforeClass
-	public static void setUpClass() throws Exception {
-	    dao = WordPressDAOTest.getTestWordPressDAO(); // only needs to be done once
-	}
+	@Autowired
+	WordPressDAO dao;
 	
-	@Before
-	public void setUp() throws Exception {
-	    scraper.setWordPressDAO( dao );
-	}
-
     @Test
     public void testDoLogin() throws Exception {
         scraper.doLogin();
@@ -46,7 +43,7 @@ public class AllocationsPageScraperTest {
         july2.set( Calendar.DATE, 2 );
         july2.set( Calendar.MONTH, 6 );
         july2.set( Calendar.YEAR, 2014 );
-        logger.info( july2.getTime() );
+        LOGGER.info( july2.getTime() );
         scraper.goToCalendarPage( july2.getTime() );
     }
 
@@ -64,7 +61,7 @@ public class AllocationsPageScraperTest {
         Assert.assertNotNull( "created date not initialised", j.getCreatedDate() );
         
         scraper.doLogin();
-        logger.info( "Running bedsheet job for " + j.getCreatedDate() );
+        LOGGER.info( "Running bedsheet job for " + j.getCreatedDate() );
         HtmlPage calendarPage = scraper.goToCalendarPage( j.getCreatedDate() );
         
         // update our allocations for this job
@@ -88,13 +85,13 @@ public class AllocationsPageScraperTest {
         Matcher m = left.matcher( style );
         if( m.find() ) {
             String leftOffset = m.group(1);
-            logger.info( "offset is " + leftOffset );
+            LOGGER.info( "offset is " + leftOffset );
             if( Integer.parseInt( leftOffset ) < 0 ) {
-                logger.warn( "offset off screen, skipping " );
+                LOGGER.warn( "offset off screen, skipping " );
             }
         }
         else {
-            logger.warn( "pattern not found" );
+            LOGGER.warn( "pattern not found" );
         }
 	}
 	
@@ -106,7 +103,7 @@ public class AllocationsPageScraperTest {
         Matcher m = p.matcher( value );
         String room = null, bed = null;
         if ( m.find() == false ) {
-            logger.warn( "Couldn't determine bed name from '" + value + "'. Is it a private?" );
+            LOGGER.warn( "Couldn't determine bed name from '" + value + "'. Is it a private?" );
             room = value;
         } else {
             room = m.group( 1 );
