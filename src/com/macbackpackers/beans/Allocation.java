@@ -24,6 +24,7 @@ public class Allocation {
     private int numberGuests;
     private String dataHref;
     private Date createdDate;
+    private String notes;
 
     public int getId() {
         return id;
@@ -163,6 +164,14 @@ public class Allocation {
         this.dataHref = dataHref;
     }
 
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes( String notes ) {
+        this.notes = notes;
+    }
+
     public Date getCreatedDate() {
         return createdDate;
     }
@@ -188,6 +197,7 @@ public class Allocation {
         .append("paymentStatus", paymentStatus)
         .append("numberGuests", numberGuests)
         .append("dataHref", dataHref)
+        .append("notes", notes)
         .append("createdDate", createdDate)
         .toString();
     }

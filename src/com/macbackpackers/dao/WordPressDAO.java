@@ -1,13 +1,17 @@
 package com.macbackpackers.dao;
 
-import java.sql.SQLException;
 import java.util.Date;
 import java.util.List;
+import java.util.Properties;
+
+import org.springframework.dao.EmptyResultDataAccessException;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.BedSheetEntry;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
+import com.macbackpackers.jobs.AbstractJob;
 
 public interface WordPressDAO {
 
@@ -35,15 +39,64 @@ public interface WordPressDAO {
 
     public void deleteAllBedSheetEntriesForJobId( int jobId );
 
+    /**
+     * Inserts a new allocation. The assigned id will be set on the
+     * given allocation object.
+     * 
+     * @param alloc the new allocation to insert
+     */
     public void insertAllocation( Allocation alloc );
 
+    /**
+     * Inserts a job and associated parameters
+     * 
+     * @param job job to insert
+     * @return PK of job
+     */
     public int insertJob( Job job );
-    
-    public void deleteAllJobData() throws Exception;
 
-    public void updateJobStatus( int jobId, JobStatus status, JobStatus prevStatus );
-
-    public Job getNextJobToProcess();
+    /**
+     * Purges all job data
+     */
+    public void deleteAllJobData();
     
-    public Job getJobById( int id );
+    /**
+     * Purges all transactional data.
+     */
+    public void deleteAllTransactionalData();
+
+    /**
+     * Updates the status of the given job.
+     * 
+     * @param jobId PK of job
+     * @param status status to set
+     * @param prevStatus the previous status to verify
+     * @throws IncorrectNumberOfRecordsUpdatedException if job doesn't match prevStatus
+     */
+    public void updateJobStatus( int jobId, JobStatus status, JobStatus prevStatus ) 
+            throws IncorrectNumberOfRecordsUpdatedException;
+
+    /**
+     * Returns the first job with a state of 'submitted'.
+     * 
+     * @return next job to run or null if no jobs to run
+     */
+    public AbstractJob getNextJobToProcess();
+    
+    /**
+     * Retrieve a job by PK.
+     * 
+     * @param id job ID
+     * @return non-null job
+     * @throws EmptyResultDataAccessException if job not found
+     */
+    public Job getJobById( int id ) throws EmptyResultDataAccessException;
+    
+    /**
+     * Gets all parameters for the given job. 
+     * 
+     * @param jobId PK of job
+     * @return non-null job parameters
+     */
+    public Properties getJobParameters( int jobId );
 }

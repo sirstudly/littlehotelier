@@ -24,6 +24,8 @@ import com.macbackpackers.beans.BedSheetEntry;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
+import com.macbackpackers.jobs.AllocationScraperJob;
+import com.macbackpackers.jobs.HousekeepingJob;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = LittleHotelierConfig.class)
@@ -50,6 +52,7 @@ public class WordPressDAOTest {
 
         // clear out existing data
         getJdbcTemplate().update( "TRUNCATE TABLE wp_bedsheets" );
+        dao.deleteAllJobData();
 
         dao.insertBedSheetEntry( createBedSheetEntry( 3, "forty five", "Dollar", 2014, 4, 18,
                 BedChange.THREE_DAY_CHANGE ) );
@@ -164,19 +167,52 @@ public class WordPressDAOTest {
     @Test
     public void testInsertJob() throws Exception {
         Job j = new Job();
-        j.setName( "my name" );
+        j.setClassName( AllocationScraperJob.class.getName() );
         j.setStatus( JobStatus.submitted );
+        j.setParameter( "start_date", "2015-05-29 00:00:00" );
+        j.setParameter( "end_date", "2015-06-14 00:00:00" );
         int jobId = dao.insertJob( j );
 
         Assert.assertEquals( true, jobId > 0 );
 
         // now verify the results
         Job jobView = dao.getJobById( jobId );
+        Assert.assertEquals( AllocationScraperJob.class, jobView.getClass() );
         Assert.assertEquals( jobId, jobView.getId() );
-        Assert.assertEquals( j.getName(), jobView.getName() );
+        Assert.assertEquals( j.getClassName(), jobView.getClassName() );
         Assert.assertEquals( j.getStatus(), jobView.getStatus() );
         Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
         Assert.assertNotNull( "last updated date not null", jobView.getLastUpdatedDate() );
+        Assert.assertEquals( "start_date", j.getParameter( "start_date" ), jobView.getParameter( "start_date" ) );
+        Assert.assertEquals( "end_date", j.getParameter( "end_date" ), jobView.getParameter( "end_date" ) );
+    }
+
+    @Test
+    public void testGetJobById() throws Exception {
+        Job j1 = new Job();
+        j1.setClassName( AllocationScraperJob.class.getName() );
+        j1.setStatus( JobStatus.submitted );
+        int jobId1 = dao.insertJob( j1 );
+        Assert.assertEquals( true, jobId1 > 0 );
+
+        Job jobView1 = dao.getJobById( jobId1 );
+        Assert.assertEquals( AllocationScraperJob.class, jobView1.getClass() );
+        Assert.assertEquals( jobId1, jobView1.getId() );
+
+        // create an identical job to the first
+        Job j2 = new Job();
+        j2.setClassName( AllocationScraperJob.class.getName() );
+        j2.setStatus( JobStatus.submitted );
+        int jobId2 = dao.insertJob( j2 );
+        Assert.assertEquals( true, jobId2 > 0 );
+        Assert.assertNotEquals( jobId1, jobId2 );
+
+        Job jobView2 = dao.getJobById( jobId2 );
+        Assert.assertEquals( AllocationScraperJob.class, jobView1.getClass() );
+        Assert.assertEquals( jobId2, jobView2.getId() );
+        
+        // verify we actually have different objects
+        Assert.assertNotEquals( jobView1.getId(), jobView2.getId() );
     }
 
     @Test
@@ -185,7 +221,7 @@ public class WordPressDAOTest {
         dao.deleteAllJobData(); // clear out data
 
         Job j = new Job();
-        j.setName( "my name" );
+        j.setClassName( HousekeepingJob.class.getName() );
         j.setStatus( JobStatus.submitted );
         int jobId = dao.insertJob( j );
 
@@ -194,7 +230,7 @@ public class WordPressDAOTest {
 
         // create a job that isn't complete
         Job j2 = new Job();
-        j2.setName( "completed job" );
+        j2.setClassName( AllocationScraperJob.class.getName() );
         j2.setStatus( JobStatus.completed );
         int jobId2 = dao.insertJob( j2 );
         LOGGER.info( "created job " + jobId2 );
@@ -202,8 +238,10 @@ public class WordPressDAOTest {
         // now verify the results
         // returns the first job created
         Job jobView = dao.getNextJobToProcess();
+        
+        Assert.assertEquals( HousekeepingJob.class, jobView.getClass() );
         Assert.assertEquals( jobId, jobView.getId() );
-        Assert.assertEquals( j.getName(), jobView.getName() );
+        Assert.assertEquals( j.getClassName(), jobView.getClassName() );
         Assert.assertEquals( j.getStatus(), jobView.getStatus() );
         Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
         Assert.assertNotNull( "last updated date not null", jobView.getLastUpdatedDate() );
@@ -212,7 +250,7 @@ public class WordPressDAOTest {
     @Test
     public void testUpdateJobStatus() throws Exception {
         Job j = new Job();
-        j.setName( "my name" );
+        j.setClassName( HousekeepingJob.class.getName() );
         j.setStatus( JobStatus.submitted );
         int jobId = dao.insertJob( j );
 
@@ -221,8 +259,9 @@ public class WordPressDAOTest {
 
         // now verify the results
         Job jobView = dao.getJobById( jobId );
+        Assert.assertEquals( HousekeepingJob.class, jobView.getClass() );
         Assert.assertEquals( jobId, jobView.getId() );
-        Assert.assertEquals( j.getName(), jobView.getName() );
+        Assert.assertEquals( j.getClassName(), jobView.getClassName() );
         Assert.assertEquals( JobStatus.processing, jobView.getStatus() );
         Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
         Assert.assertNotNull( "last updated date not found", jobView.getLastUpdatedDate() );

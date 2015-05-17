@@ -1,9 +1,11 @@
 package com.macbackpackers.dao;
 
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import javax.sql.DataSource;
 
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
+import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Repository;
 
 import com.macbackpackers.beans.Allocation;
@@ -22,6 +25,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.mappers.BedSheetRowMapper;
 import com.macbackpackers.dao.mappers.JobRowMapper;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
+import com.macbackpackers.jobs.AbstractJob;
 
 @Repository
 public class WordPressDAOImpl implements WordPressDAO {
@@ -31,6 +35,9 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Autowired
     @Qualifier("txnDataSource")
     private DataSource dataSource;
+    
+    @Autowired
+    private JobRowMapper jobRowMapper;
 
     public DataSource getDataSource() {
         return dataSource;
@@ -84,31 +91,62 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     public void insertAllocation( Allocation alloc ) {
-        getJdbcTemplate().update( 
-                "INSERT INTO wp_lh_calendar (job_id, room_id, room, bed_name, reservation_id, "
-                + "guest_name, checkin_date, checkout_date, payment_total, payment_outstanding, "
-                + "rate_plan_name, payment_status, num_guests, data_href )"
-                + " VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", alloc.getJobId(), alloc.getRoomId(),
-                alloc.getRoom(), alloc.getBedName(), alloc.getReservationId(), alloc.getGuestName(),
-                alloc.getCheckinDate(), alloc.getCheckoutDate(), alloc.getPaymentTotal(),
-                alloc.getPaymentOutstanding(), alloc.getRatePlanName(), alloc.getPaymentStatus(),
-                alloc.getNumberGuests(), alloc.getDataHref() );
+
+        Map<String, Object> parameters = new HashMap<String, Object>();
+        parameters.put( "job_id", alloc.getJobId() );
+        parameters.put( "room_id", alloc.getRoomId() );
+        parameters.put( "room", alloc.getRoom() );
+        parameters.put( "bed_name", alloc.getBedName() );
+        parameters.put( "reservation_id", alloc.getReservationId() );
+        parameters.put( "guest_name", alloc.getGuestName() );
+        parameters.put( "checkin_date", alloc.getCheckinDate() );
+        parameters.put( "checkout_date", alloc.getCheckoutDate() );
+        parameters.put( "payment_total", alloc.getPaymentTotal() );
+        parameters.put( "payment_outstanding", alloc.getPaymentOutstanding() );
+        parameters.put( "rate_plan_name", alloc.getRatePlanName() );
+        parameters.put( "payment_status", alloc.getPaymentStatus() );
+        parameters.put( "num_guests", alloc.getNumberGuests() );
+        parameters.put( "data_href", alloc.getDataHref() );
+        parameters.put( "notes", alloc.getNotes() );
+
+        alloc.setId( getSimpleJdbcInsert()
+            .withTableName( "wp_lh_calendar" )
+            .usingGeneratedKeyColumns( "id" )
+            .executeAndReturnKey( parameters )
+            .intValue() );
     }
 
     public int insertJob( Job job ) {
         Map<String, Object> parameters = new HashMap<String, Object>();
-        parameters.put( "name", job.getName() );
+        parameters.put( "classname", job.getClassName() );
         parameters.put( "status", job.getStatus() );
 
-        return getSimpleJdbcInsert()
+        int jobId = getSimpleJdbcInsert()
             .withTableName( "wp_lh_jobs" )
             .usingGeneratedKeyColumns( "job_id" )
             .executeAndReturnKey( parameters )
             .intValue();
+        insertJobParameters( jobId, job.getParameters() );
+        return jobId;
+    }
+    
+    private void insertJobParameters( int jobId, Properties parameters ) {
+        for( Enumeration<Object> keys = parameters.keys(); keys.hasMoreElements(); ) {
+            Object key = keys.nextElement();
+            getJdbcTemplate().update( 
+                    "INSERT INTO wp_lh_job_param( job_id, name, value ) VALUES ( ?, ?, ? )", 
+                    jobId, key.toString(), parameters.get( key ).toString() );
+        }
     }
 
-    public void deleteAllJobData() throws Exception {
+    public void deleteAllJobData() {
+        getJdbcTemplate().update( "DELETE FROM wp_lh_job_param" );
         getJdbcTemplate().update( "DELETE FROM wp_lh_jobs" );
+    }
+
+    public void deleteAllTransactionalData() {
+        deleteAllJobData();
+        getJdbcTemplate().update( "DELETE FROM wp_lh_calendar" );
     }
 
     public void updateJobStatus( int jobId, JobStatus status, JobStatus prevStatus ) {
@@ -122,7 +160,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         }
     }
 
-    public Job getNextJobToProcess() {
+    public AbstractJob getNextJobToProcess() {
         Integer jobId = getJdbcTemplate().queryForObject( 
                 "SELECT MIN(job_id) AS job_id FROM wp_lh_jobs WHERE status = ?",
                 Integer.class, 
@@ -130,11 +168,21 @@ public class WordPressDAOImpl implements WordPressDAO {
         return jobId == null ? null : getJobById( jobId );
     }
 
-    public Job getJobById( int id ) {
+    public AbstractJob getJobById( int id ) {
         return getJdbcTemplate().queryForObject( 
                 JobRowMapper.QUERY_BY_JOB_ID, 
-                new JobRowMapper(), 
+                jobRowMapper, 
                 id );
+    }
+    
+    public Properties getJobParameters( int jobId ) {
+        Properties props = new Properties();
+        SqlRowSet rowSet = getJdbcTemplate().queryForRowSet( 
+                "SELECT name, value FROM wp_lh_job_param WHERE job_id = ?", jobId );
+        while( rowSet.next() ) {
+            props.setProperty( rowSet.getString( "name" ), rowSet.getString( "value" ) );
+        }
+        return props;
     }
 
 }

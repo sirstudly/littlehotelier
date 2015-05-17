@@ -23,6 +23,7 @@ public class AllocationRowMapper implements RowMapper<Allocation> {
         alloc.setPaymentStatus( rs.getString( "payment_status" ) );
         alloc.setNumberGuests( rs.getInt( "num_guests" ) );
         alloc.setDataHref( rs.getString( "data_href" ) );
+        alloc.setNotes( rs.getString( "notes" ) );
         alloc.setCreatedDate( rs.getDate( "created_date" ) );
         return alloc;
     }

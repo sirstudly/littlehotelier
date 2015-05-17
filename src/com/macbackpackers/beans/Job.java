@@ -1,14 +1,16 @@
 package com.macbackpackers.beans;
 
 import java.sql.Timestamp;
+import java.util.Properties;
 
 public class Job {
 
     private int id;
-    private String name;
+    private String className;
     private JobStatus status;
     private Timestamp createdDate;
     private Timestamp lastUpdatedDate;
+    private Properties parameters = new Properties();
 
     public int getId() {
         return id;
@@ -18,12 +20,12 @@ public class Job {
         this.id = id;
     }
 
-    public String getName() {
-        return name;
+    public String getClassName() {
+        return className;
     }
 
-    public void setName( String name ) {
-        this.name = name;
+    public void setClassName( String className ) {
+        this.className = className;
     }
 
     public JobStatus getStatus() {
@@ -33,7 +35,23 @@ public class Job {
     public void setStatus( JobStatus status ) {
         this.status = status;
     }
+    
+    public Properties getParameters() {
+        return parameters;
+    }
 
+    public void setParameters( Properties parameters ) {
+        this.parameters = parameters;
+    }
+
+    public String getParameter( String name ) {
+        return getParameters().getProperty( name );
+    }
+    
+    public void setParameter( String name, String value ) {
+        getParameters().setProperty( name, value );
+    }
+    
     public Timestamp getCreatedDate() {
         return createdDate;
     }

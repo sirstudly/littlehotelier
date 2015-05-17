@@ -1,17 +1,21 @@
 package com.macbackpackers.scrapers;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -19,6 +23,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
@@ -29,9 +34,10 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
 import com.gargoylesoftware.htmlunit.html.HtmlSubmitInput;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
+import com.gargoylesoftware.htmlunit.util.Cookie;
 import com.macbackpackers.beans.Allocation;
-import com.macbackpackers.beans.Job;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.exceptions.UnrecoverableFault;
 
 /**
  * Scrapes the allocations page for the specified dates.
@@ -54,14 +60,16 @@ import com.macbackpackers.dao.WordPressDAO;
  * calendar for a particular date
  */
 @Component
+@Scope( "prototype" )
 public class AllocationsPageScraper {
 
     private final Logger LOGGER = LogManager.getLogger( getClass() );
 
-    private static final SimpleDateFormat DATE_FORMAT_YYYY_MM_DD = new SimpleDateFormat( "yyyy-MM-dd" );
+    public static final SimpleDateFormat DATE_FORMAT_YYYY_MM_DD = new SimpleDateFormat( "yyyy-MM-dd" );
+    private static final String LOGIN_PAGE_TITLE = "Welcome to Little Hotelier"; // the title on the login page
 
     // current session
-    private WebClient webClient;
+    private WebClient webClient = new WebClient();
 
     @Autowired
     private WordPressDAO dao;
@@ -69,9 +77,8 @@ public class AllocationsPageScraper {
     @Autowired
     private Environment env;
     
-    public void doLogin() throws Exception {
+    public void doLogin() throws IOException {
 
-        webClient = new WebClient();
         HtmlPage loginPage = webClient.getPage( env.getProperty( "lilhotelier.url.login" ) );
 
         // The form doesn't have a name so just take the only one on the page
@@ -89,17 +96,66 @@ public class AllocationsPageScraper {
         HtmlPage nextPage = button.click();
         LOGGER.info( "Finished logging in" );
         LOGGER.info( nextPage.asXml() );
+        
+        if( LOGIN_PAGE_TITLE.equals( nextPage.getTitleText() ) ) {
+            throw new UnrecoverableFault( "Unable to login. Incorrect password?" );
+        }
+        writeCookiesToFile();
+    }
+    
+    /**
+     * Loads the previous credentials and attempts to go to a specific page. If we 
+     * get redirected back to the login page, then login and continue to the specific page.
+     * 
+     * @param pageURL the page to go to
+     * @return the loaded page
+     * @throws IOException 
+     */
+    public HtmlPage loginAndGoToPage( String pageURL ) throws IOException {
+        loadCookiesFromFile();
+        
+        // attempt to go the page directly using the current credentials
+        HtmlPage nextPage = webClient.getPage( pageURL );
+        
+        // if we get redirected back to login, then login and try again
+        if( LOGIN_PAGE_TITLE.equals( nextPage.getTitleText() ) ) {
+            LOGGER.warn( "Current credentials not valid? Attempting login..." );
+            doLogin();
+            nextPage = webClient.getPage( pageURL );
+            LOGGER.info( nextPage.asXml() );
+        }
+        return nextPage;
     }
 
-    public HtmlPage goToCalendarPage( Date date ) throws Exception {
+    public HtmlPage goToCalendarPage( Date date ) throws IOException {
         String dateAsString = DATE_FORMAT_YYYY_MM_DD.format( date );
-        HtmlPage nextPage = webClient
-                .getPage( env.getProperty( "lilhotelier.url.calendar" ) + "?start_date=" + dateAsString );
-        LOGGER.info( "Calendar page" );
-
-        serialiseToDisk( nextPage, getCalendarPageSerialisedObjectFilename( date ) );
+        String pageURL = env.getProperty( "lilhotelier.url.calendar" ) + "?start_date=" + dateAsString;
+        HtmlPage nextPage = loginAndGoToPage( pageURL );
+        LOGGER.info( "Loaded calendar page: " + pageURL );
         LOGGER.info( nextPage.asXml() );
+
+        // save it to disk so we can use it later
+        serialiseToDisk( nextPage, getCalendarPageSerialisedObjectFilename( date ) );
         return nextPage;
+    }
+    
+    /**
+     * Loads the last calendar page that was saved to disk for the given date.
+     * 
+     * @param date the (start) date for the calendar page to load
+     * @return the calendar page
+     * @throws IOException on deserialisation error or if file does not exist
+     */
+    private HtmlPage loadCalendarPageFromDisk( Date date ) throws IOException {
+        ObjectInputStream ois = new ObjectInputStream( new FileInputStream(
+                getCalendarPageSerialisedObjectFilename( date ) ) );
+        try {
+            return (HtmlPage) ois.readObject();
+        } catch ( ClassNotFoundException e ) {
+            throw new IOException( "Unable to read HtmlPage", e );
+        } finally {
+            ois.close();
+        }
     }
 
     private static String getCalendarPageSerialisedObjectFilename( Date date ) {
@@ -107,15 +163,46 @@ public class AllocationsPageScraper {
         return "calendar_page_" + dateAsString + ".ser";
     }
 
-    public void dumpPageForJob( Job job, HtmlPage calendarPage ) throws Exception {
-
-        // read in the file if page not specified
-        if ( calendarPage == null ) {
-            ObjectInputStream ois = new ObjectInputStream( new FileInputStream(
-                    getCalendarPageSerialisedObjectFilename( job.getCreatedDate() ) ) );
-            calendarPage = (HtmlPage) ois.readObject();
-            ois.close();
+    /**
+     * Dumps the allocations between the given dates (inclusive). There may be some allocations beyond
+     * the end date if the span doesn't fall within an exact 2 week period as that is what is currently
+     * shown on the calendar page.
+     * 
+     * @param jobId the job ID to associate with this dump
+     * @param startDate the start date to check allocations for (inclusive)
+     * @param endDate the minimum date in which to include allocations for
+     * @param useSerialisedDataIfAvailable check if we've already seen this page already and used the
+     *  cached version if available.
+     * @throws IOException on read/write error
+     */
+    public void dumpAllocationsBetween( 
+            int jobId, Date startDate, Date endDate, boolean useSerialisedDataIfAvailable ) throws IOException  {
+        
+        Calendar currentDate = Calendar.getInstance();
+        currentDate.setTime( startDate );
+        
+        while( currentDate.getTime().before( endDate ) ) {
+            HtmlPage calendarPage;
+            if( useSerialisedDataIfAvailable 
+                    && new File( getCalendarPageSerialisedObjectFilename( currentDate.getTime() ) ).exists() ) {
+                calendarPage = loadCalendarPageFromDisk( currentDate.getTime() );
+            } else {
+                // this takes about 10 minutes...
+                calendarPage = goToCalendarPage( currentDate.getTime() );
+            }
+    
+            dumpAllocations( jobId, calendarPage );
+            currentDate.add( Calendar.DATE, 14 ); // calendar page shows 2 weeks at a time
         }
+    }
+
+    /**
+     * Dumps the allocations on the given page to the database.
+     * 
+     * @param jobId id of job to associate with
+     * @param calendarPage the current calendar page
+     */
+    public void dumpAllocations( int jobId, HtmlPage calendarPage ) {
 
         // now iterate over all div's and gather all our information
         String currentBedName = null;
@@ -150,7 +237,7 @@ public class AllocationsPageScraper {
                     // it could be one day off screen
                     for( DomElement elem : div.getChildElements() ) {
                         if ( "span".equals( elem.getTagName() ) ) {
-                            insertAllocationFromSpan( job, Integer.parseInt( dataRoomId ),
+                            insertAllocationFromSpan( jobId, Integer.parseInt( dataRoomId ),
                                     currentBedName, dataDate, elem );
                         }
                     }
@@ -182,7 +269,7 @@ public class AllocationsPageScraper {
      * @throws SQLException
      *             on data creation error
      */
-    private void insertAllocationFromSpan( Job job, int dataRoomId, String currentBedName, String dataDate,
+    private void insertAllocationFromSpan( int jobId, int dataRoomId, String currentBedName, String dataDate,
             DomElement span )
             throws ParseException, SQLException {
 
@@ -205,6 +292,7 @@ public class AllocationsPageScraper {
         LOGGER.info( "  data-payment_status: " + span.getAttribute( "data-payment_status" ) );
         LOGGER.info( "  data-occupancy: " + span.getAttribute( "data-occupancy" ) );
         LOGGER.info( "  data-href: " + span.getAttribute( "data-href" ) );
+        LOGGER.info( "  data-notes: " + span.getAttribute( "data-notes" ) );
         LOGGER.info( "  data-guest_name: " + span.getAttribute( "data-guest_name" ) );
 
         // split room/bed name
@@ -220,7 +308,7 @@ public class AllocationsPageScraper {
         }
 
         Allocation alloc = new Allocation();
-        alloc.setJobId( job.getId() );
+        alloc.setJobId( jobId );
         alloc.setRoomId( dataRoomId );
         alloc.setRoom( room );
         alloc.setBedName( bed );
@@ -248,6 +336,7 @@ public class AllocationsPageScraper {
         }
 
         alloc.setDataHref( span.getAttribute( "data-href" ) );
+        alloc.setNotes( StringUtils.trimToNull( span.getAttribute( "data-notes") ) );
 
         LOGGER.info( "Done allocation!" );
         LOGGER.info( alloc );
@@ -364,24 +453,45 @@ public class AllocationsPageScraper {
         }
     }
 
+    /**
+     * Serialises the current cookies to disk.
+     * 
+     * @throws IOException on serialisation error
+     */
+    private void writeCookiesToFile() throws IOException {
+        ObjectOutput out = new ObjectOutputStream(new FileOutputStream( "cookie.file" ));
+        out.writeObject( webClient.getCookieManager().getCookies() );
+        out.close();
+    }
+    
+    /**
+     * Loads cookies written from the previous session if found.
+     * 
+     * @throws IOException on read error
+     */
+    private void loadCookiesFromFile() throws IOException {
+        
+        File file = new File("cookie.file");
+        if( file.exists() ) {
+            ObjectInputStream in = new ObjectInputStream(new FileInputStream(file));
+            try {
+                @SuppressWarnings("unchecked")
+                Set<Cookie> cookies = (Set<Cookie>) in.readObject();
+        
+                for (Iterator<Cookie> i = cookies.iterator(); i.hasNext(); ) {
+                    webClient.getCookieManager().addCookie(i.next());
+                }
+            } catch ( ClassNotFoundException e ) {
+                throw new IOException( "Unable to read cookie!", e );
+            }
+            finally {
+                in.close();
+            }
+        }
+    }
+
     public void closeAllWindows() {
-        webClient.closeAllWindows();
-    }
-
-    public String getPageAsXml() throws Exception {
-        final WebClient webClient = new WebClient();
-        final HtmlPage page = webClient.getPage( env.getProperty( "lilhotelier.url.login" ) );
-        final String pageAsXml = page.asXml();
-        webClient.closeAllWindows();
-        return pageAsXml;
-    }
-
-    public String getPageAsText() throws Exception {
-        final WebClient webClient = new WebClient();
-        final HtmlPage page = webClient.getPage( env.getProperty( "lilhotelier.url.login" ) );
-        final String pageAsText = page.asText();
-        webClient.closeAllWindows();
-        return pageAsText;
+        webClient.close();
     }
 
 }
