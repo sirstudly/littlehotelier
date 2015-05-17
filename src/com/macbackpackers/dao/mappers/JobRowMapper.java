@@ -39,7 +39,7 @@ public class JobRowMapper implements RowMapper<AbstractJob> {
             j.setStatus( JobStatus.valueOf( rs.getString( "status" ) ) );
             j.setCreatedDate( rs.getTimestamp( "created_date" ) );
             j.setLastUpdatedDate( rs.getTimestamp( "last_updated_date" ) );
-            j.setJobParameters( appContext.getBean( WordPressDAO.class ).getJobParameters( j.getId() ) );
+            j.setParameters( appContext.getBean( WordPressDAO.class ).getJobParameters( j.getId() ) );
             return j;
         }
         catch( ClassNotFoundException ex ) {
