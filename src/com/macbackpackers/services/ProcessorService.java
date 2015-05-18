@@ -1,7 +1,5 @@
 package com.macbackpackers.services;
 
-import java.sql.SQLException;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -24,10 +22,8 @@ public class ProcessorService {
     /**
      * Checks for any housekeeping jobs that need to be run ('submitted') and processes them.
      * 
-     * @throws SQLException
-     *             on error
      */
-    public void processJobs() throws SQLException {
+    public void processJobs() {
         // find and run all submitted jobs
         for( AbstractJob job = dao.getNextJobToProcess(); job != null; job = dao.getNextJobToProcess() ) {
             job.doProcessJob();

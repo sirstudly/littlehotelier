@@ -21,7 +21,7 @@ CREATE TABLE `wp_lh_calendar` (
   KEY `lh_c_checkin` (`checkin_date`),
   KEY `lh_c_checkout` (`checkout_date`),
   KEY `lh_c_jobid` (`job_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7877 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 
 CREATE TABLE `wp_lh_jobs` (
@@ -31,7 +31,7 @@ CREATE TABLE `wp_lh_jobs` (
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_updated_date` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   PRIMARY KEY (`job_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 
 CREATE TABLE `wp_lh_job_param` (
@@ -40,8 +40,24 @@ CREATE TABLE `wp_lh_job_param` (
   `name` varchar(255) NOT NULL,
   `value` varchar(255) NOT NULL,
   PRIMARY KEY (`job_param_id`),
-  KEY `job_id_idx` (`job_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8;
+  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+-- reporting table for reservations split across multiple rooms of the same type
+CREATE TABLE `wp_lh_rpt_split_rooms` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `job_id` bigint(20) unsigned NOT NULL,
+  `reservation_id` bigint(20) unsigned DEFAULT NULL,
+  `guest_name` varchar(255) DEFAULT NULL,
+  `checkin_date` datetime NOT NULL,
+  `checkout_date` datetime NOT NULL,
+  `data_href` varchar(255) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_date` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `job_id_idx` (`job_id`),
+  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE `wp_lh_rooms` (
   `id` bigint(20) unsigned NOT NULL,

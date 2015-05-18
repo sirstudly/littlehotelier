@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+    <comment>Reporting SQL queries</comment>
+    <entry key="reservations.split.rooms">
+-- Query all reservations that span more than 1 room for the same room type
+-- Parameters: job_id of the AllocationScraperJob to use data for
+INSERT INTO wp_lh_rpt_split_rooms (job_id, reservation_id, guest_name, checkin_date, checkout_date, data_href, notes, created_date)
+SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' ) guest_name, 
+       checkin_date, checkout_date, data_href, notes, MAX(created_date) `created_date` 
+  FROM wp_lh_calendar rep
+ WHERE EXISTS (
+       -- all reservations where for the same room type, they are split into different rooms
+       -- does not take into account group bookings
+       SELECT t.job_id, t.reservation_id, t.capacity, t.room_type, count(1)
+         FROM ( -- for each reservation, determine which rooms are they assigned to
+                SELECT c.job_id, c.reservation_id, rm.room, rm.capacity, rm.room_type, count(1)
+                  FROM wp_lh_calendar c
+                  JOIN wp_lh_rooms rm ON c.room = rm.room AND c.bed_name = rm.bed_name
+                 WHERE rm.room_type NOT IN ('LT MALE', 'LT FEMALE')
+                   AND c.reservation_id > 0 -- do not include room closures
+                   AND c.job_id = ?
+                 GROUP BY c.job_id, c.reservation_id, rm.room, rm.capacity, rm.room_type
+              ) t
+        WHERE t.reservation_id = rep.reservation_id
+          AND t.job_id = rep.job_id
+        GROUP BY t.reservation_id, t.capacity, t.room_type
+       HAVING COUNT(1) > 1
+       ) -- end exists
+ GROUP BY job_id, reservation_id, checkin_date, checkout_date, data_href, notes
+    </entry>
+</properties>

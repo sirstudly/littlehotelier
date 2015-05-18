@@ -99,4 +99,12 @@ public interface WordPressDAO {
      * @return non-null job parameters
      */
     public Properties getJobParameters( int jobId );
+
+    /**
+     * Creates a report that determines reservations which, for the same room type, are split
+     * amongst different rooms.
+     * 
+     * @param allocationScraperJobId job ID of the allocation scraper job to use data from
+     */
+    public void runSplitRoomsReservationsReport( int allocationScraperJobId );
 }

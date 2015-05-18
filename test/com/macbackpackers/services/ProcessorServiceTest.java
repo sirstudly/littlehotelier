@@ -30,7 +30,8 @@ public class ProcessorServiceTest {
     
     @Before
     public void setUp() {
-        dao.deleteAllJobData();
+        LOGGER.info( "deleting test data" );
+        dao.deleteAllTransactionalData();
     }
     
     @Test
@@ -40,9 +41,9 @@ public class ProcessorServiceTest {
         Job j = new Job();
         j.setClassName( AllocationScraperJob.class.getName() );
         j.setStatus( JobStatus.submitted );
-        j.setParameter( "start_date", "2015-05-16 00:00:00" );
-        j.setParameter( "end_date", "2015-05-19 00:00:00" );
-        j.setParameter( "test_mode", "true" );
+        j.setParameter( "start_date", "2015-05-18 00:00:00" );
+        j.setParameter( "end_date", "2015-09-18 00:00:00" );
+//        j.setParameter( "test_mode", "true" );
         int jobId = dao.insertJob( j );
 
         // this should now run the job
@@ -52,4 +53,9 @@ public class ProcessorServiceTest {
         Job jobVerify = dao.getJobById( jobId );
         Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
     }
+    
+//    @Test
+//    public void testReport() throws Exception {
+//        dao.runSplitRoomsReservationsReport( 9 );
+//    }        
 }

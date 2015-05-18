@@ -1,11 +1,12 @@
 package com.macbackpackers.config;
 
+import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Description;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.core.io.ClassPathResource;
  
 @Configuration
 @ComponentScan("com.macbackpackers")
@@ -13,10 +14,10 @@ import org.springframework.context.annotation.PropertySource;
 @PropertySource("classpath:config.properties")
 public class LittleHotelierConfig {
  
-//    @Bean(name="helloWorldBean")
-//    @Description("This is a sample HelloWorld Bean")
-//    public HelloWorld helloWorld() {
-//        return new HelloWorldImpl();
-//    }
- 
+    @Bean(name = "reportsSQL")
+    public PropertiesFactoryBean getSqlReports() {
+        PropertiesFactoryBean bean = new PropertiesFactoryBean();
+        bean.setLocation(new ClassPathResource("report_sql.xml"));
+        return bean;
+    }
 }

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
+import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 
 /**
@@ -20,9 +21,13 @@ public class AllocationScraperJob extends AbstractJob {
     @Autowired
     private AllocationsPageScraper allocationScraper;
     
+    @Autowired
+    private WordPressDAO dao;
+    
     @Override
     public void processJob() throws Exception {
         allocationScraper.dumpAllocationsBetween( getId(), getStartDate(), getEndDate(), isTestMode() );
+        dao.runSplitRoomsReservationsReport( getId() );
     }
     
     /**

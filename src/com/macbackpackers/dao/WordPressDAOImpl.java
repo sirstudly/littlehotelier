@@ -39,6 +39,10 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Autowired
     private JobRowMapper jobRowMapper;
 
+    @Autowired
+    @Qualifier("reportsSQL")
+    private Properties sql;
+
     public DataSource getDataSource() {
         return dataSource;
     }
@@ -145,8 +149,9 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     public void deleteAllTransactionalData() {
-        deleteAllJobData();
+        getJdbcTemplate().update( "DELETE FROM wp_lh_rpt_split_rooms" );
         getJdbcTemplate().update( "DELETE FROM wp_lh_calendar" );
+        deleteAllJobData();
     }
 
     public void updateJobStatus( int jobId, JobStatus status, JobStatus prevStatus ) {
@@ -185,4 +190,12 @@ public class WordPressDAOImpl implements WordPressDAO {
         return props;
     }
 
+    /////////////////////////////////////////////////////////////////////
+    //    REPORTING SPECIFIC
+    /////////////////////////////////////////////////////////////////////
+    
+    public void runSplitRoomsReservationsReport( int allocationScraperJobId ) {
+        LOGGER.info( "Running report for job id: " + allocationScraperJobId );
+        getJdbcTemplate().update( sql.getProperty( "reservations.split.rooms" ), allocationScraperJobId );
+    }
 }
