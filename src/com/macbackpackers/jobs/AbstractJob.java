@@ -17,7 +17,7 @@ public abstract class AbstractJob extends Job {
     private final Logger LOGGER = LogManager.getLogger( getClass() );
 
     @Autowired
-    private WordPressDAO dao;
+    protected WordPressDAO dao;
     
     /**
      * Do whatever it is we need to do.

@@ -1,5 +1,8 @@
 package com.macbackpackers.scrapers;
 
+import java.util.Calendar;
+import java.util.Date;
+
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.junit.Test;
@@ -18,15 +21,25 @@ public class BookingsPageScraperTest {
 	
 	@Autowired
 	BookingsPageScraper scraper;
-
+	
 	@Test
-	public void testGetPageAsText() throws Exception {
-	    LOGGER.info(scraper.getPageAsText());
+	public void testGoToBookingPage() throws Exception {
+	    Calendar c = Calendar.getInstance();
+	    c.add( Calendar.MONTH, 2 );
+	    scraper.goToBookingPage( c.getTime() );
 	}
+	
+    @Test
+    public void testUpdateBookingPage() throws Exception {
+        Calendar startDate = Calendar.getInstance();
+        startDate.add( Calendar.MONTH, 2 );
+        startDate.add( Calendar.DATE, -1 );
 
-	@Test
-	public void testGetPageAsXml() throws Exception {
-	    LOGGER.info(scraper.getPageAsXml());
-	}
-
+        Calendar endDate = Calendar.getInstance();
+        endDate.add( Calendar.MONTH, 2 );
+        endDate.add( Calendar.DATE, -1 );
+        
+        scraper.updateBookingsBetween( 14, startDate.getTime(), endDate.getTime(), true );
+    }
+    
 }

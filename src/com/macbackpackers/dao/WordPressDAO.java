@@ -1,5 +1,6 @@
 package com.macbackpackers.dao;
 
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Properties;
@@ -14,6 +15,8 @@ import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
 
 public interface WordPressDAO {
+    
+    public static final SimpleDateFormat DATE_FORMAT_YYYY_MM_DD = new SimpleDateFormat(  "yyyy-MM-dd 00:00:00" );
 
     // BedSheets
     // Room | Bed | W Th Fr Sa Su Mo Tu |
@@ -46,6 +49,24 @@ public interface WordPressDAO {
      * @param alloc the new allocation to insert
      */
     public void insertAllocation( Allocation alloc );
+    
+    /**
+     * Updates extended attributes on an existing allocation by
+     * reservation id <b>NOT by id (primary key)</i>.
+     * 
+     * @param alloc allocation to update in DB
+     */
+    public void updateAllocation( Allocation alloc );
+    
+    /**
+     * Queries an existing allocation by job id and reservation id.
+     * 
+     * @param jobId ID of job that scraped the original allocation
+     * @param reservationId the reservationId to match
+     * @return list of matched allocations
+     * @throws EmptyResultDataAccessException if no record found
+     */
+    public List<Allocation> queryAllocationsByJobIdAndReservationId( int jobId, int reservationId ) throws EmptyResultDataAccessException;
 
     /**
      * Inserts a job and associated parameters
@@ -77,6 +98,11 @@ public interface WordPressDAO {
             throws IncorrectNumberOfRecordsUpdatedException;
 
     /**
+     * Updates all job statuses of 'processing' to 'failed'.
+     */
+    public void resetAllProcessingJobsToFailed();
+    
+    /**
      * Returns the first job with a state of 'submitted'.
      * 
      * @return next job to run or null if no jobs to run
@@ -107,4 +133,14 @@ public interface WordPressDAO {
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from
      */
     public void runSplitRoomsReservationsReport( int allocationScraperJobId );
+
+    /**
+     * Returns the checkin dates for all allocations found by the
+     * given AllocationScraper job ID.
+     * 
+     * @param jobId allocation scraper job ID
+     * @return list of checkin dates
+     */
+    public List<Date> getCheckinDatesForAllocationScraperJobId( int jobId );
+
 }

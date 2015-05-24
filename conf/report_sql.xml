@@ -5,9 +5,11 @@
     <entry key="reservations.split.rooms">
 -- Query all reservations that span more than 1 room for the same room type
 -- Parameters: job_id of the AllocationScraperJob to use data for
-INSERT INTO wp_lh_rpt_split_rooms (job_id, reservation_id, guest_name, checkin_date, checkout_date, data_href, notes, created_date)
+INSERT INTO wp_lh_rpt_split_rooms (job_id, reservation_id, guest_name, checkin_date, checkout_date, data_href, 
+       notes, lh_status, booking_reference, booking_source, booked_date, eta, viewed_yn, created_date)
 SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' ) guest_name, 
-       checkin_date, checkout_date, data_href, notes, MAX(created_date) `created_date` 
+       checkin_date, checkout_date, data_href, notes, lh_status, booking_reference, 
+       booking_source, booked_date, eta, viewed_yn, MAX(created_date) `created_date` 
   FROM wp_lh_calendar rep
  WHERE EXISTS (
        -- all reservations where for the same room type, they are split into different rooms
@@ -27,6 +29,6 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
         GROUP BY t.reservation_id, t.capacity, t.room_type
        HAVING COUNT(1) > 1
        ) -- end exists
- GROUP BY job_id, reservation_id, checkin_date, checkout_date, data_href, notes
+ GROUP BY job_id, reservation_id, checkin_date, checkout_date, data_href, notes, lh_status, booking_reference, booking_source, booked_date, eta, viewed_yn
     </entry>
 </properties>

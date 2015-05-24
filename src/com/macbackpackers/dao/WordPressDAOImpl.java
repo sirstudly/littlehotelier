@@ -14,6 +14,7 @@ import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Repository;
@@ -22,6 +23,7 @@ import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.BedSheetEntry;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.dao.mappers.AllocationRowMapper;
 import com.macbackpackers.dao.mappers.BedSheetRowMapper;
 import com.macbackpackers.dao.mappers.JobRowMapper;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
@@ -49,6 +51,10 @@ public class WordPressDAOImpl implements WordPressDAO {
     
     private JdbcTemplate getJdbcTemplate() {
         return new JdbcTemplate( getDataSource() );
+    }
+    
+    private NamedParameterJdbcTemplate getNamedParamJdbcTemplate() {
+        return new NamedParameterJdbcTemplate( getDataSource() );
     }
     
     private SimpleJdbcInsert getSimpleJdbcInsert() {
@@ -111,13 +117,48 @@ public class WordPressDAOImpl implements WordPressDAO {
         parameters.put( "payment_status", alloc.getPaymentStatus() );
         parameters.put( "num_guests", alloc.getNumberGuests() );
         parameters.put( "data_href", alloc.getDataHref() );
+        parameters.put( "lh_status", alloc.getStatus() );
+        parameters.put( "booking_reference", alloc.getBookingReference() );
+        parameters.put( "booking_source", alloc.getBookingSource() );
+        parameters.put( "booked_date", alloc.getBookedDate() );
+        parameters.put( "eta", alloc.getEta() );
         parameters.put( "notes", alloc.getNotes() );
+        parameters.put( "viewed_yn", alloc.isViewed() ? "Y" : "N" );
 
         alloc.setId( getSimpleJdbcInsert()
             .withTableName( "wp_lh_calendar" )
             .usingGeneratedKeyColumns( "id" )
             .executeAndReturnKey( parameters )
             .intValue() );
+    }
+    
+    public void updateAllocation( Allocation alloc ) {
+        Map<String, Object> parameters = new HashMap<String, Object>();
+        parameters.put( "lh_status", alloc.getStatus() );
+        parameters.put( "booking_reference", alloc.getBookingReference() );
+        parameters.put( "booking_source", alloc.getBookingSource() );
+        parameters.put( "booked_date", alloc.getBookedDate() );
+        parameters.put( "eta", alloc.getEta() );
+        parameters.put( "viewed_yn", alloc.isViewed() ? "Y" : "N" );
+        parameters.put( "reservation_id", alloc.getReservationId() );
+        parameters.put( "job_id", alloc.getJobId() );
+        
+        getNamedParamJdbcTemplate().update( 
+                "UPDATE wp_lh_calendar "
+                + "SET lh_status = :lh_status, "
+                + "    booking_reference = :booking_reference, "
+                + "    booking_source = :booking_source, "
+                + "    booked_date = :booked_date, "
+                + "    eta = :eta, "
+                + "    viewed_yn = :viewed_yn "
+                + " WHERE reservation_id = :reservation_id"
+                + "   AND job_id = :job_id", parameters );   
+    }
+    
+    public List<Allocation> queryAllocationsByJobIdAndReservationId( int jobId, int reservationId ) {
+        return getJdbcTemplate().query(
+                AllocationRowMapper.QUERY_BY_JOB_ID_RESERVATION_ID, 
+                new AllocationRowMapper(), jobId, reservationId );
     }
 
     public int insertJob( Job job ) {
@@ -164,6 +205,12 @@ public class WordPressDAOImpl implements WordPressDAO {
                     "Unable to update status of job " + jobId + " to " + status );
         }
     }
+    
+    public void resetAllProcessingJobsToFailed() {
+        getJdbcTemplate().update(
+                "UPDATE wp_lh_jobs SET status = 'failed', last_updated_date = NOW() "
+                + " WHERE status = 'processing'" );
+    }
 
     public AbstractJob getNextJobToProcess() {
         Integer jobId = getJdbcTemplate().queryForObject( 
@@ -188,6 +235,27 @@ public class WordPressDAOImpl implements WordPressDAO {
             props.setProperty( rowSet.getString( "name" ), rowSet.getString( "value" ) );
         }
         return props;
+    }
+    
+    public List<Date> getCheckinDatesForAllocationScraperJobId( int jobId ) {
+        // dates from calendar for a given (allocation scraper) job id
+        // do not include room closures
+        return getJdbcTemplate().queryForList( 
+                "SELECT DISTINCT checkin_date " +
+                "  FROM wp_lh_calendar " +
+                " WHERE job_id = ? " +
+                "   AND reservation_id > 0 " +
+                " ORDER BY checkin_date", Date.class, jobId );
+    }
+
+    public Date getMaxCheckinDateForAllocationScraperJobId( int jobId ) {
+        // max from calendar for a given (allocation scraper) job id
+        // do not include room closures
+        return getJdbcTemplate().queryForObject( 
+                "SELECT MAX(checkin_date) `checkin_date` " +
+                "  FROM wp_lh_calendar " +
+                " WHERE job_id = ? " +
+                "   AND reservation_id > 0", java.sql.Date.class, jobId );
     }
 
     /////////////////////////////////////////////////////////////////////

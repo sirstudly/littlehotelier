@@ -7,7 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.beans.Job;
+import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 
 /**
@@ -21,13 +22,43 @@ public class AllocationScraperJob extends AbstractJob {
     @Autowired
     private AllocationsPageScraper allocationScraper;
     
-    @Autowired
-    private WordPressDAO dao;
-    
     @Override
     public void processJob() throws Exception {
         allocationScraper.dumpAllocationsBetween( getId(), getStartDate(), getEndDate(), isTestMode() );
-        dao.runSplitRoomsReservationsReport( getId() );
+        insertBookingsScraperJobs();
+    }
+    
+    /**
+     * We need additional jobs to update some fields by scraping the bookings pages
+     * and any reports that use this data. Create these jobs now.
+     */
+    private void insertBookingsScraperJobs() {
+        
+        // create a separate job for each checkin_date for the given allocation records
+        // this will make it easier to re-run if any date fails
+        for( Date checkinDate : dao.getCheckinDatesForAllocationScraperJobId( getId() ) ) {
+            Job bookingScraperJob = new Job();
+            bookingScraperJob.setClassName( BookingScraperJob.class.getName() );
+            bookingScraperJob.setStatus( JobStatus.submitted );
+            bookingScraperJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
+            bookingScraperJob.setParameter( "checkin_date", 
+                    AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ) );
+            dao.insertJob( bookingScraperJob );
+        }
+        
+        // insert jobs to create any repoorts
+        insertSplitRoomReportJob();
+    }
+    
+    /**
+     * Creates an additional job to run the split room report.
+     */
+    private void insertSplitRoomReportJob() {
+        Job splitRoomReportJob = new Job();
+        splitRoomReportJob.setClassName( SplitRoomReservationReportJob.class.getName() );
+        splitRoomReportJob.setStatus( JobStatus.submitted );
+        splitRoomReportJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
+        dao.insertJob( splitRoomReportJob );
     }
     
     /**

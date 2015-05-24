@@ -6,7 +6,10 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.context.annotation.Scope;
 import org.springframework.core.io.ClassPathResource;
+
+import com.gargoylesoftware.htmlunit.WebClient;
  
 @Configuration
 @ComponentScan("com.macbackpackers")
@@ -19,5 +22,11 @@ public class LittleHotelierConfig {
         PropertiesFactoryBean bean = new PropertiesFactoryBean();
         bean.setLocation(new ClassPathResource("report_sql.xml"));
         return bean;
+    }
+    
+    @Bean
+    @Scope( "prototype" )
+    public WebClient getWebClient() {
+        return new WebClient(); // return a new instance of this when requested        
     }
 }

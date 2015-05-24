@@ -32,23 +32,7 @@ public class AllocationsPageScraperTest {
 	WordPressDAO dao;
 	
     @Test
-    public void testDoLogin() throws Exception {
-        scraper.doLogin();
-    }
-    
-    @Test
-    public void testGoToPageSkippingLogin() throws Exception {
-        scraper.loginAndGoToPage( "https://emea.littlehotelier.com/extranet/reports/summary?property_id=533" );
-    }
-
-    @Test
     public void testGoToCalendarPage() throws Exception {
-//        scraper.doLogin();
-//        Calendar july2 = Calendar.getInstance();
-//        july2.set( Calendar.DATE, 2 );
-//        july2.set( Calendar.MONTH, 6 );
-//        july2.set( Calendar.YEAR, 2014 );
-//        LOGGER.info( july2.getTime() );
         scraper.goToCalendarPage( new Date() );
     }
 
