@@ -48,6 +48,7 @@ public class AllocationScraperJob extends AbstractJob {
         
         // insert jobs to create any repoorts
         insertSplitRoomReportJob();
+        insertUnpaidDepositReportJob();
     }
     
     /**
@@ -59,6 +60,17 @@ public class AllocationScraperJob extends AbstractJob {
         splitRoomReportJob.setStatus( JobStatus.submitted );
         splitRoomReportJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
         dao.insertJob( splitRoomReportJob );
+    }
+    
+    /**
+     * Creates an additional job to run the unpaid deposit report.
+     */
+    private void insertUnpaidDepositReportJob() {
+        Job updateDepositRptJob = new Job();
+        updateDepositRptJob.setClassName( UnpaidDepositReportJob.class.getName() );
+        updateDepositRptJob.setStatus( JobStatus.submitted );
+        updateDepositRptJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
+        dao.insertJob( updateDepositRptJob );
     }
     
     /**

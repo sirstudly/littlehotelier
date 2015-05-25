@@ -71,6 +71,26 @@ CREATE TABLE `wp_lh_rpt_split_rooms` (
   FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+-- bookings where no deposit had been paid yet
+CREATE TABLE `wp_lh_rpt_unpaid_deposit` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `job_id` bigint(20) unsigned NOT NULL,
+  `guest_name` varchar(255) DEFAULT NULL,
+  `checkin_date` datetime NOT NULL,
+  `checkout_date` datetime NOT NULL,
+  `payment_total` decimal(10,2) DEFAULT NULL,
+  `data_href` varchar(255) DEFAULT NULL,
+  `booking_reference` varchar(50) DEFAULT NULL,
+  `booking_source` varchar(50) DEFAULT NULL,
+  `booked_date` timestamp NULL DEFAULT NULL,
+  `notes` text,
+  `viewed_yn` char(1) DEFAULT NULL,
+  `created_date` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `job_id_idx` (`job_id`),
+  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 CREATE TABLE `wp_lh_rooms` (
   `id` bigint(20) unsigned NOT NULL,
   `room` varchar(50) DEFAULT NULL,

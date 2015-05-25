@@ -109,8 +109,9 @@ public class BookingsPageScraper {
                     List<Allocation> allocList = wordPressDAO.queryAllocationsByJobIdAndReservationId( 
                             jobId, Integer.parseInt( dataId ) );
                     if( allocList.isEmpty() ) {
-                        LOGGER.warn( "No allocation record found for reservation_id " + dataId + " and job " + jobId );
-                        LOGGER.warn( "This might occur if the booking has come in in between the time the original scraper job has run and now" );
+                        // this may happen if there are additional records in the bookings page
+                        // that weren't in our list of allocations
+                        LOGGER.debug( "No allocation record found for reservation_id " + dataId + " and job " + jobId );
                         continue;
                     }
                     

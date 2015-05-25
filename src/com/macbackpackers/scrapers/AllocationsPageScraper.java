@@ -147,22 +147,22 @@ public class AllocationsPageScraper {
                 }
 
                 if ( StringUtils.isNotBlank( div.getAttribute( "data-room_id" ) ) ) {
-                    LOGGER.info( "data-room_id: " + dataRoomId );
-                    LOGGER.info( "data-room_type_id: " + div.getAttribute( "data-room_type_id" ) );
+                    LOGGER.debug( "data-room_id: " + dataRoomId );
+                    LOGGER.debug( "data-room_type_id: " + div.getAttribute( "data-room_type_id" ) );
 
                     if ( false == div.hasChildNodes() ) {
                         LOGGER.warn( "no child nodes for " + div.asText() );
                     } else {
                         DomElement label = div.getFirstElementChild();
                         if ( false == "label".equals( label.getTagName() ) ) {
-                            LOGGER.info( "not a label? " + label.asText() );
+                            LOGGER.debug( "not a label? " + label.asText() );
                         } else {
-                            LOGGER.info( "Bed Name: " + label.getAttribute( "title" ) );
+                            LOGGER.debug( "Bed Name: " + label.getAttribute( "title" ) );
                             currentBedName = label.getAttribute( "title" );
                         }
                     }
                 } else if ( StringUtils.isNotBlank( dataDate ) ) {
-                    LOGGER.info( "data-date: " + dataDate );
+                    LOGGER.debug( "data-date: " + dataDate );
 
                     // first entry after the data-date div is not always correct
                     // it could be one day off screen
@@ -173,7 +173,7 @@ public class AllocationsPageScraper {
                         }
                     }
                     if ( div.hasChildNodes() == false ) {
-                        LOGGER.info( "no records for " + dataDate );
+                        LOGGER.debug( "no records for " + dataDate );
                     }
                 }
             } catch ( Exception ex ) {
@@ -213,18 +213,18 @@ public class AllocationsPageScraper {
             return;
         }
 
-        LOGGER.info( "  class: " + span.getAttribute( "class" ) );
-        LOGGER.info( "  style: " + span.getAttribute( "style" ) );
-        LOGGER.info( "  data-reservation_payment_total: " + span.getAttribute( "data-reservation_payment_total" ) );
-        LOGGER.info( "  data-reservation_payment_oustanding: "
+        LOGGER.debug( "  class: " + span.getAttribute( "class" ) );
+        LOGGER.debug( "  style: " + span.getAttribute( "style" ) );
+        LOGGER.debug( "  data-reservation_payment_total: " + span.getAttribute( "data-reservation_payment_total" ) );
+        LOGGER.debug( "  data-reservation_payment_oustanding: "
                 + span.getAttribute( "data-reservation_payment_oustanding" ) );
-        LOGGER.info( "  data-reservation_id: " + span.getAttribute( "data-reservation_id" ) );
-        LOGGER.info( "  data-rate_plan_name: " + span.getAttribute( "data-rate_plan_name" ) );
-        LOGGER.info( "  data-payment_status: " + span.getAttribute( "data-payment_status" ) );
-        LOGGER.info( "  data-occupancy: " + span.getAttribute( "data-occupancy" ) );
-        LOGGER.info( "  data-href: " + span.getAttribute( "data-href" ) );
-        LOGGER.info( "  data-notes: " + span.getAttribute( "data-notes" ) );
-        LOGGER.info( "  data-guest_name: " + span.getAttribute( "data-guest_name" ) );
+        LOGGER.debug( "  data-reservation_id: " + span.getAttribute( "data-reservation_id" ) );
+        LOGGER.debug( "  data-rate_plan_name: " + span.getAttribute( "data-rate_plan_name" ) );
+        LOGGER.debug( "  data-payment_status: " + span.getAttribute( "data-payment_status" ) );
+        LOGGER.debug( "  data-occupancy: " + span.getAttribute( "data-occupancy" ) );
+        LOGGER.debug( "  data-href: " + span.getAttribute( "data-href" ) );
+        LOGGER.debug( "  data-notes: " + span.getAttribute( "data-notes" ) );
+        LOGGER.debug( "  data-guest_name: " + span.getAttribute( "data-guest_name" ) );
 
         // split room/bed name
         Pattern p = Pattern.compile( "([^\\-]*)-(.*)$" ); // anything but dash for room #, everything else for bed
@@ -249,10 +249,10 @@ public class AllocationsPageScraper {
         if ( StringUtils.contains( span.getAttribute( "class" ), "room_closure" ) ) {
             DomElement closedRoom = span.getFirstElementChild();
             if ( false == "span".equals( closedRoom.getTagName() ) ) {
-                LOGGER.info( "not a span? " );
-                LOGGER.info( closedRoom.asText() );
+                LOGGER.debug( "not a span? " );
+                LOGGER.debug( closedRoom.asText() );
             } else {
-                LOGGER.info( "closed room?: " + closedRoom.getTextContent() );
+                LOGGER.debug( "closed room?: " + closedRoom.getTextContent() );
                 alloc.setGuestName( closedRoom.getTextContent() );
             }
         } else {

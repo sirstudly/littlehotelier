@@ -15,6 +15,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
+import com.macbackpackers.jobs.UnpaidDepositReportJob;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = LittleHotelierConfig.class)
@@ -44,6 +45,24 @@ public class ProcessorServiceTest {
         j.setParameter( "start_date", "2015-05-23 00:00:00" );
         j.setParameter( "end_date", "2015-06-04 00:00:00" );
         j.setParameter( "test_mode", "true" );
+        int jobId = dao.insertJob( j );
+
+        // this should now run the job
+        processorService.processJobs();
+        
+        // verify that the job completed successfully
+        Job jobVerify = dao.getJobById( jobId );
+        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+    }
+    
+    @Test
+    public void testUnpaidDepositReportJob() throws Exception {
+        
+        // setup a job to scrape allocation info
+        Job j = new Job();
+        j.setClassName( UnpaidDepositReportJob.class.getName() );
+        j.setStatus( JobStatus.submitted );
+        j.setParameter( "allocation_scraper_job_id", "21" );
         int jobId = dao.insertJob( j );
 
         // this should now run the job

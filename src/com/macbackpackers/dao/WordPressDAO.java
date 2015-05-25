@@ -133,6 +133,13 @@ public interface WordPressDAO {
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from
      */
     public void runSplitRoomsReservationsReport( int allocationScraperJobId );
+    
+    /**
+     * Creates a report with all bookings where no deposit had been paid yet.
+     * 
+     * @param allocationScraperJobId job ID of the allocation scraper job to use data from
+     */
+    public void runUnpaidDepositReport( int allocationScraperJobId );
 
     /**
      * Returns the checkin dates for all allocations found by the
