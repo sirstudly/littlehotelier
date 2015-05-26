@@ -217,6 +217,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                 "SELECT MIN(job_id) AS job_id FROM wp_lh_jobs WHERE status = ?",
                 Integer.class, 
                 JobStatus.submitted.name() );
+        LOGGER.info( "Next job to process: " + ( jobId == null ? "none" : jobId ) );
         return jobId == null ? null : getJobById( jobId );
     }
 
