@@ -142,6 +142,15 @@ public interface WordPressDAO {
     public void runUnpaidDepositReport( int allocationScraperJobId );
 
     /**
+     * Returns the list of HW/HB reservation IDs for which the deposit amount has
+     * not yet been deducted from the total.
+     * 
+     * @param allocationScraperJobId job ID of the allocation scraper job to use data from
+     * @return non-null list of reservation IDs
+     */
+    public List<Integer> getHostelworldHostelBookersUnpaidDepositReservations( int allocationScraperJobId );
+    
+    /**
      * Returns the checkin dates for all allocations found by the
      * given AllocationScraper job ID.
      * 

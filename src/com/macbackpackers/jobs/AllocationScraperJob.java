@@ -46,9 +46,10 @@ public class AllocationScraperJob extends AbstractJob {
             dao.insertJob( bookingScraperJob );
         }
         
-        // insert jobs to create any repoorts
+        // insert jobs to create any reports
         insertSplitRoomReportJob();
         insertUnpaidDepositReportJob();
+        insertHostelworldHostelBookersConfirmDepositJob();
     }
     
     /**
@@ -66,11 +67,24 @@ public class AllocationScraperJob extends AbstractJob {
      * Creates an additional job to run the unpaid deposit report.
      */
     private void insertUnpaidDepositReportJob() {
-        Job updateDepositRptJob = new Job();
-        updateDepositRptJob.setClassName( UnpaidDepositReportJob.class.getName() );
-        updateDepositRptJob.setStatus( JobStatus.submitted );
-        updateDepositRptJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
-        dao.insertJob( updateDepositRptJob );
+        Job unpaidDepositRptJob = new Job();
+        unpaidDepositRptJob.setClassName( UnpaidDepositReportJob.class.getName() );
+        unpaidDepositRptJob.setStatus( JobStatus.submitted );
+        unpaidDepositRptJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
+        dao.insertJob( unpaidDepositRptJob );
+    }
+    
+    /**
+     * Creates additional jobs to tick off any unpaid deposits for HW/HB.
+     */
+    private void insertHostelworldHostelBookersConfirmDepositJob() {
+        for( int reservationId : dao.getHostelworldHostelBookersUnpaidDepositReservations( getId() ) ) {
+            Job tickDepositJob = new Job();
+            tickDepositJob.setClassName( ConfirmDepositAmountsJob.class.getName() );
+            tickDepositJob.setStatus( JobStatus.submitted );
+            tickDepositJob.setParameter( "reservation_id", String.valueOf( reservationId ) );
+            dao.insertJob( tickDepositJob );
+        }
     }
     
     /**

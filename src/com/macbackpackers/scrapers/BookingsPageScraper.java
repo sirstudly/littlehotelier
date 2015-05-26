@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.core.env.Environment;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.WebClient;
@@ -60,7 +59,7 @@ public class BookingsPageScraper {
         String pageURL = getBookingsURLForDate( date );
         LOGGER.info( "Loading bookings page: " + pageURL );
         HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
-        LOGGER.info( nextPage.asXml() );
+        LOGGER.debug( nextPage.asXml() );
 
         // save it to disk so we can use it later - ConcurrentModificationException?
         //fileService.serialisePageToDisk( nextPage, getBookingPageSerialisedObjectFilename( date ) );
@@ -103,7 +102,7 @@ public class BookingsPageScraper {
                 String styleClass = tr.getAttribute( "class" ); // read or unread
                 
                 if( StringUtils.isNotBlank( dataId )) {
-                    LOGGER.info( "Found record " + dataId + " " + styleClass );
+                    LOGGER.debug( "Found record " + dataId + " " + styleClass );
                     
                     // attempt to load the existing record if possible
                     List<Allocation> allocList = wordPressDAO.queryAllocationsByJobIdAndReservationId( 
@@ -142,10 +141,10 @@ public class BookingsPageScraper {
                         if( false == "a".equals( ahref.getTagName() ) ) {
                             LOGGER.warn( "Expecting link but was " + ahref.getTagName() + " : " + ahref.asText() );
                         } else {
-                            LOGGER.info( "  booking href: " + ahref.getAttribute( "href" ) );
+                            LOGGER.debug( "  booking href: " + ahref.getAttribute( "href" ) );
                             DomElement span = ahref.getFirstElementChild();
                             if( span != null ) {
-                                LOGGER.info( "  status: " + span.getAttribute( "class" ) );
+                                LOGGER.debug( "  status: " + span.getAttribute( "class" ) );
                                 alloc.setStatus( span.getAttribute( "class" ) );
                             } else {
                                 LOGGER.warn( "No span found in status? " );
@@ -155,39 +154,39 @@ public class BookingsPageScraper {
                     
                     // existing record should already have the guest name(s)
                     td = td.getNextElementSibling();
-                    LOGGER.info( "  name: " + StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  name: " + StringUtils.trim( td.getTextContent() ) );
 
                     td = td.getNextElementSibling();
                     alloc.setBookingReference( StringUtils.trim( td.getTextContent() ) );
-                    LOGGER.info( "  booking_reference: " + alloc.getBookingReference() );
+                    LOGGER.debug( "  booking_reference: " + alloc.getBookingReference() );
                     
                     td = td.getNextElementSibling();
                     alloc.setBookingSource( StringUtils.trim( td.getTextContent() ) );
-                    LOGGER.info( "  booking_source: " + alloc.getBookingSource() );
+                    LOGGER.debug( "  booking_source: " + alloc.getBookingSource() );
 
                     td = td.getNextElementSibling();
-                    LOGGER.info( "  guests: " + StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  guests: " + StringUtils.trim( td.getTextContent() ) );
 
                     // existing record should have checkin/checkout dates
                     td = td.getNextElementSibling();
-                    LOGGER.info( "  check in: " + StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  check in: " + StringUtils.trim( td.getTextContent() ) );
 
                     td = td.getNextElementSibling();
-                    LOGGER.info( "  check out: " + StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  check out: " + StringUtils.trim( td.getTextContent() ) );
 
                     td = td.getNextElementSibling();
                     alloc.setBookedDate( StringUtils.trim( td.getTextContent() ) );
-                    LOGGER.info( "  booked on: " + StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  booked on: " + StringUtils.trim( td.getTextContent() ) );
 
                     td = td.getNextElementSibling();
-                    LOGGER.info( "  total: " + StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  total: " + StringUtils.trim( td.getTextContent() ) );
 
                     td = td.getNextElementSibling();
                     alloc.setEta( StringUtils.trim( td.getTextContent() ) );
-                    LOGGER.info( "  ETA: " + alloc.getEta() );
+                    LOGGER.debug( "  ETA: " + alloc.getEta() );
 
                     td = td.getNextElementSibling();
-                    LOGGER.info( "  number of 'rooms': " + StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  number of 'rooms': " + StringUtils.trim( td.getTextContent() ) );
             
                     // write the updated attributes to datastore
                     wordPressDAO.updateAllocation( alloc );

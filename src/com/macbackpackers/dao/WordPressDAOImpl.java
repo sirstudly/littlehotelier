@@ -257,6 +257,18 @@ public class WordPressDAOImpl implements WordPressDAO {
                 " WHERE job_id = ? " +
                 "   AND reservation_id > 0", java.sql.Date.class, jobId );
     }
+    
+    public List<Integer> getHostelworldHostelBookersUnpaidDepositReservations( int allocationScraperJobId ) {
+        LOGGER.info( "Querying unpaid reservations for allocation job : " + allocationScraperJobId );
+        return getJdbcTemplate().queryForList(
+                "SELECT reservation_id " +
+                "  FROM wp_lh_calendar " +  
+                "WHERE job_id = ? " +
+                "  AND payment_total = payment_outstanding " +
+                "  AND booking_source IN ( 'Hostelworld', 'Hostelbookers' ) " +
+                "GROUP BY reservation_id", 
+                Integer.class, allocationScraperJobId );
+    }
 
     /////////////////////////////////////////////////////////////////////
     //    REPORTING SPECIFIC

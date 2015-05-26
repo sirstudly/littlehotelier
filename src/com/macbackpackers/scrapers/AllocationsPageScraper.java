@@ -74,10 +74,10 @@ public class AllocationsPageScraper {
         String pageURL = calendarUrl + "?start_date=" + dateAsString;
         LOGGER.info( "Loading calendar page: " + pageURL );
         HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
-        LOGGER.info( nextPage.asXml() );
+        LOGGER.debug( nextPage.asXml() );
 
         // save it to disk so we can use it later
-        fileService.serialisePageToDisk( nextPage, getCalendarPageSerialisedObjectFilename( date ) );
+//        fileService.serialisePageToDisk( nextPage, getCalendarPageSerialisedObjectFilename( date ) );
         return nextPage;
     }
     

@@ -2,6 +2,7 @@ package com.macbackpackers.jobs;
 
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.apache.log4j.NDC;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.macbackpackers.beans.Job;
@@ -31,7 +32,8 @@ public abstract class AbstractJob extends Job {
      */
     public void doProcessJob() {
         dao.updateJobStatus( getId(), JobStatus.processing, JobStatus.submitted );
-        
+        NDC.push( String.valueOf( getId() ) ); // record the ID of this job for logging
+
         try {
             processJob();
             dao.updateJobStatus( getId(), JobStatus.completed, JobStatus.processing );
@@ -39,6 +41,9 @@ public abstract class AbstractJob extends Job {
         catch( Exception ex ) {
             LOGGER.error( "Error occurred when running " + getClass().getSimpleName() + " id: " + getId(), ex );
             dao.updateJobStatus( getId(), JobStatus.failed, JobStatus.processing );
+        } 
+        finally {
+            NDC.pop();
         }
     }
 

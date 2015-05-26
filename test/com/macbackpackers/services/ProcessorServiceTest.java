@@ -1,7 +1,11 @@
 package com.macbackpackers.services;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.apache.log4j.NDC;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -15,6 +19,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
+import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.UnpaidDepositReportJob;
 
 @RunWith(SpringJUnit4ClassRunner.class)
@@ -72,9 +77,23 @@ public class ProcessorServiceTest {
         Job jobVerify = dao.getJobById( jobId );
         Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
     }
-    
-//    @Test
-//    public void testReport() throws Exception {
-//        dao.runSplitRoomsReservationsReport( 9 );
-//    }        
+
+    @Test
+    public void testConfirmDepositAmountsJob() throws Exception {
+        
+        // setup a job to scrape allocation info
+        Job j = new Job();
+        j.setClassName( ConfirmDepositAmountsJob.class.getName() );
+        j.setStatus( JobStatus.submitted );
+        j.setParameter( "reservation_id", "1074445" );
+        int jobId = dao.insertJob( j );
+
+        // this should now run the job
+        processorService.processJobs();
+        
+        // verify that the job completed successfully
+        Job jobVerify = dao.getJobById( jobId );
+        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+    }
+
 }
