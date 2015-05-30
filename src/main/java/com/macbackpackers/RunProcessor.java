@@ -18,6 +18,8 @@ import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
+import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
+import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.ProcessorService;
 
@@ -85,6 +87,14 @@ public class RunProcessor implements Closeable
         dao.insertJob( j );
     }
 
+    public void insertScrapeReservationsBookedOnJob() {
+        Job j = new Job();
+        j.setClassName( ScrapeReservationsBookedOnJob.class.getName() );
+        j.setStatus( JobStatus.submitted );
+        j.setParameter( "booked_on_date", BookingsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( new Date() ) );
+        dao.insertJob( j );
+    }
+
     /**
      * Runs the processor.
      * 
@@ -107,6 +117,12 @@ public class RunProcessor implements Closeable
             processor.insertCreateConfirmDepositAmountsJob();
         }
         
+        // option -b to add click deposits job (by booking date - today)
+        if( args.length == 1 && "-b".equals( args[0] ) ) {
+            LOGGER.info( "ScrapeReservationsBookedOn job requested; queueing job..." );
+            processor.insertScrapeReservationsBookedOnJob();
+        }
+
         processor.processJobs();
         processor.close();
         LOGGER.info( "Finished processor... " + new Date() );

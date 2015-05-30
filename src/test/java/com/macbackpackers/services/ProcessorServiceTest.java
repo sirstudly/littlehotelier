@@ -2,6 +2,7 @@ package com.macbackpackers.services;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -20,7 +21,9 @@ import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
+import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.jobs.UnpaidDepositReportJob;
+import com.macbackpackers.scrapers.BookingsPageScraper;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = LittleHotelierConfig.class)
@@ -86,6 +89,25 @@ public class ProcessorServiceTest {
         j.setClassName( ConfirmDepositAmountsJob.class.getName() );
         j.setStatus( JobStatus.submitted );
         j.setParameter( "reservation_id", "1074445" );
+        int jobId = dao.insertJob( j );
+
+        // this should now run the job
+        processorService.processJobs();
+        
+        // verify that the job completed successfully
+        Job jobVerify = dao.getJobById( jobId );
+        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+    }
+    
+    @Test
+    public void testScrapeReservationsBookedOnJob() throws Exception {
+
+        // setup a job to find reservations booked today and
+        // create the confirm deposit job for each unread entry
+        Job j = new Job();
+        j.setClassName( ScrapeReservationsBookedOnJob.class.getName() );
+        j.setStatus( JobStatus.submitted );
+        j.setParameter( "booked_on_date", BookingsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( new Date() ) );
         int jobId = dao.insertJob( j );
 
         // this should now run the job

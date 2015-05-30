@@ -204,6 +204,20 @@ public class WordPressDAOImpl implements WordPressDAO {
             throw new IncorrectNumberOfRecordsUpdatedException(
                     "Unable to update status of job " + jobId + " to " + status );
         }
+        
+        if( status == JobStatus.processing ) {
+            getJdbcTemplate().update( 
+                    "  UPDATE wp_lh_jobs "
+                    + "   SET start_date = NOW(), last_updated_date = NOW() "
+                    + " WHERE job_id = ?", jobId );
+        }
+
+        if( status == JobStatus.completed ) {
+            getJdbcTemplate().update( 
+                    "  UPDATE wp_lh_jobs "
+                    + "   SET end_date = NOW(), last_updated_date = NOW() "
+                    + " WHERE job_id = ?", jobId );
+        }
     }
     
     public void resetAllProcessingJobsToFailed() {

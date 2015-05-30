@@ -37,13 +37,15 @@ public class AuthenticationService {
     
     /**
      * Loads the previous credentials and attempts to go to a specific page. If we 
-     * get redirected back to the login page, then login and continue to the specific page.
+     * get redirected back to the login page, then this method will fail with
+     * an unrecoverable fault.
      * 
      * @param pageURL the page to go to
      * @return the loaded page
-     * @throws IOException 
+     * @throws IOException if unable to read previously saved credentials
+     * @throws UnrecoverableFault if credentials were not successful
      */
-    public HtmlPage loginAndGoToPage( String pageURL, WebClient webClient ) throws IOException {
+    public HtmlPage loginAndGoToPage( String pageURL, WebClient webClient ) throws IOException, UnrecoverableFault {
         fileService.loadCookiesFromFile( webClient );
         
         // attempt to go the page directly using the current credentials
@@ -51,14 +53,18 @@ public class AuthenticationService {
         
         // if we get redirected back to login, then login and try again
         if( LOGIN_PAGE_TITLE.equals( nextPage.getTitleText() ) ) {
-            LOGGER.warn( "Current credentials not valid? Attempting login..." );
-            doLogin();
-            nextPage = webClient.getPage( pageURL );
-            LOGGER.info( nextPage.asXml() );
+            LOGGER.warn( "Current credentials not valid?" );
+            throw new UnrecoverableFault( "Unable to login using existing credentials. Has the password changed?" );
         }
         return nextPage;
     }
 
+    /**
+     * Logs into the application and writes the credentials to file so we
+     * don't have to do it again.
+     * 
+     * @throws IOException on write error
+     */
     public void doLogin() throws IOException {
 
         WebClient webClient = webClientFactory.getObject();

@@ -34,10 +34,12 @@ CREATE TABLE `wp_lh_jobs` (
   `job_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `classname` varchar(255) NOT NULL,
   `status` varchar(20) NOT NULL,
+  `start_date` timestamp NULL DEFAULT NULL,
+  `end_date` timestamp NULL DEFAULT NULL,
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `last_updated_date` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `last_updated_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`job_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 CREATE TABLE `wp_lh_job_param` (

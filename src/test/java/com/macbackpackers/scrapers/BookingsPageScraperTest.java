@@ -1,7 +1,6 @@
 package com.macbackpackers.scrapers;
 
 import java.util.Calendar;
-import java.util.Date;
 
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -26,7 +25,7 @@ public class BookingsPageScraperTest {
 	public void testGoToBookingPage() throws Exception {
 	    Calendar c = Calendar.getInstance();
 	    c.add( Calendar.MONTH, 2 );
-	    scraper.goToBookingPage( c.getTime() );
+	    scraper.goToBookingPageForArrivals( c.getTime() );
 	}
 	
     @Test

@@ -20,7 +20,10 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.beans.Allocation;
+import com.macbackpackers.beans.Job;
+import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.services.AuthenticationService;
 import com.macbackpackers.services.FileService;
 
@@ -55,8 +58,14 @@ public class BookingsPageScraper {
     @Value( "${lilhotelier.url.bookings}" )
     private String bookingUrl;
     
-    public HtmlPage goToBookingPage( Date date ) throws IOException {
-        String pageURL = getBookingsURLForDate( date );
+    /**
+     * Goes to the booking page showing arrivals for the given date.
+     * @param date date to query
+     * @return URL of bookings arriving on this date
+     * @throws IOException if credentials could not be loaded
+     */
+    public HtmlPage goToBookingPageForArrivals( Date date ) throws IOException {
+        String pageURL = getBookingsURLForArrivalsByDate( date );
         LOGGER.info( "Loading bookings page: " + pageURL );
         HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
         LOGGER.debug( nextPage.asXml() );
@@ -67,13 +76,47 @@ public class BookingsPageScraper {
     }
     
     /**
-     * Returns the booking URL for the given date.
+     * Goes to the booking page showing reservations that have been booked on the 
+     * given date with a matching booking ref.
+     * 
+     * @param date date to query
+     * @param bookingRefId a matching booking ref; can be "HWL" or "HBK" for example
+     * @return URL of bookings booked on this date
+     * @throws IOException if credentials could not be loaded
+     */
+    public HtmlPage goToBookingPageBookedOn( Date date, String bookingRefId ) throws IOException {
+        String pageURL = getBookingsURLForBookedOnDate( date, bookingRefId );
+        LOGGER.info( "Loading bookings page: " + pageURL );
+        HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
+        LOGGER.debug( nextPage.asXml() );
+        return nextPage;
+    }
+    
+    /**
+     * Returns the booking URL for all checkins occurring on the given date.
      * 
      * @param date date to query
      * @return URL of bookings arriving on this date
      */
-    private String getBookingsURLForDate( Date date ) {
-        return bookingUrl.replaceAll( "__DATE__", DATE_FORMAT_BOOKING_URL.format( date ) );
+    private String getBookingsURLForArrivalsByDate( Date date ) {
+        return bookingUrl
+                .replaceAll( "__DATE__", DATE_FORMAT_BOOKING_URL.format( date ) )
+                .replaceAll( "__BOOKING_REF_ID__", "" )
+                .replaceAll( "__DATE_TYPE__", "CheckIn" );
+    }
+
+    /**
+     * Returns the booking URL for all checkins occurring on the given date.
+     * 
+     * @param date date to query
+     * @param bookingRefId a matching booking ref; can be "HWL" or "HBK" for example
+     * @return URL of bookings booked on on this date
+     */
+    private String getBookingsURLForBookedOnDate( Date date, String bookingRefId ) {
+        return bookingUrl
+                .replaceAll( "__DATE__", DATE_FORMAT_BOOKING_URL.format( date ) )
+                .replaceAll( "__BOOKING_REF_ID__", bookingRefId )
+                .replaceAll( "__DATE_TYPE__", "BookedOn" );
     }
 
     /**
@@ -200,6 +243,37 @@ public class BookingsPageScraper {
     }
     
     /**
+     * For the booking page in question, find any where the amount payable
+     * is equal to the total payable and create a job to confirm the 
+     * deposit amount on the booking page.
+     * 
+     * @param bookingsPage the current bookings page to parse data from
+     */
+    public void createConfirmDepositJobs( HtmlPage bookingsPage ) {
+        
+        for( DomElement tr : bookingsPage.getElementsByTagName( "tr" ) ) {
+            try {
+                String dataId = tr.getAttribute( "data-id" );
+                String styleClass = tr.getAttribute( "class" ); // read or unread
+                
+                // only look at the "unread" records ... any ones that are read
+                // will be picked up the allocation scraper job run daily
+                if( StringUtils.isNotBlank( dataId ) && "unread".equals( styleClass )) {
+                    LOGGER.info( "Creating ConfirmDepositAmountsJob for reservation id " + dataId );
+                    Job tickDepositJob = new Job();
+                    tickDepositJob.setClassName( ConfirmDepositAmountsJob.class.getName() );
+                    tickDepositJob.setStatus( JobStatus.submitted );
+                    tickDepositJob.setParameter( "reservation_id", dataId );
+                    wordPressDAO.insertJob( tickDepositJob );
+                } // data-id isNotBlank
+                
+            } catch ( Exception ex ) {
+                LOGGER.error( "Exception handled.", ex );
+            }
+        }
+    }
+    
+    /**
      * Updates the calendar records using by querying the bookings page between the given dates (inclusive) 
      * for the given job. 
      * 
@@ -224,7 +298,7 @@ public class BookingsPageScraper {
                 bookingsPage = fileService.loadPageFromDisk( serialisedFileName );
             } else {
                 // this takes about 10 minutes...
-                bookingsPage = goToBookingPage( currentDate.getTime() );
+                bookingsPage = goToBookingPageForArrivals( currentDate.getTime() );
             }
     
             updateBookings( jobId, bookingsPage );
