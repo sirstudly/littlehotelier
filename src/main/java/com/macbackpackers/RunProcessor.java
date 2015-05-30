@@ -17,7 +17,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
-import com.macbackpackers.scrapers.AllocationsPageScraper;
+import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.ProcessorService;
 
@@ -78,6 +78,13 @@ public class RunProcessor implements Closeable
         dao.insertJob( j );
     }
 
+    public void insertCreateConfirmDepositAmountsJob() {
+        Job j = new Job();
+        j.setClassName( CreateConfirmDepositAmountsJob.class.getName() );
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+    }
+
     /**
      * Runs the processor.
      * 
@@ -92,6 +99,12 @@ public class RunProcessor implements Closeable
         if( args.length == 1 && "-a".equals( args[0] ) ) {
             LOGGER.info( "Allocation job requested; queueing job..." );
             processor.insertAllocationScraperJob();
+        }
+        
+        // option -d to add click deposits job
+        if( args.length == 1 && "-d".equals( args[0] ) ) {
+            LOGGER.info( "Create Confirm Deposits job requested; queueing job..." );
+            processor.insertCreateConfirmDepositAmountsJob();
         }
         
         processor.processJobs();

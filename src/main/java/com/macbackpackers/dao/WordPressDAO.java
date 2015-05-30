@@ -125,6 +125,14 @@ public interface WordPressDAO {
      * @return non-null job parameters
      */
     public Properties getJobParameters( int jobId );
+    
+    /**
+     * Returns the most recent completed job of the given type.
+     * 
+     * @param jobType type of job
+     * @return last job or null if not found
+     */
+    public <T extends AbstractJob> T getLastCompletedJobOfType( Class<T> jobType );
 
     /**
      * Creates a report that determines reservations which, for the same room type, are split

@@ -15,7 +15,7 @@ import com.macbackpackers.dao.WordPressDAO;
  */
 public abstract class AbstractJob extends Job {
 
-    private final Logger LOGGER = LogManager.getLogger( getClass() );
+    protected final Logger LOGGER = LogManager.getLogger( getClass() );
 
     @Autowired
     protected WordPressDAO dao;
@@ -35,7 +35,9 @@ public abstract class AbstractJob extends Job {
         NDC.push( String.valueOf( getId() ) ); // record the ID of this job for logging
 
         try {
+            LOGGER.info( "Processing job " + getId() );
             processJob();
+            LOGGER.info( "Finished job " + getId() );
             dao.updateJobStatus( getId(), JobStatus.completed, JobStatus.processing );
         }
         catch( Exception ex ) {

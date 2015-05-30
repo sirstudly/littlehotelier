@@ -96,4 +96,26 @@ public class ProcessorServiceTest {
         Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
     }
 
+    @Test
+    public void testDateAfter() throws Exception {
+        final SimpleDateFormat DATE_FORMAT_BOOKED_DATE = new SimpleDateFormat( "dd MMM yyyy" );
+
+        NDC.push( "begin stack" );
+        Calendar c = Calendar.getInstance();
+        int year = c.get( Calendar.YEAR );
+        java.util.Date bookedDate = DATE_FORMAT_BOOKED_DATE.parse( "25 May" + " " + year );
+        //if( bookedDate.after( c.getTime() ) ) {
+        if( bookedDate.compareTo( c.getTime() ) >= 0 ) {
+            LOGGER.error( "AFTER" );
+        } else {
+            try {
+                LOGGER.error( "BEFORE'" );
+                throw new NullPointerException( "boom!" );
+            }
+            catch( Exception ex ) {
+                LOGGER.error( "Boom!", ex );
+            }
+        }
+        NDC.pop();
+    }
 }

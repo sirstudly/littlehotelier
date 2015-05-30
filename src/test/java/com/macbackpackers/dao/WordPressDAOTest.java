@@ -24,6 +24,7 @@ import com.macbackpackers.beans.BedSheetEntry;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
+import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.HousekeepingJob;
 
@@ -266,6 +267,21 @@ public class WordPressDAOTest {
         Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
         Assert.assertNotNull( "last updated date not found", jobView.getLastUpdatedDate() );
     }
+    
+    @Test
+    public void testGetHostelworldHostelBookersUnpaidDepositReservations() {
+        for( int reservationId : dao.getHostelworldHostelBookersUnpaidDepositReservations( 21 ) ) {
+            LOGGER.info( reservationId );
+        }
+    }
+
+    @Test
+    public void testGetLastCompletedJobOfType() {
+        AbstractJob j = dao.getLastCompletedJobOfType( AllocationScraperJob.class );
+        LOGGER.info( j.getId() );
+        LOGGER.info( j.getLastUpdatedDate() );
+    }
+
 
     private JdbcTemplate getJdbcTemplate() {
         return new JdbcTemplate( getDataSource() );

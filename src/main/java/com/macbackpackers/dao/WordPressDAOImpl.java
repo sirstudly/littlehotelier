@@ -238,6 +238,17 @@ public class WordPressDAOImpl implements WordPressDAO {
         return props;
     }
     
+    @SuppressWarnings("unchecked")
+    public <T extends AbstractJob> T getLastCompletedJobOfType( Class<T> jobType ) {
+        Integer jobId = getJdbcTemplate().queryForObject( 
+                "SELECT MAX(job_id) AS job_id FROM wp_lh_jobs WHERE classname = ? AND status = ?",
+                Integer.class, 
+                jobType.getName(),
+                JobStatus.completed.name() );
+        LOGGER.info( "Next job to process: " + ( jobId == null ? "none" : jobId ) );
+        return jobId == null ? null : (T) getJobById( jobId );
+    }
+
     public List<Date> getCheckinDatesForAllocationScraperJobId( int jobId ) {
         // dates from calendar for a given (allocation scraper) job id
         // do not include room closures

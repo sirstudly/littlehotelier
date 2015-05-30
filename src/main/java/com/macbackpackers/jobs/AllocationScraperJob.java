@@ -78,13 +78,10 @@ public class AllocationScraperJob extends AbstractJob {
      * Creates additional jobs to tick off any unpaid deposits for HW/HB.
      */
     private void insertHostelworldHostelBookersConfirmDepositJob() {
-        for( int reservationId : dao.getHostelworldHostelBookersUnpaidDepositReservations( getId() ) ) {
-            Job tickDepositJob = new Job();
-            tickDepositJob.setClassName( ConfirmDepositAmountsJob.class.getName() );
-            tickDepositJob.setStatus( JobStatus.submitted );
-            tickDepositJob.setParameter( "reservation_id", String.valueOf( reservationId ) );
-            dao.insertJob( tickDepositJob );
-        }
+        Job j = new Job();
+        j.setClassName( CreateConfirmDepositAmountsJob.class.getName() );
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
     }
     
     /**
