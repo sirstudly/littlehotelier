@@ -49,6 +49,7 @@ public class AllocationScraperJob extends AbstractJob {
         // insert jobs to create any reports
         insertSplitRoomReportJob();
         insertUnpaidDepositReportJob();
+        insertGroupBookingsReportJob();
         insertHostelworldHostelBookersConfirmDepositJob();
     }
     
@@ -72,6 +73,17 @@ public class AllocationScraperJob extends AbstractJob {
         unpaidDepositRptJob.setStatus( JobStatus.submitted );
         unpaidDepositRptJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
         dao.insertJob( unpaidDepositRptJob );
+    }
+    
+    /**
+     * Creates an additional job to run the group bookings report.
+     */
+    private void insertGroupBookingsReportJob() {
+        Job groupBookingRptJob = new Job();
+        groupBookingRptJob.setClassName( GroupBookingsReportJob.class.getName() );
+        groupBookingRptJob.setStatus( JobStatus.submitted );
+        groupBookingRptJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
+        dao.insertJob( groupBookingRptJob );
     }
     
     /**

@@ -41,4 +41,13 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
 		AND booking_source IN ('Booking.com')
 		GROUP BY reservation_id, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn;
     </entry>
+    <entry key="group.bookings">
+	    INSERT INTO `wp_lh_group_bookings` (job_id, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn)
+	    SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, COUNT(num_guests) `num_guests`, notes, viewed_yn
+		  FROM wp_lh_calendar
+		 WHERE job_id = ?
+		   AND reservation_id > 0 -- ignore room closures
+      GROUP BY reservation_id, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, notes, viewed_yn
+		HAVING COUNT(1) >= 6;
+    </entry>
 </properties>

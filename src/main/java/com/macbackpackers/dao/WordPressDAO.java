@@ -148,6 +148,13 @@ public interface WordPressDAO {
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from
      */
     public void runUnpaidDepositReport( int allocationScraperJobId );
+    
+    /**
+     * Creates a report with all bookings with more than 5 guests.
+     * 
+     * @param allocationScraperJobId job ID of the allocation scraper job to use data from
+     */
+    public void runGroupBookingsReport( int allocationScraperJobId );
 
     /**
      * Returns the list of HW/HB reservation IDs for which the deposit amount has

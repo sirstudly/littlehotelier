@@ -21,6 +21,7 @@ import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
+import com.macbackpackers.jobs.GroupBookingsReportJob;
 import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.jobs.UnpaidDepositReportJob;
 import com.macbackpackers.scrapers.BookingsPageScraper;
@@ -108,6 +109,25 @@ public class ProcessorServiceTest {
         j.setClassName( ScrapeReservationsBookedOnJob.class.getName() );
         j.setStatus( JobStatus.submitted );
         j.setParameter( "booked_on_date", BookingsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( new Date() ) );
+        int jobId = dao.insertJob( j );
+
+        // this should now run the job
+        processorService.processJobs();
+        
+        // verify that the job completed successfully
+        Job jobVerify = dao.getJobById( jobId );
+        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+    }
+
+    @Test
+    public void testGroupBookingsReportJob() throws Exception {
+
+        // setup a job to find reservations booked today and
+        // create the confirm deposit job for each unread entry
+        Job j = new Job();
+        j.setClassName( GroupBookingsReportJob.class.getName() );
+        j.setStatus( JobStatus.submitted );
+        j.setParameter( "allocation_scraper_job_id", "21" );
         int jobId = dao.insertJob( j );
 
         // this should now run the job

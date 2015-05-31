@@ -309,4 +309,9 @@ public class WordPressDAOImpl implements WordPressDAO {
         LOGGER.info( "Running report for job id: " + allocationScraperJobId );
         getJdbcTemplate().update( sql.getProperty( "unpaid.deposit.report" ), allocationScraperJobId );
     }
+
+    public void runGroupBookingsReport( int allocationScraperJobId ) {
+        LOGGER.info( "Running report for job id: " + allocationScraperJobId );
+        getJdbcTemplate().update( sql.getProperty( "group.bookings" ), allocationScraperJobId );
+    }
 }
