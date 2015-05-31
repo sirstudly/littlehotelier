@@ -94,6 +94,7 @@ CREATE TABLE `wp_lh_rpt_unpaid_deposit` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE `wp_lh_group_bookings` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `job_id` bigint(20) unsigned NOT NULL,
   `reservation_id` bigint(20) unsigned DEFAULT NULL,
   `guest_name` varchar(255) DEFAULT NULL,
@@ -106,7 +107,10 @@ CREATE TABLE `wp_lh_group_bookings` (
   `data_href` varchar(255) DEFAULT NULL,
   `num_guests` int(10) unsigned NOT NULL DEFAULT '0',
   `notes` text,
-  `viewed_yn` char(1) DEFAULT NULL
+  `viewed_yn` char(1) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `job_id_idx` (`job_id`),
+  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- application log data
