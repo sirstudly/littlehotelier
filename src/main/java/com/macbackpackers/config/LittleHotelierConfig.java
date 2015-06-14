@@ -9,6 +9,7 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.context.annotation.Scope;
 import org.springframework.core.io.ClassPathResource;
 
+import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.WebClient;
  
 @Configuration
@@ -27,6 +28,6 @@ public class LittleHotelierConfig {
     @Bean
     @Scope( "prototype" )
     public WebClient getWebClient() {
-        return new WebClient(); // return a new instance of this when requested        
+        return new WebClient( BrowserVersion.CHROME ); // return a new instance of this when requested        
     }
 }

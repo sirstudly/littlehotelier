@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.channels.FileLock;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.TimeZone;
 
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -18,6 +19,7 @@ import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
+import com.macbackpackers.jobs.HousekeepingJob;
 import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.services.FileService;
@@ -95,6 +97,14 @@ public class RunProcessor implements Closeable
         dao.insertJob( j );
     }
 
+    public void insertHousekeepingJob() {
+        Job j = new Job();
+        j.setClassName( HousekeepingJob.class.getName() );
+        j.setStatus( JobStatus.submitted );
+        j.setParameter( "selected_date", BookingsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( new Date() ) );
+        dao.insertJob( j );
+    }
+
     /**
      * Runs the processor.
      * 
@@ -102,9 +112,36 @@ public class RunProcessor implements Closeable
      * @throws Exception on disastrous failure
      */
     public static void main(String args[]) throws Exception {
+        TimeZone.setDefault(TimeZone.getTimeZone("Europe/London"));
         LOGGER.info( "Starting processor... " + new Date() );
         RunProcessor processor = new RunProcessor();
         
+        // option -h for help
+        if( args.length == 1 && "-h".equals( args[0] ) ) {
+            System.out.println( "USAGE: " + RunProcessor.class.getName() );
+            System.out.println( "Flags (only one allowed at a time)");
+            System.out.println( "    -a    Adds an allocation scraper job");
+            System.out.println( "          This will queue up all the report jobs");
+            System.out.println();
+            System.out.println( "    -d    Create a click deposits job");
+            System.out.println( "          This will find the last completed AllocationScraperJob and find");
+            System.out.println( "          all HW/HB reservations where the total amount = payment outstanding");
+            System.out.println( "          and create a click deposit job for each one");
+            System.out.println();
+            System.out.println( "    -b    This will create a job that will search all bookings on HW/HB");
+            System.out.println( "          made today and, if they're unread, create a click deposit job");
+            System.out.println( "          for that reservation");
+            System.out.println();
+            System.out.println( " --housekeeping     This will create an equivalent of an AllocationScraperJob");
+            System.out.println( "          for the previous day except it won't create the corresponding BookingScraperJob");
+            System.out.println( "          (for additional details). The Housekeeping report will pull the information");
+            System.out.println( "          directly from the allocation data");
+            
+            System.out.println( "The current date is " + new Date() );
+
+            System.exit( 0 );
+        }
+
         // option -a to add allocations job
         if( args.length == 1 && "-a".equals( args[0] ) ) {
             LOGGER.info( "Allocation job requested; queueing job..." );
@@ -121,6 +158,12 @@ public class RunProcessor implements Closeable
         if( args.length == 1 && "-b".equals( args[0] ) ) {
             LOGGER.info( "ScrapeReservationsBookedOn job requested; queueing job..." );
             processor.insertScrapeReservationsBookedOnJob();
+        }
+
+        // option -h to add a housekeeping report job
+        if( args.length == 1 && "--housekeeping".equals( args[0] ) ) {
+            LOGGER.info( "Housekeeping job requested; queueing job..." );
+            processor.insertHousekeepingJob();
         }
 
         processor.processJobs();
