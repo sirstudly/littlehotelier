@@ -68,8 +68,7 @@ public class RunProcessor implements Closeable
      * Creates an allocation scraper job.
      */
     public void insertAllocationScraperJob() {
-        Job j = new Job();
-        j.setClassName( AllocationScraperJob.class.getName() );
+        Job j = new AllocationScraperJob();
         j.setStatus( JobStatus.submitted );
         
         Calendar c = Calendar.getInstance();
@@ -83,23 +82,20 @@ public class RunProcessor implements Closeable
     }
 
     public void insertCreateConfirmDepositAmountsJob() {
-        Job j = new Job();
-        j.setClassName( CreateConfirmDepositAmountsJob.class.getName() );
+        Job j = new CreateConfirmDepositAmountsJob();
         j.setStatus( JobStatus.submitted );
         dao.insertJob( j );
     }
 
     public void insertScrapeReservationsBookedOnJob() {
-        Job j = new Job();
-        j.setClassName( ScrapeReservationsBookedOnJob.class.getName() );
+        Job j = new ScrapeReservationsBookedOnJob();
         j.setStatus( JobStatus.submitted );
         j.setParameter( "booked_on_date", BookingsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( new Date() ) );
         dao.insertJob( j );
     }
 
     public void insertHousekeepingJob() {
-        Job j = new Job();
-        j.setClassName( HousekeepingJob.class.getName() );
+        Job j = new HousekeepingJob();
         j.setStatus( JobStatus.submitted );
         j.setParameter( "selected_date", BookingsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( new Date() ) );
         dao.insertJob( j );

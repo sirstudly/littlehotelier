@@ -4,7 +4,6 @@
     <comment>Reporting SQL queries</comment>
     <entry key="reservations.split.rooms">
 -- Query all reservations that span more than 1 room for the same room type
--- Parameters: job_id of the AllocationScraperJob to use data for
 INSERT INTO wp_lh_rpt_split_rooms (job_id, reservation_id, guest_name, checkin_date, checkout_date, data_href, 
        notes, lh_status, booking_reference, booking_source, booked_date, eta, viewed_yn, created_date)
 SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' ) guest_name, 
@@ -21,7 +20,7 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
                   JOIN wp_lh_rooms rm ON c.room = rm.room AND c.bed_name = rm.bed_name
                  WHERE rm.room_type NOT IN ('LT MALE', 'LT FEMALE')
                    AND c.reservation_id > 0 -- do not include room closures
-                   AND c.job_id = ?
+                   AND c.job_id = ? -- the job_id of the AllocationScraperJob to use data for
                  GROUP BY c.job_id, c.reservation_id, rm.room, rm.capacity, rm.room_type
               ) t
         WHERE t.reservation_id = rep.reservation_id

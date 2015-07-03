@@ -3,9 +3,11 @@ package com.macbackpackers.jobs;
 import java.text.ParseException;
 import java.util.Date;
 
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
+
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Component;
 
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
@@ -15,11 +17,12 @@ import com.macbackpackers.scrapers.BookingsPageScraper;
  * and updates the allocation records from a previous AllocationScraperJob.
  *
  */
-@Component
-@Scope( "prototype" )
+@Entity
+@DiscriminatorValue( value = "com.macbackpackers.jobs.BookingScraperJob" )
 public class BookingScraperJob extends AbstractJob {
     
     @Autowired
+    @Transient
     private BookingsPageScraper bookingScraper;
     
     @Override

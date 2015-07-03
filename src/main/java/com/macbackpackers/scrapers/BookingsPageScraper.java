@@ -2,12 +2,12 @@ package com.macbackpackers.scrapers;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,8 +37,8 @@ public class BookingsPageScraper {
     
     private final Logger LOGGER = LogManager.getLogger( getClass() );
 
-    public static final SimpleDateFormat DATE_FORMAT_YYYY_MM_DD = new SimpleDateFormat( "yyyy-MM-dd" );
-    public static final SimpleDateFormat DATE_FORMAT_BOOKING_URL = new SimpleDateFormat( "dd+MMM+yyyy" );
+    public static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
+    public static final FastDateFormat DATE_FORMAT_BOOKING_URL = FastDateFormat.getInstance( "dd+MMM+yyyy" );
 	
     @Autowired
     private WebClient webClient;
@@ -260,8 +260,7 @@ public class BookingsPageScraper {
                 // will be picked up the allocation scraper job run daily
                 if( StringUtils.isNotBlank( dataId ) && "unread".equals( styleClass )) {
                     LOGGER.info( "Creating ConfirmDepositAmountsJob for reservation id " + dataId );
-                    Job tickDepositJob = new Job();
-                    tickDepositJob.setClassName( ConfirmDepositAmountsJob.class.getName() );
+                    Job tickDepositJob = new ConfirmDepositAmountsJob();
                     tickDepositJob.setStatus( JobStatus.submitted );
                     tickDepositJob.setParameter( "reservation_id", dataId );
                     wordPressDAO.insertJob( tickDepositJob );

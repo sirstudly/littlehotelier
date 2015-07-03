@@ -2,44 +2,103 @@ package com.macbackpackers.beans;
 
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.sql.Timestamp;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Calendar;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.hibernate.annotations.Type;
 
+@Entity
+@Table( name = "wp_lh_calendar" )
 public class Allocation {
 
-    private final Logger LOGGER = LogManager.getLogger(getClass());
+    private final static Logger LOGGER = LogManager.getLogger(Allocation.class);
 
-    public static final SimpleDateFormat DATE_FORMAT_BOOKED_DATE = new SimpleDateFormat( "dd MMM yyyy" );
+    public static final FastDateFormat DATE_FORMAT_BOOKED_DATE = FastDateFormat.getInstance( "dd MMM yyyy" );
 
+    @Id
+    @GeneratedValue( strategy = GenerationType.AUTO )
+    @Column( name = "id", nullable = false )
     private int id;
+    
+    @Column( name = "job_id", nullable = false )
     private int jobId;
+    
+    @Column( name = "room_id" )
     private int roomId;
+
+    @Column( name = "room", nullable = false )
     private String room;
+
+    @Column( name = "bed_name" )
     private String bedName;
+
+    @Column( name = "reservation_id" )
     private int reservationId;
+
+    @Column( name = "guest_name" )
     private String guestName;
+
+    @Column( name = "checkin_date" )
     private Date checkinDate;
+
+    @Column( name = "checkout_date" )
     private Date checkoutDate;
+
+    @Column( name = "payment_total" )
     private BigDecimal paymentTotal;
+
+    @Column( name = "payment_outstanding" )
     private BigDecimal paymentOutstanding;
+
+    @Column( name = "rate_plan_name" )
     private String ratePlanName;
+
+    @Column( name = "payment_status" )
     private String paymentStatus;
+
+    @Column( name = "num_guests" )
     private int numberGuests;
+
+    @Column( name = "data_href" )
     private String dataHref;
+
+    @Column( name = "lh_status" )
     private String status;
+
+    @Column( name = "booking_reference" )
     private String bookingReference;
+
+    @Column( name = "booking_source" )
     private String bookingSource;
+
+    @Column( name = "booked_date" )
     private java.util.Date bookedDate;
+
+    @Column( name = "eta" )
     private String eta;
+
+    @Column( name = "notes" )
     private String notes;
+
+    @Column( name = "viewed_yn" )
+    @Type(type = "yes_no")
     private boolean viewed;
-    private Date createdDate;
+
+    @Column( name = "created_date" )
+    private Timestamp createdDate;
 
     public int getId() {
         return id;
@@ -264,11 +323,11 @@ public class Allocation {
         this.notes = notes;
     }
 
-    public Date getCreatedDate() {
+    public Timestamp getCreatedDate() {
         return createdDate;
     }
 
-    public void setCreatedDate( Date createdDate ) {
+    public void setCreatedDate( Timestamp createdDate ) {
         this.createdDate = createdDate;
     }
     

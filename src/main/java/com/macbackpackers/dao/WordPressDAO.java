@@ -1,46 +1,23 @@
 package com.macbackpackers.dao;
 
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
-import java.util.Properties;
 
+import org.apache.commons.lang3.time.FastDateFormat;
 import org.springframework.dao.EmptyResultDataAccessException;
 
 import com.macbackpackers.beans.Allocation;
-import com.macbackpackers.beans.BedSheetEntry;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
 
 public interface WordPressDAO {
-    
-    public static final SimpleDateFormat DATE_FORMAT_YYYY_MM_DD = new SimpleDateFormat(  "yyyy-MM-dd 00:00:00" );
 
-    // BedSheets
-    // Room | Bed | W Th Fr Sa Su Mo Tu |
-    // 12 Change / No Change / 3-Day Change
-    //
-    // wp_bedcount
-    // job id
-    // room #
-    // bed name
-    // date (mm/dd/yyyy)
-    // change Y/N/3
-
-    /*
-     * 
-     * CREATE TABLE `wp_bedsheets` ( `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT, `job_id` bigint(2) unsigned,
-     * `room` varchar(50) NOT NULL, `bed_name` varchar(50) DEFAULT NULL, `checkout_date` datetime NOT NULL, `change`
-     * varchar(1) DEFAULT 'N' NOT NULL, `created_date` timestamp DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (`id`) )DEFAULT
-     * CHARSET=utf8;
+    /**
+     * Format for use when parsing whole dates (e.g. checkin/checkout dates, etc.)
      */
-    public List<BedSheetEntry> getAllBedSheetEntriesForDate( int jobId, Date date );
-    
-    public void insertBedSheetEntry( BedSheetEntry entry );
-
-    public void deleteAllBedSheetEntriesForJobId( int jobId );
+    public static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance(  "yyyy-MM-dd 00:00:00" );
 
     /**
      * Inserts a new allocation. The assigned id will be set on the
@@ -59,6 +36,14 @@ public interface WordPressDAO {
     public void updateAllocation( Allocation alloc );
     
     /**
+     * Returns an allocation by primary key.
+     * @param id primary key
+     * @return non-null allocation
+     * @throws EmptyResultDataAccessException if allocation does not exist
+     */
+    public Allocation fetchAllocation( int id ) throws EmptyResultDataAccessException;
+    
+    /**
      * Queries an existing allocation by job id and reservation id.
      * 
      * @param jobId ID of job that scraped the original allocation
@@ -75,16 +60,6 @@ public interface WordPressDAO {
      * @return PK of job
      */
     public int insertJob( Job job );
-
-    /**
-     * Purges all job data
-     */
-    public void deleteAllJobData();
-    
-    /**
-     * Purges all transactional data.
-     */
-    public void deleteAllTransactionalData();
 
     /**
      * Updates the status of the given job.
@@ -116,15 +91,7 @@ public interface WordPressDAO {
      * @return non-null job
      * @throws EmptyResultDataAccessException if job not found
      */
-    public Job getJobById( int id ) throws EmptyResultDataAccessException;
-    
-    /**
-     * Gets all parameters for the given job. 
-     * 
-     * @param jobId PK of job
-     * @return non-null job parameters
-     */
-    public Properties getJobParameters( int jobId );
+    public AbstractJob fetchJobById( int id ) throws EmptyResultDataAccessException;
     
     /**
      * Returns the most recent completed job of the given type.

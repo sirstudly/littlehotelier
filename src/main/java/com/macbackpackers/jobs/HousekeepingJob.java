@@ -1,12 +1,15 @@
+
 package com.macbackpackers.jobs;
 
 import java.text.ParseException;
 import java.util.Calendar;
 import java.util.Date;
 
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
+
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Component;
 
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 
@@ -14,13 +17,14 @@ import com.macbackpackers.scrapers.AllocationsPageScraper;
  * Job that updates the housekeeping tables for the given date
  *
  */
-@Component
-@Scope( "prototype" )
+@Entity
+@DiscriminatorValue( value = "com.macbackpackers.jobs.HousekeepingJob" )
 public class HousekeepingJob extends AbstractJob {
-    
+
     @Autowired
+    @Transient
     private AllocationsPageScraper allocationScraper;
-    
+
     @Override
     public void processJob() throws Exception {
         // we just need to scrape new data for the given date (and previous day)
@@ -31,7 +35,7 @@ public class HousekeepingJob extends AbstractJob {
         dayBefore.add( Calendar.DATE, -1 );
         allocationScraper.dumpAllocationsBetween( getId(), dayBefore.getTime(), selectedDate, false );
     }
-    
+
     /**
      * Gets the date to start scraping the allocation data (inclusive).
      * 
@@ -41,5 +45,5 @@ public class HousekeepingJob extends AbstractJob {
     private Date getSelectedDate() throws ParseException {
         return AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "selected_date" ) );
     }
-    
+
 }

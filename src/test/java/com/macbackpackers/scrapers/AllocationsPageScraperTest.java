@@ -38,15 +38,13 @@ public class AllocationsPageScraperTest {
 
     @Test
     public void testInsertAndRunHousekeepingJob() throws Exception {
-        Job j = new Job();
-        j.setClassName( HousekeepingJob.class.getName() );
+        Job j = new HousekeepingJob();
         j.setStatus( JobStatus.submitted );
         dao.insertJob( j );
         
         // this should be the one we just added
         j = dao.getNextJobToProcess();
         Assert.assertEquals( HousekeepingJob.class, j.getClass() );
-        Assert.assertEquals( HousekeepingJob.class.getName(), j.getClassName() );
         Assert.assertEquals( "submitted", j.getStatus() );
         Assert.assertNotNull( "created date not initialised", j.getCreatedDate() );
         

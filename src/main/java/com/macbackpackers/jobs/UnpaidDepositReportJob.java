@@ -1,15 +1,15 @@
 package com.macbackpackers.jobs;
 
-import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Component;
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
 
 /**
  * Creates a report with all bookings that have not yet paid a deposit using 
  * data from a previous AllocationScraperJob.
  *
  */
-@Component
-@Scope( "prototype" )
+@Entity
+@DiscriminatorValue( value = "com.macbackpackers.jobs.UnpaidDepositReportJob" )
 public class UnpaidDepositReportJob extends AbstractJob {
     
     @Override
