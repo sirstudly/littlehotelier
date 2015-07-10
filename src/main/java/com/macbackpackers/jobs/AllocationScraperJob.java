@@ -2,6 +2,7 @@
 package com.macbackpackers.jobs;
 
 import java.text.ParseException;
+import java.util.Calendar;
 import java.util.Date;
 
 import javax.persistence.DiscriminatorValue;
@@ -45,11 +46,10 @@ public class AllocationScraperJob extends AbstractJob {
         // create a separate job for each checkin_date for the given allocation records
         // this will make it easier to re-run if any date fails
         for ( Date checkinDate : dao.getCheckinDatesForAllocationScraperJobId( getId() ) ) {
-            Job bookingScraperJob = new BookingScraperJob();
+            BookingScraperJob bookingScraperJob = new BookingScraperJob();
             bookingScraperJob.setStatus( JobStatus.submitted );
-            bookingScraperJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
-            bookingScraperJob.setParameter( "checkin_date",
-                    AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ) );
+            bookingScraperJob.setAllocationScraperJobId( getId() );
+            bookingScraperJob.setCheckinDate( checkinDate );
             dao.insertJob( bookingScraperJob );
         }
 
@@ -64,9 +64,9 @@ public class AllocationScraperJob extends AbstractJob {
      * Creates an additional job to run the split room report.
      */
     private void insertSplitRoomReportJob() {
-        Job splitRoomReportJob = new SplitRoomReservationReportJob();
+        SplitRoomReservationReportJob splitRoomReportJob = new SplitRoomReservationReportJob();
         splitRoomReportJob.setStatus( JobStatus.submitted );
-        splitRoomReportJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
+        splitRoomReportJob.setAllocationScraperJobId( getId() );
         dao.insertJob( splitRoomReportJob );
     }
 
@@ -74,9 +74,9 @@ public class AllocationScraperJob extends AbstractJob {
      * Creates an additional job to run the unpaid deposit report.
      */
     private void insertUnpaidDepositReportJob() {
-        Job unpaidDepositRptJob = new UnpaidDepositReportJob();
+        UnpaidDepositReportJob unpaidDepositRptJob = new UnpaidDepositReportJob();
         unpaidDepositRptJob.setStatus( JobStatus.submitted );
-        unpaidDepositRptJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
+        unpaidDepositRptJob.setAllocationScraperJobId( getId() );
         dao.insertJob( unpaidDepositRptJob );
     }
 
@@ -84,9 +84,9 @@ public class AllocationScraperJob extends AbstractJob {
      * Creates an additional job to run the group bookings report.
      */
     private void insertGroupBookingsReportJob() {
-        Job groupBookingRptJob = new GroupBookingsReportJob();
+        GroupBookingsReportJob groupBookingRptJob = new GroupBookingsReportJob();
         groupBookingRptJob.setStatus( JobStatus.submitted );
-        groupBookingRptJob.setParameter( "allocation_scraper_job_id", String.valueOf( getId() ) );
+        groupBookingRptJob.setAllocationScraperJobId( getId() );
         dao.insertJob( groupBookingRptJob );
     }
 
@@ -105,8 +105,38 @@ public class AllocationScraperJob extends AbstractJob {
      * @return non-null date parameter
      * @throws ParseException
      */
-    private Date getStartDate() throws ParseException {
+    public Date getStartDate() throws ParseException {
         return AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "start_date" ) );
+    }
+
+    /**
+     * Sets the date to start scraping the allocation data (inclusive).
+     * 
+     * @param startDate non-null date parameter
+     */
+    public void setStartDate( Date startDate ) {
+        setParameter( "start_date", AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( startDate ) );
+    }
+
+    /**
+     * Returns the number of days ahead to look for allocations from the start date.
+     * 
+     * @return non-negative number of days
+     */
+    public int getDaysAhead() {
+        return Integer.parseInt( getParameter( "days_ahead" ) );
+    }
+
+    /**
+     * Sets the number of days ahead to look for allocations from the start date.
+     * 
+     * @param daysAhead number of days
+     */
+    public void setDaysAhead( int daysAhead ) {
+        if ( daysAhead < 0 ) {
+            throw new IllegalArgumentException( "Days ahead must be non-negative" );
+        }
+        setParameter( "days_ahead", String.valueOf( daysAhead ) );
     }
 
     /**
@@ -115,8 +145,10 @@ public class AllocationScraperJob extends AbstractJob {
      * @return non-null date parameter
      * @throws ParseException
      */
-    private Date getEndDate() throws ParseException {
-        return AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "end_date" ) );
+    public Date getEndDate() throws ParseException {
+        Calendar cal = Calendar.getInstance();
+        cal.add( Calendar.DATE, getDaysAhead() );
+        return cal.getTime();
     }
 
     /**

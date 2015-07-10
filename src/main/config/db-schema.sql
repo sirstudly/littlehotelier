@@ -48,8 +48,28 @@ CREATE TABLE `wp_lh_job_param` (
   `job_id` bigint(20) unsigned NOT NULL,
   `name` varchar(255) NOT NULL,
   `value` varchar(255) NOT NULL,
-  PRIMARY KEY (`job_param_id`),
-  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
+  PRIMARY KEY (`job_param_id`)
+--  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)  -- removed cause of hibernate
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+
+CREATE TABLE `wp_lh_scheduled_jobs` (
+  `job_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `classname` varchar(255) NOT NULL,
+  `cron_schedule` varchar(255) NOT NULL,
+  `active_yn` char(1) DEFAULT 'Y',
+  `last_scheduled_date` timestamp NULL DEFAULT NULL,
+  `last_updated_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`job_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `wp_lh_scheduled_job_param` (
+  `job_param_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `job_id` bigint(20) unsigned NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `value` varchar(255) NOT NULL,
+  PRIMARY KEY (`job_param_id`)
+--  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_scheduled_jobs`(`id`) -- removed cause of hibernate
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 -- reporting table for reservations split across multiple rooms of the same type

@@ -1,6 +1,9 @@
 
 package com.macbackpackers.config;
 
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.quartz.impl.StdSchedulerFactory;
 import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -30,6 +33,11 @@ public class LittleHotelierConfig {
     @Scope( "prototype" )
     public WebClient getWebClient() {
         return new WebClient( BrowserVersion.CHROME ); // return a new instance of this when requested        
+    }
+
+    @Bean
+    public Scheduler getScheduler() throws SchedulerException {
+        return StdSchedulerFactory.getDefaultScheduler();
     }
 
 }

@@ -1,6 +1,8 @@
 
 package com.macbackpackers.services;
 
+import java.sql.Timestamp;
+import java.util.Calendar;
 import java.util.Date;
 
 import org.apache.log4j.LogManager;
@@ -9,7 +11,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.quartz.Scheduler;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
@@ -21,6 +25,7 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
+import com.macbackpackers.jobs.DbPurgeJob;
 import com.macbackpackers.jobs.GroupBookingsReportJob;
 import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.jobs.SplitRoomReservationReportJob;
@@ -41,6 +46,9 @@ public class ProcessorServiceTest {
 
     @Autowired
     TestHarnessDAO testDAO;
+
+    @Autowired
+    Scheduler scheduler;
 
     @Before
     public void setUp() {
@@ -187,6 +195,44 @@ public class ProcessorServiceTest {
         // verify that the job completed successfully
         Job jobVerify = dao.fetchJobById( jobId );
         Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+    }
+
+    @Test
+    public void testDbPurgeJob() throws Exception {
+        Calendar now = Calendar.getInstance();
+        now.add( Calendar.DATE, -30 ); // 30 days ago
+
+        // insert old job to be deleted
+        Job j = new AllocationScraperJob();
+        j.setStatus( JobStatus.completed );
+        j.setParameter( "start_date", "2015-05-29 00:00:00" );
+        j.setParameter( "end_date", "2015-06-14 00:00:00" );
+        j.setCreatedDate( new Timestamp( now.getTimeInMillis() ) );
+        j.setLastUpdatedDate( new Timestamp( now.getTimeInMillis() ) );
+        j.setJobStartDate( new Timestamp( now.getTimeInMillis() ) );
+        j.setJobEndDate( new Timestamp( now.getTimeInMillis() ) );
+        int oldJobId = dao.insertJob( j );
+
+        // setup job under test
+        DbPurgeJob dbJob = new DbPurgeJob();
+        dbJob.setStatus( JobStatus.submitted );
+        dbJob.setDaysToKeep( 20 );
+        int jobId = dao.insertJob( j );
+
+        // this should now run the job
+        processorService.processJobs();
+
+        // verify that the job completed successfully
+        Job jobVerify = dao.fetchJobById( jobId );
+        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+
+        try {
+            dao.fetchJobById( oldJobId ); // this should've been deleted
+            Assert.fail( "exception expected" );
+        }
+        catch ( EmptyResultDataAccessException ex ) {
+            // expected exception
+        }
     }
 
 }

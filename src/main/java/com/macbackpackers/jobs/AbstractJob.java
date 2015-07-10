@@ -22,14 +22,13 @@ import com.macbackpackers.dao.WordPressDAO;
  *
  */
 @Entity
-//@Configurable
 @Component
 @Scope( "prototype" )
 @Polymorphism( type = PolymorphismType.EXPLICIT )
-//@DiscriminatorValue( value = "com.macbackpackers.jobs.AbstractJob" )
 public abstract class AbstractJob extends Job {
 
-    protected static final Logger LOGGER = LogManager.getLogger( AbstractJob.class );
+    @Transient
+    protected final Logger LOGGER = LogManager.getLogger( getClass() );
 
     @Autowired
     @Transient
@@ -55,7 +54,7 @@ public abstract class AbstractJob extends Job {
             LOGGER.info( "Finished job " + getId() );
             dao.updateJobStatus( getId(), JobStatus.completed, JobStatus.processing );
         }
-        catch ( Exception ex ) {
+        catch ( Throwable ex ) {
             LOGGER.error( "Error occurred when running " + getClass().getSimpleName() + " id: " + getId(), ex );
             dao.updateJobStatus( getId(), JobStatus.failed, JobStatus.processing );
         }

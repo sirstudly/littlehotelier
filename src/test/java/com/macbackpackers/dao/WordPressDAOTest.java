@@ -3,6 +3,7 @@ package com.macbackpackers.dao;
 
 import java.sql.Timestamp;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -38,7 +39,7 @@ public class WordPressDAOTest {
 
     @Autowired
     TestHarnessDAO testDAO;
-    
+
     static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
 
     @Before
@@ -148,7 +149,6 @@ public class WordPressDAOTest {
     @Test
     public void testCreateBookingScraperJob() throws Exception {
         Job j = new BookingScraperJob();
-        //j.setClassName( AllocationScraperJob.class.getName() );
         j.setStatus( JobStatus.submitted );
         j.setParameter( "checkin_date", "2015-05-29 00:00:00" );
         j.setParameter( "allocation_scraper_job_id", "12" );
@@ -223,7 +223,6 @@ public class WordPressDAOTest {
     @Test
     public void testUpdateJobStatus() throws Exception {
         HousekeepingJob j = new HousekeepingJob();
-        //j.setClassName( HousekeepingJob.class.getName() );
         j.setStatus( JobStatus.submitted );
         int jobId = dao.insertJob( j );
 
@@ -273,26 +272,26 @@ public class WordPressDAOTest {
         // execute
         Assert.assertEquals( "empty list", 0, dao.queryAllocationsByJobIdAndReservationId( 2, 10 ).size() );
         Assert.assertEquals( "empty list", 0, dao.queryAllocationsByJobIdAndReservationId( 3, 19 ).size() );
-        
+
         // execute returned list of size 1
         List<Allocation> allocs = dao.queryAllocationsByJobIdAndReservationId( 2, 11 );
         Assert.assertEquals( "size", 1, allocs.size() );
         Assert.assertEquals( "allocation name", "guest B", allocs.get( 0 ).getGuestName() );
         Assert.assertEquals( "reservation ID", 11, allocs.get( 0 ).getReservationId() );
         Assert.assertEquals( "job ID", 2, allocs.get( 0 ).getJobId() );
-        
+
         // execute returned list of size 3
         allocs = dao.queryAllocationsByJobIdAndReservationId( 3, 10 );
         Assert.assertEquals( "size", 3, allocs.size() );
-        for( Allocation alloc : allocs ) {
+        for ( Allocation alloc : allocs ) {
             Assert.assertEquals( "reservation ID", 10, alloc.getReservationId() );
             Assert.assertEquals( "job ID", 3, alloc.getJobId() );
         }
-        Assert.assertEquals( "allocation names", 
-                new HashSet<String>( Arrays.asList( "guest A", "guest C", "guest E" ) ), 
-                new HashSet<String>( Arrays.asList( 
-                        allocs.get( 0 ).getGuestName(), 
-                        allocs.get( 1 ).getGuestName(), 
+        Assert.assertEquals( "allocation names",
+                new HashSet<String>( Arrays.asList( "guest A", "guest C", "guest E" ) ),
+                new HashSet<String>( Arrays.asList(
+                        allocs.get( 0 ).getGuestName(),
+                        allocs.get( 1 ).getGuestName(),
                         allocs.get( 2 ).getGuestName() ) ) );
     }
 
@@ -320,13 +319,13 @@ public class WordPressDAOTest {
         Assert.assertEquals( "first date", "2014-04-20", DATE_FORMAT_YYYY_MM_DD.format( dates.get( 0 ) ) );
         Assert.assertEquals( "second date", "2014-05-03", DATE_FORMAT_YYYY_MM_DD.format( dates.get( 1 ) ) );
     }
-    
+
     @Test
     public void testResetAllProcessingJobsToFailed() throws Exception {
         Job job1 = new AllocationScraperJob();
         job1.setStatus( JobStatus.submitted );
         dao.insertJob( job1 );
-        
+
         Job job2 = new HousekeepingJob();
         job2.setStatus( JobStatus.processing );
         dao.insertJob( job2 );
@@ -334,12 +333,33 @@ public class WordPressDAOTest {
         Job job3 = new ConfirmDepositAmountsJob();
         job3.setStatus( JobStatus.completed );
         dao.insertJob( job3 );
-        
+
         // execute
         dao.resetAllProcessingJobsToFailed();
         Assert.assertEquals( "job1 status", JobStatus.submitted, dao.fetchJobById( job1.getId() ).getStatus() );
         Assert.assertEquals( "job2 status", JobStatus.failed, dao.fetchJobById( job2.getId() ).getStatus() );
         Assert.assertEquals( "job3 status", JobStatus.completed, dao.fetchJobById( job3.getId() ).getStatus() );
+    }
+
+    @Test
+    public void testPurgeRecordsOlderThan() throws Exception {
+        Calendar now = Calendar.getInstance();
+        now.add( Calendar.DATE, -30 ); // 30 days ago
+
+        Job j = new AllocationScraperJob();
+        j.setStatus( JobStatus.completed );
+        j.setParameter( "start_date", "2015-05-29 00:00:00" );
+        j.setParameter( "end_date", "2015-06-14 00:00:00" );
+        j.setCreatedDate( new Timestamp( now.getTimeInMillis() ) );
+        j.setLastUpdatedDate( new Timestamp( now.getTimeInMillis() ) );
+        j.setJobStartDate( new Timestamp( now.getTimeInMillis() ) );
+        j.setJobEndDate( new Timestamp( now.getTimeInMillis() ) );
+        int jobId = dao.insertJob( j );
+
+        insertTestAllocation( jobId, 10, "Hostelworld", "12.01", "12.01" );
+
+        now.add( Calendar.DATE, 1 ); // move up a day
+        dao.purgeRecordsOlderThan( now.getTime() );
     }
 
     private Allocation createTestAllocation( int jobId, Date checkinDate, String bookingSource ) throws Exception {

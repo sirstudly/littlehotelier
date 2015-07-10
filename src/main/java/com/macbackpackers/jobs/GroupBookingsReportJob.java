@@ -18,8 +18,12 @@ public class GroupBookingsReportJob extends AbstractJob {
         dao.runGroupBookingsReport( getAllocationScraperJobId() );
     }
 
-    private int getAllocationScraperJobId() {
+    public int getAllocationScraperJobId() {
         return Integer.parseInt( getParameter( "allocation_scraper_job_id" ) );
+    }
+
+    public void setAllocationScraperJobId( int jobId ) {
+        setParameter( "allocation_scraper_job_id", String.valueOf( jobId ) );
     }
 
 }

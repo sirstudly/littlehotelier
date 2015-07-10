@@ -8,8 +8,8 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 
 @Entity
-@Table( name = "wp_lh_job_param" )
-public class JobParameter implements NameValuePair {
+@Table( name = "wp_lh_scheduled_job_param" )
+public class ScheduledJobParameter implements NameValuePair {
 
     @Id
     @GeneratedValue
@@ -25,11 +25,11 @@ public class JobParameter implements NameValuePair {
     @Column( name = "value" )
     private String value;
 
-    public JobParameter() {
+    public ScheduledJobParameter() {
         // default constructor
     }
 
-    public JobParameter( String name, String value ) {
+    public ScheduledJobParameter( String name, String value ) {
         this.name = name;
         this.value = value;
     }
@@ -70,8 +70,8 @@ public class JobParameter implements NameValuePair {
 
     @Override
     public boolean equals( Object other ) {
-        if ( other.getClass().isAssignableFrom( JobParameter.class ) ) {
-            return getName().equals( ((JobParameter) other).getName() );
+        if ( other.getClass().isAssignableFrom( ScheduledJobParameter.class ) ) {
+            return getName().equals( ((ScheduledJobParameter) other).getName() );
         }
         return false;
     }
