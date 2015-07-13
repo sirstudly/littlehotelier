@@ -64,7 +64,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     public void updateAllocationList( AllocationList allocList ) {
         allocList.setCreatedDate( new Timestamp( System.currentTimeMillis() ) );
-        for( Allocation a : allocList ) {
+        for ( Allocation a : allocList ) {
             sessionFactory.getCurrentSession().saveOrUpdate( a );
         }
     }
@@ -95,7 +95,16 @@ public class WordPressDAOImpl implements WordPressDAO {
             throw new IncorrectNumberOfRecordsUpdatedException(
                     "Previous job status is " + job.getStatus() + " when attempting to set to " + status );
         }
+        updateJobStatus( job, status );
+    }
 
+    @Transactional
+    @Override
+    public void updateJobStatus( int jobId, JobStatus status ) {
+        updateJobStatus( fetchJobById( jobId ), status );
+    }
+
+    private void updateJobStatus( Job job, JobStatus status ) {
         if ( status == JobStatus.processing ) {
             job.setJobStartDate( new Timestamp( System.currentTimeMillis() ) );
         }
@@ -197,7 +206,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                 "FROM ScheduledJob WHERE active = true" )
                 .list();
     }
-    
+
     @Transactional
     @Override
     public void updateScheduledJob( int jobId ) {
@@ -264,7 +273,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         LOGGER.info( "Running report for job id: " + allocationScraperJobId );
         sessionFactory.getCurrentSession()
                 .createSQLQuery( sql.getProperty( "reservations.split.rooms" ) )
-                .setParameter( 0, allocationScraperJobId )
+                .setParameter( "jobId", allocationScraperJobId )
                 .executeUpdate();
     }
 

@@ -37,7 +37,10 @@ public class Allocation {
     private int jobId;
     
     @Column( name = "room_id" )
-    private int roomId;
+    private Integer roomId;
+
+    @Column( name = "room_type_id", nullable = false )
+    private int roomTypeId;
 
     @Column( name = "room", nullable = false )
     private String room;
@@ -124,12 +127,22 @@ public class Allocation {
         this.reservationId = reservationId;
     }
 
-    public int getRoomId() {
+    public Integer getRoomId() {
         return roomId;
     }
 
-    public void setRoomId( int roomId ) {
+    public void setRoomId( Integer roomId ) {
         this.roomId = roomId;
+    }
+
+    
+    public int getRoomTypeId() {
+        return roomTypeId;
+    }
+
+    
+    public void setRoomTypeId( int roomTypeId ) {
+        this.roomTypeId = roomTypeId;
     }
 
     public String getRoom() {

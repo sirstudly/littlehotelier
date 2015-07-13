@@ -81,6 +81,15 @@ public interface WordPressDAO {
             throws IncorrectNumberOfRecordsUpdatedException;
 
     /**
+     * Updates the status of the given job.
+     * 
+     * @param jobId PK of job
+     * @param status status to set
+     * @throws EmptyResultDataAccessException if record not found
+     */
+    public void updateJobStatus( int jobId, JobStatus status ) throws EmptyResultDataAccessException;
+
+    /**
      * Updates all job statuses of 'processing' to 'failed'.
      */
     public void resetAllProcessingJobsToFailed();

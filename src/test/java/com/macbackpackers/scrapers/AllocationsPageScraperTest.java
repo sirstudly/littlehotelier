@@ -17,6 +17,7 @@ import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.HousekeepingJob;
 
 @RunWith(SpringJUnit4ClassRunner.class)
@@ -60,17 +61,15 @@ public class AllocationsPageScraperTest {
 
     @Test
 	public void testDumpCalendarPage() throws Exception {
+        Date july27 = AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( "2015-07-27" );
+        Date aug03 = AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( "2015-08-03" );
+        
+        Job j = new AllocationScraperJob();
+        j.setStatus( JobStatus.submitted );
+        int jobId = dao.insertJob( j );
 
-        // create a job
-//        Job j = new Job();
-//        j.setName( "test dump job" );
-//        j.setStatus( JobStatus.submitted );
-//        int jobId = dao.insertJob( j );
-//        
-//        // FIXME: might not be the same job
-//        Job job = dao.getNextJobToProcess();
-//		scraper.dumpPageForJob( job, new Date() ); // writes the current page to file updating wp_lh_calendar
-//        dao.updateJobStatus( job.getId(), JobStatus.completed, JobStatus.submitted );
+        scraper.dumpAllocationsBetween( jobId, july27, aug03, false );
+        dao.updateJobStatus( jobId, JobStatus.completed, JobStatus.submitted );
 	}
 
 	@Test

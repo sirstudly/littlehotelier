@@ -30,11 +30,8 @@ import com.macbackpackers.services.FileService;
 /**
  * Scrapes the allocations page for the specified dates.
  * 
- * TODO:
  * <ul>
  * <li>wordpress -> refresh button -> inserts "job" record into db.</li>
- * <li>fires off (async) shell command to scrape.</li>
- * <li>Polls job every 10 seconds until complete. Displays content of page.</li>
  * </ul>
  * 
  * <b>Scraper</b>
@@ -54,6 +51,7 @@ public class AllocationsPageScraper {
     private final Logger LOGGER = LogManager.getLogger( getClass() );
 
     public static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
+    public static final String POUND = "\u00a3";
 
     @Autowired
     private WebClient webClient;
@@ -146,18 +144,29 @@ public class AllocationsPageScraper {
 
         // now iterate over all div's and gather all our information
         String currentBedName = null;
-        String dataRoomId = "";
+        String dataRoomId = null;
+        String dataRoomTypeId = null;
         for ( DomElement div : calendarPage.getElementsByTagName( "div" ) ) {
             try {
                 String dataDate = div.getAttribute( "data-date" );
 
-                if ( StringUtils.isNotBlank( div.getAttribute( "data-room_id" ) ) ) {
-                    dataRoomId = div.getAttribute( "data-room_id" );
+                if ( StringUtils.isNotBlank( div.getAttribute( "data-room_type_id" ) ) ) {
+                    dataRoomTypeId = div.getAttribute( "data-room_type_id" );
+                    currentBedName = null; // reset
+
+                    if ( StringUtils.isNotBlank( div.getAttribute( "data-room_id" ) ) ) {
+                        dataRoomId = div.getAttribute( "data-room_id" );
+                    }
+                    else if ( StringUtils.contains( div.getAttribute( "class" ), "unallocated" ) ) {
+                        LOGGER.debug( "unallocated row for room_type_id: " + dataRoomTypeId );
+                        dataRoomId = null;
+                        currentBedName = "Unallocated";
+                    }
                 }
 
                 if ( StringUtils.isNotBlank( div.getAttribute( "data-room_id" ) ) ) {
                     LOGGER.debug( "data-room_id: " + dataRoomId );
-                    LOGGER.debug( "data-room_type_id: " + div.getAttribute( "data-room_type_id" ) );
+                    LOGGER.debug( "data-room_type_id: " + dataRoomTypeId );
 
                     if ( false == div.hasChildNodes() ) {
                         LOGGER.warn( "no child nodes for " + div.asText() );
@@ -169,7 +178,7 @@ public class AllocationsPageScraper {
                         }
                         else {
                             LOGGER.debug( "Bed Name: " + label.getAttribute( "title" ) );
-                            currentBedName = label.getAttribute( "title" );
+                            currentBedName = StringUtils.trimToNull( label.getAttribute( "title" ) );
                         }
                     }
                 }
@@ -180,7 +189,8 @@ public class AllocationsPageScraper {
                     // it could be one day off screen
                     for ( DomElement elem : div.getChildElements() ) {
                         if ( "span".equals( elem.getTagName() ) ) {
-                            insertAllocationFromSpan( jobId, Integer.parseInt( dataRoomId ),
+                            insertAllocationFromSpan( jobId, Integer.parseInt( dataRoomTypeId ),
+                                    dataRoomId == null ? null : Integer.parseInt( dataRoomId ),
                                     currentBedName, dataDate, elem );
                         }
                     }
@@ -199,15 +209,16 @@ public class AllocationsPageScraper {
      * Builds an allocation object from the given span element and inserts it into the db.
      * 
      * @param job job we are currently running
-     * @param dataRoomId room id
+     * @param dataRoomTypeId the unique id for the room <i>type</i> (required)
+     * @param dataRoomId room id (optional)
      * @param currentBedName the bed name for the allocation (required)
      * @param dataDate the data date for the record we are currently processing
      * @param span the span element containing the allocation details
      * @throws ParseException if date could not be parsed
      * @throws SQLException on data creation error
      */
-    private void insertAllocationFromSpan( int jobId, int dataRoomId, String currentBedName, String dataDate,
-            DomElement span )
+    private void insertAllocationFromSpan( int jobId, int dataRoomTypeId,
+            Integer dataRoomId, String currentBedName, String dataDate, DomElement span )
             throws ParseException, SQLException {
 
         // should have 3 spans
@@ -248,6 +259,7 @@ public class AllocationsPageScraper {
         Allocation alloc = new Allocation();
         alloc.setJobId( jobId );
         alloc.setRoomId( dataRoomId );
+        alloc.setRoomTypeId( dataRoomTypeId );
         alloc.setRoom( room );
         alloc.setBedName( bed );
         setCheckInOutDates( alloc, dataDate, span.getAttribute( "style" ) );
@@ -265,11 +277,10 @@ public class AllocationsPageScraper {
             }
         }
         else {
-
             alloc.setReservationId( Integer.parseInt( span.getAttribute( "data-reservation_id" ) ) );
             alloc.setGuestName( span.getAttribute( "data-guest_name" ) );
-            alloc.setPaymentTotal( span.getAttribute( "data-reservation_payment_total" ) );
-            alloc.setPaymentOutstanding( span.getAttribute( "data-reservation_payment_oustanding" ) );
+            alloc.setPaymentTotal( StringUtils.replaceChars( span.getAttribute( "data-reservation_payment_total" ), POUND + ",", "" ) );
+            alloc.setPaymentOutstanding( StringUtils.replaceChars( span.getAttribute( "data-reservation_payment_oustanding" ), POUND + ",", "" ) );
             alloc.setRatePlanName( span.getAttribute( "data-rate_plan_name" ) );
             alloc.setPaymentStatus( span.getAttribute( "data-payment_status" ) );
             alloc.setNumberGuests( calculateNumberOfGuests( span.getAttribute( "data-occupancy" ) ) );
