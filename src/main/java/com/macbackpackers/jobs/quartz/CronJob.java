@@ -2,8 +2,11 @@
 package com.macbackpackers.jobs.quartz;
 
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.log4j.LogManager;
@@ -52,9 +55,19 @@ public class CronJob implements org.quartz.Job {
             for ( String paramName : params.keySet() ) {
                 if ( false == KEYS.contains( paramName ) ) {
 
+                    Pattern p = Pattern.compile( "TODAY([\\+\\-][0-9]+)$" );
+                    Matcher m = p.matcher( params.getString( paramName ) );
+
                     // auto-fill TODAY with today's date
                     if ( "TODAY".equals( params.getString( paramName ) ) ) {
                         j.setParameter( paramName, DATE_FORMAT_YYYY_MM_DD.format( new Date() ) );
+                    }
+                    // auto-fill TODAY(+/- adjustment value)
+                    else if ( m.find() ) {
+                        String matchedAdjustment = m.group( 1 );
+                        Calendar cal = Calendar.getInstance();
+                        cal.add( Calendar.DATE, Integer.parseInt( matchedAdjustment ) );
+                        j.setParameter( paramName, DATE_FORMAT_YYYY_MM_DD.format( cal.getTime() ) );
                     }
                     else {
                         j.setParameter( paramName, params.getString( paramName ) );

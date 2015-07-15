@@ -437,21 +437,21 @@ INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`roo
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7024,'77',NULL,3,2965,'TRIPLE','Y');
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7016,'78',NULL,2,2964,'DBL','Y');
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7017,'79',NULL,2,2964,'DBL','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (1,'Unallocated',NULL,NULL,3109,'LT_MALE','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (2,'Unallocated',NULL,NULL,3110,'LT_FEMALE','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (3,'Unallocated',NULL,12,2967,'MX','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (4,'Unallocated',NULL,10,2970,'MX','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (5,'Unallocated',NULL,16,5112,'MX','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (6,'Unallocated',NULL,8,2971,'MX','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7,'Unallocated',NULL,14,5152,'MX','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (8,'Unallocated',NULL,12,2968,'F','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (9,'Unallocated',NULL,6,2972,'MX','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (10,'Unallocated',NULL,2,2980,'TWIN','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (11,'Unallocated',NULL,2,2964,'DBL','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (12,'Unallocated',NULL,4,2966,'QUAD','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (13,'Unallocated',NULL,3,2965,'TRIPLE','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (14,'Unallocated',NULL,4,2973,'MX','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (15,'Unallocated',NULL,4,2974,'F','Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (1,'Unallocated',NULL,NULL,3109,'LT_MALE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (2,'Unallocated',NULL,NULL,3110,'LT_FEMALE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (3,'Unallocated',NULL,12,2967,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (4,'Unallocated',NULL,10,2970,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (5,'Unallocated',NULL,16,5112,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (6,'Unallocated',NULL,8,2971,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7,'Unallocated',NULL,14,5152,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (8,'Unallocated',NULL,12,2968,'F','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (9,'Unallocated',NULL,6,2972,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (10,'Unallocated',NULL,2,2980,'TWIN','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (11,'Unallocated',NULL,2,2964,'DBL','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (12,'Unallocated',NULL,4,2966,'QUAD','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (13,'Unallocated',NULL,3,2965,'TRIPLE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (14,'Unallocated',NULL,4,2973,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (15,'Unallocated',NULL,4,2974,'F','N');
 
 
 -- If you're dumping the table from wp_lh_calendar; then you'll need to fill these in manually
@@ -505,3 +505,19 @@ UPDATE wp_lh_rooms
         WHERE c.room_id = r.id
           AND c.job_id IN ( [most recent jobs] ) );
  
+ 
+-- scheduled jobs
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (1,'com.macbackpackers.jobs.ScrapeReservationsBookedOnJob','0 31 * * * ?','Y',NULL,NOW());
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (2,'com.macbackpackers.jobs.HousekeepingJob','0 29 6 * * ?','Y',NULL,NOW());
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (3,'com.macbackpackers.jobs.AllocationScraperJob','0 1 22 * * ?','Y',NULL,NOW());
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (4,'com.macbackpackers.jobs.HousekeepingJob','0 59 8 * * ?','Y',NULL,NOW());
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (5,'com.macbackpackers.jobs.HousekeepingJob','0 19 10 * * ?','Y',NULL,NOW());
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (6,'com.macbackpackers.jobs.BedCountJob','0 20 4 * * ?','Y',NULL,NOW());
+
+INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (1,1,'booked_on_date','TODAY');
+INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (2,2,'selected_date','TODAY');
+INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (3,3,'start_date','TODAY');
+INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (4,3,'days_ahead','140');
+INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (5,4,'selected_date','TODAY');
+INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (6,5,'selected_date','TODAY');
+INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (7,6,'selected_date','TODAY-1');

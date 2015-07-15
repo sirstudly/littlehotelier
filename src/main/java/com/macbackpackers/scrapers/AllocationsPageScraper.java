@@ -277,6 +277,13 @@ public class AllocationsPageScraper {
             }
         }
         else {
+            if ( StringUtils.contains( span.getAttribute( "class" ), "checked-in" ) ) {
+                alloc.setStatus( "checked-in" );
+            } else if ( StringUtils.contains( span.getAttribute( "class" ), "checked-out" ) ) {
+                alloc.setStatus( "checked-out" );
+            } else if ( StringUtils.contains( span.getAttribute( "class" ), "confirmed" ) ) { 
+                alloc.setStatus( "confirmed" );
+            }
             alloc.setReservationId( Integer.parseInt( span.getAttribute( "data-reservation_id" ) ) );
             alloc.setGuestName( span.getAttribute( "data-guest_name" ) );
             alloc.setPaymentTotal( StringUtils.replaceChars( span.getAttribute( "data-reservation_payment_total" ), POUND + ",", "" ) );
