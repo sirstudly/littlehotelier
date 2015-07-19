@@ -13,6 +13,7 @@ import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.core.env.Environment;
@@ -43,6 +44,7 @@ public class BookingsPageScraper {
     public static final FastDateFormat DATE_FORMAT_BOOKING_URL = FastDateFormat.getInstance( "dd+MMM+yyyy" );
 
     @Autowired
+    @Qualifier( "webClientScriptingDisabled" )
     private WebClient webClient;
 
     @Autowired

@@ -41,7 +41,7 @@ CREATE TABLE `wp_lh_jobs` (
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_updated_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`job_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 
 CREATE TABLE `wp_lh_job_param` (
@@ -62,7 +62,7 @@ CREATE TABLE `wp_lh_scheduled_jobs` (
   `last_scheduled_date` timestamp NULL DEFAULT NULL,
   `last_updated_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`job_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 CREATE TABLE `wp_lh_scheduled_job_param` (
   `job_param_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -136,8 +136,8 @@ CREATE TABLE `wp_lh_group_bookings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- application log data
-CREATE TABLE `log4j_data`
-(`id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+CREATE TABLE `log4j_data`(
+ `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
  `job_id` VARCHAR(255) DEFAULT NULL,
  `date_logged` DATETIME NOT NULL,
  `location` VARCHAR(255) NOT NULL,

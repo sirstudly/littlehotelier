@@ -15,6 +15,7 @@ import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
@@ -54,6 +55,7 @@ public class AllocationsPageScraper {
     public static final String POUND = "\u00a3";
 
     @Autowired
+    @Qualifier( "webClientScriptingDisabled" )
     private WebClient webClient;
 
     @Autowired
@@ -279,9 +281,11 @@ public class AllocationsPageScraper {
         else {
             if ( StringUtils.contains( span.getAttribute( "class" ), "checked-in" ) ) {
                 alloc.setStatus( "checked-in" );
-            } else if ( StringUtils.contains( span.getAttribute( "class" ), "checked-out" ) ) {
+            }
+            else if ( StringUtils.contains( span.getAttribute( "class" ), "checked-out" ) ) {
                 alloc.setStatus( "checked-out" );
-            } else if ( StringUtils.contains( span.getAttribute( "class" ), "confirmed" ) ) { 
+            }
+            else if ( StringUtils.contains( span.getAttribute( "class" ), "confirmed" ) ) {
                 alloc.setStatus( "confirmed" );
             }
             alloc.setReservationId( Integer.parseInt( span.getAttribute( "data-reservation_id" ) ) );

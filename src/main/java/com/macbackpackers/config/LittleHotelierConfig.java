@@ -29,10 +29,25 @@ public class LittleHotelierConfig {
         return bean;
     }
 
-    @Bean
+    @Bean( name = "webClient" )
     @Scope( "prototype" )
     public WebClient getWebClient() {
         return new WebClient( BrowserVersion.CHROME ); // return a new instance of this when requested        
+    }
+    
+    @Bean( name = "webClientScriptingDisabled" )
+    @Scope( "prototype" )
+    public WebClient getWebClientWithScriptingDisabled() {
+        // try to speed things up a bit by disabling unused functionality
+        WebClient webClient = new WebClient( BrowserVersion.CHROME );
+        webClient.getOptions().setTimeout( 120000 );
+        webClient.getOptions().setRedirectEnabled( true );
+        webClient.getOptions().setJavaScriptEnabled( false );
+        webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
+        webClient.getOptions().setThrowExceptionOnScriptError( false );
+        webClient.getOptions().setCssEnabled( false );
+        webClient.getOptions().setUseInsecureSSL( true );
+        return webClient;
     }
 
     @Bean
