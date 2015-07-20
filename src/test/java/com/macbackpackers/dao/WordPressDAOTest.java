@@ -16,6 +16,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
@@ -360,6 +361,28 @@ public class WordPressDAOTest {
 
         now.add( Calendar.DATE, 1 ); // move up a day
         dao.purgeRecordsOlderThan( now.getTime() );
+    }
+
+    @Test
+    public void testGetRoomTypeIdForHostelworldLabel() throws Exception {
+        Assert.assertEquals( 2964, dao.getRoomTypeIdForHostelworldLabel( "Basic Double Bed Private (Shared Bathroom)" ) );
+        Assert.assertEquals( 2965, dao.getRoomTypeIdForHostelworldLabel( "Basic 3 Bed Private (Shared Bathroom)" ) );
+        Assert.assertEquals( 2966, dao.getRoomTypeIdForHostelworldLabel( "4 Bed Private (Shared Bathroom)" ) );
+        Assert.assertEquals( 2973, dao.getRoomTypeIdForHostelworldLabel( "4 Bed Mixed Dorm" ) );
+        Assert.assertEquals( 2974, dao.getRoomTypeIdForHostelworldLabel( "4 Bed Female Dorm" ) );
+        Assert.assertEquals( 2972, dao.getRoomTypeIdForHostelworldLabel( "6 Bed Mixed Dorm" ) );
+        Assert.assertEquals( 2971, dao.getRoomTypeIdForHostelworldLabel( "8 Bed Mixed Dorm" ) );
+        Assert.assertEquals( 2970, dao.getRoomTypeIdForHostelworldLabel( "10 Bed Mixed Dorm" ) );
+        Assert.assertEquals( 2969, dao.getRoomTypeIdForHostelworldLabel( "12 Bed Male Dorm" ) );
+        Assert.assertEquals( 2968, dao.getRoomTypeIdForHostelworldLabel( "12 Bed Female Dorm" ) );
+        Assert.assertEquals( 2967, dao.getRoomTypeIdForHostelworldLabel( "12 Bed Mixed Dormitory" ) );
+        Assert.assertEquals( 5152, dao.getRoomTypeIdForHostelworldLabel( "14 Bed Mixed Dorm" ) );
+        Assert.assertEquals( 5112, dao.getRoomTypeIdForHostelworldLabel( "16 Bed Mixed Dormitory" ) );
+    }
+
+    @Test( expected = EmptyResultDataAccessException.class )
+    public void testGetRoomTypeIdForHostelworldLabelThrowsException() throws Exception {
+        dao.getRoomTypeIdForHostelworldLabel( "7 Bed Mixed Dorm" );
     }
 
     private Allocation createTestAllocation( int jobId, Date checkinDate, String bookingSource ) throws Exception {

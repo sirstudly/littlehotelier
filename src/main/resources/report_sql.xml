@@ -65,4 +65,40 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
       GROUP BY reservation_id, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, notes, viewed_yn
         HAVING COUNT(1) >= 6;
     </entry>
+    <entry key="mismatched.bookings.hw">
+SELECT x.*, y.*, z.* 
+ FROM (
+        SELECT DISTINCT t.booking_reference FROM (
+        SELECT b.guest_name `hw_guest_name`, b.booking_reference, b.booked_date `booked_on`, d.room_type_id, d.booked_date, d.persons `hw_persons`, c.guest_name, 
+               SUM(IF(c.guest_name IS NULL, 0, 1)) * IFNULL((SELECT MAX(r.capacity) FROM wp_lh_rooms r WHERE r.room_type IN ('DBL', 'TWIN', 'TRIPLE', 'QUAD') AND r.room_type_id = c.room_type_id), 1 ) `lh_persons`
+          FROM wp_hw_booking b
+          JOIN wp_hw_booking_dates d ON b.id = d.hw_booking_id
+          LEFT OUTER JOIN wp_lh_calendar c ON c.booking_reference = CONCAT('HWL-551-', b.booking_reference) 
+           AND c.job_id = 1017 
+           AND c.checkin_date <= d.booked_date
+           AND c.checkout_date > d.booked_date
+           AND c.room_type_id = d.room_type_id
+         WHERE b.job_id = 2
+         GROUP BY b.guest_name, b.booking_reference, b.booked_date, d.room_type_id, d.booked_date, d.persons, c.guest_name, c.room_type_id
+        ) t
+         WHERE t.hw_persons != t.lh_persons
+) x
+JOIN (SELECT b.booking_reference, b.guest_name, b.booked_date, b.persons, r.capacity, r.room_type,
+               MIN(d.booked_date) `checkin_date`, DATE_ADD(MAX(d.booked_date), INTERVAL 1 DAY) `checkout_date`
+          FROM wp_hw_booking b
+          JOIN wp_hw_booking_dates d ON b.id = d.hw_booking_id
+          JOIN (SELECT DISTINCT room_type_id, room_type, capacity FROM wp_lh_rooms) r ON r.room_type_id = d.room_type_id
+         WHERE b.job_id = 2
+         GROUP BY b.booking_reference, b.guest_name, b.booked_date, r.capacity, r.room_type
+) y ON x.booking_reference = y.booking_reference
+LEFT OUTER JOIN (
+SELECT c.booking_reference, c.guest_name, c.booked_date, r.capacity, r.room_type, c.checkin_date, c.checkout_date,
+       SUM(IFNULL((SELECT MAX(r.capacity) FROM wp_lh_rooms r WHERE r.room_type IN ('DBL', 'TWIN', 'TRIPLE', 'QUAD') AND r.room_type_id = c.room_type_id), 1 )) `lh_persons`
+  FROM wp_lh_calendar c 
+  JOIN (SELECT DISTINCT room_type_id, room_type, capacity FROM wp_lh_rooms) r ON r.room_type_id = c.room_type_id
+ WHERE c.job_id = 1017
+   AND c.booking_source = 'Hostelworld'
+  GROUP BY c.booking_reference, c.guest_name, c.booked_date, r.capacity, r.room_type, c.checkin_date, c.checkout_date
+) z ON CONCAT('HWL-551-', x.booking_reference) = z.booking_reference;
+    </entry>
 </properties>

@@ -135,6 +135,39 @@ CREATE TABLE `wp_lh_group_bookings` (
   FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+
+CREATE TABLE `wp_hw_booking` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `job_id` bigint(20) unsigned NOT NULL,
+  `guest_name` varchar(255) DEFAULT NULL,
+  `guest_email` varchar(255) DEFAULT NULL,
+  `guest_phone` varchar(255) DEFAULT NULL,
+  `guest_nationality` varchar(255) DEFAULT NULL,
+  `payment_total` decimal(10,2) DEFAULT NULL,
+  `payment_outstanding` decimal(10,2) DEFAULT NULL,
+  `persons` varchar(255) DEFAULT NULL,
+  `booking_reference` varchar(255) DEFAULT NULL,
+  `booking_source` varchar(255) DEFAULT NULL,
+  `booked_date` datetime NULL DEFAULT NULL,
+  `arrival_time` datetime NULL DEFAULT NULL,
+  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `hw_c_jobid` (`job_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+CREATE TABLE `wp_hw_booking_dates` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `hw_booking_id` bigint(20) unsigned NOT NULL,
+  `room_type_id` int(10) unsigned NOT NULL,
+  `checkin_date` datetime NOT NULL,
+  `persons` int(10) unsigned NOT NULL,
+  `price` decimal(10,2) DEFAULT NULL,
+  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `hw_fk_bookingid` (`hw_booking_id`) -- no foreign key due to hibernate
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+
 -- application log data
 CREATE TABLE `log4j_data`(
  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -452,7 +485,7 @@ INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`roo
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (13,'Unallocated',NULL,3,2965,'TRIPLE','N');
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (14,'Unallocated',NULL,4,2973,'MX','N');
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (15,'Unallocated',NULL,4,2974,'F','N');
-
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (16,'Unallocated',NULL,12,2969,'M','N');
 
 -- If you're dumping the table from wp_lh_calendar; then you'll need to fill these in manually
 

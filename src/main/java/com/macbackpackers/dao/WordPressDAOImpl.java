@@ -6,6 +6,8 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.transaction.Transactional;
 
@@ -15,10 +17,12 @@ import org.hibernate.SessionFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.IncorrectResultSetColumnCountException;
 import org.springframework.stereotype.Repository;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.ScheduledJob;
@@ -261,6 +265,72 @@ public class WordPressDAOImpl implements WordPressDAO {
                     .executeUpdate();
             LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from " + table );
         }
+    }
+
+    @Transactional
+    @Override
+    public void insertHostelworldBooking( HostelworldBooking booking ) {
+        sessionFactory.getCurrentSession().save( booking );
+    }
+
+    @Transactional
+    @Override
+    public int getRoomTypeIdForHostelworldLabel( String roomTypeLabel ) {
+
+        String roomType;
+        int capacity = 0;
+
+        Pattern p = Pattern.compile( "([\\d]{1,2}) Bed" );
+        Matcher m = p.matcher( roomTypeLabel );
+        if ( m.find() ) {
+            capacity = Integer.parseInt( m.group( 1 ) );
+        }
+
+        if ( roomTypeLabel.contains( "Mixed" ) ) {
+            roomType = "MX";
+        }
+        else if ( roomTypeLabel.contains( "Female" ) ) {
+            roomType = "F";
+        }
+        else if ( roomTypeLabel.contains( "Male" ) ) {
+            roomType = "M";
+        }
+        else if ( roomTypeLabel.contains( "Double" ) ) {
+            roomType = "DBL";
+            capacity = 2;
+        }
+        else if ( roomTypeLabel.contains( "3 Bed Private" ) ) {
+            roomType = "TRIPLE";
+        }
+        else if ( roomTypeLabel.contains( "4 Bed Private" ) ) {
+            roomType = "QUAD";
+        }
+        else {
+            throw new IllegalArgumentException( "Unsupported room type, unable to determine type: " + roomTypeLabel );
+        }
+
+        if ( capacity == 0 ) {
+            throw new IllegalArgumentException( "Unsupported room type, unable to determine capacity: " + roomTypeLabel );
+        }
+
+        @SuppressWarnings( "unchecked" )
+        List<Integer> roomTypeIds = sessionFactory.getCurrentSession()
+                .createSQLQuery( "SELECT DISTINCT room_type_id "
+                        + "  FROM wp_lh_rooms "
+                        + " WHERE room_type = :roomType "
+                        + "   AND capacity = :capacity" )
+                .setParameter( "roomType", roomType )
+                .setParameter( "capacity", capacity )
+                .list();
+
+        if ( roomTypeIds.isEmpty() ) {
+            throw new EmptyResultDataAccessException( 1 );
+        }
+
+        if ( roomTypeIds.size() > 1 ) {
+            throw new IncorrectResultSetColumnCountException( 1, roomTypeIds.size() );
+        }
+        return roomTypeIds.get( 0 );
     }
 
     /////////////////////////////////////////////////////////////////////

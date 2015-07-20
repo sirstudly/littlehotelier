@@ -9,6 +9,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.ScheduledJob;
@@ -35,7 +36,7 @@ public interface WordPressDAO {
      * @param alloc allocation to update in DB
      */
     public void updateAllocation( Allocation alloc );
-    
+
     /**
      * Updates attributes to a list of existing allocations.
      * 
@@ -179,4 +180,19 @@ public interface WordPressDAO {
      */
     public List<Date> getCheckinDatesForAllocationScraperJobId( int jobId );
 
+    /**
+     * Inserts a new HW booking.
+     * 
+     * @param booking booking to save
+     */
+    public void insertHostelworldBooking( HostelworldBooking booking );
+
+    /**
+     * Returns the room type (id) for the given hostelworld room type label.
+     * 
+     * @param roomTypeLabel e.g. 12 Bed Female Dorm
+     * @return room type ID
+     * @throws EmptyResultDataAccessException if unable to determine room type idO
+     */
+    public int getRoomTypeIdForHostelworldLabel( String roomTypeLabel ) throws EmptyResultDataAccessException;
 }

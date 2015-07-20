@@ -97,13 +97,23 @@ public class FileService {
     
     /**
      * Loads cookies written from the previous session if found.
-     * 
+     * @param webClient
      * @throws IOException on read error
      */
     public void loadCookiesFromFile( WebClient webClient ) throws IOException {
+        loadCookiesFromFile( webClient, COOKIE_FILE );
+    }
+
+    /**
+     * Loads cookies written from the previous session if found.
+     * @param webClient
+     * @param filename name of cookie file
+     * @throws IOException on read error
+     */
+    public void loadCookiesFromFile( WebClient webClient, String filename ) throws IOException {
         
-        File file = new File( COOKIE_FILE );
-        LOGGER.info( "loading cookies from file " + COOKIE_FILE );
+        File file = new File( filename );
+        LOGGER.info( "loading cookies from file " + filename );
         if( file.exists() ) {
             ObjectInputStream in = new ObjectInputStream(new FileInputStream(file));
             try {
@@ -128,8 +138,17 @@ public class FileService {
      * @throws IOException on serialisation error
      */
     public void writeCookiesToFile( WebClient webClient ) throws IOException {
-        LOGGER.info( "writing cookies to file " + COOKIE_FILE );
-        ObjectOutput out = new ObjectOutputStream(new FileOutputStream( COOKIE_FILE ));
+        writeCookiesToFile( webClient, COOKIE_FILE );
+    }
+    
+    /**
+     * Serialises the current cookies to disk.
+     * 
+     * @throws IOException on serialisation error
+     */
+    public void writeCookiesToFile( WebClient webClient, String filename ) throws IOException {
+        LOGGER.info( "writing cookies to file " + filename );
+        ObjectOutput out = new ObjectOutputStream(new FileOutputStream( filename ));
         out.writeObject( webClient.getCookieManager().getCookies() );
         out.close();
     }

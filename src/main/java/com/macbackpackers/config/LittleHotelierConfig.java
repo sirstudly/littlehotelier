@@ -35,6 +35,27 @@ public class LittleHotelierConfig {
         return new WebClient( BrowserVersion.CHROME ); // return a new instance of this when requested        
     }
     
+    @Bean( name = "webClientForHostelworldLogin" )
+    @Scope( "prototype" )
+    public WebClient getWebClientForHostelworldLogin() {
+        // return the default web client (with JS enabled)
+        return new WebClient( BrowserVersion.FIREFOX_38 );        
+    }
+    
+    @Bean( name = "webClientForHostelworld" )
+    @Scope( "prototype" )
+    public WebClient getWebClientForHostelworld() {
+        WebClient webClient = new WebClient( BrowserVersion.FIREFOX_38 );        
+        webClient.getOptions().setTimeout( 120000 );
+        webClient.getOptions().setRedirectEnabled( true );
+        webClient.getOptions().setJavaScriptEnabled( false );
+        webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
+        webClient.getOptions().setThrowExceptionOnScriptError( false );
+        webClient.getOptions().setCssEnabled( false );
+        webClient.getOptions().setUseInsecureSSL( true );
+        return webClient;
+    }
+    
     @Bean( name = "webClientScriptingDisabled" )
     @Scope( "prototype" )
     public WebClient getWebClientWithScriptingDisabled() {
