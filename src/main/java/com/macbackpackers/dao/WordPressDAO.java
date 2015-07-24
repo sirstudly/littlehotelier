@@ -119,6 +119,15 @@ public interface WordPressDAO {
     public List<ScheduledJob> fetchActiveScheduledJobs();
 
     /**
+     * Retrieve a scheduled job by PK.
+     * 
+     * @param jobId job ID
+     * @return non-null job
+     * @throws EmptyResultDataAccessException if job not found
+     */
+    public ScheduledJob fetchScheduledJobById( int jobId ) throws EmptyResultDataAccessException;
+
+    /**
      * Updates the last scheduled date for the given scheduled job.
      * 
      * @param jobId ID of scheduled job to update

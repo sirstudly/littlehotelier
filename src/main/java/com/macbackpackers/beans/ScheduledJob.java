@@ -2,8 +2,12 @@
 package com.macbackpackers.beans;
 
 import java.sql.Timestamp;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -15,6 +19,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
+import org.apache.commons.lang3.time.FastDateFormat;
 import org.hibernate.annotations.Cascade;
 import org.hibernate.annotations.CascadeType;
 import org.hibernate.annotations.Type;
@@ -28,6 +33,8 @@ import org.hibernate.annotations.Type;
 @Entity
 @Table( name = "wp_lh_scheduled_jobs" )
 public class ScheduledJob {
+
+    public static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
 
     @Id
     @GeneratedValue( strategy = GenerationType.AUTO )
@@ -124,4 +131,39 @@ public class ScheduledJob {
         this.lastUpdatedDate = lasterUpdatedDate;
     }
 
+    /**
+     * Convenience method for instantiating a Job for this ScheduledJob and setting its parameters.
+     * 
+     * @return non-null Job
+     * @throws ReflectiveOperationException
+     */
+    public Job createNewJob() throws ReflectiveOperationException {
+
+        // now create a Job with a copy of the parameters from the scheduled job (making substitutions when necessary)
+        Job j = Job.class.cast( Class.forName( getClassname() ).newInstance() );
+        j.setStatus( JobStatus.submitted );
+
+        // now copy the parameters from the scheduled job to the actual job we're creating
+        for ( ScheduledJobParameter param : getParameters() ) {
+
+            Pattern p = Pattern.compile( "TODAY([\\+\\-][0-9]+)$" );
+            Matcher m = p.matcher( param.getValue() );
+
+            // auto-fill TODAY with today's date
+            if ( "TODAY".equals( param.getValue() ) ) {
+                j.setParameter( param.getName(), DATE_FORMAT_YYYY_MM_DD.format( new Date() ) );
+            }
+            // auto-fill TODAY(+/- adjustment value)
+            else if ( m.find() ) {
+                String matchedAdjustment = m.group( 1 );
+                Calendar cal = Calendar.getInstance();
+                cal.add( Calendar.DATE, Integer.parseInt( matchedAdjustment ) );
+                j.setParameter( param.getName(), DATE_FORMAT_YYYY_MM_DD.format( cal.getTime() ) );
+            }
+            else {
+                j.setParameter( param.getName(), param.getValue() );
+            }
+        }
+        return j;
+    }
 }

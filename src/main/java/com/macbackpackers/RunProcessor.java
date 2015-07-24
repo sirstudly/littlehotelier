@@ -7,6 +7,11 @@ import java.nio.channels.FileLock;
 import java.util.Date;
 import java.util.TimeZone;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Options;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.quartz.SchedulerException;
@@ -14,17 +19,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
+import org.springframework.stereotype.Component;
 
-import com.macbackpackers.beans.Job;
-import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.ShutdownException;
-import com.macbackpackers.jobs.AllocationScraperJob;
-import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
-import com.macbackpackers.jobs.HousekeepingJob;
-import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
-import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.ProcessorService;
 import com.macbackpackers.services.SchedulerService;
@@ -33,9 +32,9 @@ import com.macbackpackers.services.SchedulerService;
  * The main bootstrap for running all available jobs.
  *
  */
+@Component
 public class RunProcessor
 {
-
     private static final Logger LOGGER = LogManager.getLogger( RunProcessor.class );
 
     @Autowired
@@ -53,18 +52,8 @@ public class RunProcessor
     @Value( "${processor.repeat.interval.ms:60000}" )
     private long repeatIntervalMillis;
 
-    /**
-     * Processes all available jobs. To ensure only one processor is running at a time, attempt to
-     * get an exclusive file lock before attempting. If a lock is not obtained, this method returns
-     * immediately.
-     * 
-     * @throws IOException if file could not be read/created
-     * @throws ShutdownException if an immediate shutdown is requested
-     * @throws SchedulerException on scheduler exception
-     */
-    public void processJobs() throws IOException, ShutdownException, SchedulerException {
-        processorService.processJobs();
-    }
+    // exclusive-file lock so only ever one instance of the processor is running
+    private FileLock processorLock;
 
     /**
      * Process all jobs. If no jobs are available to be run, then pause for a configured period
@@ -74,14 +63,12 @@ public class RunProcessor
      * @throws ShutdownException if shutdown has been requested
      * @throws SchedulerException on scheduling exception
      */
-    public void processJobsLoopIndefinitely() throws IOException, ShutdownException, SchedulerException {
-
-        dao.resetAllProcessingJobsToFailed();
+    private void processJobsLoopIndefinitely() throws IOException, ShutdownException, SchedulerException {
 
         while ( true ) {
 
             // run all submitted jobs
-            processJobs();
+            processorService.processJobs();
 
             // repeat indefinitely
             try {
@@ -93,44 +80,43 @@ public class RunProcessor
         }
     }
 
+    private void acquireLock() throws IOException, ShutdownException {
+        processorLock = fileService.lockFile( new File( "processor.lock" ) );
+        if ( processorLock == null ) {
+            throw new ShutdownException( "Could not acquire exclusive lock; shutting down" );
+        }
+    }
+
     /**
-     * Loads and starts the scheduler.
+     * Runs this process in server-mode periodically polling the jobs table and executing any that
+     * are outstanding.
      * 
-     * @throws SchedulerException if scheduler could not be started
+     * @throws IOException
+     * @throws ShutdownException
+     * @throws SchedulerException
      */
-    public void startScheduler() throws SchedulerException {
-        scheduler.reloadScheduledJobs();
+    public void runInServerMode() throws IOException, ShutdownException, SchedulerException {
+        acquireLock();
+        dao.resetAllProcessingJobsToFailed();
+        scheduler.reloadScheduledJobs(); // load and start the scheduler
+        processJobsLoopIndefinitely();
+    }
+
+    public void runInStandardMode() throws IOException, ShutdownException, SchedulerException {
+        acquireLock();
+        dao.resetAllProcessingJobsToFailed();
+        processorService.processJobs();
     }
 
     /**
-     * Creates an allocation scraper job.
+     * Releases the exclusive (file) lock on this process if it has been initialised.
+     * 
+     * @throws IOException
      */
-    public void insertAllocationScraperJob() {
-        AllocationScraperJob j = new AllocationScraperJob();
-        j.setStatus( JobStatus.submitted );
-        j.setStartDate( new Date() );
-        j.setDaysAhead( 140 ); // look-ahead 4-5 months
-        dao.insertJob( j );
-    }
-
-    public void insertCreateConfirmDepositAmountsJob() {
-        Job j = new CreateConfirmDepositAmountsJob();
-        j.setStatus( JobStatus.submitted );
-        dao.insertJob( j );
-    }
-
-    public void insertScrapeReservationsBookedOnJob() {
-        Job j = new ScrapeReservationsBookedOnJob();
-        j.setStatus( JobStatus.submitted );
-        j.setParameter( "booked_on_date", BookingsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( new Date() ) );
-        dao.insertJob( j );
-    }
-
-    public void insertHousekeepingJob() {
-        Job j = new HousekeepingJob();
-        j.setStatus( JobStatus.submitted );
-        j.setParameter( "selected_date", BookingsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( new Date() ) );
-        dao.insertJob( j );
+    public void releaseExclusivityLock() throws IOException {
+        if ( processorLock != null ) {
+            processorLock.release();
+        }
     }
 
     /**
@@ -140,82 +126,49 @@ public class RunProcessor
      * @throws Exception on disastrous failure
      */
     public static void main( String args[] ) throws Exception {
+
+        // create the command line parser
+        CommandLineParser parser = new DefaultParser();
+
+        // create the Options
+        Options options = new Options();
+        options.addOption( "h", "help", false, "Show this help message" );
+        options.addOption( "S", "server", false, "server-mode; keep the processor running continuously" );
+
+        // parse the command line arguments
+        CommandLine line = parser.parse( options, args );
+
+        // automatically generate the help statement
+        if ( line.hasOption( "h" ) ) {
+            HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp( RunProcessor.class.getName(), options );
+            return;
+        }
+
         TimeZone.setDefault( TimeZone.getTimeZone( "Europe/London" ) );
         LOGGER.info( "Starting processor... " + new Date() );
         AbstractApplicationContext context = new AnnotationConfigApplicationContext( LittleHotelierConfig.class );
 
         // make sure there is only ever one process running
-        FileService fileService = context.getBean( FileService.class );
-        FileLock lock = fileService.lockFile( new File( "processor.lock" ) );
-        if ( lock == null ) {
-            LOGGER.info( "Could not acquire lock. Exiting." );
-            context.close();
-            LOGGER.info( "Finished processor... " + new Date() );
-            return;
-        }
-
-        RunProcessor processor = new RunProcessor();
-        context.getAutowireCapableBeanFactory().autowireBean( processor );
+        RunProcessor processor = context.getBean( RunProcessor.class );
 
         try {
-            // option -h for help
-            if ( args.length == 1 && "-h".equals( args[0] ) ) {
-                System.out.println( "USAGE: " + RunProcessor.class.getName() );
-                System.out.println( "Flags (only one allowed at a time)" );
-                System.out.println( "    -a    Adds an allocation scraper job" );
-                System.out.println( "          This will queue up all the report jobs" );
-                System.out.println();
-                System.out.println( "    -d    Create a click deposits job" );
-                System.out.println( "          This will find the last completed AllocationScraperJob and find" );
-                System.out.println( "          all HW/HB reservations where the total amount = payment outstanding" );
-                System.out.println( "          and create a click deposit job for each one" );
-                System.out.println();
-                System.out.println( "    -b    This will create a job that will search all bookings on HW/HB" );
-                System.out.println( "          made today and, if they're unread, create a click deposit job" );
-                System.out.println( "          for that reservation" );
-                System.out.println();
-                System.out.println( " --housekeeping     This will create an equivalent of an AllocationScraperJob" );
-                System.out.println( "          for the previous day except it won't create the corresponding BookingScraperJob" );
-                System.out.println( "          (for additional details). The Housekeeping report will pull the information" );
-                System.out.println( "          directly from the allocation data" );
-
-                System.out.println( "The current date is " + new Date() );
-
-                System.exit( 0 );
+            // server-mode: keep the processor running
+            if ( line.hasOption( "S" ) ) {
+                LOGGER.info( "Running in server-mode" );
+                processor.runInServerMode();
             }
-
-            // option -a to add allocations job
-            if ( args.length == 1 && "-a".equals( args[0] ) ) {
-                LOGGER.info( "Allocation job requested; queueing job..." );
-                processor.insertAllocationScraperJob();
+            // standard-mode: running all outstanding jobs and quit
+            else {
+                LOGGER.info( "Running in standard mode" );
+                processor.runInStandardMode();
             }
-
-            // option -d to add click deposits job
-            if ( args.length == 1 && "-d".equals( args[0] ) ) {
-                LOGGER.info( "Create Confirm Deposits job requested; queueing job..." );
-                processor.insertCreateConfirmDepositAmountsJob();
-            }
-
-            // option -b to add click deposits job (by booking date - today)
-            if ( args.length == 1 && "-b".equals( args[0] ) ) {
-                LOGGER.info( "ScrapeReservationsBookedOn job requested; queueing job..." );
-                processor.insertScrapeReservationsBookedOnJob();
-            }
-
-            // option -h to add a housekeeping report job
-            if ( args.length == 1 && "--housekeeping".equals( args[0] ) ) {
-                LOGGER.info( "Housekeeping job requested; queueing job..." );
-                processor.insertHousekeepingJob();
-            }
-
-            processor.startScheduler();
-            processor.processJobsLoopIndefinitely();
         }
         catch ( ShutdownException ex ) {
             LOGGER.info( "Shutdown task requested" );
         }
         finally {
-            lock.release();
+            processor.releaseExclusivityLock();
             context.close();
             LOGGER.info( "Finished processor... " + new Date() );
         }

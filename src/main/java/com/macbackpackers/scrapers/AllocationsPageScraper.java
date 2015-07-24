@@ -10,6 +10,8 @@ import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.transaction.Transactional;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.log4j.LogManager;
@@ -113,6 +115,7 @@ public class AllocationsPageScraper {
      *            the cached version if available.
      * @throws IOException on read/write error
      */
+    @Transactional
     public void dumpAllocationsBetween(
             int jobId, Date startDate, Date endDate, boolean useSerialisedDataIfAvailable ) throws IOException {
 

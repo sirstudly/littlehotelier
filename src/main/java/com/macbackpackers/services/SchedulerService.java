@@ -17,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.macbackpackers.beans.ScheduledJob;
-import com.macbackpackers.beans.ScheduledJobParameter;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.quartz.CronJob;
 
@@ -52,14 +51,10 @@ public class SchedulerService {
             // buildup job parameters
             JobDataMap jobData = new JobDataMap();
             jobData.put( CronJob.PARAM_DAO, dao );
-            for ( ScheduledJobParameter param : job.getParameters() ) {
-                jobData.put( param.getName(), param.getValue() );
-            }
+            jobData.put( CronJob.PARAM_SCHEDULED_JOB, job );
 
             JobDetail jobDetail = JobBuilder.newJob( CronJob.class )
                     .withIdentity( "job " + job.getClassname() + job.getId() )
-                    .usingJobData( CronJob.PARAM_CLASSNAME, job.getClassname() )
-                    .usingJobData( CronJob.PARAM_SCHEDULED_JOB_ID, job.getId() )
                     .usingJobData( jobData )
                     .build();
 

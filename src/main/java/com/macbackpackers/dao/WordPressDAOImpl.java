@@ -213,6 +213,16 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Transactional
     @Override
+    public ScheduledJob fetchScheduledJobById( int jobId ) {
+        ScheduledJob j = (ScheduledJob) sessionFactory.getCurrentSession().get( ScheduledJob.class, jobId );
+        if ( j == null ) {
+            throw new EmptyResultDataAccessException( 1 );
+        }
+        return j;
+    }
+
+    @Transactional
+    @Override
     public void updateScheduledJob( int jobId ) {
         ScheduledJob job = (ScheduledJob) sessionFactory.getCurrentSession().get( ScheduledJob.class, jobId );
         if ( job == null ) {

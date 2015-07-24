@@ -75,7 +75,7 @@ SELECT x.*, y.*, z.*
           JOIN wp_hw_booking_dates d ON b.id = d.hw_booking_id
           LEFT OUTER JOIN wp_lh_calendar c ON c.booking_reference = CONCAT('HWL-551-', b.booking_reference) 
            AND c.job_id = 1017 
-           AND c.checkin_date <= d.booked_date
+           AND c.checkin_date &lt;= d.booked_date
            AND c.checkout_date > d.booked_date
            AND c.room_type_id = d.room_type_id
          WHERE b.job_id = 2

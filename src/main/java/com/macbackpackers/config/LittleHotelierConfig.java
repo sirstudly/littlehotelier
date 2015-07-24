@@ -32,7 +32,9 @@ public class LittleHotelierConfig {
     @Bean( name = "webClient" )
     @Scope( "prototype" )
     public WebClient getWebClient() {
-        return new WebClient( BrowserVersion.CHROME ); // return a new instance of this when requested        
+        WebClient webClient = new WebClient( BrowserVersion.CHROME ); // return a new instance of this when requested
+        webClient.getOptions().setThrowExceptionOnScriptError( false );
+        return webClient;
     }
     
     @Bean( name = "webClientForHostelworldLogin" )
