@@ -285,6 +285,34 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Transactional
     @Override
+    @SuppressWarnings( "unchecked" )
+    public void deleteHostelworldBookingsWithArrivalDate( Date checkinDate ) {
+
+        // find all bookings where the first (booked) date matches the checkin date
+        List<Integer> bookingIds = sessionFactory.getCurrentSession().createQuery(
+                "           SELECT bookingId "
+                        + "   FROM HostelworldBookingDate "
+                        + "  GROUP BY bookingId"
+                        + " HAVING MIN( bookedDate ) = :bookedDate" )
+                .setParameter( "bookedDate", checkinDate )
+                .list();
+
+        // now delete the records one by one since i couldn't figure out
+        // how to do a cascade delete correctly
+        for ( Integer bookingId : bookingIds ) {
+            sessionFactory.getCurrentSession().createQuery(
+                    "DELETE HostelworldBookingDate WHERE bookingId = :bookingId" )
+                    .setParameter( "bookingId", bookingId )
+                    .executeUpdate();
+            sessionFactory.getCurrentSession().createQuery(
+                    "DELETE HostelworldBooking WHERE id = :bookingId" )
+                    .setParameter( "bookingId", bookingId )
+                    .executeUpdate();
+        }
+    }
+
+    @Transactional
+    @Override
     public int getRoomTypeIdForHostelworldLabel( String roomTypeLabel ) {
 
         String roomType;

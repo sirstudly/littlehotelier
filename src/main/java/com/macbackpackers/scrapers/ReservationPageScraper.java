@@ -28,7 +28,7 @@ public class ReservationPageScraper {
     private final Logger LOGGER = LogManager.getLogger( getClass() );
 
     @Autowired
-    @Qualifier( "webClient" )
+    @Qualifier( "webClientScriptingDisabled" )
     private WebClient webClient;
 
     @Autowired

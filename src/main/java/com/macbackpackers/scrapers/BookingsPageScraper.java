@@ -3,6 +3,7 @@ package com.macbackpackers.scrapers;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Component;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
@@ -41,6 +43,7 @@ public class BookingsPageScraper {
     private final Logger LOGGER = LogManager.getLogger( getClass() );
 
     public static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
+    public static final FastDateFormat DATE_FORMAT_DD_MON_YYYY = FastDateFormat.getInstance( "dd MMM yyyy" );
     public static final FastDateFormat DATE_FORMAT_BOOKING_URL = FastDateFormat.getInstance( "dd+MMM+yyyy" );
 
     @Autowired
@@ -62,6 +65,9 @@ public class BookingsPageScraper {
     @Value( "${lilhotelier.url.bookings}" )
     private String bookingUrl;
 
+    @Value( "${lilhotelier.url.reservation}" )
+    private String bookingReservationUrl;
+
     /**
      * Goes to the booking page showing arrivals for the given date.
      * 
@@ -70,10 +76,23 @@ public class BookingsPageScraper {
      * @throws IOException if credentials could not be loaded
      */
     public HtmlPage goToBookingPageForArrivals( Date date ) throws IOException {
-        String pageURL = getBookingsURLForArrivalsByDate( date );
+        return goToBookingPageForArrivals( date, null, null );
+    }
+
+    /**
+     * Goes to the booking page showing arrivals for the given date and booking reference.
+     * 
+     * @param date date to query
+     * @param bookingRef booking reference
+     * @param status status of reservation (optional)
+     * @return URL of bookings arriving on this date
+     * @throws IOException if credentials could not be loaded
+     */
+    public HtmlPage goToBookingPageForArrivals( Date date, String bookingRef, String status ) throws IOException {
+        String pageURL = getBookingsURLForArrivalsByDate( date, bookingRef, status );
         LOGGER.info( "Loading bookings page: " + pageURL );
         HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
-        LOGGER.debug( nextPage.asXml() );
+        //LOGGER.debug( nextPage.asXml() );
 
         // save it to disk so we can use it later - ConcurrentModificationException?
         //fileService.serialisePageToDisk( nextPage, getBookingPageSerialisedObjectFilename( date ) );
@@ -90,7 +109,7 @@ public class BookingsPageScraper {
      * @throws IOException if credentials could not be loaded
      */
     public HtmlPage goToBookingPageBookedOn( Date date, String bookingRefId ) throws IOException {
-        String pageURL = getBookingsURLForBookedOnDate( date, bookingRefId );
+        String pageURL = getBookingsURLForBookedOnDate( date, bookingRefId, null );
         LOGGER.info( "Loading bookings page: " + pageURL );
         HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
         LOGGER.debug( nextPage.asXml() );
@@ -101,13 +120,16 @@ public class BookingsPageScraper {
      * Returns the booking URL for all checkins occurring on the given date.
      * 
      * @param date date to query
+     * @param bookingRef booking reference (optional)
+     * @param status status of reservation (optional)
      * @return URL of bookings arriving on this date
      */
-    private String getBookingsURLForArrivalsByDate( Date date ) {
+    private String getBookingsURLForArrivalsByDate( Date date, String bookingRef, String status ) {
         return bookingUrl
                 .replaceAll( "__DATE__", DATE_FORMAT_BOOKING_URL.format( date ) )
-                .replaceAll( "__BOOKING_REF_ID__", "" )
-                .replaceAll( "__DATE_TYPE__", "CheckIn" );
+                .replaceAll( "__BOOKING_REF_ID__", bookingRef == null ? "" : bookingRef )
+                .replaceAll( "__DATE_TYPE__", "CheckIn" )
+                .replaceAll( "__STATUS__", status == null ? "" : status );
     }
 
     /**
@@ -115,13 +137,25 @@ public class BookingsPageScraper {
      * 
      * @param date date to query
      * @param bookingRefId a matching booking ref; can be "HWL" or "HBK" for example
+     * @param status status of reservation (optional)
      * @return URL of bookings booked on on this date
      */
-    private String getBookingsURLForBookedOnDate( Date date, String bookingRefId ) {
+    private String getBookingsURLForBookedOnDate( Date date, String bookingRefId, String status ) {
         return bookingUrl
                 .replaceAll( "__DATE__", DATE_FORMAT_BOOKING_URL.format( date ) )
-                .replaceAll( "__BOOKING_REF_ID__", bookingRefId )
-                .replaceAll( "__DATE_TYPE__", "BookedOn" );
+                .replaceAll( "__BOOKING_REF_ID__", bookingRefId == null ? "" : bookingRefId )
+                .replaceAll( "__DATE_TYPE__", "BookedOn" )
+                .replaceAll( "__STATUS__", status == null ? "" : status );
+    }
+
+    /**
+     * Returns the booking reservation detail URL for the given reservation ID.
+     * 
+     * @param reservationId LH reservation ID
+     * @return URL for detailed booking record
+     */
+    private String getBookingReservationURL( String reservationId ) {
+        return bookingReservationUrl.replaceAll( "__RESERVATION_ID__", reservationId );
     }
 
     /**
@@ -248,6 +282,184 @@ public class BookingsPageScraper {
     }
 
     /**
+     * Inserts new allocation records from the given page for the given jobId.
+     * 
+     * @param jobId ID of job to update
+     * @param bookingsPage the current bookings page to parse data from
+     */
+    private void insertBookings( int jobId, HtmlPage bookingsPage ) {
+
+        for ( DomElement tr : bookingsPage.getElementsByTagName( "tr" ) ) {
+            try {
+                String dataId = tr.getAttribute( "data-id" );
+                String styleClass = tr.getAttribute( "class" ); // read or unread
+
+                if ( StringUtils.isNotBlank( dataId ) ) {
+                    LOGGER.debug( "Found record " + dataId + " " + styleClass );
+
+                    Allocation alloc = new Allocation();
+                    alloc.setJobId( jobId );
+                    alloc.setDataHref( "/extranet/properties/533/reservations/" + dataId + "/edit" );
+                    alloc.setReservationId( Integer.parseInt( dataId ) );
+
+                    updateAllocationFromBookingDetailsPage( alloc,
+                            authService.loginAndGoToPage( getBookingReservationURL( dataId ), webClient ) );
+
+                    // may want to improve this later if i split out the table so it's not flattened
+                    DomElement td = tr.getFirstElementChild();
+
+                    // viewed_yn
+                    if ( "read".equals( tr.getAttribute( "class" ) ) ) {
+                        alloc.setViewed( true );
+                    }
+                    else if ( "unread".equals( tr.getAttribute( "class" ) ) ) {
+                        alloc.setViewed( false );
+                    }
+                    else {
+                        LOGGER.warn( "Unsupported attribute on booking row: " + tr.getAttribute( "class" ) );
+                    }
+
+                    // status       
+                    {
+                        DomElement ahref = td.getFirstElementChild();
+                        if ( false == "a".equals( ahref.getTagName() ) ) {
+                            LOGGER.warn( "Expecting link but was " + ahref.getTagName() + " : " + ahref.asText() );
+                        }
+                        else {
+                            LOGGER.debug( "  booking href: " + ahref.getAttribute( "href" ) );
+                            DomElement span = ahref.getFirstElementChild();
+                            if ( span != null ) {
+                                LOGGER.debug( "  status: " + span.getAttribute( "class" ) );
+                                alloc.setStatus( span.getAttribute( "class" ) );
+                            }
+                            else {
+                                LOGGER.warn( "No span found in status? " );
+                            }
+                        }
+                    } // status
+
+                    // existing record should already have the guest name(s)
+                    td = td.getNextElementSibling();
+                    alloc.setGuestName( StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  name: " + alloc.getGuestName() );
+
+                    td = td.getNextElementSibling();
+                    alloc.setBookingReference( StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  booking_reference: " + alloc.getBookingReference() );
+
+                    td = td.getNextElementSibling();
+                    alloc.setBookingSource( StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  booking_source: " + alloc.getBookingSource() );
+
+                    td = td.getNextElementSibling();
+                    LOGGER.debug( "  guests: " + StringUtils.trim( td.getTextContent() ) );
+
+                    td = td.getNextElementSibling();
+                    LOGGER.debug( "  check in: " + StringUtils.trim( td.getTextContent() ) );
+
+                    td = td.getNextElementSibling();
+                    LOGGER.debug( "  check out: " + StringUtils.trim( td.getTextContent() ) );
+
+                    td = td.getNextElementSibling();
+                    alloc.setBookedDate( StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  booked on: " + StringUtils.trim( td.getTextContent() ) );
+
+                    td = td.getNextElementSibling();
+                    //                    alloc.setPaymentTotal( StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  total: " + StringUtils.trim( td.getTextContent() ) );
+
+                    td = td.getNextElementSibling();
+                    alloc.setEta( StringUtils.trim( td.getTextContent() ) );
+                    LOGGER.debug( "  ETA: " + StringUtils.trim( td.getTextContent() ) );
+
+                    td = td.getNextElementSibling();
+                    LOGGER.debug( "  number of 'rooms': " + StringUtils.trim( td.getTextContent() ) );
+
+                    // insert the allocation to datastore
+                    wordPressDAO.insertAllocation( alloc );
+
+                } // data-id isNotBlank
+
+            }
+            catch ( Exception ex ) {
+                LOGGER.error( "Exception handled.", ex );
+            }
+        }
+    }
+
+    /**
+     * Updates additional fields in the booking reservation (details) page.
+     * 
+     * @param alloc allocation to update
+     * @param bookingPage detailed reservation page
+     * @throws ParseException on checkin/checkout date parse error
+     */
+    private void updateAllocationFromBookingDetailsPage( Allocation alloc, HtmlPage bookingPage ) throws ParseException {
+        alloc.setCheckinDate( DATE_FORMAT_DD_MON_YYYY.parse(
+                bookingPage.getElementById( "reservation_check_in_date" ).getAttribute( "value" ) ) );
+        alloc.setCheckoutDate( DATE_FORMAT_DD_MON_YYYY.parse(
+                bookingPage.getElementById( "reservation_check_out_date" ).getAttribute( "value" ) ) );
+
+        // set the room type
+        DomElement roomSelect = bookingPage.getElementById( "reservation_reservation_room_types__room_type_id" );
+        for ( DomElement roomOption : roomSelect.getElementsByTagName( "option" ) ) {
+            if ( StringUtils.isNotBlank( roomOption.getAttribute( "selected" ) ) ) {
+                alloc.setRoomTypeId( Integer.parseInt( roomOption.getAttribute( "value" ) ) );
+                LOGGER.debug( "  Room Type: " + alloc.getRoomTypeId() );
+                break;
+            }
+        }
+
+        // set the rate plan if applicable
+        DomElement ratePlanSelect = bookingPage.getElementById( "reservation_reservation_room_types__rate_plan_id" );
+        for ( DomElement ratePlanOption : ratePlanSelect.getElementsByTagName( "option" ) ) {
+            if ( StringUtils.isNotBlank( ratePlanOption.getAttribute( "selected" ) ) ) {
+                alloc.setRatePlanName( StringUtils.trim( ratePlanOption.getTextContent() ) );
+                LOGGER.debug( "  Rate Plan: " + alloc.getRatePlanName() );
+                break;
+            }
+        }
+
+        // set the room assignment if applicable
+        roomSelect = bookingPage.getElementById( "reservation_reservation_room_types__room_id" );
+        if ( StringUtils.isNotBlank( roomSelect.getAttribute( "disabled" ) ) ) {
+            alloc.setRoom( "Unallocated" ); // not set if disabled 
+            LOGGER.debug( "  Room: " + alloc.getRoom() );
+        }
+        else {
+            for ( DomElement roomOption : roomSelect.getElementsByTagName( "option" ) ) {
+                if ( StringUtils.isNotBlank( roomOption.getAttribute( "selected" ) ) ) {
+                    alloc.setRoomId( Integer.parseInt( roomOption.getAttribute( "value" ) ) );
+                    alloc.setRoom( StringUtils.trim( roomOption.getTextContent() ) );
+                    LOGGER.debug( "  Room Id: " + alloc.getRoomId() );
+                    LOGGER.debug( "  Room: " + alloc.getRoom() );
+                    break;
+                }
+            }
+        }
+
+        // set number of guests
+        alloc.setNumberGuests(
+                Integer.parseInt( bookingPage.getElementById( "reservation_reservation_room_types__number_adults" ).getAttribute( "value" ) ) +
+                        Integer.parseInt( bookingPage.getElementById( "reservation_reservation_room_types__number_children" ).getAttribute( "value" ) ) +
+                        Integer.parseInt( bookingPage.getElementById( "reservation_reservation_room_types__number_infants" ).getAttribute( "value" ) ) );
+
+        alloc.setNotes( StringUtils.trimToNull( bookingPage.getElementById( "reservation_notes" ).getTextContent() ) );
+
+        // set totals
+        for ( DomElement totalLabel : bookingPage.getElementsByTagName( "label" ) ) {
+            if ( "Total".equals( StringUtils.trim( totalLabel.getTextContent() ) ) ) {
+                alloc.setPaymentTotal( StringUtils.trim( totalLabel.getNextElementSibling().getTextContent() ) );
+                LOGGER.debug( "  Total: " + alloc.getPaymentTotal() );
+            }
+            if ( "Total Outstanding".equals( StringUtils.trim( totalLabel.getTextContent() ) ) ) {
+                alloc.setPaymentOutstanding( StringUtils.trim( totalLabel.getNextElementSibling().getTextContent() ) );
+                LOGGER.debug( "  Total Outstanding: " + alloc.getPaymentOutstanding() );
+            }
+        }
+    }
+
+    /**
      * For the booking page in question, find any where the amount payable is equal to the total
      * payable and create a job to confirm the deposit amount on the booking page.
      * 
@@ -312,4 +524,31 @@ public class BookingsPageScraper {
         }
     }
 
+    /**
+     * Updates the calendar records using by querying the bookings page for the given date and job.
+     * 
+     * @param jobId the job ID to associate with this dump
+     * @param arrivalDate the checkin-date to search on
+     * @param bookingRef (optional) booking reference (to narrow down the subset of records)
+     * @throws IOException on read/write error
+     */
+    @Transactional
+    public void updateBookingsFor( int jobId, Date arrivalDate, String bookingRef ) throws IOException {
+        HtmlPage bookingsPage = goToBookingPageForArrivals( arrivalDate, bookingRef, null );
+        updateBookings( jobId, bookingsPage );
+    }
+
+    /**
+     * Inserts the calendar records by querying the bookings page for the given date.
+     * 
+     * @param jobId the job ID to associate with this dump
+     * @param arrivalDate the checkin-date to search on
+     * @param bookingRef (optional) booking reference (to narrow down the subset of records)
+     * @throws IOException on read/write error
+     */
+    @Transactional
+    public void insertCancelledBookingsFor( int jobId, Date arrivalDate, String bookingRef ) throws IOException {
+        HtmlPage bookingsPage = goToBookingPageForArrivals( arrivalDate, bookingRef, "cancelled" );
+        insertBookings( jobId, bookingsPage );
+    }
 }

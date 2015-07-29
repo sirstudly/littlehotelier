@@ -385,6 +385,13 @@ public class WordPressDAOTest {
         dao.getRoomTypeIdForHostelworldLabel( "7 Bed Mixed Dorm" );
     }
 
+    @Test
+    public void testDeleteHostelworldBookingsWithArrivalDate() throws Exception {
+        Calendar c = Calendar.getInstance();
+        c.set( Calendar.DATE, 20 );
+        dao.deleteHostelworldBookingsWithArrivalDate( c.getTime() );
+    }
+
     private Allocation createTestAllocation( int jobId, Date checkinDate, String bookingSource ) throws Exception {
         Allocation alloc = new Allocation();
         alloc.setJobId( jobId );

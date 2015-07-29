@@ -1,3 +1,4 @@
+
 package com.macbackpackers.scrapers;
 
 import java.util.Calendar;
@@ -12,22 +13,22 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.macbackpackers.config.LittleHotelierConfig;
 
-@RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(classes = LittleHotelierConfig.class)
+@RunWith( SpringJUnit4ClassRunner.class )
+@ContextConfiguration( classes = LittleHotelierConfig.class )
 public class BookingsPageScraperTest {
 
-	private final Logger LOGGER = LogManager.getLogger(getClass());
-	
-	@Autowired
-	BookingsPageScraper scraper;
-	
-	@Test
-	public void testGoToBookingPage() throws Exception {
-	    Calendar c = Calendar.getInstance();
-	    c.add( Calendar.MONTH, 2 );
-	    scraper.goToBookingPageForArrivals( c.getTime() );
-	}
-	
+    protected final Logger LOGGER = LogManager.getLogger( getClass() );
+
+    @Autowired
+    BookingsPageScraper scraper;
+
+    @Test
+    public void testGoToBookingPage() throws Exception {
+        Calendar c = Calendar.getInstance();
+        c.add( Calendar.MONTH, 2 );
+        scraper.goToBookingPageForArrivals( c.getTime() );
+    }
+
     @Test
     public void testUpdateBookingPage() throws Exception {
         Calendar startDate = Calendar.getInstance();
@@ -37,8 +38,18 @@ public class BookingsPageScraperTest {
         Calendar endDate = Calendar.getInstance();
         endDate.add( Calendar.MONTH, 2 );
         endDate.add( Calendar.DATE, -1 );
-        
+
         scraper.updateBookingsBetween( 14, startDate.getTime(), endDate.getTime(), true );
     }
-    
+
+    @Test
+    public void testInsertCancelledBookings() throws Exception {
+        Calendar startDate = Calendar.getInstance();
+        startDate.set( Calendar.MONTH, 6 ); // july
+        startDate.set( Calendar.DATE, 28 );
+        startDate.set( Calendar.YEAR, 2015 );
+
+        scraper.insertCancelledBookingsFor( 1, startDate.getTime(), null );
+    }
+
 }

@@ -159,7 +159,7 @@ CREATE TABLE `wp_hw_booking_dates` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `hw_booking_id` bigint(20) unsigned NOT NULL,
   `room_type_id` int(10) unsigned NOT NULL,
-  `checkin_date` datetime NOT NULL,
+  `booked_date` datetime NOT NULL,
   `persons` int(10) unsigned NOT NULL,
   `price` decimal(10,2) DEFAULT NULL,
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,

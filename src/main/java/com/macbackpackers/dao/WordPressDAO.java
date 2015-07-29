@@ -197,6 +197,13 @@ public interface WordPressDAO {
     public void insertHostelworldBooking( HostelworldBooking booking );
 
     /**
+     * Deletes all HW bookings matching the given arrival date.
+     * 
+     * @param checkinDate date of arrival
+     */
+    public void deleteHostelworldBookingsWithArrivalDate( Date checkinDate );
+
+    /**
      * Returns the room type (id) for the given hostelworld room type label.
      * 
      * @param roomTypeLabel e.g. 12 Bed Female Dorm
