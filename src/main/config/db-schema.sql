@@ -138,7 +138,6 @@ CREATE TABLE `wp_lh_group_bookings` (
 
 CREATE TABLE `wp_hw_booking` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `job_id` bigint(20) unsigned NOT NULL,
   `guest_name` varchar(255) DEFAULT NULL,
   `guest_email` varchar(255) DEFAULT NULL,
   `guest_phone` varchar(255) DEFAULT NULL,
@@ -151,8 +150,7 @@ CREATE TABLE `wp_hw_booking` (
   `booked_date` datetime NULL DEFAULT NULL,
   `arrival_time` datetime NULL DEFAULT NULL,
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `hw_c_jobid` (`job_id`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 CREATE TABLE `wp_hw_booking_dates` (
@@ -164,7 +162,8 @@ CREATE TABLE `wp_hw_booking_dates` (
   `price` decimal(10,2) DEFAULT NULL,
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `hw_fk_bookingid` (`hw_booking_id`) -- no foreign key due to hibernate
+  KEY `hw_fk_bookingid` (`hw_booking_id`), -- no foreign key due to hibernate
+  KEY `hw_booked_date` (`booked_date`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 

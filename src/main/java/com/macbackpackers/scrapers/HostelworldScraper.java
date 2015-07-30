@@ -152,13 +152,12 @@ public class HostelworldScraper {
     /**
      * Dumps all HW bookings checking in on the given date.
      * 
-     * @param jobId the ID of the job creating this record
      * @param arrivalDate date of arrival
      * @throws IOException
      * @throws ParseException
      */
     @Transactional
-    public void dumpBookingsForArrivalDate( int jobId, Date arrivalDate ) throws IOException, ParseException {
+    public void dumpBookingsForArrivalDate( Date arrivalDate ) throws IOException, ParseException {
 
         // first delete any existing bookings on the given arrival date
         wordPressDAO.deleteHostelworldBookingsWithArrivalDate( arrivalDate );
@@ -175,7 +174,7 @@ public class HostelworldScraper {
         while ( matcher.find() ) {
             String bookingRef = matcher.group( 1 );
             LOGGER.info( "Booking Ref: " + bookingRef );
-            dumpSingleBooking( jobId, bookingRef );
+            dumpSingleBooking( bookingRef );
         }
 
     }
@@ -183,20 +182,18 @@ public class HostelworldScraper {
     /**
      * Writes a single booking to the database.
      * 
-     * @param jobId the ID of the job creating this record
      * @param bookingRef HW booking ref
      * @return the booking page that was saved
      * @throws IOException
      * @throws ParseException
      */
-    public HtmlPage dumpSingleBooking( int jobId, String bookingRef ) throws IOException, ParseException {
+    public HtmlPage dumpSingleBooking( String bookingRef ) throws IOException, ParseException {
 
         HtmlPage bookingPage = webClient.getPage( "https://secure.hostelworld.com/inbox/bookings/bookingdetails.php?CustID=" + bookingRef );
         List<DomElement> tables = bookingPage.getElementsByTagName( "table" );
         LOGGER.debug( tables.size() + " tables found" );
 
         HostelworldBooking hwBooking = new HostelworldBooking();
-        hwBooking.setJobId( jobId );
         hwBooking.setBookingRef( bookingRef );
 
         // seventh table on the page contains the booking summary we want to scrape
@@ -261,7 +258,7 @@ public class HostelworldScraper {
                 LOGGER.debug( "  Room: " + roomType );
                 LOGGER.debug( "  Persons: " + persons );
                 LOGGER.debug( "  Price: " + price );
-                bookingDate.setBookedDate( new java.sql.Date( convertHostelworldDate( bookedDate + " 00:00:00" ).getTime() ) );
+                bookingDate.setBookedDate( convertHostelworldDate( bookedDate + " 00:00:00" ) );
                 bookingDate.setRoomTypeId( wordPressDAO.getRoomTypeIdForHostelworldLabel( roomType ) );
                 bookingDate.setPersons( Integer.parseInt( persons ) );
                 bookingDate.setPrice( new BigDecimal( price.replaceAll( "GBP", "" ).trim() ) );

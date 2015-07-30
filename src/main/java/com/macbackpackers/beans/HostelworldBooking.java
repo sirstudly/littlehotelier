@@ -31,9 +31,6 @@ public class HostelworldBooking {
     @Column( name = "id", nullable = false )
     private int id;
 
-    @Column( name = "job_id", nullable = false )
-    private int jobId;
-
     @Column( name = "guest_name" )
     private String guestName;
 
@@ -83,14 +80,6 @@ public class HostelworldBooking {
         this.id = id;
     }
 
-    public int getJobId() {
-        return jobId;
-    }
-
-    public void setJobId( int jobId ) {
-        this.jobId = jobId;
-    }
-
     public String getGuestName() {
         return guestName;
     }
@@ -129,6 +118,18 @@ public class HostelworldBooking {
 
     public void setPaymentTotal( BigDecimal paymentTotal ) {
         this.paymentTotal = paymentTotal;
+    }
+
+    /**
+     * Adds the amount to the payment total.
+     * 
+     * @param amount valid amount to add
+     */
+    public void addToPaymentTotal( String amount ) {
+        if ( getPaymentTotal() == null ) {
+            setPaymentTotal( new BigDecimal( 0 ) );
+        }
+        setPaymentTotal( getPaymentTotal().add( new BigDecimal( amount ) ) );
     }
 
     public BigDecimal getPaymentOutstanding() {

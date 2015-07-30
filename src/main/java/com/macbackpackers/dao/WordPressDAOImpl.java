@@ -290,12 +290,48 @@ public class WordPressDAOImpl implements WordPressDAO {
 
         // find all bookings where the first (booked) date matches the checkin date
         List<Integer> bookingIds = sessionFactory.getCurrentSession().createQuery(
-                "           SELECT bookingId "
-                        + "   FROM HostelworldBookingDate "
-                        + "  GROUP BY bookingId"
-                        + " HAVING MIN( bookedDate ) = :bookedDate" )
+                "           SELECT d.bookingId "
+                        + "   FROM HostelworldBookingDate d"
+                        + "  WHERE EXISTS( "
+                        + "          SELECT 1 FROM HostelworldBooking w "
+                        + "           WHERE w.id = d.bookingId "
+                        + "             AND w.bookingSource != 'Hostelbookers' )"
+                        + "  GROUP BY d.bookingId"
+                        + " HAVING MIN( d.bookedDate ) = :bookedDate" )
                 .setParameter( "bookedDate", checkinDate )
                 .list();
+
+        deleteHostelworldBookings( bookingIds );
+    }
+
+    @Transactional
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public void deleteHostelbookersBookingsWithArrivalDate( Date checkinDate ) {
+
+        // find all bookings where the first (booked) date matches the checkin date
+        // find all bookings where the first (booked) date matches the checkin date
+        List<Integer> bookingIds = sessionFactory.getCurrentSession().createQuery(
+                "           SELECT d.bookingId "
+                        + "   FROM HostelworldBookingDate d "
+                        + "  WHERE EXISTS( "
+                        + "          SELECT 1 FROM HostelworldBooking w "
+                        + "           WHERE w.id = d.bookingId "
+                        + "             AND w.bookingSource = 'Hostelbookers' )"
+                        + "  GROUP BY d.bookingId"
+                        + " HAVING MIN( d.bookedDate ) = :bookedDate" )
+                .setParameter( "bookedDate", checkinDate )
+                .list();
+
+        deleteHostelworldBookings( bookingIds );
+    }
+
+    /**
+     * Deletes all HW/HB bookings with the given primary keys.
+     * 
+     * @param bookingIds list of primary keys
+     */
+    private void deleteHostelworldBookings( List<Integer> bookingIds ) {
 
         // now delete the records one by one since i couldn't figure out
         // how to do a cascade delete correctly
@@ -337,11 +373,13 @@ public class WordPressDAOImpl implements WordPressDAO {
             roomType = "DBL";
             capacity = 2;
         }
-        else if ( roomTypeLabel.contains( "3 Bed Private" ) ) {
+        else if ( roomTypeLabel.contains( "3 Bed Private" ) || roomTypeLabel.contains( "Triple" ) ) {
             roomType = "TRIPLE";
+            capacity = 3;
         }
-        else if ( roomTypeLabel.contains( "4 Bed Private" ) ) {
+        else if ( roomTypeLabel.contains( "4 Bed Private" ) || roomTypeLabel.contains( "4 person" ) ) {
             roomType = "QUAD";
+            capacity = 4;
         }
         else {
             throw new IllegalArgumentException( "Unsupported room type, unable to determine type: " + roomTypeLabel );

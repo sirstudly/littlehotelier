@@ -353,6 +353,10 @@ public class BookingsPageScraper {
 
                     td = td.getNextElementSibling();
                     LOGGER.debug( "  guests: " + StringUtils.trim( td.getTextContent() ) );
+                    alloc.setNumberGuests( 0 );
+                    for( String persons : td.getTextContent().split( "/" ) ) {
+                        alloc.setNumberGuests( alloc.getNumberGuests() + Integer.parseInt( persons.trim() ) );
+                    }
 
                     td = td.getNextElementSibling();
                     LOGGER.debug( "  check in: " + StringUtils.trim( td.getTextContent() ) );
@@ -365,7 +369,6 @@ public class BookingsPageScraper {
                     LOGGER.debug( "  booked on: " + StringUtils.trim( td.getTextContent() ) );
 
                     td = td.getNextElementSibling();
-                    //                    alloc.setPaymentTotal( StringUtils.trim( td.getTextContent() ) );
                     LOGGER.debug( "  total: " + StringUtils.trim( td.getTextContent() ) );
 
                     td = td.getNextElementSibling();
@@ -437,12 +440,6 @@ public class BookingsPageScraper {
                 }
             }
         }
-
-        // set number of guests
-        alloc.setNumberGuests(
-                Integer.parseInt( bookingPage.getElementById( "reservation_reservation_room_types__number_adults" ).getAttribute( "value" ) ) +
-                        Integer.parseInt( bookingPage.getElementById( "reservation_reservation_room_types__number_children" ).getAttribute( "value" ) ) +
-                        Integer.parseInt( bookingPage.getElementById( "reservation_reservation_room_types__number_infants" ).getAttribute( "value" ) ) );
 
         alloc.setNotes( StringUtils.trimToNull( bookingPage.getElementById( "reservation_notes" ).getTextContent() ) );
 

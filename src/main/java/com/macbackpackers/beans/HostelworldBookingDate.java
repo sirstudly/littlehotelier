@@ -75,6 +75,10 @@ public class HostelworldBookingDate {
         this.bookedDate = bookedDate;
     }
 
+    public void setBookedDate( java.util.Date bookedDate ) {
+        this.bookedDate = new Date( bookedDate.getTime() );
+    }
+
     public int getPersons() {
         return persons;
     }
