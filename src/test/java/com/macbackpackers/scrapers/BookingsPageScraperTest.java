@@ -49,7 +49,7 @@ public class BookingsPageScraperTest {
         startDate.set( Calendar.DATE, 28 );
         startDate.set( Calendar.YEAR, 2015 );
 
-        scraper.insertCancelledBookingsFor( 1, startDate.getTime(), null );
+        scraper.insertCancelledBookingsFor( 1, startDate.getTime(), startDate.getTime(), null );
     }
 
 }

@@ -47,12 +47,12 @@ public class DiffBookingEnginesJob extends AbstractJob {
     @Transactional
     public void processJob() throws Exception {
 
-        // we just need to scrape new data for the given date (and previous day)
+        // we just need to scrape new data for the given date (include the previous week)
         Date checkinDate = getCheckinDate();
-        Calendar dayBefore = Calendar.getInstance();
-        dayBefore.setTime( checkinDate );
-        dayBefore.add( Calendar.DATE, -1 );
-        allocationScraper.dumpAllocationsBetween( getId(), dayBefore.getTime(), checkinDate, false );
+        Calendar weekBefore = Calendar.getInstance();
+        weekBefore.setTime( checkinDate );
+        weekBefore.add( Calendar.DATE, -7 );
+        allocationScraper.dumpAllocationsBetween( getId(), weekBefore.getTime(), checkinDate, false );
 
         // and update the additional fields for the records
         for ( Date nextDate : dao.getCheckinDatesForAllocationScraperJobId( getId() ) ) {
@@ -60,7 +60,17 @@ public class DiffBookingEnginesJob extends AbstractJob {
         }
 
         // finally, don't forget about cancelled bookings
-        bookingsScraper.insertCancelledBookingsFor( getId(), checkinDate, null );
+        // include all cancelled bookings +/- 2 weeks
+        Calendar twoWeeksBefore = Calendar.getInstance();
+        twoWeeksBefore.setTime( checkinDate );
+        twoWeeksBefore.add( Calendar.DATE, -14 );
+
+        Calendar twoWeeksAfter = Calendar.getInstance();
+        twoWeeksAfter.setTime( checkinDate );
+        twoWeeksAfter.add( Calendar.DATE, 14 );
+
+        // split into 2 searches to avoid having too many results
+        bookingsScraper.insertCancelledBookingsFor( getId(), twoWeeksBefore.getTime(), twoWeeksAfter.getTime(), null );
 
         // now dump the data from HW/HB
         hwScraper.dumpBookingsForArrivalDate( checkinDate );

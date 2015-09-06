@@ -83,19 +83,36 @@ public class BookingsPageScraper {
      * Goes to the booking page showing arrivals for the given date and booking reference.
      * 
      * @param date date to query
-     * @param bookingRef booking reference
+     * @param bookingRef booking reference (optional)
      * @param status status of reservation (optional)
      * @return URL of bookings arriving on this date
      * @throws IOException if credentials could not be loaded
      */
     public HtmlPage goToBookingPageForArrivals( Date date, String bookingRef, String status ) throws IOException {
-        String pageURL = getBookingsURLForArrivalsByDate( date, bookingRef, status );
+        String pageURL = getBookingsURLForArrivalsByDate( date, date, bookingRef, status );
         LOGGER.info( "Loading bookings page: " + pageURL );
         HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
         //LOGGER.debug( nextPage.asXml() );
 
         // save it to disk so we can use it later - ConcurrentModificationException?
         //fileService.serialisePageToDisk( nextPage, getBookingPageSerialisedObjectFilename( date ) );
+        return nextPage;
+    }
+
+    /**
+     * Goes to the booking page showing arrivals for the given dates and booking reference.
+     * 
+     * @param fromDate date to start query
+     * @param toDate date to query to
+     * @param bookingRef booking reference (optional)
+     * @param status status of reservation (optional)
+     * @return URL of bookings arriving on this date
+     * @throws IOException if credentials could not be loaded
+     */
+    public HtmlPage goToBookingPageForArrivals( Date fromDate, Date toDate, String bookingRef, String status ) throws IOException {
+        String pageURL = getBookingsURLForArrivalsByDate( fromDate, toDate, bookingRef, status );
+        LOGGER.info( "Loading bookings page: " + pageURL );
+        HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
         return nextPage;
     }
 
@@ -119,14 +136,16 @@ public class BookingsPageScraper {
     /**
      * Returns the booking URL for all checkins occurring on the given date.
      * 
-     * @param date date to query
+     * @param fromDate date to start querying from
+     * @param toDate date to query to
      * @param bookingRef booking reference (optional)
      * @param status status of reservation (optional)
      * @return URL of bookings arriving on this date
      */
-    private String getBookingsURLForArrivalsByDate( Date date, String bookingRef, String status ) {
+    private String getBookingsURLForArrivalsByDate( Date fromDate, Date toDate, String bookingRef, String status ) {
         return bookingUrl
-                .replaceAll( "__DATE__", DATE_FORMAT_BOOKING_URL.format( date ) )
+                .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( fromDate ) )
+                .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( toDate ) )
                 .replaceAll( "__BOOKING_REF_ID__", bookingRef == null ? "" : bookingRef )
                 .replaceAll( "__DATE_TYPE__", "CheckIn" )
                 .replaceAll( "__STATUS__", status == null ? "" : status );
@@ -354,7 +373,7 @@ public class BookingsPageScraper {
                     td = td.getNextElementSibling();
                     LOGGER.debug( "  guests: " + StringUtils.trim( td.getTextContent() ) );
                     alloc.setNumberGuests( 0 );
-                    for( String persons : td.getTextContent().split( "/" ) ) {
+                    for ( String persons : td.getTextContent().split( "/" ) ) {
                         alloc.setNumberGuests( alloc.getNumberGuests() + Integer.parseInt( persons.trim() ) );
                     }
 
@@ -398,9 +417,9 @@ public class BookingsPageScraper {
      * @throws ParseException on checkin/checkout date parse error
      */
     private void updateAllocationFromBookingDetailsPage( Allocation alloc, HtmlPage bookingPage ) throws ParseException {
-        alloc.setCheckinDate( DATE_FORMAT_DD_MON_YYYY.parse(
+        alloc.setCheckinDate( DATE_FORMAT_YYYY_MM_DD.parse(
                 bookingPage.getElementById( "reservation_check_in_date" ).getAttribute( "value" ) ) );
-        alloc.setCheckoutDate( DATE_FORMAT_DD_MON_YYYY.parse(
+        alloc.setCheckoutDate( DATE_FORMAT_YYYY_MM_DD.parse(
                 bookingPage.getElementById( "reservation_check_out_date" ).getAttribute( "value" ) ) );
 
         // set the room type
@@ -539,13 +558,14 @@ public class BookingsPageScraper {
      * Inserts the calendar records by querying the bookings page for the given date.
      * 
      * @param jobId the job ID to associate with this dump
-     * @param arrivalDate the checkin-date to search on
+     * @param fromDate the date to start searching from
+     * @param toDate the end date to search to
      * @param bookingRef (optional) booking reference (to narrow down the subset of records)
      * @throws IOException on read/write error
      */
     @Transactional
-    public void insertCancelledBookingsFor( int jobId, Date arrivalDate, String bookingRef ) throws IOException {
-        HtmlPage bookingsPage = goToBookingPageForArrivals( arrivalDate, bookingRef, "cancelled" );
+    public void insertCancelledBookingsFor( int jobId, Date fromDate, Date toDate, String bookingRef ) throws IOException {
+        HtmlPage bookingsPage = goToBookingPageForArrivals( fromDate, toDate, bookingRef, "cancelled" );
         insertBookings( jobId, bookingsPage );
     }
 }
