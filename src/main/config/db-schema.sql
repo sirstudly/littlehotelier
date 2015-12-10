@@ -39,7 +39,7 @@ CREATE TABLE `wp_lh_jobs` (
   `start_date` timestamp NULL DEFAULT NULL,
   `end_date` timestamp NULL DEFAULT NULL,
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `last_updated_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_updated_date` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`job_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
@@ -167,6 +167,18 @@ CREATE TABLE `wp_hw_booking_dates` (
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 
+CREATE TABLE `wp_lh_rpt_guest_comments` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `reservation_id` bigint(20) unsigned DEFAULT NULL,
+  `comments` text,
+  `acknowledged_date` timestamp NULL DEFAULT NULL,
+  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `lh_rpt_gc_reservation` (`reservation_id`),
+  UNIQUE (`reservation_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+
 -- application log data
 CREATE TABLE `log4j_data`(
  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -234,14 +246,22 @@ INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`roo
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (13274,'12','08Poopy',10,3110,'LT_FEMALE','Y');
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (13275,'12','09Pervy',10,3110,'LT_FEMALE','Y');
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (13276,'12','10Pimp',10,3110,'LT_FEMALE','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7435,'13','01Coconut',8,3109,'LT_MALE','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7438,'13','02Peanut',8,3109,'LT_MALE','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7441,'13','03Walnut',8,3109,'LT_MALE','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7440,'13','04MichaelJackson',8,3109,'LT_MALE','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7439,'13','05Cashew',8,3109,'LT_MALE','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7432,'13','06Hazelnut',8,3109,'LT_MALE','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (13464,'13','07BrazilNut',8,3109,'LT_MALE','Y');
-INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (13465,'13','08Pecan',8,3109,'LT_MALE','Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (28838,'13','001Coconut',8,2971,'MX','Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (28839,'13','002Peanut',8,2971,'MX','Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (28840,'13','003Walnut',8,2971,'MX','Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (28841,'13','004MichaelJackson',8,2971,'MX','Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (28842,'13','005Cashew',8,2971,'MX','Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (28843,'13','006Hazelnut',8,2971,'MX','Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (28844,'13','007BrazilNut',8,2971,'MX','Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (28845,'13','008Peacan',8,2971,'MX','Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7435,'13','01Coconut',8,3109,'LT_MALE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7438,'13','02Peanut',8,3109,'LT_MALE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7441,'13','03Walnut',8,3109,'LT_MALE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7440,'13','04MichaelJackson',8,3109,'LT_MALE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7439,'13','05Cashew',8,3109,'LT_MALE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7432,'13','06Hazelnut',8,3109,'LT_MALE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (13464,'13','07BrazilNut',8,3109,'LT_MALE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (13465,'13','08Pecan',8,3109,'LT_MALE','N');
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7420,'14','01 Last Drop',14,3109,'LT_MALE','Y');
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7421,'14','02 Maggie Dicksons',14,3109,'LT_MALE','Y');
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7429,'14','03 Biddy Mulligans',14,3109,'LT_MALE','Y');

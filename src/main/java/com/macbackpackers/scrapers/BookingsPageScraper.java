@@ -3,6 +3,7 @@ package com.macbackpackers.scrapers;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.text.ParseException;
 import java.util.Calendar;
 import java.util.Date;
@@ -567,5 +568,19 @@ public class BookingsPageScraper {
     public void insertCancelledBookingsFor( int jobId, Date fromDate, Date toDate, String bookingRef ) throws IOException {
         HtmlPage bookingsPage = goToBookingPageForArrivals( fromDate, toDate, bookingRef, "cancelled" );
         insertBookings( jobId, bookingsPage );
+    }
+
+    /**
+     * Scrapes the guest comments field for the given reservation ID.
+     * 
+     * @param reservationId the reservation ID to scrape
+     * @return the contents of the guest comments field
+     * @throws IOException on read/write error
+     */
+    public String getGuestCommentsForReservation( BigInteger reservationId ) throws IOException {
+        HtmlPage bookingPage = authService.loginAndGoToPage( getBookingReservationURL(
+                String.valueOf( reservationId ) ), webClient );
+        String guestComment = bookingPage.getElementById( "reservation_guest_comments" ).getTextContent();
+        return StringUtils.trimToNull( guestComment );
     }
 }

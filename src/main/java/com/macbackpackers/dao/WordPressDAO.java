@@ -1,6 +1,7 @@
 
 package com.macbackpackers.dao;
 
+import java.math.BigInteger;
 import java.util.Date;
 import java.util.List;
 
@@ -218,4 +219,27 @@ public interface WordPressDAO {
      * @throws EmptyResultDataAccessException if unable to determine room type idO
      */
     public int getRoomTypeIdForHostelworldLabel( String roomTypeLabel ) throws EmptyResultDataAccessException;
+
+    /**
+     * Returns the ID of the last completed allocation scraper job.
+     * @return job ID or null if none exist
+     */
+    public Integer getLastCompletedAllocationScraperJobId();
+
+    /**
+     * Returns a list of reservation IDs which haven't been added to the guest comments report
+     * table.
+     * 
+     * @param allocationScraperJobId the scraper job ID which was run
+     * @return non-null list of reservation IDs
+     */
+    public List<BigInteger> getReservationIdsWithoutEntryInGuestCommentsReport( int allocationScraperJobId );
+
+    /**
+     * Inserts/updates the table for guest comments with the given guest comment.
+     * 
+     * @param reservationId ID of reservation to update
+     * @param comment the guest comment (if applicable) for the reservation
+     */
+    public void updateGuestCommentsForReservation( BigInteger reservationId, String comment );
 }

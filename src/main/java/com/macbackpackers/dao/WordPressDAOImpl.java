@@ -1,6 +1,7 @@
 
 package com.macbackpackers.dao;
 
+import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.Iterator;
@@ -28,6 +29,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
+import com.macbackpackers.jobs.AllocationScraperJob;
 
 @Repository
 public class WordPressDAOImpl implements WordPressDAO {
@@ -310,7 +312,6 @@ public class WordPressDAOImpl implements WordPressDAO {
     public void deleteHostelbookersBookingsWithArrivalDate( Date checkinDate ) {
 
         // find all bookings where the first (booked) date matches the checkin date
-        // find all bookings where the first (booked) date matches the checkin date
         List<Integer> bookingIds = sessionFactory.getCurrentSession().createQuery(
                 "           SELECT d.bookingId "
                         + "   FROM HostelworldBookingDate d "
@@ -441,5 +442,52 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .createSQLQuery( sql.getProperty( "group.bookings" ) )
                 .setParameter( 0, allocationScraperJobId )
                 .executeUpdate();
+    }
+
+    @Transactional
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public Integer getLastCompletedAllocationScraperJobId() {
+        List<Integer> results = sessionFactory.getCurrentSession()
+                .createQuery( "SELECT id FROM AllocationScraperJob "
+                        + "     WHERE jobEndDate IN ("
+                        + "         SELECT MAX( jobEndDate ) FROM AllocationScraperJob "
+                        + "          WHERE classname = :classname AND status = :status )" )
+                .setParameter( "classname", AllocationScraperJob.class.getCanonicalName() )
+                .setParameter( "status", JobStatus.completed )
+                .list();
+        return results.isEmpty() ? null : results.get( 0 );
+    }
+
+    @Transactional
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public List<BigInteger> getReservationIdsWithoutEntryInGuestCommentsReport( int allocationScraperJobId ) {
+        List<BigInteger> reservationIds = sessionFactory.getCurrentSession().createSQLQuery(
+                "          SELECT c.reservation_id "
+                        + "  FROM wp_lh_calendar c "
+                        + "  LEFT OUTER JOIN wp_lh_rpt_guest_comments r "
+                        + "    ON c.reservation_id = r.reservation_id "
+                        + " WHERE c.job_id = :allocationScraperJobId "
+                        + "   AND r.reservation_id IS NULL "
+                        + "   AND c.reservation_id > 0" )
+                .setParameter( "allocationScraperJobId", allocationScraperJobId )
+                .list();
+        return reservationIds;
+    }
+
+    @Transactional
+    @Override
+    public void updateGuestCommentsForReservation( BigInteger reservationId, String comment ) {
+        sessionFactory.getCurrentSession()
+                .createSQLQuery( "INSERT INTO wp_lh_rpt_guest_comments ( reservation_id, comments ) "
+                        + " VALUES ( :reservationId, :comments ) "
+                        + " ON DUPLICATE KEY UPDATE "
+                        + " reservation_id = VALUES( reservation_id ), "
+                        + " comments = VALUES( comments )" )
+                .setParameter( "reservationId", reservationId )
+                .setParameter( "comments", comment )
+                .executeUpdate();
+        LOGGER.info( "Updating guest comments for reservation " + reservationId );
     }
 }
