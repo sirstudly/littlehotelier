@@ -162,7 +162,8 @@ public class BookingsPageScraper {
      */
     private String getBookingsURLForBookedOnDate( Date date, String bookingRefId, String status ) {
         return bookingUrl
-                .replaceAll( "__DATE__", DATE_FORMAT_BOOKING_URL.format( date ) )
+                .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( date ) )
+                .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( date ) )
                 .replaceAll( "__BOOKING_REF_ID__", bookingRefId == null ? "" : bookingRefId )
                 .replaceAll( "__DATE_TYPE__", "BookedOn" )
                 .replaceAll( "__STATUS__", status == null ? "" : status );

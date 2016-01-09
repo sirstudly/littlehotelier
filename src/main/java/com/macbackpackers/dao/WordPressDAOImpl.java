@@ -401,11 +401,11 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .list();
 
         if ( roomTypeIds.isEmpty() ) {
-            throw new EmptyResultDataAccessException( 1 );
+            throw new EmptyResultDataAccessException( "Unable to determine room type id for " + roomTypeLabel, 1 );
         }
 
         if ( roomTypeIds.size() > 1 ) {
-            throw new IncorrectResultSetColumnCountException( 1, roomTypeIds.size() );
+            throw new IncorrectResultSetColumnCountException( "Unable to determine room type id for " + roomTypeLabel, 1, roomTypeIds.size() );
         }
         return roomTypeIds.get( 0 );
     }

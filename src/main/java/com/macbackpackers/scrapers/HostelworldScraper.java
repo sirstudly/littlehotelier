@@ -33,6 +33,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlForm;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
+import com.gargoylesoftware.htmlunit.html.HtmlUnorderedList;
 import com.gargoylesoftware.htmlunit.util.Cookie;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.HostelworldBookingDate;
@@ -169,7 +170,7 @@ public class HostelworldScraper {
         String bookingsPageHtml = arrivalsPage.getWebResponse().getContentAsString();
 
         // now loop through the bookings, saving each one
-        Pattern pattern = Pattern.compile( "bookingdetails\\.php\\?CustID\\=([\\d]+)" );
+        Pattern pattern = Pattern.compile( "\\/booking\\/view\\/([\\d]+)" );
         Matcher matcher = pattern.matcher( bookingsPageHtml );
         while ( matcher.find() ) {
             String bookingRef = matcher.group( 1 );
@@ -189,102 +190,139 @@ public class HostelworldScraper {
      */
     public HtmlPage dumpSingleBooking( String bookingRef ) throws IOException, ParseException {
 
-        HtmlPage bookingPage = webClient.getPage( "https://secure.hostelworld.com/inbox/bookings/bookingdetails.php?CustID=" + bookingRef );
-        List<DomElement> tables = bookingPage.getElementsByTagName( "table" );
-        LOGGER.debug( tables.size() + " tables found" );
+        HtmlPage bookingPage = webClient.getPage( "https://inbox.hostelworld.com/booking/view/" + bookingRef );
+        List<?> custDetails = bookingPage.getByXPath( "//ul[@class='customer-details']" );
+        LOGGER.debug( custDetails.size() + " cust detail blocks found (expecting 1)" );
+        HtmlUnorderedList ul = HtmlUnorderedList.class.cast( custDetails.get( 0 ) );
+        LOGGER.debug( ul.getChildElementCount() + " customer elements found" );
 
         HostelworldBooking hwBooking = new HostelworldBooking();
         hwBooking.setBookingRef( bookingRef );
 
-        // seventh table on the page contains the booking summary we want to scrape
-        for ( DomElement tr : tables.get( 6 ).getElementsByTagName( "tr" ) ) {
-            DomElement td = tr.getFirstElementChild();
-            if ( "Name:".equals( StringUtils.trim( td.getTextContent() ) ) ) {
-                hwBooking.setGuestName( StringUtils.trim( tr.getElementsByTagName( "td" ).get( 2 ).getTextContent() ) );
-                LOGGER.debug( "Name: " + hwBooking.getGuestName() );
-            }
-            else if ( "Email:".equals( StringUtils.trim( td.getTextContent() ) ) ) {
-                hwBooking.setGuestEmail( StringUtils.trim( tr.getElementsByTagName( "td" ).get( 2 ).getTextContent() ) );
-                LOGGER.debug( "Email: " + hwBooking.getGuestEmail() );
-            }
-            else if ( "Phone:".equals( StringUtils.trim( td.getTextContent() ) ) ) {
-                hwBooking.setGuestPhone( StringUtils.trim( tr.getElementsByTagName( "td" ).get( 2 ).getTextContent() ) );
-                LOGGER.debug( "Phone: " + hwBooking.getGuestPhone() );
-            }
-            else if ( "Nationality:".equals( StringUtils.trim( td.getTextContent() ) ) ) {
-                hwBooking.setGuestNationality( StringUtils.trim( tr.getElementsByTagName( "td" ).get( 2 ).getTextContent() ) );
-                LOGGER.debug( "Nationality: " + hwBooking.getGuestNationality() );
-            }
-            else if ( "Booked:".equals( StringUtils.trim( td.getTextContent() ) ) ) {
-                String bookedDate = StringUtils.trim( tr.getElementsByTagName( "td" ).get( 2 ).getTextContent() );
-                LOGGER.debug( "Booked on: " + bookedDate );
-                hwBooking.setBookedDate( convertHostelworldDate( bookedDate ) );
-            }
-            else if ( "Source:".equals( StringUtils.trim( td.getTextContent() ) ) ) {
-                hwBooking.setBookingSource( StringUtils.trim( tr.getElementsByTagName( "td" ).get( 2 ).getTextContent() ) );
-                LOGGER.debug( "Source: " + hwBooking.getBookingSource() );
-            }
-            else if ( "Arriving:".equals( StringUtils.trim( td.getTextContent() ) ) ) {
-                String arrivalDate = StringUtils.trim( tr.getElementsByTagName( "td" ).get( 2 ).getTextContent() );
-                LOGGER.debug( "Arriving: " + arrivalDate );
-                hwBooking.setArrivalTime( convertHostelworldDate( arrivalDate + " 00:00:00" ) );
-            }
-            else if ( "Arrival Time:".equals( StringUtils.trim( td.getTextContent() ) ) ) {
-                String arrivalTime = StringUtils.trim( tr.getElementsByTagName( "td" ).get( 2 ).getTextContent() );
-                LOGGER.debug( "Arrival Time: " + arrivalTime );
-                hwBooking.setArrivalTime( setTimeOnDate( hwBooking.getArrivalTime(), arrivalTime ) );
-            }
-            else if ( "Persons:".equals( StringUtils.trim( td.getTextContent() ) ) ) {
-                hwBooking.setPersons( StringUtils.trim( tr.getElementsByTagName( "td" ).get( 2 ).getTextContent() ) );
-                LOGGER.debug( "Persons: " + hwBooking.getPersons() );
-            }
+        Iterator<DomElement> it = ul.getChildElements().iterator();
+        hwBooking.setGuestName( processCustDetailsElement( it ) );
+        LOGGER.debug( "Name: " + hwBooking.getGuestName() );
+
+        hwBooking.setGuestEmail( processCustDetailsElement( it ) );
+        LOGGER.debug( "Email: " + hwBooking.getGuestEmail() );
+
+        hwBooking.setGuestPhone( processCustDetailsElement( it ) );
+        LOGGER.debug( "Phone: " + hwBooking.getGuestPhone() );
+
+        hwBooking.setGuestNationality( processCustDetailsElement( it ) );
+        LOGGER.debug( "Nationality: " + hwBooking.getGuestNationality() );
+
+        String bookedDate = processCustDetailsElement( it );
+        LOGGER.debug( "Booked on: " + bookedDate );
+        hwBooking.setBookedDate( convertHostelworldDate( bookedDate ) );
+
+        hwBooking.setBookingSource( processCustDetailsElement( it ) );
+        LOGGER.debug( "Source: " + hwBooking.getBookingSource() );
+        
+        //////////// FOR NOW - IGNORE Hostelbookers (within HW) ///////////////////
+        //////////// The room type isn't displayed correctly in HW ?? /////////////
+        if( "Hostelbookers".equals( hwBooking.getBookingSource() ) ) {
+            LOGGER.info( "Skipping HB record " + bookingRef );
+            return bookingPage;
         }
 
-        // eighth table on the page contains the booking dates we want to scrape
-        for ( DomElement tr : tables.get( 7 ).getElementsByTagName( "tr" ) ) {
-            DomElement td = tr.getFirstElementChild();
+        String arrivalDate = processCustDetailsElement( it );
+        LOGGER.debug( "Arriving: " + arrivalDate );
+        hwBooking.setArrivalTime( convertHostelworldDate( arrivalDate + " 00:00:00" ) );
 
-            // for all rows that isn't the header row (or the footer totals)
-            List<HtmlElement> columns = tr.getElementsByTagName( "td" );
-            if ( false == "Date".equals( td.getTextContent().replaceAll( NON_BREAKING_SPACE, "" ).trim() )
-                    && columns.size() == 9 ) {
+        String arrivalTime = processCustDetailsElement( it );
+        LOGGER.debug( "Arrival Time: " + arrivalTime );
+        hwBooking.setArrivalTime( setTimeOnDate( hwBooking.getArrivalTime(), arrivalTime ) );
 
-                HostelworldBookingDate bookingDate = new HostelworldBookingDate();
-                String bookedDate = StringUtils.trim( columns.get( 0 ).getTextContent() );
-                String roomType = StringUtils.trim( columns.get( 4 ).getTextContent() );
-                String persons = StringUtils.trim( columns.get( 6 ).getTextContent() );
-                String price = StringUtils.trim( columns.get( 8 ).getTextContent() );
-                LOGGER.debug( "  Date: " + bookedDate );
-                LOGGER.debug( "  Room: " + roomType );
-                LOGGER.debug( "  Persons: " + persons );
-                LOGGER.debug( "  Price: " + price );
-                bookingDate.setBookedDate( convertHostelworldDate( bookedDate + " 00:00:00" ) );
-                bookingDate.setRoomTypeId( wordPressDAO.getRoomTypeIdForHostelworldLabel( roomType ) );
-                bookingDate.setPersons( Integer.parseInt( persons ) );
-                bookingDate.setPrice( new BigDecimal( price.replaceAll( "GBP", "" ).trim() ) );
-                LOGGER.debug( "  Adding HW booked date: " + ToStringBuilder.reflectionToString( bookingDate ) );
-                hwBooking.addBookedDate( bookingDate );
-            }
+        hwBooking.setPersons( processCustDetailsElement( it ) );
+        LOGGER.debug( "Persons: " + hwBooking.getPersons() );
+
+        // fetch the room/date details
+        List<?> roomDetails = bookingPage.getByXPath( "//h2[@class='room-details']/../div[@class='table']/div/ul[not(@class='title')]" );
+        for ( Object elem : roomDetails ) {
+            ul = HtmlUnorderedList.class.cast( elem );
+            it = ul.getChildElements().iterator();
+
+            HostelworldBookingDate bookingDate = new HostelworldBookingDate();
+            assert it.hasNext();
+            bookedDate = StringUtils.trim( it.next().getTextContent() );
+            assert it.hasNext();
+            String acknowledged = StringUtils.trim( it.next().getTextContent() );
+            assert it.hasNext();
+            String roomType = StringUtils.trim( it.next().getTextContent() );
+            assert it.hasNext();
+            String persons = StringUtils.trim( it.next().getTextContent() );
+            assert it.hasNext();
+            String price = StringUtils.trim( it.next().getTextContent() );
+            LOGGER.debug( "  Date: " + bookedDate );
+            LOGGER.debug( "  Acknowledged: " + acknowledged );
+            LOGGER.debug( "  Room: " + roomType );
+            LOGGER.debug( "  Persons: " + persons );
+            LOGGER.debug( "  Price: " + price );
+            bookingDate.setBookedDate( convertHostelworldDate( bookedDate + " 00:00:00" ) );
+            bookingDate.setRoomTypeId( wordPressDAO.getRoomTypeIdForHostelworldLabel( roomType ) );
+            bookingDate.setPersons( Integer.parseInt( persons ) );
+            bookingDate.setPrice( new BigDecimal( price.replaceAll( "GBP", "" ).trim() ) );
+            LOGGER.debug( "  Adding HW booked date: " + ToStringBuilder.reflectionToString( bookingDate ) );
+            hwBooking.addBookedDate( bookingDate );
         }
 
-        // eighth table on the page contains the payment details in the footer
-        for ( DomElement tr : tables.get( 7 ).getElementsByTagName( "tr" ) ) {
-            DomElement td = tr.getFirstElementChild();
-            if ( "Total Price inc. Service Charge:".equals( td.getTextContent() ) ) {
-                String paymentTotal = StringUtils.trim( tr.getElementsByTagName( "td" ).get( 1 ).getTextContent() );
-                LOGGER.debug( "Total Price inc. Service Charge: " + paymentTotal );
-                hwBooking.setPaymentTotal( new BigDecimal( paymentTotal.replaceAll( "GBP", "" ).trim() ) );
-            }
-            else if ( "Balance Due:".equals( td.getTextContent() ) ) {
-                String balanceDue = StringUtils.trim( tr.getElementsByTagName( "td" ).get( 1 ).getTextContent() );
-                LOGGER.debug( "Balance Due: " + balanceDue );
-                hwBooking.setPaymentOutstanding( new BigDecimal( balanceDue.replaceAll( "GBP", "" ).trim() ) );
-            }
-        }
+        // fetch the payment totals
+        List<?> paymentDetails = bookingPage.getByXPath( "//div[@class='prices-total']/div/ul" );
+        assert paymentDetails.size() == 5;
+        ul = HtmlUnorderedList.class.cast( paymentDetails.get( 0 ) );
+        it = ul.getChildElements().iterator();
+
+        assert it.hasNext();
+        it.next();
+        assert it.hasNext();
+        String serviceCharge = StringUtils.trim( it.next().getTextContent() );
+        LOGGER.debug( "Service Charge: " + serviceCharge );
+
+        ul = HtmlUnorderedList.class.cast( paymentDetails.get( 1 ) );
+        it = ul.getChildElements().iterator();
+        assert it.hasNext();
+        it.next();
+        assert it.hasNext();
+        String paymentTotal = StringUtils.trim( it.next().getTextContent() );
+        LOGGER.debug( "Total Price inc. Service Charge: " + paymentTotal );
+        hwBooking.setPaymentTotal( new BigDecimal( paymentTotal.replaceAll( "GBP", "" ).trim() ) );
+
+        ul = HtmlUnorderedList.class.cast( paymentDetails.get( 2 ) );
+        it = ul.getChildElements().iterator();
+        assert it.hasNext();
+        it.next();
+        assert it.hasNext();
+        String deposit = StringUtils.trim( it.next().getTextContent() );
+        LOGGER.debug( "Deposit: " + deposit );
+
+        ul = HtmlUnorderedList.class.cast( paymentDetails.get( 4 ) );
+        it = ul.getChildElements().iterator();
+        assert it.hasNext();
+        it.next();
+        assert it.hasNext();
+        String balanceDue = StringUtils.trim( it.next().getTextContent() );
+        LOGGER.debug( "Balance Due: " + balanceDue );
+        hwBooking.setPaymentOutstanding( new BigDecimal( balanceDue.replaceAll( "GBP", "" ).trim() ) );
 
         LOGGER.debug( "Adding HW Booking: " + ToStringBuilder.reflectionToString( hwBooking ) );
         wordPressDAO.insertHostelworldBooking( hwBooking );
         return bookingPage;
+    }
+
+    /**
+     * Moves the iterator over 2 elements and returns the text content of the 2nd element. Throws
+     * assertion error if iterator runs out of elements.
+     * 
+     * @param it Iterator of HTML list items
+     * @return text content of 2nd element
+     */
+    private String processCustDetailsElement( Iterator<DomElement> it ) {
+        assert it.hasNext();
+        DomElement elem = it.next();
+        assert it.hasNext();
+        elem = it.next();
+        return StringUtils.trim( elem.getTextContent() );
     }
 
     /**
