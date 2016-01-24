@@ -9,6 +9,7 @@ import org.apache.log4j.Logger;
 import org.hibernate.annotations.Polymorphism;
 import org.hibernate.annotations.PolymorphismType;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
@@ -32,11 +33,24 @@ public abstract class AbstractJob extends Job {
     @Transient
     protected WordPressDAO dao;
 
+    @Value( "${process.jobs.retries:3}" )
+    @Transient
+    private int numberRetries;
+
     /**
      * Do whatever it is we need to do.
      * 
      * @throws Exception
      */
     public abstract void processJob() throws Exception;
+
+    /**
+     * Returns the number of attempts to run this job before aborting with a failure.
+     * 
+     * @return retry count
+     */
+    public int getRetryCount() {
+        return numberRetries;
+    }
 
 }

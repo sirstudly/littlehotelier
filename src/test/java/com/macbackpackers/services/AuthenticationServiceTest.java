@@ -28,7 +28,7 @@ public class AuthenticationServiceTest {
     
     @Test
     public void testGoToPageSkippingLogin() throws Exception {
-        authService.loginAndGoToPage( "https://emea.littlehotelier.com/extranet/reports/summary?property_id=533", webClient );
+        authService.goToPage( "https://emea.littlehotelier.com/extranet/reports/summary?property_id=533", webClient );
     }
 
     

@@ -21,10 +21,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
-import org.w3c.dom.NodeList;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
+import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlElement;
 import com.gargoylesoftware.htmlunit.html.HtmlForm;
 import com.gargoylesoftware.htmlunit.html.HtmlImageInput;
@@ -68,12 +68,6 @@ public class HostelbookersScraper {
     @Value( "${hostelbookers.url.login}" )
     private String loginUrl;
 
-    @Value( "${hostelbookers.username}" )
-    private String username;
-
-    @Value( "${hostelbookers.password}" )
-    private String password;
-
     @Value( "${hostelbookers.url.bookings}" )
     private String bookingsUrl;
 
@@ -83,7 +77,21 @@ public class HostelbookersScraper {
      * @return the page after login
      * @throws IOException
      */
-    public HtmlPage login() throws IOException {
+    public HtmlPage doLogin() throws IOException {
+        return doLogin(
+                wordPressDAO.getOption( "hbo_hb_username" ),
+                wordPressDAO.getOption( "hbo_hb_password" ) );
+    }
+
+    /**
+     * Logs into Hostelbookers providing the necessary credentials.
+     * 
+     * @param username HB username
+     * @param password HB password
+     * @return the page after login
+     * @throws IOException
+     */
+    public HtmlPage doLogin( String username, String password ) throws IOException {
         LOGGER.info( "Logging into Hostelbookers" );
         HtmlPage loginPage = webClient.getPage( loginUrl );
         HtmlForm form = loginPage.getHtmlElementById( "loginForm" );
@@ -99,10 +107,24 @@ public class HostelbookersScraper {
         HtmlPage nextPage = (HtmlPage) submitButton.click();
 
         LOGGER.info( "Finished logging in" );
+        LOGGER.debug( nextPage.asXml() );
+
+        List<?> anchorList = nextPage.getByXPath( "//a[text()='click here']" );
+        if ( anchorList.size() == 0 ) {
+            LOGGER.error( "Processing... link not found" );
+            throw new UnrecoverableFault( "Unable to login to Hostelbookers! Has the password changed?" );
+        }
+        nextPage = ((HtmlAnchor) anchorList.get( 0 )).click();
+
+        // if we still get redirected to the login page...
+        if ( isNotLoggedIn( nextPage ) ) {
+            throw new UnrecoverableFault( "Unable to login to Hostelbookers! Has the password changed?" );
+        }
 
         // save credentials to disk so we don't need to do this again
         // for the immediate future
         fileService.writeCookiesToFile( webClient, COOKIE_FILE );
+
         return nextPage;
     }
 
@@ -121,18 +143,45 @@ public class HostelbookersScraper {
         HtmlPage nextPage = webClient.getPage( url );
 
         // if we got redirected, then login
-        NodeList h1Elements = nextPage.getElementsByTagName( "h1" );
-        if ( h1Elements.getLength() == 1 && "Unauthorized".equals( StringUtils.trim( h1Elements.item( 0 ).getTextContent() ) ) ) {
-            login();
-            nextPage = webClient.getPage( url );
+        if ( isNotLoggedIn( nextPage ) ) {
+            doLogin();
 
-            // if we still get redirected to the login page...
-            h1Elements = nextPage.getElementsByTagName( "h1" );
-            if ( h1Elements.getLength() == 1 && "Unauthorized".equals( StringUtils.trim( h1Elements.item( 0 ).getTextContent() ) ) ) {
-                throw new UnrecoverableFault( "Unable to login to Hostelbookers! Has the password changed?" );
-            }
+            // attempt to go to the page again...
+            nextPage = webClient.getPage( url );
         }
         return nextPage;
+    }
+
+    /**
+     * Checks whether we are able to view the current HB page.
+     * 
+     * @param currentPage the page we are currently on
+     * @return true if login failed, false if we have logged in
+     */
+    private static boolean isNotLoggedIn( HtmlPage currentPage ) {
+
+        // if we try to access a secured page without login (or login expired)
+        for ( DomElement elem : currentPage.getElementsByTagName( "h1" ) ) {
+            if ( "Unauthorized".equals( elem.getTextContent() ) ) {
+                return true;
+            }
+        }
+
+        // this occurs if an invalid password
+        for ( Object elem : currentPage.getByXPath( "//form[@id='loginForm']/b" ) ) {
+            DomElement boldItem = (DomElement) elem;
+            if ( "Incorrect login or password.".equals( boldItem.getTextContent() ) ) {
+                return true;
+            }
+        }
+
+        // this occurs if an invalid username is passed in
+        for ( DomElement elem : currentPage.getElementsByTagName( "h2" ) ) {
+            if ( "Reset Password".equals( elem.getTextContent() ) ) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

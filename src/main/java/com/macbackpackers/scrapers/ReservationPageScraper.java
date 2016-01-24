@@ -1,3 +1,4 @@
+
 package com.macbackpackers.scrapers;
 
 import java.io.IOException;
@@ -24,7 +25,7 @@ import com.macbackpackers.services.AuthenticationService;
 @Component
 @Scope( "prototype" )
 public class ReservationPageScraper {
-    
+
     private final Logger LOGGER = LogManager.getLogger( getClass() );
 
     @Autowired
@@ -36,15 +37,15 @@ public class ReservationPageScraper {
 
     @Value( "${lilhotelier.url.reservation}" )
     private String reservationUrl;
-    
+
     public HtmlPage goToReservationPage( int reservationId ) throws IOException {
         String pageURL = getReservationURL( reservationId );
         LOGGER.info( "Loading reservations page: " + pageURL );
-        HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
+        HtmlPage nextPage = authService.goToPage( pageURL, webClient );
         LOGGER.debug( nextPage.asXml() );
         return nextPage;
     }
-    
+
     /**
      * Returns the reservation URL for the given ID.
      * 
@@ -62,25 +63,28 @@ public class ReservationPageScraper {
      * @throws IOException on comms error
      */
     public void tickDeposit( HtmlPage reservationPage ) throws IOException {
-        HtmlCheckBoxInput depositCheckbox = (HtmlCheckBoxInput)reservationPage.getElementById( 
+        HtmlCheckBoxInput depositCheckbox = (HtmlCheckBoxInput) reservationPage.getElementById(
                 "reservation_payments_attributes_0_processed" );
-        if( depositCheckbox == null || depositCheckbox.isChecked() ) {
-            LOGGER.info( "Deposit checkbox not found or already checked. " + reservationPage.getUrl() );  
-        } else {
+        if ( depositCheckbox == null || depositCheckbox.isChecked() ) {
+            LOGGER.info( "Deposit checkbox not found or already checked. " + reservationPage.getUrl() );
+        }
+        else {
             LOGGER.info( "Clicking on deposit checkbox for " + reservationPage.getUrl() );
             depositCheckbox.click();
 
             List<?> submitButtons = reservationPage.getByXPath( "//li[@class='commit']/input[@class='save' and @value='Update']" );
-            if( submitButtons.isEmpty() ) {
+            if ( submitButtons.isEmpty() ) {
                 LOGGER.error( "Could not find Update button??" );
-            } else if( submitButtons.size() > 1 ) {
+            }
+            else if ( submitButtons.size() > 1 ) {
                 LOGGER.error( "More than 1 Update button found??" );
-            } else {
+            }
+            else {
                 LOGGER.info( "Clicking update button on reservation" );
-                HtmlSubmitInput updateButton = (HtmlSubmitInput)submitButtons.get( 0 );
+                HtmlSubmitInput updateButton = (HtmlSubmitInput) submitButtons.get( 0 );
                 updateButton.click();
             }
         }
     }
-    
+
 }

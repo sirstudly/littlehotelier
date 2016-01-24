@@ -46,7 +46,7 @@ public class AuthenticationService {
      * @throws IOException if unable to read previously saved credentials
      * @throws UnrecoverableFault if credentials were not successful
      */
-    public HtmlPage loginAndGoToPage( String pageURL, WebClient webClient ) throws IOException, UnrecoverableFault {
+    public HtmlPage goToPage( String pageURL, WebClient webClient ) throws IOException, UnrecoverableFault {
         fileService.loadCookiesFromFile( webClient );
 
         // attempt to go the page directly using the current credentials
@@ -63,9 +63,12 @@ public class AuthenticationService {
     /**
      * Logs into the application and writes the credentials to file so we don't have to do it again.
      * 
+     * @param username the username to use
+     * @param password the password to use
      * @throws IOException on write error
+     * @throws UnrecoverableFault if unable to login; cookie file not updated in this case
      */
-    public void doLogin() throws IOException {
+    public void doLogin( String username, String password ) throws IOException {
 
         HtmlPage loginPage = localWebClient.getPage( env.getProperty( "lilhotelier.url.login" ) );
 
@@ -78,8 +81,8 @@ public class AuthenticationService {
         HtmlPasswordInput passwordField = form.getInputByName( "user_session[password]" );
 
         // Change the value of the text field
-        usernameField.setValueAttribute( env.getProperty( "lilhotelier.username" ) );
-        passwordField.setValueAttribute( env.getProperty( "lilhotelier.password" ) );
+        usernameField.setValueAttribute( username );
+        passwordField.setValueAttribute( password );
 
         HtmlPage nextPage = button.click();
         LOGGER.info( "Finished logging in" );
@@ -89,6 +92,17 @@ public class AuthenticationService {
             throw new UnrecoverableFault( "Unable to login. Incorrect password?" );
         }
         fileService.writeCookiesToFile( localWebClient );
+    }
+
+    /**
+     * Logs into the application using the environment properties and writes the credentials to file
+     * so we don't have to do it again.
+     * 
+     * @throws IOException on write error
+     * @throws UnrecoverableFault if unable to login; cookie file not updated in this case
+     */
+    public void doLogin() throws IOException {
+        doLogin( env.getProperty( "lilhotelier.username" ), env.getProperty( "lilhotelier.password" ) );
     }
 
 }

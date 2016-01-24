@@ -154,7 +154,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     public AbstractJob fetchJobById( int id ) {
         AbstractJob j = (AbstractJob) sessionFactory.getCurrentSession().get( AbstractJob.class, id );
         if ( j == null ) {
-            throw new EmptyResultDataAccessException( 1 );
+            throw new EmptyResultDataAccessException( "Unable to find Job with ID " + id, 1 );
         }
         return j;
     }
@@ -363,6 +363,12 @@ public class WordPressDAOImpl implements WordPressDAO {
 
         if ( roomTypeLabel.contains( "Mixed" ) ) {
             roomType = "MX";
+
+            //////////// 1/24/2016: ATM, this room type isn't displayed correctly in HW /////////////
+            // "1 Bed Mixed Dorm" should actually be "16 Bed Mixed Dorm" for HB bookings //
+            if( capacity == 1 ) {
+                capacity = 16;
+            }
         }
         else if ( roomTypeLabel.contains( "Female" ) ) {
             roomType = "F";
@@ -489,5 +495,23 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( "comments", comment )
                 .executeUpdate();
         LOGGER.info( "Updating guest comments for reservation " + reservationId );
+    }
+
+    @Transactional
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public String getOption( String property ) {
+        List<String> sqlResult = sessionFactory.getCurrentSession().createSQLQuery(
+                "          SELECT option_value"
+                        + "  FROM wp_options"
+                        + " WHERE option_name = :optionName " )
+                .setParameter( "optionName", property )
+                .list();
+
+        // key doesn't exist; just return null
+        if ( sqlResult.isEmpty() ) {
+            return null;
+        }
+        return sqlResult.get( 0 );
     }
 }

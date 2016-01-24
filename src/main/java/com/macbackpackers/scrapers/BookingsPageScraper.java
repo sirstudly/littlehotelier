@@ -18,7 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
-import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.WebClient;
@@ -60,9 +59,6 @@ public class BookingsPageScraper {
     @Autowired
     private WordPressDAO wordPressDAO;
 
-    @Autowired
-    private Environment env;
-
     @Value( "${lilhotelier.url.bookings}" )
     private String bookingUrl;
 
@@ -92,12 +88,7 @@ public class BookingsPageScraper {
     public HtmlPage goToBookingPageForArrivals( Date date, String bookingRef, String status ) throws IOException {
         String pageURL = getBookingsURLForArrivalsByDate( date, date, bookingRef, status );
         LOGGER.info( "Loading bookings page: " + pageURL );
-        HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
-        //LOGGER.debug( nextPage.asXml() );
-
-        // save it to disk so we can use it later - ConcurrentModificationException?
-        //fileService.serialisePageToDisk( nextPage, getBookingPageSerialisedObjectFilename( date ) );
-        return nextPage;
+        return authService.goToPage( pageURL, webClient );
     }
 
     /**
@@ -113,7 +104,7 @@ public class BookingsPageScraper {
     public HtmlPage goToBookingPageForArrivals( Date fromDate, Date toDate, String bookingRef, String status ) throws IOException {
         String pageURL = getBookingsURLForArrivalsByDate( fromDate, toDate, bookingRef, status );
         LOGGER.info( "Loading bookings page: " + pageURL );
-        HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
+        HtmlPage nextPage = authService.goToPage( pageURL, webClient );
         return nextPage;
     }
 
@@ -129,7 +120,7 @@ public class BookingsPageScraper {
     public HtmlPage goToBookingPageBookedOn( Date date, String bookingRefId ) throws IOException {
         String pageURL = getBookingsURLForBookedOnDate( date, bookingRefId, null );
         LOGGER.info( "Loading bookings page: " + pageURL );
-        HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
+        HtmlPage nextPage = authService.goToPage( pageURL, webClient );
         LOGGER.debug( nextPage.asXml() );
         return nextPage;
     }
@@ -324,7 +315,7 @@ public class BookingsPageScraper {
                     alloc.setReservationId( Integer.parseInt( dataId ) );
 
                     updateAllocationFromBookingDetailsPage( alloc,
-                            authService.loginAndGoToPage( getBookingReservationURL( dataId ), webClient ) );
+                            authService.goToPage( getBookingReservationURL( dataId ), webClient ) );
 
                     // may want to improve this later if i split out the table so it's not flattened
                     DomElement td = tr.getFirstElementChild();
@@ -579,7 +570,7 @@ public class BookingsPageScraper {
      * @throws IOException on read/write error
      */
     public String getGuestCommentsForReservation( BigInteger reservationId ) throws IOException {
-        HtmlPage bookingPage = authService.loginAndGoToPage( getBookingReservationURL(
+        HtmlPage bookingPage = authService.goToPage( getBookingReservationURL(
                 String.valueOf( reservationId ) ), webClient );
         String guestComment = bookingPage.getElementById( "reservation_guest_comments" ).getTextContent();
         return StringUtils.trimToNull( guestComment );

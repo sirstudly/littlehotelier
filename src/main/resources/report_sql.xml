@@ -48,7 +48,7 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
 		WHERE job_id = ?
 		AND payment_total = payment_outstanding
 		AND payment_total > 0
-		AND booking_source IN ('Booking.com')
+		AND booking_source IN ('Booking.com', 'Expedia')
 		GROUP BY reservation_id, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn;
     </entry>
     <entry key="group.bookings">

@@ -76,7 +76,7 @@ public class AllocationsPageScraper {
         String dateAsString = DATE_FORMAT_YYYY_MM_DD.format( date );
         String pageURL = calendarUrl + "?start_date=" + dateAsString;
         LOGGER.info( "Loading calendar page: " + pageURL );
-        HtmlPage nextPage = authService.loginAndGoToPage( pageURL, webClient );
+        HtmlPage nextPage = authService.goToPage( pageURL, webClient );
         LOGGER.debug( nextPage.asXml() );
         return nextPage;
     }
@@ -224,7 +224,7 @@ public class AllocationsPageScraper {
      */
     private void insertAllocationFromSpan( int jobId, int dataRoomTypeId,
             Integer dataRoomId, String currentBedName, String dataDate, DomElement span )
-            throws ParseException, SQLException {
+                    throws ParseException, SQLException {
 
         // should have 3 spans
         // 1) wrapper holding the following info

@@ -28,7 +28,6 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlDivision;
-import com.gargoylesoftware.htmlunit.html.HtmlElement;
 import com.gargoylesoftware.htmlunit.html.HtmlForm;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
@@ -50,11 +49,11 @@ public class HostelworldScraper {
     public static final FastDateFormat DATE_FORMAT_BOOKED_DATE = FastDateFormat.getInstance( "d MMM yy HH:mm:ss" );
     public static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
 
+    /** the title on the login page */
+    public static final String LOGIN_PAGE_TITLE = "Hostels Inbox Login";
+
     /** for saving login credentials */
     private static final String COOKIE_FILE = "hostelworld.cookies";
-
-    /** &nbsp; in HTML terms */
-    private static final String NON_BREAKING_SPACE = "\u00a0";
 
     @Autowired
     @Qualifier( "webClientForHostelworld" )
@@ -76,12 +75,6 @@ public class HostelworldScraper {
     @Value( "${hostelworld.hostelnumber}" )
     private String hostelNumber;
 
-    @Value( "${hostelworld.username}" )
-    private String username;
-
-    @Value( "${hostelworld.password}" )
-    private String password;
-
     @Value( "${hostelworld.url.bookings}" )
     private String bookingsUrl;
 
@@ -91,7 +84,21 @@ public class HostelworldScraper {
      * @return the page after login
      * @throws IOException
      */
-    public HtmlPage login() throws IOException {
+    public HtmlPage doLogin() throws IOException {
+        return doLogin(
+                wordPressDAO.getOption( "hbo_hw_username" ),
+                wordPressDAO.getOption( "hbo_hw_password" ) );
+    }
+
+    /**
+     * Logs into Hostelworld providing the necessary credentials.
+     * 
+     * @param username user credentials
+     * @param password user credentials
+     * @return the page after login
+     * @throws IOException
+     */
+    public HtmlPage doLogin( String username, String password ) throws IOException {
         LOGGER.info( "Logging into Hostelworld" );
         HtmlPage loginPage = webClientForLogin.getPage( loginUrl );
         HtmlForm form = loginPage.getFormByName( "loginForm" );
@@ -110,6 +117,12 @@ public class HostelworldScraper {
 
         HtmlPage nextPage = loginLink.click();
         LOGGER.info( "Finished logging in" );
+        LOGGER.debug( nextPage.asXml() );
+
+        // if we get redirected to the login page again...
+        if ( LOGIN_PAGE_TITLE.equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
+            throw new UnrecoverableFault( "Unable to login to Hostelworld. Incorrect password?" );
+        }
 
         // save credentials to disk so we don't need to do this again
         // for the immediate future
@@ -138,12 +151,12 @@ public class HostelworldScraper {
         HtmlPage nextPage = webClient.getPage( url );
 
         // if we got redirected, then login
-        if ( "Hostels Inbox Login".equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
-            login();
+        if ( LOGIN_PAGE_TITLE.equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
+            doLogin();
             nextPage = webClient.getPage( url );
 
             // if we still get redirected to the login page...
-            if ( "Hostels Inbox Login".equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
+            if ( LOGIN_PAGE_TITLE.equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
                 throw new UnrecoverableFault( "Unable to login to Hostelworld! Has the password changed?" );
             }
         }
@@ -218,13 +231,14 @@ public class HostelworldScraper {
 
         hwBooking.setBookingSource( processCustDetailsElement( it ) );
         LOGGER.debug( "Source: " + hwBooking.getBookingSource() );
-        
+
         //////////// FOR NOW - IGNORE Hostelbookers (within HW) ///////////////////
         //////////// The room type isn't displayed correctly in HW ?? /////////////
-        if( "Hostelbookers".equals( hwBooking.getBookingSource() ) ) {
-            LOGGER.info( "Skipping HB record " + bookingRef );
-            return bookingPage;
-        }
+        // Workaround is being done in WordpressDAOImpl#getRoomTypeIdForHostelworldLabel() 
+        //        if ( StringUtils.trimToEmpty( hwBooking.getBookingSource() ).startsWith( "Hostelbookers" ) ) {
+        //            LOGGER.info( "Skipping HB record " + bookingRef );
+        //            return bookingPage;
+        //        }
 
         String arrivalDate = processCustDetailsElement( it );
         LOGGER.debug( "Arriving: " + arrivalDate );

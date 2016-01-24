@@ -28,9 +28,6 @@ public class ProcessorService {
     @Autowired
     private AutowireCapableBeanFactory autowireBeanFactory;
 
-    @Value( "${process.jobs.retries:3}" )
-    private int numberRetries;
-
     @Value( "${process.jobs.backoff.millis:3000}" )
     private int backoffMillis; // time to wait before re-attempting failed job
 
@@ -58,7 +55,7 @@ public class ProcessorService {
     @Transactional
     private void processJob( AbstractJob job ) {
 
-        for ( int i = 0 ; i < numberRetries ; i++ ) {
+        for ( int i = 0 ; i < job.getRetryCount() ; i++ ) {
             NDC.push( String.valueOf( job.getId() ) ); // record the ID of this job for logging
 
             try {
@@ -73,7 +70,7 @@ public class ProcessorService {
                 LOGGER.error( "Error occurred when running " + getClass().getSimpleName() + " id: " + job.getId(), ex );
 
                 // if we're on our last retry, fail this job
-                if ( i == numberRetries - 1 ) {
+                if ( i == job.getRetryCount() - 1 ) {
                     LOGGER.error( "Maximum number of attempts reached. Job " + job.getId() + " failed" );
                     dao.updateJobStatus( job.getId(), JobStatus.failed, JobStatus.processing );
                 }

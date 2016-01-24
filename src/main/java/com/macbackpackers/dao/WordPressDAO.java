@@ -222,6 +222,7 @@ public interface WordPressDAO {
 
     /**
      * Returns the ID of the last completed allocation scraper job.
+     * 
      * @return job ID or null if none exist
      */
     public Integer getLastCompletedAllocationScraperJobId();
@@ -242,4 +243,12 @@ public interface WordPressDAO {
      * @param comment the guest comment (if applicable) for the reservation
      */
     public void updateGuestCommentsForReservation( BigInteger reservationId, String comment );
+
+    /**
+     * Returns the wordpress option for the given property.
+     * 
+     * @param property name of key to get
+     * @return option value or null if key doesn't exist
+     */
+    public String getOption( String property );
 }

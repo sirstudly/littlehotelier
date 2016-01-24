@@ -45,7 +45,7 @@ public class WordPressDAOTest {
 
     @Before
     public void setUp() throws Exception {
-        testDAO.deleteAllTransactionalData(); // clear out data
+        //testDAO.deleteAllTransactionalData(); // clear out data
     }
 
     @Test
@@ -429,6 +429,12 @@ public class WordPressDAOTest {
         dao.insertAllocation( alloc );
         Assert.assertTrue( "ID not assigned", alloc.getId() > 0 );
         return alloc;
+    }
+
+    @Test
+    public void testGetOption() {
+        Assert.assertEquals( "Just another WordPress site", dao.getOption( "blogdescription" ) );
+        Assert.assertEquals( null, dao.getOption( "non.existent.key" ) );
     }
 
 }

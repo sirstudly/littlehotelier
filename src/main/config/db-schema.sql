@@ -507,7 +507,7 @@ INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`roo
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (16,'Unallocated',NULL,12,2969,'M','N');
 
 -- If you're dumping the table from wp_lh_calendar; then you'll need to fill these in manually
-
+/*
 INSERT INTO wp_lh_rooms(id, room, bed_name)
 SELECT DISTINCT room_id, room, bed_name
   FROM wp_lh_calendar;
@@ -556,9 +556,10 @@ UPDATE wp_lh_rooms
          FROM wp_lh_calendar c
         WHERE c.room_id = r.id
           AND c.job_id IN ( [most recent jobs] ) );
- 
+ */
  
 -- scheduled jobs
+/*
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (1,'com.macbackpackers.jobs.ScrapeReservationsBookedOnJob','0 31 * * * ?','Y',NULL,NOW());
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (2,'com.macbackpackers.jobs.HousekeepingJob','0 29 6 * * ?','Y',NULL,NOW());
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (3,'com.macbackpackers.jobs.AllocationScraperJob','0 1 22 * * ?','Y',NULL,NOW());
@@ -573,3 +574,27 @@ INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`)
 INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (5,4,'selected_date','TODAY');
 INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (6,5,'selected_date','TODAY');
 INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (7,6,'selected_date','TODAY-1');
+*/
+
+-- housekeeping
+
+CREATE TABLE `wp_lh_cleaner` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `first_name` varchar(255) DEFAULT NULL,
+  `last_name` varchar(255) DEFAULT NULL,
+  `active_yn` char(1) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+CREATE TABLE `wp_lh_cleaner_bed_assign` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `lh_cleaner_id` bigint(20) unsigned NOT NULL,
+  `room_id` bigint(20) unsigned NOT NULL,
+  `start_date` datetime NOT NULL,
+  `end_date` datetime NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+--  FOREIGN KEY (`lh_cleaner_id`) REFERENCES `wp_lh_cleaner`(`id`)  -- removed cause of hibernate
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
