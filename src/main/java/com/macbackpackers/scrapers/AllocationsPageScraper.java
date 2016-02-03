@@ -243,7 +243,6 @@ public class AllocationsPageScraper {
         LOGGER.debug( "  data-reservation_id: " + span.getAttribute( "data-reservation_id" ) );
         LOGGER.debug( "  data-rate_plan_name: " + span.getAttribute( "data-rate_plan_name" ) );
         LOGGER.debug( "  data-payment_status: " + span.getAttribute( "data-payment_status" ) );
-        LOGGER.debug( "  data-occupancy: " + span.getAttribute( "data-occupancy" ) );
         LOGGER.debug( "  data-href: " + span.getAttribute( "data-href" ) );
         LOGGER.debug( "  data-notes: " + span.getAttribute( "data-notes" ) );
         LOGGER.debug( "  data-guest_name: " + span.getAttribute( "data-guest_name" ) );
@@ -253,7 +252,7 @@ public class AllocationsPageScraper {
         Matcher m = p.matcher( currentBedName );
         String room = null, bed = null;
         if ( m.find() == false ) {
-            LOGGER.warn( "Couldn't determine bed name from '" + currentBedName + "'. Is it a private?" );
+            LOGGER.info( "Couldn't determine bed name from '" + currentBedName + "'. Is it a private?" );
             room = currentBedName;
         }
         else {
@@ -267,7 +266,7 @@ public class AllocationsPageScraper {
         alloc.setRoomTypeId( dataRoomTypeId );
         alloc.setRoom( room );
         alloc.setBedName( bed );
-        setCheckInOutDates( alloc, dataDate, span.getAttribute( "style" ) );
+        setCheckInOutDates( alloc, dataDate, span );
 
         // check for "room closures"
         if ( StringUtils.contains( span.getAttribute( "class" ), "room_closure" ) ) {
@@ -297,7 +296,7 @@ public class AllocationsPageScraper {
             alloc.setPaymentOutstanding( StringUtils.replaceChars( span.getAttribute( "data-reservation_payment_oustanding" ), POUND + ",", "" ) );
             alloc.setRatePlanName( span.getAttribute( "data-rate_plan_name" ) );
             alloc.setPaymentStatus( span.getAttribute( "data-payment_status" ) );
-            alloc.setNumberGuests( calculateNumberOfGuests( span.getAttribute( "data-occupancy" ) ) );
+            alloc.setNumberGuests( calculateNumberOfGuests( span ) );
         }
 
         alloc.setDataHref( span.getAttribute( "data-href" ) );
@@ -309,37 +308,15 @@ public class AllocationsPageScraper {
     }
 
     /**
-     * Returns the attribute from the given style string.
+     * Sums the adults/children/infants from the reservation span.
      * 
-     * @param attribute name of attribute
-     * @param unit unit to match against
-     * @return attribute value
-     */
-    private static String getStyleAttribute( String style, String attribute, String unit ) {
-        Pattern p = Pattern.compile( attribute + ": *([\\-0-9]*)" + unit );
-        Matcher m = p.matcher( style );
-        if ( m.find() ) {
-            return m.group( 1 );
-        }
-        throw new RuntimeException( "Attribute " + attribute + " not found in style " + style );
-    }
-
-    /**
-     * Sums the adults/children/infants from the occupancy field.
-     * 
-     * @param occupancy , e.g. 2 / 0 / 0 technically, the latter two numbers should be 0
+     * @param reservationSpan HTML span containing the reservation details on the calendar page
      * @return sum of occupancy values
      */
-    private int calculateNumberOfGuests( String occupancy ) {
-        String values[] = occupancy.split( "/" );
-        if ( values.length != 3 ) {
-            LOGGER.error( "unexpected occupancy " + occupancy );
-        }
-        int count = 0;
-        for ( int i = 0 ; i < values.length ; i++ ) {
-            count += Integer.parseInt( StringUtils.trim( values[i] ) );
-        }
-        return count;
+    private int calculateNumberOfGuests( DomElement reservationSpan ) {
+        return Integer.parseInt( reservationSpan.getAttribute( "data-number_adults" ) ) +
+                Integer.parseInt( reservationSpan.getAttribute( "data-number_children" ) ) +
+                Integer.parseInt( reservationSpan.getAttribute( "data-number_infants" ) );
     }
 
     /**
@@ -348,54 +325,25 @@ public class AllocationsPageScraper {
      * @param alloc object to update
      * @param dataDate this is the date in the html table we are currently processing, in format
      *            yyyy-MM-dd
-     * @param style this is the style attribute on the form
+     * @param reservationSpan HTML span of the reservation within the calendar page
      * @throws ParseException on date parse error
      */
-    private void setCheckInOutDates( Allocation alloc, String dataDate, String style ) throws ParseException {
+    private void setCheckInOutDates( Allocation alloc, String dataDate, DomElement reservationSpan ) throws ParseException {
 
-        int leftOffset = Integer.parseInt( getStyleAttribute( style, "left", "px" ) );
-        // normally, the offset would be 30px but if they are off the screen (to the left)
-        // then the one day off screen is -31px
-        // 2 days off screen is -92px (-31px - 56px - 5px buffer), etc...
-        int daysToSubtract = 0;
-        if ( leftOffset < 0 ) {
-
-            LOGGER.info( "offscreen record found" );
-            // check if my calculation is correct
-            // this should be a multiple of 61
-            if ( (leftOffset - 30) % 61 != 0 ) {
-                LOGGER.warn( "leftOffset has unexpected value " + leftOffset );
-            }
-
-            daysToSubtract = (leftOffset - 30) / 61;
-        }
-
+        // if the start date is defined, then use that. otherwise use the date passed in.
+        // usually the start date only appears if the record appears off-screen
         Calendar checkinDate = Calendar.getInstance();
-        checkinDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse( dataDate ) );
-        checkinDate.add( Calendar.DATE, daysToSubtract );
+        String checkinDateStr = StringUtils.trimToNull( reservationSpan.getAttribute( "data-start-date" ) );
+        LOGGER.info( "checkin-date: " + checkinDateStr );
+        checkinDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse( 
+                checkinDateStr != null ? checkinDateStr : dataDate ) );
         alloc.setCheckinDate( checkinDate.getTime() );
-
-        // calculate checkout date by calculating number of nights
-        // added to the checkin date
-        // width of a single day is 56px, gap is 5px
-        int width = Integer.parseInt( getStyleAttribute( style, "width", "px" ) );
-        int numberNights = 0;
-        // width (minus first night) should be divisible by 61
-        if ( (width - 56) % 61 != 0 ) {
-            LOGGER.error( "unexpected width of record " + width );
-        }
-        if ( width == 56 ) {
-            numberNights = 1;
-        }
-        else {
-            numberNights = 1 + ((width - 56) / 61); // number of additional nights
-        }
-        LOGGER.info( "Number of nights: " + numberNights );
 
         // adjust checkout date by number of nights
         Calendar checkoutDate = Calendar.getInstance();
-        checkoutDate.setTime( alloc.getCheckinDate() );
-        checkoutDate.add( Calendar.DATE, numberNights );
+        String checkoutDateStr = StringUtils.trimToNull( reservationSpan.getAttribute( "data-end-date" ) );
+        LOGGER.info( "checkout-date: " + checkoutDateStr );
+        checkoutDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse( checkoutDateStr ) );
         alloc.setCheckoutDate( checkoutDate.getTime() );
     }
 
