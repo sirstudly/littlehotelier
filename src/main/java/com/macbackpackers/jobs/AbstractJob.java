@@ -4,10 +4,10 @@ package com.macbackpackers.jobs;
 import javax.persistence.Entity;
 import javax.persistence.Transient;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.hibernate.annotations.Polymorphism;
 import org.hibernate.annotations.PolymorphismType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
@@ -27,7 +27,7 @@ import com.macbackpackers.dao.WordPressDAO;
 public abstract class AbstractJob extends Job {
 
     @Transient
-    protected final Logger LOGGER = LogManager.getLogger( getClass() );
+    protected final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
     @Transient

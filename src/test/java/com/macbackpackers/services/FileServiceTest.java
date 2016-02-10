@@ -1,24 +1,25 @@
+
 package com.macbackpackers.services;
 
 import java.io.File;
 import java.nio.channels.FileLock;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.macbackpackers.config.LittleHotelierConfig;
 
-@RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(classes = LittleHotelierConfig.class)
+@RunWith( SpringJUnit4ClassRunner.class )
+@ContextConfiguration( classes = LittleHotelierConfig.class )
 public class FileServiceTest {
 
-    private static final Logger LOGGER = LogManager.getLogger( FileServiceTest.class );
+    private static final Logger LOGGER = LoggerFactory.getLogger( FileServiceTest.class );
 
     @Autowired
     FileService fs;
@@ -44,10 +45,11 @@ public class FileServiceTest {
 
     private static void sleep( int millis ) {
         Object lock = new Object();
-        synchronized (lock) {
+        synchronized ( lock ) {
             try {
                 lock.wait( millis );
-            } catch ( InterruptedException e ) {
+            }
+            catch ( InterruptedException e ) {
                 // woke up
             }
         }
@@ -56,8 +58,7 @@ public class FileServiceTest {
     /**
      * Needed so we can create multiple processes for this test.
      * 
-     * @param argv
-     *            no args req'd
+     * @param argv no args req'd
      */
     public static void main( String argv[] ) throws Exception {
         FileService fs = new FileService();

@@ -1,0 +1,59 @@
+
+<configuration>
+
+    <property name="USER_HOME" value="logs" />
+
+	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+		<!-- encoders are assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+	<!-- a separate log file for each job -->
+    <appender name="BY-JOB" class="ch.qos.logback.classic.sift.SiftingAppender">
+
+        <!-- This is MDC value -->
+        <!-- We will assign a value to 'jobId' via Java code -->
+        <discriminator>
+            <key>jobId</key>
+            <defaultValue>queue</defaultValue>
+        </discriminator>
+
+        <sift>
+
+          <!-- A standard RollingFileAppender, the log file is based on 'jobId' at runtime  -->
+          <appender name="FILE-${logFileName}" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${USER_HOME}/job-${jobId}.log</file>
+
+            <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+                <Pattern>%d{yyyy-MM-dd HH:mm:ss} %mdc [%thread] %level %logger{35}:%line - %msg%n</Pattern>
+            </encoder>
+
+            <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+                <FileNamePattern>${USER_HOME}/${logFileName}.%i.log.zip</FileNamePattern>
+                <MinIndex>1</MinIndex>
+                <MaxIndex>10</MaxIndex>
+            </rollingPolicy>
+
+            <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+                <MaxFileSize>10MB</MaxFileSize>
+            </triggeringPolicy>
+
+          </appender>
+
+        </sift>
+    </appender>
+
+	<logger name="org.hibernate" level="INFO" />
+    <logger name="org.quartz" level="INFO" />
+
+    <logger name="com.macbackpackers" level="DEBUG" additivity="false">
+        <appender-ref ref="BY-JOB" />
+        <appender-ref ref="STDOUT" />
+    </logger>
+    
+   	<root level="INFO">
+		<appender-ref ref="STDOUT" />
+	</root>
+</configuration>

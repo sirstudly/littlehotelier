@@ -1,11 +1,11 @@
 
 package com.macbackpackers.jobs.quartz;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.quartz.JobDataMap;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.dao.WordPressDAO;
@@ -17,7 +17,7 @@ import com.macbackpackers.dao.WordPressDAO;
  */
 public class CronJob implements org.quartz.Job {
 
-    private final Logger LOGGER = LogManager.getLogger( getClass() );
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     /** The job that is being scheduled */
     public static final String PARAM_SCHEDULED_JOB = "scheduled_job";

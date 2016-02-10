@@ -9,12 +9,12 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.apache.commons.lang3.time.FastDateFormat;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.test.context.ContextConfiguration;
@@ -33,7 +33,7 @@ import com.macbackpackers.jobs.HousekeepingJob;
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class WordPressDAOTest {
 
-    final Logger LOGGER = LogManager.getLogger( getClass() );
+    final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
     WordPressDAO dao;

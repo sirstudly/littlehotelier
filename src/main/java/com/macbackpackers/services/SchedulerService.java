@@ -3,8 +3,6 @@ package com.macbackpackers.services;
 
 import java.util.TimeZone;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.JobBuilder;
 import org.quartz.JobDataMap;
@@ -13,6 +11,8 @@ import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -26,7 +26,7 @@ import com.macbackpackers.jobs.quartz.CronJob;
 @Service
 public class SchedulerService {
 
-    private final Logger LOGGER = LogManager.getLogger( getClass() );
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
     private WordPressDAO dao;

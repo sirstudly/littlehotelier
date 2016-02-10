@@ -4,8 +4,8 @@ package com.macbackpackers.services;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.env.Environment;
@@ -22,7 +22,7 @@ import com.macbackpackers.exceptions.UnrecoverableFault;
 @Service
 public class AuthenticationService {
 
-    private final Logger LOGGER = LogManager.getLogger( getClass() );
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     /** the title on the login page */
     public static final String LOGIN_PAGE_TITLE = "Welcome to Little Hotelier";

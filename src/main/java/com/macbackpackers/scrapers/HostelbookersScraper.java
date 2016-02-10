@@ -14,8 +14,8 @@ import javax.transaction.Transactional;
 import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,7 +41,7 @@ import com.macbackpackers.services.FileService;
 @Scope( "prototype" )
 public class HostelbookersScraper {
 
-    private final Logger LOGGER = LogManager.getLogger( getClass() );
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     public static final FastDateFormat DATE_FORMAT_BOOKED_DATE = FastDateFormat.getInstance( "d MMM yy HH:mm:ss" );
     public static final FastDateFormat DATE_FORMAT_DD_MMMMM_YYYY = FastDateFormat.getInstance( "dd-MMMMM-yyyy" );

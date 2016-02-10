@@ -3,10 +3,10 @@ package com.macbackpackers.scrapers;
 
 import java.util.Calendar;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
@@ -19,7 +19,7 @@ import com.macbackpackers.exceptions.UnrecoverableFault;
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class HostelbookersScraperTest {
 
-    protected final Logger LOGGER = LogManager.getLogger( getClass() );
+    protected final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
     HostelbookersScraper scraper;
@@ -41,7 +41,7 @@ public class HostelbookersScraperTest {
         HtmlPage nextPage = scraper.doLogin( "testlogin", "xxxxx" );
         LOGGER.info( nextPage.asXml() );
     }
-    
+
     @Test
     public void testGotoPage() throws Exception {
         HtmlPage nextPage = scraper.gotoPage( "https://admin.hostelbookers.com/backoffice/booking/index.cfm?fuseaction=search&sub=query&page=1&searchType=Arrival&strArrivalDateStart=28-January-2016&strArrivalDateEnd=28-January-2016&intArrivalStatusID=0&intArrivalSourceID=0&btnSubmit=Search" );

@@ -9,8 +9,8 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
@@ -29,7 +29,7 @@ import com.macbackpackers.dao.WordPressDAO;
 @Component
 public class InsertJob {
 
-    private static final Logger LOGGER = LogManager.getLogger( InsertJob.class );
+    private static final Logger LOGGER = LoggerFactory.getLogger( InsertJob.class );
 
     @Autowired
     private WordPressDAO dao;

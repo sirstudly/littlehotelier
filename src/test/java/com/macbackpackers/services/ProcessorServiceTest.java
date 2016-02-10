@@ -5,13 +5,13 @@ import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.Date;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.quartz.Scheduler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.test.context.ContextConfiguration;
@@ -36,7 +36,7 @@ import com.macbackpackers.scrapers.BookingsPageScraper;
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class ProcessorServiceTest {
 
-    private final Logger LOGGER = LogManager.getLogger( getClass() );
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
     ProcessorService processorService;

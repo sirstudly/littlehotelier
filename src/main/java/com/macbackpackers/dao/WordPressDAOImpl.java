@@ -12,9 +12,9 @@ import java.util.regex.Pattern;
 
 import javax.transaction.Transactional;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.hibernate.SessionFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -34,7 +34,7 @@ import com.macbackpackers.jobs.AllocationScraperJob;
 @Repository
 public class WordPressDAOImpl implements WordPressDAO {
 
-    private final Logger LOGGER = LogManager.getLogger( getClass() );
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
     private SessionFactory sessionFactory;
@@ -366,7 +366,7 @@ public class WordPressDAOImpl implements WordPressDAO {
 
             //////////// 1/24/2016: ATM, this room type isn't displayed correctly in HW /////////////
             // "1 Bed Mixed Dorm" should actually be "16 Bed Mixed Dorm" for HB bookings //
-            if( capacity == 1 ) {
+            if ( capacity == 1 ) {
                 capacity = 16;
             }
         }

@@ -1,3 +1,4 @@
+
 package com.macbackpackers.services;
 
 import java.io.File;
@@ -15,8 +16,8 @@ import java.nio.channels.OverlappingFileLockException;
 import java.util.Iterator;
 import java.util.Set;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.gargoylesoftware.htmlunit.WebClient;
@@ -25,35 +26,34 @@ import com.gargoylesoftware.htmlunit.util.Cookie;
 
 @Service
 public class FileService {
-    
-    private final Logger LOGGER = LogManager.getLogger(getClass());
-    
+
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+
     private static final String COOKIE_FILE = "cookie.file";
-   
+
     /**
-     * Attempts to acquire an exclusive lock on the given file.
-     * Creates the file first if it doesn't exist. This method will *not*
-     * block if it cannot acquire the lock.
+     * Attempts to acquire an exclusive lock on the given file. Creates the file first if it doesn't
+     * exist. This method will *not* block if it cannot acquire the lock.
      * 
      * @param file the lock file
      * @return the file lock (or null if lock could not be acquired)
      * @throws IOException if file could not be created
      */
     public FileLock lockFile( File file ) throws IOException {
-        
+
         FileLock lock = null;
 
         LOGGER.info( "attempting file lock on " + file.getName() );
-        
-        if( false == file.exists() ) {
+
+        if ( false == file.exists() ) {
             file.createNewFile();
         }
-        
+
         try {
-           
+
             // Get a file channel for the file
             //File file = new File("filename");
-            FileChannel channel = new RandomAccessFile(file, "rw").getChannel();
+            FileChannel channel = new RandomAccessFile( file, "rw" ).getChannel();
 
             // Use the file channel to create a lock on the file.
             // This method blocks until it can retrieve the lock.
@@ -62,41 +62,44 @@ public class FileService {
             /*
                use channel.lock OR channel.tryLock();
             */
-            
+
             // Try acquiring the lock without blocking. This method returns
             // null or throws an exception if the file is already locked.
             try {
                 lock = channel.tryLock();
-            } catch (OverlappingFileLockException e) {
+            }
+            catch ( OverlappingFileLockException e ) {
                 // File is already locked in this thread or virtual machine
                 LOGGER.info( "File is already locked in this thread or virtual machine" );
-            } 
-            
-            if( lock == null ) {
+            }
+
+            if ( lock == null ) {
                 LOGGER.info( "could not acquire file lock" );
-            } else {
+            }
+            else {
                 LOGGER.info( "file lock acquired" );
             }
 
             // Release the lock
-//            if( lock != null ) {
-//                lock.release();
-//            }
-//            
-//            // Close the file
-//            channel.close();
-            
-            
-        } catch (IOException e) {
+            //            if( lock != null ) {
+            //                lock.release();
+            //            }
+            //            
+            //            // Close the file
+            //            channel.close();
 
-            LOGGER.error(e);
+        }
+        catch ( IOException e ) {
+
+            LOGGER.error( "I/O error", e );
 
         }
         return lock;
     }
-    
+
     /**
      * Loads cookies written from the previous session if found.
+     * 
      * @param webClient
      * @throws IOException on read error
      */
@@ -106,24 +109,26 @@ public class FileService {
 
     /**
      * Loads cookies written from the previous session if found.
+     * 
      * @param webClient
      * @param filename name of cookie file
      * @throws IOException on read error
      */
     public void loadCookiesFromFile( WebClient webClient, String filename ) throws IOException {
-        
+
         File file = new File( filename );
         LOGGER.info( "loading cookies from file " + filename );
-        if( file.exists() ) {
-            ObjectInputStream in = new ObjectInputStream(new FileInputStream(file));
+        if ( file.exists() ) {
+            ObjectInputStream in = new ObjectInputStream( new FileInputStream( file ) );
             try {
-                @SuppressWarnings("unchecked")
+                @SuppressWarnings( "unchecked" )
                 Set<Cookie> cookies = (Set<Cookie>) in.readObject();
-        
-                for (Iterator<Cookie> i = cookies.iterator(); i.hasNext(); ) {
-                    webClient.getCookieManager().addCookie(i.next());
+
+                for ( Iterator<Cookie> i = cookies.iterator() ; i.hasNext() ; ) {
+                    webClient.getCookieManager().addCookie( i.next() );
                 }
-            } catch ( ClassNotFoundException e ) {
+            }
+            catch ( ClassNotFoundException e ) {
                 throw new IOException( "Unable to read cookie!", e );
             }
             finally {
@@ -140,7 +145,7 @@ public class FileService {
     public void writeCookiesToFile( WebClient webClient ) throws IOException {
         writeCookiesToFile( webClient, COOKIE_FILE );
     }
-    
+
     /**
      * Serialises the current cookies to disk.
      * 
@@ -148,11 +153,11 @@ public class FileService {
      */
     public void writeCookiesToFile( WebClient webClient, String filename ) throws IOException {
         LOGGER.info( "writing cookies to file " + filename );
-        ObjectOutput out = new ObjectOutputStream(new FileOutputStream( filename ));
+        ObjectOutput out = new ObjectOutputStream( new FileOutputStream( filename ) );
         out.writeObject( webClient.getCookieManager().getCookies() );
         out.close();
     }
-    
+
     /**
      * Serialises the given page to disk so it can be loaded in later.
      * 
@@ -167,10 +172,12 @@ public class FileService {
             oos.writeObject( page );
             oos.close();
 
-        } catch ( FileNotFoundException e ) {
-            LOGGER.error( e );
-        } catch ( IOException e ) {
-            LOGGER.error( e );
+        }
+        catch ( FileNotFoundException e ) {
+            LOGGER.error( "File not found.", e );
+        }
+        catch ( IOException e ) {
+            LOGGER.error( "I/O error", e );
         }
     }
 
@@ -186,9 +193,11 @@ public class FileService {
         ObjectInputStream ois = new ObjectInputStream( new FileInputStream( fileName ) );
         try {
             return (HtmlPage) ois.readObject();
-        } catch ( ClassNotFoundException e ) {
+        }
+        catch ( ClassNotFoundException e ) {
             throw new IOException( "Unable to read HtmlPage", e );
-        } finally {
+        }
+        finally {
             ois.close();
         }
     }

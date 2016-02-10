@@ -1,3 +1,4 @@
+
 package com.macbackpackers.beans;
 
 import java.math.BigDecimal;
@@ -16,15 +17,15 @@ import javax.persistence.Table;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.time.FastDateFormat;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.hibernate.annotations.Type;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Entity
 @Table( name = "wp_lh_calendar" )
 public class Allocation {
 
-    private final static Logger LOGGER = LogManager.getLogger(Allocation.class);
+    private final static Logger LOGGER = LoggerFactory.getLogger( Allocation.class );
 
     public static final FastDateFormat DATE_FORMAT_BOOKED_DATE = FastDateFormat.getInstance( "dd MMM yyyy" );
 
@@ -32,10 +33,10 @@ public class Allocation {
     @GeneratedValue( strategy = GenerationType.AUTO )
     @Column( name = "id", nullable = false )
     private int id;
-    
+
     @Column( name = "job_id", nullable = false )
     private int jobId;
-    
+
     @Column( name = "room_id" )
     private Integer roomId;
 
@@ -97,7 +98,7 @@ public class Allocation {
     private String notes;
 
     @Column( name = "viewed_yn" )
-    @Type(type = "yes_no")
+    @Type( type = "yes_no" )
     private boolean viewed;
 
     @Column( name = "created_date" )
@@ -135,12 +136,10 @@ public class Allocation {
         this.roomId = roomId;
     }
 
-    
     public int getRoomTypeId() {
         return roomTypeId;
     }
 
-    
     public void setRoomTypeId( int roomTypeId ) {
         this.roomTypeId = roomTypeId;
     }
@@ -202,9 +201,9 @@ public class Allocation {
     }
 
     public void setPaymentTotal( String paymentTotal ) {
-        setPaymentTotal( new BigDecimal( 
+        setPaymentTotal( new BigDecimal(
                 paymentTotal.replaceAll( "\u00A3", "" ) // strip pound
-                .replaceAll( ",", "" )) ); // strip commas
+                        .replaceAll( ",", "" ) ) ); // strip commas
     }
 
     public BigDecimal getPaymentOutstanding() {
@@ -284,29 +283,31 @@ public class Allocation {
     }
 
     /**
-     * Converts a date of format Mmm-dd to a Date (in the past). As we're missing the year,
-     * we need to take the current year (unless by doing so we get a date in the future).
-     * If so, then subtract a year off the date so it's in the past.
+     * Converts a date of format Mmm-dd to a Date (in the past). As we're missing the year, we need
+     * to take the current year (unless by doing so we get a date in the future). If so, then
+     * subtract a year off the date so it's in the past.
      * 
      * @param monthDayString date in format Mmm-dd
-     */ 
+     */
     public void setBookedDate( String monthDayString ) {
         try {
             Calendar c = Calendar.getInstance();
             int year = c.get( Calendar.YEAR );
             java.util.Date bookedDate = DATE_FORMAT_BOOKED_DATE.parse( monthDayString + " " + year );
-            
+
             // if booked date is now in the future, then we got the wrong year
             // put it back a year
-            if( bookedDate.after( c.getTime() ) ) {
+            if ( bookedDate.after( c.getTime() ) ) {
                 c.setTime( bookedDate );
                 c.add( Calendar.YEAR, -1 );
                 setBookedDate( c.getTime() );
-            } else {
+            }
+            else {
                 setBookedDate( bookedDate );
             }
-            
-        } catch ( ParseException ex ) {
+
+        }
+        catch ( ParseException ex ) {
             LOGGER.error( "Unable to read date " + monthDayString, ex );
             // swallow error and continue...
         }
@@ -343,33 +344,33 @@ public class Allocation {
     public void setCreatedDate( Timestamp createdDate ) {
         this.createdDate = createdDate;
     }
-    
+
     @Override
     public String toString() {
         return new ToStringBuilder( this, ToStringStyle.MULTI_LINE_STYLE )
-        .append("id", id)
-        .append("jobId", jobId)
-        .append("room", room)
-        .append("bedName", bedName)
-        .append("reservationId", reservationId )
-        .append("guestName", guestName)
-        .append("checkinDate", checkinDate)
-        .append("checkoutDate", checkoutDate)
-        .append("paymentTotal", paymentTotal)
-        .append("paymentOutstanding", paymentOutstanding)
-        .append("ratePlanName", ratePlanName)
-        .append("paymentStatus", paymentStatus)
-        .append("numberGuests", numberGuests)
-        .append("dataHref", dataHref)
-        .append("status", status)
-        .append("bookingReference", bookingReference)
-        .append("bookingSource", bookingSource)
-        .append("bookedDate", bookedDate)
-        .append("eta", eta)
-        .append("notes", notes)
-        .append("viewed", viewed)
-        .append("createdDate", createdDate)
-        .toString();
+                .append( "id", id )
+                .append( "jobId", jobId )
+                .append( "room", room )
+                .append( "bedName", bedName )
+                .append( "reservationId", reservationId )
+                .append( "guestName", guestName )
+                .append( "checkinDate", checkinDate )
+                .append( "checkoutDate", checkoutDate )
+                .append( "paymentTotal", paymentTotal )
+                .append( "paymentOutstanding", paymentOutstanding )
+                .append( "ratePlanName", ratePlanName )
+                .append( "paymentStatus", paymentStatus )
+                .append( "numberGuests", numberGuests )
+                .append( "dataHref", dataHref )
+                .append( "status", status )
+                .append( "bookingReference", bookingReference )
+                .append( "bookingSource", bookingSource )
+                .append( "bookedDate", bookedDate )
+                .append( "eta", eta )
+                .append( "notes", notes )
+                .append( "viewed", viewed )
+                .append( "createdDate", createdDate )
+                .toString();
     }
 
 }

@@ -12,9 +12,9 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 import org.quartz.SchedulerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -35,7 +35,7 @@ import com.macbackpackers.services.SchedulerService;
 @Component
 public class RunProcessor
 {
-    private static final Logger LOGGER = LogManager.getLogger( RunProcessor.class );
+    private static final Logger LOGGER =  LoggerFactory.getLogger( RunProcessor.class );
 
     @Autowired
     private ProcessorService processorService;

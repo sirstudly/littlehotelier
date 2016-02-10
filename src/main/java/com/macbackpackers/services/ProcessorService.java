@@ -3,9 +3,9 @@ package com.macbackpackers.services;
 
 import javax.transaction.Transactional;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
-import org.apache.log4j.NDC;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
@@ -20,7 +20,7 @@ import com.macbackpackers.jobs.ShutdownJob;
 @Service
 public class ProcessorService {
 
-    private final Logger LOGGER = LogManager.getLogger( getClass() );
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
     private WordPressDAO dao;
@@ -56,7 +56,7 @@ public class ProcessorService {
     private void processJob( AbstractJob job ) {
 
         for ( int i = 0 ; i < job.getRetryCount() ; i++ ) {
-            NDC.push( String.valueOf( job.getId() ) ); // record the ID of this job for logging
+            MDC.put( "jobId", String.valueOf( job.getId() ) ); // record the ID of this job for logging
 
             try {
                 LOGGER.info( "Processing job " + job.getId() );
@@ -84,7 +84,7 @@ public class ProcessorService {
                 }
             }
             finally {
-                NDC.pop();
+                MDC.remove( "jobId" );
             }
         }
     }

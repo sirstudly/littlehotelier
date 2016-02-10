@@ -4,8 +4,8 @@ package com.macbackpackers.scrapers;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,7 +26,7 @@ import com.macbackpackers.services.AuthenticationService;
 @Scope( "prototype" )
 public class ReservationPageScraper {
 
-    private final Logger LOGGER = LogManager.getLogger( getClass() );
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
     @Qualifier( "webClientScriptingDisabled" )

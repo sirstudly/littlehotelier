@@ -14,8 +14,8 @@ import javax.transaction.Transactional;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,7 +51,7 @@ import com.macbackpackers.services.FileService;
 @Scope( "prototype" )
 public class AllocationsPageScraper {
 
-    private final Logger LOGGER = LogManager.getLogger( getClass() );
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     public static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
     public static final String POUND = "\u00a3";
@@ -303,7 +303,7 @@ public class AllocationsPageScraper {
         alloc.setNotes( StringUtils.trimToNull( span.getAttribute( "data-notes" ) ) );
 
         LOGGER.info( "Done allocation!" );
-        LOGGER.info( alloc );
+        LOGGER.info( alloc.toString() );
         dao.insertAllocation( alloc );
     }
 
@@ -335,7 +335,7 @@ public class AllocationsPageScraper {
         Calendar checkinDate = Calendar.getInstance();
         String checkinDateStr = StringUtils.trimToNull( reservationSpan.getAttribute( "data-start-date" ) );
         LOGGER.info( "checkin-date: " + checkinDateStr );
-        checkinDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse( 
+        checkinDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse(
                 checkinDateStr != null ? checkinDateStr : dataDate ) );
         alloc.setCheckinDate( checkinDate.getTime() );
 
