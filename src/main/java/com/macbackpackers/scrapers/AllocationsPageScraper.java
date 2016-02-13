@@ -3,7 +3,6 @@ package com.macbackpackers.scrapers;
 
 import java.io.File;
 import java.io.IOException;
-import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.Calendar;
 import java.util.Date;
@@ -27,6 +26,7 @@ import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.services.AuthenticationService;
 import com.macbackpackers.services.FileService;
 
@@ -145,67 +145,62 @@ public class AllocationsPageScraper {
      * @param jobId id of job to associate with
      * @param calendarPage the current calendar page
      */
-    public void dumpAllocations( int jobId, HtmlPage calendarPage ) {
+    public void dumpAllocations( int jobId, HtmlPage calendarPage ) throws IOException {
 
         // now iterate over all div's and gather all our information
         String currentBedName = null;
         String dataRoomId = null;
         String dataRoomTypeId = null;
         for ( DomElement div : calendarPage.getElementsByTagName( "div" ) ) {
-            try {
-                String dataDate = div.getAttribute( "data-date" );
+            String dataDate = div.getAttribute( "data-date" );
 
-                if ( StringUtils.isNotBlank( div.getAttribute( "data-room_type_id" ) ) ) {
-                    dataRoomTypeId = div.getAttribute( "data-room_type_id" );
-                    currentBedName = null; // reset
-
-                    if ( StringUtils.isNotBlank( div.getAttribute( "data-room_id" ) ) ) {
-                        dataRoomId = div.getAttribute( "data-room_id" );
-                    }
-                    else if ( StringUtils.contains( div.getAttribute( "class" ), "unallocated" ) ) {
-                        LOGGER.debug( "unallocated row for room_type_id: " + dataRoomTypeId );
-                        dataRoomId = null;
-                        currentBedName = "Unallocated";
-                    }
-                }
+            if ( StringUtils.isNotBlank( div.getAttribute( "data-room_type_id" ) ) ) {
+                dataRoomTypeId = div.getAttribute( "data-room_type_id" );
+                currentBedName = null; // reset
 
                 if ( StringUtils.isNotBlank( div.getAttribute( "data-room_id" ) ) ) {
-                    LOGGER.debug( "data-room_id: " + dataRoomId );
-                    LOGGER.debug( "data-room_type_id: " + dataRoomTypeId );
+                    dataRoomId = div.getAttribute( "data-room_id" );
+                }
+                else if ( StringUtils.contains( div.getAttribute( "class" ), "unallocated" ) ) {
+                    LOGGER.debug( "unallocated row for room_type_id: " + dataRoomTypeId );
+                    dataRoomId = null;
+                    currentBedName = "Unallocated";
+                }
+            }
 
-                    if ( false == div.hasChildNodes() ) {
-                        LOGGER.warn( "no child nodes for " + div.asText() );
+            if ( StringUtils.isNotBlank( div.getAttribute( "data-room_id" ) ) ) {
+                LOGGER.debug( "data-room_id: " + dataRoomId );
+                LOGGER.debug( "data-room_type_id: " + dataRoomTypeId );
+
+                if ( false == div.hasChildNodes() ) {
+                    LOGGER.warn( "no child nodes for " + div.asText() );
+                }
+                else {
+                    DomElement label = div.getFirstElementChild();
+                    if ( false == "label".equals( label.getTagName() ) ) {
+                        LOGGER.debug( "not a label? " + label.asText() );
                     }
                     else {
-                        DomElement label = div.getFirstElementChild();
-                        if ( false == "label".equals( label.getTagName() ) ) {
-                            LOGGER.debug( "not a label? " + label.asText() );
-                        }
-                        else {
-                            LOGGER.debug( "Bed Name: " + label.getAttribute( "title" ) );
-                            currentBedName = StringUtils.trimToNull( label.getAttribute( "title" ) );
-                        }
-                    }
-                }
-                else if ( StringUtils.isNotBlank( dataDate ) ) {
-                    LOGGER.debug( "data-date: " + dataDate );
-
-                    // first entry after the data-date div is not always correct
-                    // it could be one day off screen
-                    for ( DomElement elem : div.getChildElements() ) {
-                        if ( "span".equals( elem.getTagName() ) ) {
-                            insertAllocationFromSpan( jobId, Integer.parseInt( dataRoomTypeId ),
-                                    dataRoomId == null ? null : Integer.parseInt( dataRoomId ),
-                                    currentBedName, dataDate, elem );
-                        }
-                    }
-                    if ( div.hasChildNodes() == false ) {
-                        LOGGER.debug( "no records for " + dataDate );
+                        LOGGER.debug( "Bed Name: " + label.getAttribute( "title" ) );
+                        currentBedName = StringUtils.trimToNull( label.getAttribute( "title" ) );
                     }
                 }
             }
-            catch ( Exception ex ) {
-                LOGGER.error( "Exception handled.", ex );
+            else if ( StringUtils.isNotBlank( dataDate ) ) {
+                LOGGER.debug( "data-date: " + dataDate );
+
+                // first entry after the data-date div is not always correct
+                // it could be one day off screen
+                for ( DomElement elem : div.getChildElements() ) {
+                    if ( "span".equals( elem.getTagName() ) ) {
+                        insertAllocationFromSpan( jobId, Integer.parseInt( dataRoomTypeId ),
+                                dataRoomId == null ? null : Integer.parseInt( dataRoomId ),
+                                currentBedName, dataDate, elem );
+                    }
+                }
+                if ( div.hasChildNodes() == false ) {
+                    LOGGER.debug( "no records for " + dataDate );
+                }
             }
         }
     }
@@ -219,12 +214,9 @@ public class AllocationsPageScraper {
      * @param currentBedName the bed name for the allocation (required)
      * @param dataDate the data date for the record we are currently processing
      * @param span the span element containing the allocation details
-     * @throws ParseException if date could not be parsed
-     * @throws SQLException on data creation error
      */
     private void insertAllocationFromSpan( int jobId, int dataRoomTypeId,
-            Integer dataRoomId, String currentBedName, String dataDate, DomElement span )
-                    throws ParseException, SQLException {
+            Integer dataRoomId, String currentBedName, String dataDate, DomElement span ) {
 
         // should have 3 spans
         // 1) wrapper holding the following info
@@ -266,7 +258,14 @@ public class AllocationsPageScraper {
         alloc.setRoomTypeId( dataRoomTypeId );
         alloc.setRoom( room );
         alloc.setBedName( bed );
-        setCheckInOutDates( alloc, dataDate, span );
+
+        try {
+            setCheckInOutDates( alloc, dataDate, span );
+        }
+        catch ( ParseException e ) {
+            // can't do anything if the date isn't formatted correctly
+            throw new UnrecoverableFault( e );
+        }
 
         // check for "room closures"
         if ( StringUtils.contains( span.getAttribute( "class" ), "room_closure" ) ) {
