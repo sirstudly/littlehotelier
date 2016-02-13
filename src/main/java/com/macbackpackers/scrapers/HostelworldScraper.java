@@ -234,11 +234,10 @@ public class HostelworldScraper {
 
         //////////// FOR NOW - IGNORE Hostelbookers (within HW) ///////////////////
         //////////// The room type isn't displayed correctly in HW ?? /////////////
-        // Workaround is being done in WordpressDAOImpl#getRoomTypeIdForHostelworldLabel() 
-        //        if ( StringUtils.trimToEmpty( hwBooking.getBookingSource() ).startsWith( "Hostelbookers" ) ) {
-        //            LOGGER.info( "Skipping HB record " + bookingRef );
-        //            return bookingPage;
-        //        }
+        if ( StringUtils.trimToEmpty( hwBooking.getBookingSource() ).startsWith( "Hostelbookers" ) ) {
+            LOGGER.info( "Skipping HB record " + bookingRef );
+            return bookingPage;
+        }
 
         String arrivalDate = processCustDetailsElement( it );
         LOGGER.debug( "Arriving: " + arrivalDate );

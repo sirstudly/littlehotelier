@@ -363,12 +363,6 @@ public class WordPressDAOImpl implements WordPressDAO {
 
         if ( roomTypeLabel.contains( "Mixed" ) ) {
             roomType = "MX";
-
-            //////////// 1/24/2016: ATM, this room type isn't displayed correctly in HW /////////////
-            // "1 Bed Mixed Dorm" should actually be "16 Bed Mixed Dorm" for HB bookings //
-            if ( capacity == 1 ) {
-                capacity = 16;
-            }
         }
         else if ( roomTypeLabel.contains( "Female" ) ) {
             roomType = "F";
