@@ -23,7 +23,7 @@
         <sift>
 
           <!-- A standard RollingFileAppender, the log file is based on 'jobId' at runtime  -->
-          <appender name="FILE-${logFileName}" class="ch.qos.logback.core.rolling.RollingFileAppender">
+          <appender name="FILE-${jobId}" class="ch.qos.logback.core.rolling.RollingFileAppender">
             <file>${USER_HOME}/job-${jobId}.log</file>
 
             <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
@@ -31,13 +31,13 @@
             </encoder>
 
             <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-                <FileNamePattern>${USER_HOME}/${logFileName}.%i.log.zip</FileNamePattern>
+                <FileNamePattern>${USER_HOME}/${jobId}.%i.log.zip</FileNamePattern>
                 <MinIndex>1</MinIndex>
                 <MaxIndex>10</MaxIndex>
             </rollingPolicy>
 
             <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
-                <MaxFileSize>10MB</MaxFileSize>
+                <MaxFileSize>50MB</MaxFileSize>
             </triggeringPolicy>
 
           </appender>
