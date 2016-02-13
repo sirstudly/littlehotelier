@@ -301,8 +301,8 @@ public class AllocationsPageScraper {
         alloc.setDataHref( span.getAttribute( "data-href" ) );
         alloc.setNotes( StringUtils.trimToNull( span.getAttribute( "data-notes" ) ) );
 
-        LOGGER.info( "Done allocation!" );
-        LOGGER.info( alloc.toString() );
+        LOGGER.info( "Done allocation " + alloc.getReservationId() + ": " + alloc.getGuestName() );
+        LOGGER.debug( alloc.toString() );
         dao.insertAllocation( alloc );
     }
 
@@ -333,7 +333,7 @@ public class AllocationsPageScraper {
         // usually the start date only appears if the record appears off-screen
         Calendar checkinDate = Calendar.getInstance();
         String checkinDateStr = StringUtils.trimToNull( reservationSpan.getAttribute( "data-start-date" ) );
-        LOGGER.info( "checkin-date: " + checkinDateStr );
+        LOGGER.debug( "checkin-date: " + checkinDateStr );
         checkinDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse(
                 checkinDateStr != null ? checkinDateStr : dataDate ) );
         alloc.setCheckinDate( checkinDate.getTime() );
@@ -341,7 +341,7 @@ public class AllocationsPageScraper {
         // adjust checkout date by number of nights
         Calendar checkoutDate = Calendar.getInstance();
         String checkoutDateStr = StringUtils.trimToNull( reservationSpan.getAttribute( "data-end-date" ) );
-        LOGGER.info( "checkout-date: " + checkoutDateStr );
+        LOGGER.debug( "checkout-date: " + checkoutDateStr );
         checkoutDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse( checkoutDateStr ) );
         alloc.setCheckoutDate( checkoutDate.getTime() );
     }
