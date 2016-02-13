@@ -440,7 +440,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         LOGGER.info( "Running report for job id: " + allocationScraperJobId );
         sessionFactory.getCurrentSession()
                 .createSQLQuery( sql.getProperty( "group.bookings" ) )
-                .setParameter( 0, allocationScraperJobId )
+                .setParameter( "jobId", allocationScraperJobId )
                 .executeUpdate();
     }
 
