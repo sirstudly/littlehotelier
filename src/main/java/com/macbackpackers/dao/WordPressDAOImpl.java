@@ -198,7 +198,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                         "  FROM Allocation " +
                         "WHERE jobId = :jobId " +
                         "  AND paymentTotal = paymentOutstanding " +
-                        "  AND bookingSource IN ( 'Hostelworld', 'Hostelbookers' ) " +
+                        "  AND bookingSource IN ( 'Hostelworld', 'Hostelbookers', 'Hostelworld Group' ) " +
                         "GROUP BY reservationId" )
                 .setParameter( "jobId", allocationScraperJobId )
                 .list();
