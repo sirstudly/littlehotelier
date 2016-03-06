@@ -235,6 +235,7 @@ public class AllocationsPageScraper {
         LOGGER.debug( "  data-reservation_id: " + span.getAttribute( "data-reservation_id" ) );
         LOGGER.debug( "  data-rate_plan_name: " + span.getAttribute( "data-rate_plan_name" ) );
         LOGGER.debug( "  data-payment_status: " + span.getAttribute( "data-payment_status" ) );
+        LOGGER.debug( "  data-description: " + span.getAttribute( "data-description" ) );
         LOGGER.debug( "  data-href: " + span.getAttribute( "data-href" ) );
         LOGGER.debug( "  data-notes: " + span.getAttribute( "data-notes" ) );
         LOGGER.debug( "  data-guest_name: " + span.getAttribute( "data-guest_name" ) );
@@ -269,15 +270,14 @@ public class AllocationsPageScraper {
 
         // check for "room closures"
         if ( StringUtils.contains( span.getAttribute( "class" ), "room_closure" ) ) {
-            DomElement closedRoom = span.getFirstElementChild();
-            if ( false == "span".equals( closedRoom.getTagName() ) ) {
-                LOGGER.debug( "not a span? " );
-                LOGGER.debug( closedRoom.asText() );
-            }
-            else {
-                LOGGER.debug( "closed room?: " + closedRoom.getTextContent() );
-                alloc.setGuestName( closedRoom.getTextContent() );
-            }
+            alloc.setNotes( span.getAttribute( "data-description" ) );
+
+            // confusingly, room closures have their end-dates inclusive rather than exclusive for reservations
+            // so we need to add a day to the "checkout date"
+            Calendar checkoutDate = Calendar.getInstance();
+            checkoutDate.setTime( alloc.getCheckoutDate() );
+            checkoutDate.add( Calendar.DATE, 1 );
+            alloc.setCheckoutDate( checkoutDate.getTime() );
         }
         else {
             if ( StringUtils.contains( span.getAttribute( "class" ), "checked-in" ) ) {
@@ -296,10 +296,10 @@ public class AllocationsPageScraper {
             alloc.setRatePlanName( span.getAttribute( "data-rate_plan_name" ) );
             alloc.setPaymentStatus( span.getAttribute( "data-payment_status" ) );
             alloc.setNumberGuests( calculateNumberOfGuests( span ) );
+            alloc.setNotes( StringUtils.trimToNull( span.getAttribute( "data-notes" ) ) );
         }
 
         alloc.setDataHref( span.getAttribute( "data-href" ) );
-        alloc.setNotes( StringUtils.trimToNull( span.getAttribute( "data-notes" ) ) );
 
         LOGGER.info( "Done allocation " + alloc.getReservationId() + ": " + alloc.getGuestName() );
         LOGGER.debug( alloc.toString() );
