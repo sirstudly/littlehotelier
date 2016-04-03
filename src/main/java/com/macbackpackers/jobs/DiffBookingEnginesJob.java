@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
-import com.macbackpackers.scrapers.HostelbookersScraper;
 import com.macbackpackers.scrapers.HostelworldScraper;
 
 /**
@@ -34,10 +33,6 @@ public class DiffBookingEnginesJob extends AbstractJob {
     @Autowired
     @Transient
     private HostelworldScraper hwScraper;
-
-    @Autowired
-    @Transient
-    private HostelbookersScraper hbScraper;
 
     @Autowired
     @Transient
@@ -74,7 +69,6 @@ public class DiffBookingEnginesJob extends AbstractJob {
 
         // now dump the data from HW/HB
         hwScraper.dumpBookingsForArrivalDate( checkinDate );
-        hbScraper.dumpBookingsForArrivalDate( checkinDate );
     }
 
     /**

@@ -39,6 +39,7 @@ import com.macbackpackers.services.FileService;
 
 @Component
 @Scope( "prototype" )
+@Deprecated // No longer in use; HB merged with HW
 public class HostelbookersScraper {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );

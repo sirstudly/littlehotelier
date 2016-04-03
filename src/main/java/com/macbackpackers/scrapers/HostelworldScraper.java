@@ -232,13 +232,6 @@ public class HostelworldScraper {
         hwBooking.setBookingSource( processCustDetailsElement( it ) );
         LOGGER.debug( "Source: " + hwBooking.getBookingSource() );
 
-        //////////// FOR NOW - IGNORE Hostelbookers (within HW) ///////////////////
-        //////////// The room type isn't displayed correctly in HW ?? /////////////
-        if ( StringUtils.trimToEmpty( hwBooking.getBookingSource() ).startsWith( "Hostelbookers" ) ) {
-            LOGGER.info( "Skipping HB record " + bookingRef );
-            return bookingPage;
-        }
-
         String arrivalDate = processCustDetailsElement( it );
         LOGGER.debug( "Arriving: " + arrivalDate );
         hwBooking.setArrivalTime( convertHostelworldDate( arrivalDate + " 00:00:00" ) );
@@ -273,7 +266,9 @@ public class HostelworldScraper {
             LOGGER.debug( "  Persons: " + persons );
             LOGGER.debug( "  Price: " + price );
             bookingDate.setBookedDate( convertHostelworldDate( bookedDate + " 00:00:00" ) );
+            bookingDate.setRoomType( roomType );
             bookingDate.setRoomTypeId( wordPressDAO.getRoomTypeIdForHostelworldLabel( roomType ) );
+
             bookingDate.setPersons( Integer.parseInt( persons ) );
             bookingDate.setPrice( new BigDecimal( price.replaceAll( "GBP", "" ).trim() ) );
             LOGGER.debug( "  Adding HW booked date: " + ToStringBuilder.reflectionToString( bookingDate ) );

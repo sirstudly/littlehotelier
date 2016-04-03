@@ -365,19 +365,20 @@ public class WordPressDAOTest {
 
     @Test
     public void testGetRoomTypeIdForHostelworldLabel() throws Exception {
-        Assert.assertEquals( 2964, dao.getRoomTypeIdForHostelworldLabel( "Basic Double Bed Private (Shared Bathroom)" ) );
-        Assert.assertEquals( 2965, dao.getRoomTypeIdForHostelworldLabel( "Basic 3 Bed Private (Shared Bathroom)" ) );
-        Assert.assertEquals( 2966, dao.getRoomTypeIdForHostelworldLabel( "4 Bed Private (Shared Bathroom)" ) );
-        Assert.assertEquals( 2973, dao.getRoomTypeIdForHostelworldLabel( "4 Bed Mixed Dorm" ) );
-        Assert.assertEquals( 2974, dao.getRoomTypeIdForHostelworldLabel( "4 Bed Female Dorm" ) );
-        Assert.assertEquals( 2972, dao.getRoomTypeIdForHostelworldLabel( "6 Bed Mixed Dorm" ) );
-        Assert.assertEquals( 2971, dao.getRoomTypeIdForHostelworldLabel( "8 Bed Mixed Dorm" ) );
-        Assert.assertEquals( 2970, dao.getRoomTypeIdForHostelworldLabel( "10 Bed Mixed Dorm" ) );
-        Assert.assertEquals( 2969, dao.getRoomTypeIdForHostelworldLabel( "12 Bed Male Dorm" ) );
-        Assert.assertEquals( 2968, dao.getRoomTypeIdForHostelworldLabel( "12 Bed Female Dorm" ) );
-        Assert.assertEquals( 2967, dao.getRoomTypeIdForHostelworldLabel( "12 Bed Mixed Dormitory" ) );
-        Assert.assertEquals( 5152, dao.getRoomTypeIdForHostelworldLabel( "14 Bed Mixed Dorm" ) );
-        Assert.assertEquals( 5112, dao.getRoomTypeIdForHostelworldLabel( "16 Bed Mixed Dormitory" ) );
+        Assert.assertEquals( new Integer(2964), dao.getRoomTypeIdForHostelworldLabel( "Basic Double Bed Private (Shared Bathroom)" ) );
+        Assert.assertEquals( new Integer(2965), dao.getRoomTypeIdForHostelworldLabel( "Basic 3 Bed Private (Shared Bathroom)" ) );
+        Assert.assertEquals( new Integer(2966), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Private (Shared Bathroom)" ) );
+        Assert.assertEquals( new Integer(2973), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Mixed Dorm" ) );
+        Assert.assertEquals( new Integer(2974), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Female Dorm" ) );
+        Assert.assertEquals( new Integer(2972), dao.getRoomTypeIdForHostelworldLabel( "6 Bed Mixed Dorm" ) );
+        Assert.assertEquals( new Integer(2971), dao.getRoomTypeIdForHostelworldLabel( "8 Bed Mixed Dorm" ) );
+        Assert.assertEquals( new Integer(2970), dao.getRoomTypeIdForHostelworldLabel( "10 Bed Mixed Dorm" ) );
+        Assert.assertEquals( new Integer(2969), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Male Dorm" ) );
+        Assert.assertEquals( new Integer(2968), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Female Dorm" ) );
+        Assert.assertEquals( new Integer(2967), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Mixed Dormitory" ) );
+        Assert.assertEquals( new Integer(5152), dao.getRoomTypeIdForHostelworldLabel( "14 Bed Mixed Dorm" ) );
+        Assert.assertEquals( new Integer(5112), dao.getRoomTypeIdForHostelworldLabel( "16 Bed Mixed Dormitory" ) );
+        Assert.assertEquals( null, dao.getRoomTypeIdForHostelworldLabel( "1 Bed Mixed Dormitory" ) );
     }
 
     @Test( expected = EmptyResultDataAccessException.class )

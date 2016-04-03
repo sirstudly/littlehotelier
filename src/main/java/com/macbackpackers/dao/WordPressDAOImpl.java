@@ -296,8 +296,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "   FROM HostelworldBookingDate d"
                         + "  WHERE EXISTS( "
                         + "          SELECT 1 FROM HostelworldBooking w "
-                        + "           WHERE w.id = d.bookingId "
-                        + "             AND w.bookingSource != 'Hostelbookers' )"
+                        + "           WHERE w.id = d.bookingId )"
                         + "  GROUP BY d.bookingId"
                         + " HAVING MIN( d.bookedDate ) = :bookedDate" )
                 .setParameter( "bookedDate", checkinDate )
@@ -350,7 +349,7 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Transactional
     @Override
-    public int getRoomTypeIdForHostelworldLabel( String roomTypeLabel ) {
+    public Integer getRoomTypeIdForHostelworldLabel( String roomTypeLabel ) {
 
         String roomType;
         int capacity = 0;
@@ -383,11 +382,13 @@ public class WordPressDAOImpl implements WordPressDAO {
             capacity = 4;
         }
         else {
-            throw new IllegalArgumentException( "Unsupported room type, unable to determine type: " + roomTypeLabel );
+            LOGGER.error( "Unsupported room type, unable to determine type: " + roomTypeLabel );
+            return null;
         }
 
         if ( capacity == 0 ) {
-            throw new IllegalArgumentException( "Unsupported room type, unable to determine capacity: " + roomTypeLabel );
+            LOGGER.error( "Unsupported room type, unable to determine capacity: " + roomTypeLabel );
+            return null;
         }
 
         @SuppressWarnings( "unchecked" )
@@ -401,9 +402,11 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .list();
 
         if ( roomTypeIds.isEmpty() ) {
-            throw new EmptyResultDataAccessException( "Unable to determine room type id for " + roomTypeLabel, 1 );
+            LOGGER.error( "Unable to determine room type id for " + roomTypeLabel, 1 );
+            return null;
         }
 
+        // this is the only error we will generate; if there is some invalid reference data in the table
         if ( roomTypeIds.size() > 1 ) {
             throw new IncorrectResultSetColumnCountException( "Unable to determine room type id for " + roomTypeLabel, 1, roomTypeIds.size() );
         }

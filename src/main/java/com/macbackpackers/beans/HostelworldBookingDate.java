@@ -28,8 +28,11 @@ public class HostelworldBookingDate {
     @Column( name = "hw_booking_id", nullable = false )
     private int bookingId;
 
-    @Column( name = "room_type_id", nullable = false )
-    private int roomTypeId;
+    @Column( name = "room_type_id" )
+    private Integer roomTypeId;
+
+    @Column( name = "room_type" )
+    private String roomType;
 
     @Column( name = "booked_date" )
     private Date bookedDate;
@@ -59,12 +62,20 @@ public class HostelworldBookingDate {
         this.bookingId = bookingId;
     }
 
-    public int getRoomTypeId() {
+    public Integer getRoomTypeId() {
         return roomTypeId;
     }
 
-    public void setRoomTypeId( int roomTypeId ) {
+    public void setRoomTypeId( Integer roomTypeId ) {
         this.roomTypeId = roomTypeId;
+    }
+
+    public String getRoomType() {
+        return roomType;
+    }
+
+    public void setRoomType( String roomType ) {
+        this.roomType = roomType;
     }
 
     public Date getBookedDate() {

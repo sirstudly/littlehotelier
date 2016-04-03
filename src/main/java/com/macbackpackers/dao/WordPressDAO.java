@@ -215,10 +215,9 @@ public interface WordPressDAO {
      * Returns the room type (id) for the given hostelworld room type label.
      * 
      * @param roomTypeLabel e.g. 12 Bed Female Dorm
-     * @return room type ID
-     * @throws EmptyResultDataAccessException if unable to determine room type idO
+     * @return room type ID (or null if cannot be determined)
      */
-    public int getRoomTypeIdForHostelworldLabel( String roomTypeLabel ) throws EmptyResultDataAccessException;
+    public Integer getRoomTypeIdForHostelworldLabel( String roomTypeLabel );
 
     /**
      * Returns the ID of the last completed allocation scraper job.
