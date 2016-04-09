@@ -17,6 +17,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
 import com.gargoylesoftware.htmlunit.html.HtmlSubmitInput;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
+import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 
 @Service
@@ -26,6 +27,7 @@ public class AuthenticationService {
 
     /** the title on the login page */
     public static final String LOGIN_PAGE_TITLE = "Welcome to Little Hotelier";
+    public static final String LOGIN_PAGE_TITLE2 = "LittleHotelier Extranet";
 
     @Autowired
     @Qualifier( "webClientScriptingDisabled" )
@@ -36,6 +38,12 @@ public class AuthenticationService {
 
     @Autowired
     private Environment env;
+
+    @Autowired
+    private WordPressDAO wordpressDAO;
+
+    // the currently logged in LH user; so we don't have to requery the DB each time
+    private String loggedInLHUser;
 
     /**
      * Loads the previous credentials and attempts to go to a specific page. If we get redirected
@@ -53,7 +61,8 @@ public class AuthenticationService {
         HtmlPage nextPage = webClient.getPage( pageURL );
 
         // if we get redirected back to login, then login and try again
-        if ( LOGIN_PAGE_TITLE.equals( nextPage.getTitleText() ) ) {
+        if ( false == LOGIN_PAGE_TITLE.equals( nextPage.getTitleText() )
+                && false == LOGIN_PAGE_TITLE2.equals( nextPage.getTitleText() ) ) {
             LOGGER.warn( "Current credentials not valid?" );
             throw new UnrecoverableFault( "Unable to login using existing credentials. Has the password changed?" );
         }
@@ -88,10 +97,12 @@ public class AuthenticationService {
         LOGGER.info( "Finished logging in" );
         LOGGER.info( nextPage.asXml() );
 
-        if ( LOGIN_PAGE_TITLE.equals( nextPage.getTitleText() ) ) {
+        if ( false == LOGIN_PAGE_TITLE.equals( nextPage.getTitleText() )
+                && false == LOGIN_PAGE_TITLE2.equals( nextPage.getTitleText() ) ) {
             throw new UnrecoverableFault( "Unable to login. Incorrect password?" );
         }
         fileService.writeCookiesToFile( localWebClient );
+        loggedInLHUser = username;
     }
 
     /**
@@ -102,7 +113,21 @@ public class AuthenticationService {
      * @throws UnrecoverableFault if unable to login; cookie file not updated in this case
      */
     public void doLogin() throws IOException {
-        doLogin( env.getProperty( "lilhotelier.username" ), env.getProperty( "lilhotelier.password" ) );
+        doLogin( wordpressDAO.getOption( "hbo_lilho_username" ),
+                wordpressDAO.getOption( "hbo_lilho_password" ) );
     }
 
+    /**
+     * Checks whether the details saved are for high street hostel. Some things are just different
+     * there...
+     * 
+     * @return true if HSH, false otherwise
+     */
+    public boolean isHighStreetHostel() {
+        // saved locally on first-access; to prevent unnecessary DB calls
+        if ( loggedInLHUser == null ) {
+            loggedInLHUser = wordpressDAO.getOption( "hbo_lilho_username" );
+        }
+        return "highstreet".equals( loggedInLHUser );
+    }
 }

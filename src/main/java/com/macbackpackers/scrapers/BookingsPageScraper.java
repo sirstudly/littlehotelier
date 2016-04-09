@@ -499,12 +499,12 @@ public class BookingsPageScraper {
     }
 
     /**
-     * Updates the calendar records using by querying the bookings page between the given dates
+     * Updates the calendar records by querying the bookings page between the given dates
      * (inclusive) for the given job.
      * 
      * @param jobId the job ID to associate with this dump
      * @param startDate the start date to check allocations for (inclusive)
-     * @param endDate the minimum date in which to include allocations for
+     * @param endDate the end date in which to include allocations for
      * @param useSerialisedDataIfAvailable check if we've already seen this page already and used
      *            the cached version if available.
      * @throws IOException on read/write error
@@ -524,7 +524,7 @@ public class BookingsPageScraper {
                 bookingsPage = fileService.loadPageFromDisk( serialisedFileName );
             }
             else {
-                // this takes about 10 minutes...
+                // this may take a few minutes...
                 bookingsPage = goToBookingPageForArrivals( currentDate.getTime() );
             }
 

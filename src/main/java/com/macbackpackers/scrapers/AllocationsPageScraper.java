@@ -6,8 +6,6 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.transaction.Transactional;
 
@@ -27,6 +25,9 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.scrapers.matchers.CastleRockRoomBedMatcher;
+import com.macbackpackers.scrapers.matchers.HSHRoomBedMatcher;
+import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 import com.macbackpackers.services.AuthenticationService;
 import com.macbackpackers.services.FileService;
 
@@ -241,24 +242,20 @@ public class AllocationsPageScraper {
         LOGGER.debug( "  data-guest_name: " + span.getAttribute( "data-guest_name" ) );
 
         // split room/bed name
-        Pattern p = Pattern.compile( "([^\\-]*)-(.*)$" ); // anything but dash for room #, everything else for bed
-        Matcher m = p.matcher( currentBedName );
-        String room = null, bed = null;
-        if ( m.find() == false ) {
-            LOGGER.info( "Couldn't determine bed name from '" + currentBedName + "'. Is it a private?" );
-            room = currentBedName;
+        RoomBedMatcher matcher;
+        if ( authService.isHighStreetHostel() ) {
+            matcher = new HSHRoomBedMatcher( currentBedName );
         }
         else {
-            room = m.group( 1 );
-            bed = m.group( 2 );
+            matcher = new CastleRockRoomBedMatcher( currentBedName );
         }
 
         Allocation alloc = new Allocation();
         alloc.setJobId( jobId );
         alloc.setRoomId( dataRoomId );
         alloc.setRoomTypeId( dataRoomTypeId );
-        alloc.setRoom( room );
-        alloc.setBedName( bed );
+        alloc.setRoom( matcher.getRoom() );
+        alloc.setBedName( matcher.getBedName() );
 
         try {
             setCheckInOutDates( alloc, dataDate, span );

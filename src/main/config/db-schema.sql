@@ -181,19 +181,19 @@ CREATE TABLE `wp_lh_rpt_guest_comments` (
 
 
 -- application log data
-CREATE TABLE `log4j_data`(
- `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
- `job_id` VARCHAR(255) DEFAULT NULL,
- `date_logged` DATETIME NOT NULL,
- `location` VARCHAR(255) NOT NULL,
- `log_level` VARCHAR(10) NOT NULL,
- `message` TEXT,
- `throwable` TEXT,
- `stacktrace` TEXT,
-  PRIMARY KEY (`id`),
-  KEY `job_id_idx` (`job_id`),
-  KEY `date_idx` (`date_logged`)
-);
+-- CREATE TABLE `log4j_data`(
+--  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+--  `job_id` VARCHAR(255) DEFAULT NULL,
+--  `date_logged` DATETIME NOT NULL,
+--  `location` VARCHAR(255) NOT NULL,
+--  `log_level` VARCHAR(10) NOT NULL,
+--  `message` TEXT,
+--  `throwable` TEXT,
+--  `stacktrace` TEXT,
+--   PRIMARY KEY (`id`),
+--   KEY `job_id_idx` (`job_id`),
+--   KEY `date_idx` (`date_logged`)
+-- );
 
 CREATE TABLE `wp_lh_rooms` (
   `id` bigint(20) unsigned NOT NULL,
@@ -509,8 +509,8 @@ INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`roo
 
 -- If you're dumping the table from wp_lh_calendar; then you'll need to fill these in manually
 /*
-INSERT INTO wp_lh_rooms(id, room, bed_name)
-SELECT DISTINCT room_id, room, bed_name
+INSERT INTO wp_lh_rooms(id, room_type_id, room, bed_name)
+SELECT DISTINCT room_id, room_type_id, room, bed_name
   FROM wp_lh_calendar;
 
 UPDATE wp_lh_rooms
@@ -558,6 +558,50 @@ UPDATE wp_lh_rooms
         WHERE c.room_id = r.id
           AND c.job_id IN ( [most recent jobs] ) );
  */
+ 
+ /***  START HSH *********
+ 
+UPDATE wp_lh_rooms
+   SET capacity = 2, room_type = 'TWIN', active_yn = 'Y' WHERE room IN ( 'TA', 'TB' );
+UPDATE wp_lh_rooms
+   SET capacity = 2, room_type = 'DBL', active_yn = 'Y' WHERE room IN ( 'TC' );
+UPDATE wp_lh_rooms
+   SET capacity = 18, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '6' );
+UPDATE wp_lh_rooms
+   SET capacity = 4, room_type = 'F', active_yn = 'Y' WHERE room IN ( '5A' );
+UPDATE wp_lh_rooms
+   SET capacity = 4, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '5C', '6P', 'LOTR', 'T3M', 'TMNT' );
+UPDATE wp_lh_rooms
+   SET capacity = 6, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '3E', '5F' );
+UPDATE wp_lh_rooms
+   SET capacity = 8, room_type = 'F', active_yn = 'Y' WHERE room IN ( '3A' );
+UPDATE wp_lh_rooms
+   SET capacity = 10, room_type = 'F', active_yn = 'Y' WHERE room IN ( '3D' );
+UPDATE wp_lh_rooms
+   SET capacity = 8, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '5D', '5E' );
+UPDATE wp_lh_rooms
+   SET capacity = 10, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '3B', '3C', '5G' );
+UPDATE wp_lh_rooms
+   SET capacity = 8, room_type = 'LT_FEMALE', active_yn = 'Y' WHERE room IN ( '5B', 'F&V' );
+UPDATE wp_lh_rooms
+   SET capacity = 16, room_type = 'LT_MALE', active_yn = 'Y' WHERE room IN ( 'Zoo' );
+
+-- SELECT DISTINCT 'Unallocated' `room`, null `bed_name`, capacity, room_type_id, room_type, 'N' `active_yn` FROM wp_lh_rooms;
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (1,'Unallocated',NULL,2,2933,'TWIN','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (2,'Unallocated',NULL,4,2934,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (3,'Unallocated',NULL,4,2935,'F','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (4,'Unallocated',NULL,6,2936,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (5,'Unallocated',NULL,2,3035,'DBL','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (6,'Unallocated',NULL,8,3037,'F','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (7,'Unallocated',NULL,10,3037,'F','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (8,'Unallocated',NULL,16,3039,'LT_MALE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (9,'Unallocated',NULL,8,3039,'LT_FEMALE','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (10,'Unallocated',NULL,10,3036,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (11,'Unallocated',NULL,8,3036,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (12,'Unallocated',NULL,18,3038,'MX','N');
+
+*************** END HSH ***************/
+
  
 -- scheduled jobs
 /*
