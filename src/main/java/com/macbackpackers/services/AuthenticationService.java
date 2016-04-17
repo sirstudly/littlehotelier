@@ -86,8 +86,8 @@ public class AuthenticationService {
         HtmlForm form = forms.iterator().next();
 
         HtmlSubmitInput button = form.getInputByName( "commit" );
-        HtmlTextInput usernameField = form.getInputByName( "user_session[username]" );
-        HtmlPasswordInput passwordField = form.getInputByName( "user_session[password]" );
+        HtmlTextInput usernameField = form.getInputByName( "username" );
+        HtmlPasswordInput passwordField = form.getInputByName( "password" );
 
         // Change the value of the text field
         usernameField.setValueAttribute( username );
