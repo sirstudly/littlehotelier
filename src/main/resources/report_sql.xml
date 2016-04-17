@@ -15,24 +15,23 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
        EXISTS (
            -- all reservations where for the same room type, they are split into different rooms
            -- does not take into account group bookings
-           SELECT t.job_id, t.reservation_id, t.room_type_id, count(1)
+           SELECT t.job_id, t.reservation_id, t.room_type_id, MAX(t.capacity) AS capacity, SUM(t.num_beds) AS total_beds, COUNT(1) AS num_rooms
              FROM ( -- for each reservation, determine which rooms are they assigned to
-                  SELECT c.job_id, c.reservation_id, rm.room, rm.room_type_id, count(1)
-                    FROM wp_lh_calendar c
+                  SELECT c.job_id, c.reservation_id, rm.room, rm.room_type_id, rm.capacity, count(1) AS num_beds
+                    FROM (SELECT DISTINCT job_id, reservation_id, room_id FROM wp_lh_calendar WHERE job_id = :jobId) c -- remove duplicates (bug when inserting data?)
                     JOIN wp_lh_rooms rm ON c.room_id = rm.id 
                    WHERE rm.room_type NOT IN ('LT_MALE', 'LT_FEMALE', 'DBL', 'TRIPLE', 'QUAD', 'TWIN')
                      AND c.reservation_id > 0 -- do not include room closures
-                     AND c.job_id = :jobId
-                   GROUP BY c.job_id, c.reservation_id, rm.room, rm.room_type_id
+                   GROUP BY c.job_id, c.reservation_id, rm.room, rm.room_type_id, rm.capacity
               ) t
             WHERE t.reservation_id = rep.reservation_id
-              AND t.job_id = rep.job_id
             GROUP BY t.reservation_id, t.room_type_id
-           HAVING COUNT(1) > 1
+           HAVING SUM(t.num_beds) &lt;= MAX(t.capacity) -- strip out group bookings (ie. if number of beds exceeds capacity of room)
+              AND COUNT(1) > 1 -- assigned to more than one room (for the same room type)
        ) -- end exists
        OR EXISTS (
            -- include all reservations which have unallocated rooms
-           SELECT c.job_id, c.reservation_id, c.room_type_id, 1
+           SELECT c.job_id, c.reservation_id, c.room_type_id
              FROM wp_lh_calendar c
             WHERE c.room_id IS NULL -- unallocated reservations don't have this set
               AND c.reservation_id = rep.reservation_id
