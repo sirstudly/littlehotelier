@@ -244,17 +244,10 @@ public class WordPressDAOImpl implements WordPressDAO {
                 "wp_lh_group_bookings",
                 "wp_lh_calendar" );
 
-        // delete from log4j
-        int rowsDeleted = sessionFactory.getCurrentSession()
-                .createSQLQuery( "DELETE FROM log4j_data WHERE date_logged < :specifiedDate" )
-                .setParameter( "specifiedDate", specifiedDate )
-                .executeUpdate();
-        LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from log4j_data" );
-
-        // delete from jobs
+        // now delete from jobs
         deleteFromTablesByJobId( specifiedDate, "wp_lh_job_param" );
 
-        rowsDeleted = sessionFactory.getCurrentSession()
+        int rowsDeleted = sessionFactory.getCurrentSession()
                 .createSQLQuery( "DELETE FROM wp_lh_jobs WHERE last_updated_date < :specifiedDate" )
                 .setParameter( "specifiedDate", specifiedDate )
                 .executeUpdate();
