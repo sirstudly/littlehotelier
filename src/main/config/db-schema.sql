@@ -180,21 +180,6 @@ CREATE TABLE `wp_lh_rpt_guest_comments` (
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 
--- application log data
--- CREATE TABLE `log4j_data`(
---  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
---  `job_id` VARCHAR(255) DEFAULT NULL,
---  `date_logged` DATETIME NOT NULL,
---  `location` VARCHAR(255) NOT NULL,
---  `log_level` VARCHAR(10) NOT NULL,
---  `message` TEXT,
---  `throwable` TEXT,
---  `stacktrace` TEXT,
---   PRIMARY KEY (`id`),
---   KEY `job_id_idx` (`job_id`),
---   KEY `date_idx` (`date_logged`)
--- );
-
 CREATE TABLE `wp_lh_rooms` (
   `id` bigint(20) unsigned NOT NULL,
   `room` varchar(50) DEFAULT NULL,
