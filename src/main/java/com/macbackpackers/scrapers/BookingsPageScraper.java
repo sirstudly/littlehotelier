@@ -216,11 +216,11 @@ public class BookingsPageScraper {
                     DomElement td = tr.getFirstElementChild();
 
                     // viewed_yn
-                    if ( "read".equals( tr.getAttribute( "class" ) ) ) {
-                        allocList.setViewed( true );
-                    }
-                    else if ( "unread".equals( tr.getAttribute( "class" ) ) ) {
+                    if ( StringUtils.trimToEmpty( tr.getAttribute( "class" ) ).contains( "unread" ) ) {
                         allocList.setViewed( false );
+                    }
+                    else if ( StringUtils.trimToEmpty( tr.getAttribute( "class" ) ).contains( "read" ) ) {
+                        allocList.setViewed( true );
                     }
                     else {
                         LOGGER.warn( "Unsupported attribute on booking row: " + tr.getAttribute( "class" ) );
