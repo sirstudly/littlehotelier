@@ -1,6 +1,7 @@
 
 package com.macbackpackers.config;
 
+import java.beans.PropertyVetoException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -21,6 +22,7 @@ import org.springframework.orm.hibernate5.LocalSessionFactoryBean;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.mchange.v2.c3p0.ComboPooledDataSource;
 
 @Configuration
 @EnableTransactionManagement
@@ -45,12 +47,16 @@ public class DatabaseConfig {
     }
 
     @Bean( name = "txnDataSource" )
-    public DataSource getDataSource() {
-        DriverManagerDataSource ds = new DriverManagerDataSource();
-        ds.setUrl( url );
-        ds.setDriverClassName( driverClass );
-        ds.setUsername( username );
+    public DataSource getDataSource() throws PropertyVetoException {
+        ComboPooledDataSource ds = new ComboPooledDataSource();
+        ds.setJdbcUrl( url );
+        ds.setDriverClass( driverClass );
+        ds.setUser( username );
         ds.setPassword( password );
+        ds.setMinPoolSize( 3 );
+        ds.setMaxPoolSize( 10 );
+        ds.setTestConnectionOnCheckout( true );
+        ds.setPreferredTestQuery( "SELECT 1" );
         return ds;
     }
 
@@ -60,13 +66,6 @@ public class DatabaseConfig {
     public LocalSessionFactoryBean getSessionFactory( DataSource dataSource ) throws IOException {
         LocalSessionFactoryBean bean = new LocalSessionFactoryBean();
         bean.setDataSource( dataSource );
-//        bean.getHibernateProperties().setProperty( "hibernate.dialect", "org.hibernate.dialect.MySQL5Dialect" );
-//        bean.getHibernateProperties().setProperty( "hibernate.show_sql", "true" );
-//        bean.getHibernateProperties().setProperty( "hibernate.c3p0.min_size", "3" );
-//        bean.getHibernateProperties().setProperty( "hibernate.c3p0.max_size", "10" );
-//        bean.getHibernateProperties().setProperty( "hibernate.c3p0.timeout", "100" ); // max number of seconds connection to remain pooled and idle (otherwise discarded)
-//        bean.getHibernateProperties().setProperty( "hibernate.c3p0.max_statements", "50" ); // max number of prepared statements to cache
-//        bean.getHibernateProperties().setProperty( "hibernate.c3p0.idle_test_period", "1000" ); // number of seconds to test each connection in pool
         bean.getHibernateProperties().putAll( getHibernateProperties() );
         bean.setPackagesToScan( "com.macbackpackers.beans", "com.macbackpackers.jobs" );
         return bean;
