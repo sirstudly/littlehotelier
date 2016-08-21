@@ -402,7 +402,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         LOGGER.info( "Running report for job id: " + allocationScraperJobId );
         sessionFactory.getCurrentSession()
                 .createNativeQuery( sql.getProperty( "unpaid.deposit.report" ) )
-                .setParameter( 0, allocationScraperJobId )
+                .setParameter( "jobId", allocationScraperJobId )
                 .executeUpdate();
     }
 

@@ -44,7 +44,7 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
 		INSERT INTO wp_lh_rpt_unpaid_deposit( job_id, guest_name, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn, created_date )
 		SELECT job_id, GROUP_CONCAT( DISTINCT guest_name ) `guest_name`, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn, MAX(created_date) `created_date`
 		  FROM wp_lh_calendar f  
-		WHERE job_id = ?
+		WHERE job_id = :jobId
 		AND payment_total = payment_outstanding
 		AND payment_total > 0
 		AND booking_source IN ('Booking.com', 'Expedia')
