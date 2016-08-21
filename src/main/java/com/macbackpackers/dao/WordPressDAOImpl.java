@@ -4,13 +4,10 @@ package com.macbackpackers.dao;
 import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import javax.transaction.Transactional;
 
 import org.hibernate.SessionFactory;
 import org.slf4j.Logger;
@@ -20,6 +17,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.IncorrectResultSetColumnCountException;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
@@ -32,6 +30,7 @@ import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
 
 @Repository
+@Transactional
 public class WordPressDAOImpl implements WordPressDAO {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
@@ -43,13 +42,11 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Qualifier( "reportsSQL" )
     private Properties sql;
 
-    @Transactional
     @Override
     public void insertAllocation( Allocation alloc ) {
         sessionFactory.getCurrentSession().save( alloc );
     }
 
-    @Transactional
     @Override
     public Allocation fetchAllocation( int id ) {
         Allocation alloc = (Allocation) sessionFactory.getCurrentSession().get( Allocation.class, id );
@@ -59,14 +56,12 @@ public class WordPressDAOImpl implements WordPressDAO {
         return alloc;
     }
 
-    @Transactional
     @Override
     public void updateAllocation( Allocation alloc ) {
         alloc.setCreatedDate( new Timestamp( System.currentTimeMillis() ) );
         sessionFactory.getCurrentSession().saveOrUpdate( alloc );
     }
 
-    @Transactional
     @Override
     public void updateAllocationList( AllocationList allocList ) {
         allocList.setCreatedDate( new Timestamp( System.currentTimeMillis() ) );
@@ -75,7 +70,6 @@ public class WordPressDAOImpl implements WordPressDAO {
         }
     }
 
-    @Transactional
     @SuppressWarnings( "unchecked" )
     @Override
     public AllocationList queryAllocationsByJobIdAndReservationId( int jobId, int reservationId ) {
@@ -83,17 +77,15 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .createQuery( "FROM Allocation WHERE jobId = :jobId AND reservationId = :reservationId" )
                 .setParameter( "jobId", jobId )
                 .setParameter( "reservationId", reservationId )
-                .list() );
+                .getResultList() );
     }
 
-    @Transactional
     @Override
     public int insertJob( Job job ) {
         sessionFactory.getCurrentSession().save( job );
         return job.getId();
     }
 
-    @Transactional
     @Override
     public void updateJobStatus( int jobId, JobStatus status, JobStatus prevStatus ) {
         AbstractJob job = fetchJobById( jobId );
@@ -104,7 +96,6 @@ public class WordPressDAOImpl implements WordPressDAO {
         updateJobStatus( job, status );
     }
 
-    @Transactional
     @Override
     public void updateJobStatus( int jobId, JobStatus status ) {
         updateJobStatus( fetchJobById( jobId ), status );
@@ -123,7 +114,6 @@ public class WordPressDAOImpl implements WordPressDAO {
         job.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
     }
 
-    @Transactional
     @Override
     public void resetAllProcessingJobsToFailed() {
         sessionFactory.getCurrentSession().createQuery(
@@ -136,20 +126,18 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .executeUpdate();
     }
 
-    @Transactional
     @Override
     public AbstractJob getNextJobToProcess() {
         // shutdown job has priority if present
-        Iterator<?> it = sessionFactory.getCurrentSession()
+        List<?> jobIds = sessionFactory.getCurrentSession()
                 .createQuery( "SELECT id FROM AbstractJob WHERE status = :status "
                         + " ORDER BY CASE WHEN classname = 'com.macbackpackers.jobs.ShutdownJob' THEN 0 ELSE 1 END, job_id" )
-                .setParameter( "status", JobStatus.submitted ).iterate();
-        Integer jobId = it.hasNext() ? (Integer) it.next() : null;
+                .setParameter( "status", JobStatus.submitted ).getResultList();
+        Integer jobId = jobIds.isEmpty() ? null : Integer.class.cast( jobIds.get( 0 ));
         LOGGER.info( "Next job to process: " + (jobId == null ? "none" : jobId) );
         return jobId == null ? null : fetchJobById( jobId );
     }
 
-    @Transactional
     @Override
     public AbstractJob fetchJobById( int id ) {
         AbstractJob j = (AbstractJob) sessionFactory.getCurrentSession().get( AbstractJob.class, id );
@@ -159,20 +147,19 @@ public class WordPressDAOImpl implements WordPressDAO {
         return j;
     }
 
-    @Transactional
     @SuppressWarnings( "unchecked" )
     @Override
     public <T extends AbstractJob> T getLastCompletedJobOfType( Class<T> jobType ) {
-        Integer jobId = (Integer) sessionFactory.getCurrentSession()
+        List<?> jobIds = sessionFactory.getCurrentSession()
                 .createQuery( "SELECT MAX(id) FROM AbstractJob WHERE classname = :classname AND status = :status" )
                 .setParameter( "classname", jobType.getName() )
                 .setParameter( "status", JobStatus.completed )
-                .iterate().next();
+                .getResultList();
+        Integer jobId = jobIds.isEmpty() ? null : Integer.class.cast( jobIds.get( 0 ));
         LOGGER.info( "Next job to process: " + (jobId == null ? "none" : jobId) );
         return jobId == null ? null : (T) fetchJobById( jobId );
     }
 
-    @Transactional
     @SuppressWarnings( "unchecked" )
     @Override
     public List<Date> getCheckinDatesForAllocationScraperJobId( int jobId ) {
@@ -185,10 +172,9 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "      AND reservationId > 0"
                         + "    ORDER BY checkinDate" )
                 .setParameter( "jobId", jobId )
-                .list();
+                .getResultList();
     }
 
-    @Transactional
     @SuppressWarnings( "unchecked" )
     @Override
     public List<Integer> getHostelworldHostelBookersUnpaidDepositReservations( int allocationScraperJobId ) {
@@ -201,19 +187,17 @@ public class WordPressDAOImpl implements WordPressDAO {
                         "  AND bookingSource IN ( 'Hostelworld', 'Hostelbookers', 'Hostelworld Group' ) " +
                         "GROUP BY reservationId" )
                 .setParameter( "jobId", allocationScraperJobId )
-                .list();
+                .getResultList();
     }
 
-    @Transactional
     @SuppressWarnings( "unchecked" )
     @Override
     public List<ScheduledJob> fetchActiveScheduledJobs() {
         return sessionFactory.getCurrentSession().createQuery(
                 "FROM ScheduledJob WHERE active = true" )
-                .list();
+                .getResultList();
     }
 
-    @Transactional
     @Override
     public ScheduledJob fetchScheduledJobById( int jobId ) {
         ScheduledJob j = (ScheduledJob) sessionFactory.getCurrentSession().get( ScheduledJob.class, jobId );
@@ -223,7 +207,6 @@ public class WordPressDAOImpl implements WordPressDAO {
         return j;
     }
 
-    @Transactional
     @Override
     public void updateScheduledJob( int jobId ) {
         ScheduledJob job = (ScheduledJob) sessionFactory.getCurrentSession().get( ScheduledJob.class, jobId );
@@ -233,7 +216,6 @@ public class WordPressDAOImpl implements WordPressDAO {
         job.setLastScheduledDate( new Timestamp( System.currentTimeMillis() ) );
     }
 
-    @Transactional
     @Override
     public void purgeRecordsOlderThan( Date specifiedDate ) {
 
@@ -248,7 +230,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         deleteFromTablesByJobId( specifiedDate, "wp_lh_job_param" );
 
         int rowsDeleted = sessionFactory.getCurrentSession()
-                .createSQLQuery( "DELETE FROM wp_lh_jobs WHERE last_updated_date < :specifiedDate" )
+                .createNativeQuery( "DELETE FROM wp_lh_jobs WHERE last_updated_date < :specifiedDate" )
                 .setParameter( "specifiedDate", specifiedDate )
                 .executeUpdate();
         LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from wp_lh_jobs" );
@@ -265,20 +247,18 @@ public class WordPressDAOImpl implements WordPressDAO {
 
         for ( String table : tables ) {
             int rowsDeleted = sessionFactory.getCurrentSession()
-                    .createSQLQuery( "DELETE FROM " + table + " WHERE job_id IN ( " + JOB_ID_SELECT + ")" )
+                    .createNativeQuery( "DELETE FROM " + table + " WHERE job_id IN ( " + JOB_ID_SELECT + ")" )
                     .setParameter( "specifiedDate", specifiedDate )
                     .executeUpdate();
             LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from " + table );
         }
     }
 
-    @Transactional
     @Override
     public void insertHostelworldBooking( HostelworldBooking booking ) {
         sessionFactory.getCurrentSession().save( booking );
     }
 
-    @Transactional
     @Override
     @SuppressWarnings( "unchecked" )
     public void deleteHostelworldBookingsWithArrivalDate( Date checkinDate ) {
@@ -293,12 +273,11 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "  GROUP BY d.bookingId"
                         + " HAVING MIN( d.bookedDate ) = :bookedDate" )
                 .setParameter( "bookedDate", checkinDate )
-                .list();
+                .getResultList();
 
         deleteHostelworldBookings( bookingIds );
     }
 
-    @Transactional
     @Override
     @SuppressWarnings( "unchecked" )
     public void deleteHostelbookersBookingsWithArrivalDate( Date checkinDate ) {
@@ -314,7 +293,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "  GROUP BY d.bookingId"
                         + " HAVING MIN( d.bookedDate ) = :bookedDate" )
                 .setParameter( "bookedDate", checkinDate )
-                .list();
+                .getResultList();
 
         deleteHostelworldBookings( bookingIds );
     }
@@ -340,7 +319,6 @@ public class WordPressDAOImpl implements WordPressDAO {
         }
     }
 
-    @Transactional
     @Override
     public Integer getRoomTypeIdForHostelworldLabel( String roomTypeLabel ) {
 
@@ -386,13 +364,13 @@ public class WordPressDAOImpl implements WordPressDAO {
 
         @SuppressWarnings( "unchecked" )
         List<Integer> roomTypeIds = sessionFactory.getCurrentSession()
-                .createSQLQuery( "SELECT DISTINCT room_type_id "
+                .createNativeQuery( "SELECT DISTINCT room_type_id "
                         + "  FROM wp_lh_rooms "
                         + " WHERE room_type = :roomType "
                         + "   AND capacity = :capacity" )
                 .setParameter( "roomType", roomType )
                 .setParameter( "capacity", capacity )
-                .list();
+                .getResultList();
 
         if ( roomTypeIds.isEmpty() ) {
             LOGGER.error( "Unable to determine room type id for " + roomTypeLabel, 1 );
@@ -410,37 +388,33 @@ public class WordPressDAOImpl implements WordPressDAO {
     //    REPORTING SPECIFIC
     /////////////////////////////////////////////////////////////////////
 
-    @Transactional
     @Override
     public void runSplitRoomsReservationsReport( int allocationScraperJobId ) {
         LOGGER.info( "Running report for job id: " + allocationScraperJobId );
         sessionFactory.getCurrentSession()
-                .createSQLQuery( sql.getProperty( "reservations.split.rooms" ) )
+                .createNativeQuery( sql.getProperty( "reservations.split.rooms" ) )
                 .setParameter( "jobId", allocationScraperJobId )
                 .executeUpdate();
     }
 
-    @Transactional
     @Override
     public void runUnpaidDepositReport( int allocationScraperJobId ) {
         LOGGER.info( "Running report for job id: " + allocationScraperJobId );
         sessionFactory.getCurrentSession()
-                .createSQLQuery( sql.getProperty( "unpaid.deposit.report" ) )
+                .createNativeQuery( sql.getProperty( "unpaid.deposit.report" ) )
                 .setParameter( 0, allocationScraperJobId )
                 .executeUpdate();
     }
 
-    @Transactional
     @Override
     public void runGroupBookingsReport( int allocationScraperJobId ) {
         LOGGER.info( "Running report for job id: " + allocationScraperJobId );
         sessionFactory.getCurrentSession()
-                .createSQLQuery( sql.getProperty( "group.bookings" ) )
+                .createNativeQuery( sql.getProperty( "group.bookings" ) )
                 .setParameter( "jobId", allocationScraperJobId )
                 .executeUpdate();
     }
 
-    @Transactional
     @Override
     @SuppressWarnings( "unchecked" )
     public Integer getLastCompletedAllocationScraperJobId() {
@@ -451,15 +425,14 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "          WHERE classname = :classname AND status = :status )" )
                 .setParameter( "classname", AllocationScraperJob.class.getCanonicalName() )
                 .setParameter( "status", JobStatus.completed )
-                .list();
+                .getResultList();
         return results.isEmpty() ? null : results.get( 0 );
     }
 
-    @Transactional
     @Override
     @SuppressWarnings( "unchecked" )
     public List<BigInteger> getReservationIdsWithoutEntryInGuestCommentsReport( int allocationScraperJobId ) {
-        List<BigInteger> reservationIds = sessionFactory.getCurrentSession().createSQLQuery(
+        List<BigInteger> reservationIds = sessionFactory.getCurrentSession().createNativeQuery(
                 "          SELECT c.reservation_id "
                         + "  FROM wp_lh_calendar c "
                         + "  LEFT OUTER JOIN wp_lh_rpt_guest_comments r "
@@ -468,15 +441,14 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "   AND r.reservation_id IS NULL "
                         + "   AND c.reservation_id > 0" )
                 .setParameter( "allocationScraperJobId", allocationScraperJobId )
-                .list();
+                .getResultList();
         return reservationIds;
     }
 
-    @Transactional
     @Override
     public void updateGuestCommentsForReservation( BigInteger reservationId, String comment ) {
         sessionFactory.getCurrentSession()
-                .createSQLQuery( "INSERT INTO wp_lh_rpt_guest_comments ( reservation_id, comments ) "
+                .createNativeQuery( "INSERT INTO wp_lh_rpt_guest_comments ( reservation_id, comments ) "
                         + " VALUES ( :reservationId, :comments ) "
                         + " ON DUPLICATE KEY UPDATE "
                         + " reservation_id = VALUES( reservation_id ), "
@@ -487,16 +459,16 @@ public class WordPressDAOImpl implements WordPressDAO {
         LOGGER.info( "Updating guest comments for reservation " + reservationId );
     }
 
-    @Transactional
     @Override
     @SuppressWarnings( "unchecked" )
+    @Transactional( readOnly = true )
     public String getOption( String property ) {
-        List<String> sqlResult = sessionFactory.getCurrentSession().createSQLQuery(
+        List<String> sqlResult = sessionFactory.getCurrentSession().createNativeQuery(
                 "          SELECT option_value"
                         + "  FROM wp_options"
                         + " WHERE option_name = :optionName " )
                 .setParameter( "optionName", property )
-                .list();
+                .getResultList();
 
         // key doesn't exist; just return null
         if ( sqlResult.isEmpty() ) {
