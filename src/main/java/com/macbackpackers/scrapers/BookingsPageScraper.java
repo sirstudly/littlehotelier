@@ -17,7 +17,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
@@ -508,7 +507,7 @@ public class BookingsPageScraper {
      *            the cached version if available.
      * @throws IOException on read/write error
      */
-    @Transactional
+//    @Transactional
     public void updateBookingsBetween(
             int jobId, Date startDate, Date endDate, boolean useSerialisedDataIfAvailable ) throws IOException {
 
@@ -540,7 +539,7 @@ public class BookingsPageScraper {
      * @param bookingRef (optional) booking reference (to narrow down the subset of records)
      * @throws IOException on read/write error
      */
-    @Transactional
+//    @Transactional
     public void updateBookingsFor( int jobId, Date arrivalDate, String bookingRef ) throws IOException {
         HtmlPage bookingsPage = goToBookingPageForArrivals( arrivalDate, bookingRef, null );
         updateBookings( jobId, bookingsPage );
@@ -555,7 +554,7 @@ public class BookingsPageScraper {
      * @param bookingRef (optional) booking reference (to narrow down the subset of records)
      * @throws IOException on read/write error
      */
-    @Transactional
+//    @Transactional
     public void insertCancelledBookingsFor( int jobId, Date fromDate, Date toDate, String bookingRef ) throws IOException {
         HtmlPage bookingsPage = goToBookingPageForArrivals( fromDate, toDate, bookingRef, "cancelled" );
         insertBookings( jobId, bookingsPage );

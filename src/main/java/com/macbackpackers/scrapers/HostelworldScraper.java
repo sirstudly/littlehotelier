@@ -21,7 +21,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
@@ -169,7 +168,7 @@ public class HostelworldScraper {
      * @throws IOException
      * @throws ParseException
      */
-    @Transactional
+//    @Transactional
     public void dumpBookingsForArrivalDate( Date arrivalDate ) throws IOException, ParseException {
 
         // first delete any existing bookings on the given arrival date

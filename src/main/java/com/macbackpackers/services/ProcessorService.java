@@ -8,8 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.WordPressDAO;
@@ -52,7 +50,7 @@ public class ProcessorService {
     /**
      * Runs the job and updates the status when complete.
      */
-    @Transactional( propagation = Propagation.REQUIRES_NEW )
+//    @Transactional( propagation = Propagation.REQUIRES_NEW )
     private void processJob( AbstractJob job ) {
 
         for ( int i = 0 ; i < job.getRetryCount() ; i++ ) {

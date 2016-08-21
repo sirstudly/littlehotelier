@@ -10,7 +10,6 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
@@ -39,7 +38,7 @@ public class DiffBookingEnginesJob extends AbstractJob {
     private BookingsPageScraper bookingsScraper;
 
     @Override
-    @Transactional
+//    @Transactional
     public void processJob() throws Exception {
 
         // we just need to scrape new data for the given date (include the previous week)
