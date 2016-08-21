@@ -52,7 +52,7 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
     </entry>
     <entry key="group.bookings">
 	    INSERT INTO `wp_lh_group_bookings` (job_id, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn)
-        SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, COUNT(num_guests) `num_guests`, notes, viewed_yn
+        SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, SUM(num_guests) `num_guests`, notes, viewed_yn
           FROM ( -- some duplicates may occur; remove them first
                 SELECT job_id, room, bed_name, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn 
                   FROM wp_lh_calendar
@@ -62,10 +62,10 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
                 ) t
          WHERE reservation_id > 0 -- ignore room closures
       GROUP BY reservation_id, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, notes, viewed_yn
-        HAVING COUNT(1) >= 6
+        HAVING SUM(num_guests) >= 6
      UNION ALL
         -- also include bookings for 5 guests into 6 bed dorms
-        SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, COUNT(num_guests) `num_guests`, notes, viewed_yn
+        SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, SUM(num_guests) `num_guests`, notes, viewed_yn
           FROM ( -- some duplicates may occur; remove them first
                 SELECT c.job_id, c.room, c.bed_name, c.reservation_id, c.guest_name, c.booking_reference, c.booking_source, c.checkin_date, c.checkout_date, c.booked_date, c.payment_outstanding, c.data_href, c.num_guests, c.notes, c.viewed_yn, c.room_id 
                   FROM wp_lh_calendar c
@@ -79,6 +79,6 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
                 ) t
          WHERE reservation_id > 0 -- ignore room closures
       GROUP BY reservation_id, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, notes, viewed_yn
-      HAVING COUNT(1) = 5
+      HAVING SUM(num_guests) = 5
     </entry>
 </properties>
