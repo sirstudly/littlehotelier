@@ -25,10 +25,6 @@ public class AuthenticationService {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
-    /** the title on the login page */
-    public static final String LOGIN_PAGE_TITLE = "Welcome to Little Hotelier";
-    public static final String LOGIN_PAGE_TITLE2 = "LittleHotelier Extranet";
-
     @Autowired
     @Qualifier( "webClientScriptingDisabled" )
     private WebClient localWebClient;
@@ -61,9 +57,8 @@ public class AuthenticationService {
         LOGGER.info( "Loading page: " + pageURL );
         HtmlPage nextPage = webClient.getPage( pageURL );
 
-        // if we get redirected back to login, then login and try again
-        if ( false == LOGIN_PAGE_TITLE.equals( nextPage.getTitleText() )
-                && false == LOGIN_PAGE_TITLE2.equals( nextPage.getTitleText() ) ) {
+        if( nextPage.getElementById( "user_session_username" ) != null
+                && nextPage.getElementById( "user_session_password" ) != null ) {
             LOGGER.warn( "Current credentials not valid?" );
             throw new UnrecoverableFault( "Unable to login using existing credentials. Has the password changed?" );
         }
@@ -98,8 +93,8 @@ public class AuthenticationService {
         LOGGER.info( "Finished logging in" );
         LOGGER.info( nextPage.asXml() );
 
-        if ( false == LOGIN_PAGE_TITLE.equals( nextPage.getTitleText() )
-                && false == LOGIN_PAGE_TITLE2.equals( nextPage.getTitleText() ) ) {
+        if( nextPage.getElementById( "user_session_username" ) != null
+                && nextPage.getElementById( "user_session_password" ) != null ) {
             throw new UnrecoverableFault( "Unable to login. Incorrect password?" );
         }
         fileService.writeCookiesToFile( localWebClient );
