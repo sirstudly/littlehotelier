@@ -58,6 +58,7 @@ public class AuthenticationService {
         fileService.loadCookiesFromFile( webClient );
 
         // attempt to go the page directly using the current credentials
+        LOGGER.info( "Loading page: " + pageURL );
         HtmlPage nextPage = webClient.getPage( pageURL );
 
         // if we get redirected back to login, then login and try again

@@ -43,10 +43,10 @@ public class DiffBookingEnginesJob extends AbstractJob {
 
         // we just need to scrape new data for the given date (include the previous week)
         Date checkinDate = getCheckinDate();
-        Calendar weekBefore = Calendar.getInstance();
-        weekBefore.setTime( checkinDate );
-        weekBefore.add( Calendar.DATE, -7 );
-        allocationScraper.dumpAllocationsBetween( getId(), weekBefore.getTime(), checkinDate, false );
+        Calendar oneWeekBefore = Calendar.getInstance();
+        oneWeekBefore.setTime( checkinDate );
+        oneWeekBefore.add( Calendar.DATE, -7 );
+        allocationScraper.dumpAllocationsBetween( getId(), oneWeekBefore.getTime(), checkinDate, false );
 
         // and update the additional fields for the records
         for ( Date nextDate : dao.getCheckinDatesForAllocationScraperJobId( getId() ) ) {
@@ -54,17 +54,12 @@ public class DiffBookingEnginesJob extends AbstractJob {
         }
 
         // finally, don't forget about cancelled bookings
-        // include all cancelled bookings +/- 2 weeks
-        Calendar twoWeeksBefore = Calendar.getInstance();
-        twoWeeksBefore.setTime( checkinDate );
-        twoWeeksBefore.add( Calendar.DATE, -14 );
-
-        Calendar twoWeeksAfter = Calendar.getInstance();
-        twoWeeksAfter.setTime( checkinDate );
-        twoWeeksAfter.add( Calendar.DATE, 14 );
-
-        // split into 2 searches to avoid having too many results
-        bookingsScraper.insertCancelledBookingsFor( getId(), twoWeeksBefore.getTime(), twoWeeksAfter.getTime(), null );
+        // include all cancelled bookings +/- 1 week
+        Calendar oneWeekAfter = Calendar.getInstance();
+        oneWeekAfter.setTime( checkinDate );
+        oneWeekAfter.add( Calendar.DATE, 7 );
+//FIXME: this is taking too long
+//        bookingsScraper.insertCancelledBookingsFor( getId(), oneWeekBefore.getTime(), oneWeekAfter.getTime(), null );
 
         // now dump the data from HW/HB
         hwScraper.dumpBookingsForArrivalDate( checkinDate );

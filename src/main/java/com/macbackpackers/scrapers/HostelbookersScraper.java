@@ -5,11 +5,11 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.text.ParseException;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
@@ -313,7 +313,7 @@ public class HostelbookersScraper {
 
             // Date, Room details, People, Cost, Total
             @SuppressWarnings( "unchecked" )
-            List<HtmlElement> cells = IteratorUtils.toList( tr.getElementsByTagName( "td" ).iterator() );
+            List<HtmlElement> cells = Arrays.<HtmlElement>asList( tr.getElementsByTagName( "td" ).toArray(new HtmlElement[0]) );
             if ( cells.size() == 5 && "bookingsummary".equals( tr.getAttribute( "id" ) ) == false ) {
 
                 String dateContent = StringUtils.trim( cells.get( 0 ).getTextContent() );

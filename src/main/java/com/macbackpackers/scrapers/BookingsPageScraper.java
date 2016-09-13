@@ -5,8 +5,10 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.text.ParseException;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Component;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.gargoylesoftware.htmlunit.html.HtmlSpan;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.Job;
@@ -45,7 +48,7 @@ public class BookingsPageScraper {
     public static final FastDateFormat DATE_FORMAT_BOOKING_URL = FastDateFormat.getInstance( "dd+MMM+yyyy" );
 
     @Autowired
-    @Qualifier( "webClientScriptingDisabled" )
+    @Qualifier( "webClient" )
     private WebClient webClient;
 
     @Autowired
@@ -119,7 +122,6 @@ public class BookingsPageScraper {
         String pageURL = getBookingsURLForBookedOnDate( date, bookingRefId, null );
         LOGGER.info( "Loading bookings page: " + pageURL );
         HtmlPage nextPage = authService.goToPage( pageURL, webClient );
-        LOGGER.debug( nextPage.asXml() );
         return nextPage;
     }
 
@@ -214,34 +216,23 @@ public class BookingsPageScraper {
                     DomElement td = tr.getFirstElementChild();
 
                     // viewed_yn
-                    if ( StringUtils.trimToEmpty( tr.getAttribute( "class" ) ).contains( "unread" ) ) {
-                        allocList.setViewed( false );
-                    }
-                    else if ( StringUtils.trimToEmpty( tr.getAttribute( "class" ) ).contains( "read" ) ) {
+                    List<String> classAttrs = Arrays.<String> asList( tr.getAttribute( "class" ).split( "\\s" ) );
+                    if ( classAttrs.contains( "read" ) ) {
                         allocList.setViewed( true );
                     }
                     else {
-                        LOGGER.warn( "Unsupported attribute on booking row: " + tr.getAttribute( "class" ) );
+                        allocList.setViewed( false );
                     }
 
                     // status       
-                    {
-                        DomElement ahref = td.getFirstElementChild();
-                        if ( false == "a".equals( ahref.getTagName() ) ) {
-                            LOGGER.warn( "Expecting link but was " + ahref.getTagName() + " : " + ahref.asText() );
-                        }
-                        else {
-                            LOGGER.debug( "  booking href: " + ahref.getAttribute( "href" ) );
-                            DomElement span = ahref.getFirstElementChild();
-                            if ( span != null ) {
-                                LOGGER.debug( "  status: " + span.getAttribute( "class" ) );
-                                allocList.setStatus( span.getAttribute( "class" ) );
-                            }
-                            else {
-                                LOGGER.warn( "No span found in status? " );
-                            }
-                        }
-                    } // status
+                    DomElement span = td.getFirstElementChild();
+                    if ( span != null ) {
+                        LOGGER.debug( "  status: " + span.getAttribute( "class" ) );
+                        allocList.setStatus( span.getAttribute( "class" ) );
+                    }
+                    else {
+                        LOGGER.warn( "No span found in status? " );
+                    }
 
                     // existing record should already have the guest name(s)
                     td = td.getNextElementSibling();
@@ -312,45 +303,37 @@ public class BookingsPageScraper {
                     alloc.setDataHref( "/extranet/properties/533/reservations/" + dataId + "/edit" );
                     alloc.setReservationId( Integer.parseInt( dataId ) );
 
-                    updateAllocationFromBookingDetailsPage( alloc,
-                            authService.goToPage( getBookingReservationURL( dataId ), webClient ) );
-
                     // may want to improve this later if i split out the table so it's not flattened
                     DomElement td = tr.getFirstElementChild();
 
                     // viewed_yn
-                    if ( "read".equals( tr.getAttribute( "class" ) ) ) {
+                    List<String> classAttrs = Arrays.<String> asList( tr.getAttribute( "class" ).split( "\\s" ) );
+                    if ( classAttrs.contains( "read" ) ) {
                         alloc.setViewed( true );
                     }
-                    else if ( "unread".equals( tr.getAttribute( "class" ) ) ) {
-                        alloc.setViewed( false );
-                    }
                     else {
-                        LOGGER.warn( "Unsupported attribute on booking row: " + tr.getAttribute( "class" ) );
+                        alloc.setViewed( false );
                     }
 
                     // status       
-                    {
-                        DomElement ahref = td.getFirstElementChild();
-                        if ( false == "a".equals( ahref.getTagName() ) ) {
-                            LOGGER.warn( "Expecting link but was " + ahref.getTagName() + " : " + ahref.asText() );
-                        }
-                        else {
-                            LOGGER.debug( "  booking href: " + ahref.getAttribute( "href" ) );
-                            DomElement span = ahref.getFirstElementChild();
-                            if ( span != null ) {
-                                LOGGER.debug( "  status: " + span.getAttribute( "class" ) );
-                                alloc.setStatus( span.getAttribute( "class" ) );
-                            }
-                            else {
-                                LOGGER.warn( "No span found in status? " );
-                            }
-                        }
-                    } // status
+                    DomElement span = td.getFirstElementChild();
+                    if ( span != null ) {
+                        LOGGER.debug( "  status: " + span.getAttribute( "class" ) );
+                        alloc.setStatus( span.getAttribute( "class" ) );
+                    }
+                    else {
+                        LOGGER.warn( "No span found in status? " );
+                    }
 
                     // existing record should already have the guest name(s)
                     td = td.getNextElementSibling();
-                    alloc.setGuestName( StringUtils.trim( td.getTextContent() ) );
+                    span = td.getFirstElementChild();
+                    if ( span != null ) {
+                        alloc.setGuestName( StringUtils.trim( span.getTextContent() ) );
+                    }
+                    else {
+                        LOGGER.warn( "No span found for guest name? " );
+                    }
                     LOGGER.debug( "  name: " + alloc.getGuestName() );
 
                     td = td.getNextElementSibling();
@@ -358,7 +341,13 @@ public class BookingsPageScraper {
                     LOGGER.debug( "  booking_reference: " + alloc.getBookingReference() );
 
                     td = td.getNextElementSibling();
-                    alloc.setBookingSource( StringUtils.trim( td.getTextContent() ) );
+                    span = td.getFirstElementChild();
+                    if ( span != null ) {
+                        alloc.setBookingSource( StringUtils.trim( span.getTextContent() ) );
+                    }
+                    else {
+                        LOGGER.warn( "No span found for booking source? " );
+                    }
                     LOGGER.debug( "  booking_source: " + alloc.getBookingSource() );
 
                     td = td.getNextElementSibling();
@@ -367,6 +356,7 @@ public class BookingsPageScraper {
                     for ( String persons : td.getTextContent().split( "/" ) ) {
                         alloc.setNumberGuests( alloc.getNumberGuests() + Integer.parseInt( persons.trim() ) );
                     }
+                    LOGGER.debug( "  number of guests: " + alloc.getNumberGuests() );
 
                     td = td.getNextElementSibling();
                     LOGGER.debug( "  check in: " + StringUtils.trim( td.getTextContent() ) );
@@ -387,10 +377,18 @@ public class BookingsPageScraper {
 
                     td = td.getNextElementSibling();
                     LOGGER.debug( "  number of 'rooms': " + StringUtils.trim( td.getTextContent() ) );
+                    
+                    // click on booking to get booking details
+                    HtmlPage bookingPage = HtmlSpan.class.cast( span ).click();
+                    webClient.waitForBackgroundJavaScript( 30000 );
+                    updateAllocationFromBookingDetailsPage( alloc, bookingPage );
+                    
+                    // go back to the summary page
+                    webClient.getWebWindows().get(0).getHistory().back();
 
                     // insert the allocation to datastore
                     wordPressDAO.insertAllocation( alloc );
-
+ 
                 } // data-id isNotBlank
 
             }
@@ -408,10 +406,13 @@ public class BookingsPageScraper {
      * @throws ParseException on checkin/checkout date parse error
      */
     private void updateAllocationFromBookingDetailsPage( Allocation alloc, HtmlPage bookingPage ) throws ParseException {
+        
         alloc.setCheckinDate( DATE_FORMAT_YYYY_MM_DD.parse(
                 bookingPage.getElementById( "reservation_check_in_date" ).getAttribute( "value" ) ) );
         alloc.setCheckoutDate( DATE_FORMAT_YYYY_MM_DD.parse(
                 bookingPage.getElementById( "reservation_check_out_date" ).getAttribute( "value" ) ) );
+        LOGGER.debug( "  Checkin Date: " + alloc.getCheckinDate() );
+        LOGGER.debug( "  Checkout Date: " + alloc.getCheckoutDate() );
 
         // set the room type
         DomElement roomSelect = bookingPage.getElementById( "reservation_reservation_room_types__room_type_id" );
@@ -452,18 +453,16 @@ public class BookingsPageScraper {
         }
 
         alloc.setNotes( StringUtils.trimToNull( bookingPage.getElementById( "reservation_notes" ).getTextContent() ) );
+        LOGGER.debug( "  Notes: " + alloc.getNotes() );
 
         // set totals
-        for ( DomElement totalLabel : bookingPage.getElementsByTagName( "label" ) ) {
-            if ( "Total".equals( StringUtils.trim( totalLabel.getTextContent() ) ) ) {
-                alloc.setPaymentTotal( StringUtils.trim( totalLabel.getNextElementSibling().getTextContent() ) );
-                LOGGER.debug( "  Total: " + alloc.getPaymentTotal() );
-            }
-            if ( "Total Outstanding".equals( StringUtils.trim( totalLabel.getTextContent() ) ) ) {
-                alloc.setPaymentOutstanding( StringUtils.trim( totalLabel.getNextElementSibling().getTextContent() ) );
-                LOGGER.debug( "  Total Outstanding: " + alloc.getPaymentOutstanding() );
-            }
-        }
+        HtmlSpan amountSpan = bookingPage.getFirstByXPath("//div[label='Total']/span");
+        alloc.setPaymentTotal( StringUtils.trim( amountSpan.getTextContent() ) );
+        LOGGER.debug( "  Total: " + alloc.getPaymentTotal() );
+
+        amountSpan = bookingPage.getFirstByXPath("//div[label='Total Outstanding']/span");
+        alloc.setPaymentOutstanding( StringUtils.trim( amountSpan.getTextContent() ) );
+        LOGGER.debug( "  Total Outstanding: " + alloc.getPaymentOutstanding() );
     }
 
     /**
@@ -481,7 +480,8 @@ public class BookingsPageScraper {
 
                 // only look at the "unread" records ... any ones that are read
                 // will be picked up the allocation scraper job run daily
-                if ( StringUtils.isNotBlank( dataId ) && "unread".equals( styleClass ) ) {
+                if ( StringUtils.isNotBlank( dataId ) 
+                        && Arrays.asList( styleClass.split( "\\s" )).contains( "unread" ) ) {
                     LOGGER.info( "Creating ConfirmDepositAmountsJob for reservation id " + dataId );
                     Job tickDepositJob = new ConfirmDepositAmountsJob();
                     tickDepositJob.setStatus( JobStatus.submitted );
@@ -570,7 +570,7 @@ public class BookingsPageScraper {
     public String getGuestCommentsForReservation( BigInteger reservationId ) throws IOException {
         HtmlPage bookingPage = authService.goToPage( getBookingReservationURL(
                 String.valueOf( reservationId ) ), webClient );
-        String guestComment = bookingPage.getElementById( "reservation_guest_comments" ).getTextContent();
-        return StringUtils.trimToNull( guestComment );
+        DomElement elem = bookingPage.getElementById( "reservation_guest_comments" );
+        return elem == null ? null : StringUtils.trimToNull( elem.getTextContent() );
     }
 }

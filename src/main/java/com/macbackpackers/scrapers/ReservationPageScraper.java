@@ -13,9 +13,12 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
+import com.gargoylesoftware.htmlunit.html.HtmlButton;
 import com.gargoylesoftware.htmlunit.html.HtmlCheckBoxInput;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlSubmitInput;
+import com.gargoylesoftware.htmlunit.html.HtmlTextArea;
 import com.macbackpackers.services.AuthenticationService;
 
 /**
@@ -29,7 +32,7 @@ public class ReservationPageScraper {
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
-    @Qualifier( "webClientScriptingDisabled" )
+    @Qualifier( "webClient" )
     private WebClient webClient;
 
     @Autowired
@@ -42,7 +45,6 @@ public class ReservationPageScraper {
         String pageURL = getReservationURL( reservationId );
         LOGGER.info( "Loading reservations page: " + pageURL );
         HtmlPage nextPage = authService.goToPage( pageURL, webClient );
-        LOGGER.debug( nextPage.asXml() );
         return nextPage;
     }
 
@@ -57,34 +59,26 @@ public class ReservationPageScraper {
     }
 
     /**
-     * Tick the "confirm deposit" checkbox and save the form. Does nothing if already ticked.
+     * Tick the "add payment" button for the automated deposit. Does nothing if already saved.
      * 
      * @param reservationPage the individual reservation page we're looking at.
      * @throws IOException on comms error
      */
     public void tickDeposit( HtmlPage reservationPage ) throws IOException {
-        HtmlCheckBoxInput depositCheckbox = (HtmlCheckBoxInput) reservationPage.getElementById(
-                "reservation_payments_attributes_0_processed" );
-        if ( depositCheckbox == null || depositCheckbox.isChecked() ) {
-            LOGGER.info( "Deposit checkbox not found or already checked. " + reservationPage.getUrl() );
+        
+        webClient.waitForBackgroundJavaScript( 30000 ); // wait for page to load
+        HtmlAnchor addPayment = reservationPage.getFirstByXPath( "//a[@data-click='pendingPayment.recordPayment']" );
+        if(addPayment != null) {
+            LOGGER.info( "Clicking update button on reservation" );
+            addPayment.click();
+            webClient.waitForBackgroundJavaScript( 30000 );
+            HtmlTextArea descriptionTxt = HtmlTextArea.class.cast( reservationPage.getElementById( "description" )); 
+            descriptionTxt.type( "HW automated deposit" );
+            HtmlButton paymentBtn = reservationPage.getFirstByXPath( "//button[@data-click='payment.create']" );
+            paymentBtn.click();
         }
-        else {
-            LOGGER.info( "Clicking on deposit checkbox for " + reservationPage.getUrl() );
-            depositCheckbox.click();
-
-            List<?> submitButtons = reservationPage.getByXPath( "//li[@class='commit']/input[@class='save' and @value='Update']" );
-            if ( submitButtons.isEmpty() ) {
-                LOGGER.error( "Could not find Update button??" );
-            }
-            else if ( submitButtons.size() > 1 ) {
-                LOGGER.error( "More than 1 Update button found??" );
-            }
-            else {
-                LOGGER.info( "Clicking update button on reservation" );
-                HtmlSubmitInput updateButton = (HtmlSubmitInput) submitButtons.get( 0 );
-                updateButton.click();
-            }
+        else{
+            LOGGER.info( "Payment button not found or already clicked " + reservationPage.getUrl() );
         }
     }
-
 }

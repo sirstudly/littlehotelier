@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.core.io.ClassPathResource;
 
 import com.gargoylesoftware.htmlunit.BrowserVersion;
+import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
 import com.gargoylesoftware.htmlunit.WebClient;
 
 @Configuration
@@ -33,7 +34,14 @@ public class LittleHotelierConfig {
     @Scope( "prototype" )
     public WebClient getWebClient() {
         WebClient webClient = new WebClient( BrowserVersion.CHROME ); // return a new instance of this when requested
+        webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
         webClient.getOptions().setThrowExceptionOnScriptError( false );
+        webClient.getOptions().setJavaScriptEnabled( true );
+        webClient.getOptions().setCssEnabled( false );
+        webClient.getOptions().setRedirectEnabled( true );
+        webClient.getOptions().setUseInsecureSSL(true);
+        webClient.setAjaxController( new NicelyResynchronizingAjaxController() );
+        webClient.getOptions().setTimeout( 30000 );
         return webClient;
     }
 
