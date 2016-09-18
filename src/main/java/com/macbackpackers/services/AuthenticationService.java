@@ -91,7 +91,6 @@ public class AuthenticationService {
 
         HtmlPage nextPage = button.click();
         LOGGER.info( "Finished logging in" );
-        LOGGER.info( nextPage.asXml() );
 
         if( nextPage.getElementById( "user_session_username" ) != null
                 && nextPage.getElementById( "user_session_password" ) != null ) {
