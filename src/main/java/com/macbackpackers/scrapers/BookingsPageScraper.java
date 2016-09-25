@@ -3,6 +3,7 @@ package com.macbackpackers.scrapers;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.text.ParseException;
 import java.util.Arrays;
@@ -10,6 +11,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
@@ -22,7 +24,9 @@ import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
+import com.gargoylesoftware.htmlunit.html.HtmlOption;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.gargoylesoftware.htmlunit.html.HtmlSelect;
 import com.gargoylesoftware.htmlunit.html.HtmlSpan;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
@@ -30,6 +34,7 @@ import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
+import com.macbackpackers.scrapers.matchers.CastleRockRoomBedMatcher;
 import com.macbackpackers.services.AuthenticationService;
 import com.macbackpackers.services.FileService;
 
@@ -386,9 +391,6 @@ public class BookingsPageScraper {
                     // go back to the summary page
                     webClient.getWebWindows().get(0).getHistory().back();
 
-                    // insert the allocation to datastore
-                    wordPressDAO.insertAllocation( alloc );
- 
                 } // data-id isNotBlank
 
             }
@@ -404,53 +406,23 @@ public class BookingsPageScraper {
      * @param alloc allocation to update
      * @param bookingPage detailed reservation page
      * @throws ParseException on checkin/checkout date parse error
+     * @throws NoSuchMethodException on bean copy failure
+     * @throws InvocationTargetException on bean copy failure
+     * @throws IllegalAccessException on bean copy failure
      */
-    private void updateAllocationFromBookingDetailsPage( Allocation alloc, HtmlPage bookingPage ) throws ParseException {
+    private void updateAllocationFromBookingDetailsPage( Allocation alloc, HtmlPage bookingPage ) 
+            throws ParseException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         
+        alloc.setGuestName( bookingPage.getElementById( "reservation_guest_first_name" ).getAttribute( "value" )
+                + " " + bookingPage.getElementById( "reservation_guest_last_name" ).getAttribute( "value" ) );
+        LOGGER.debug( "  Guest Name: " + alloc.getGuestName() );
+
         alloc.setCheckinDate( DATE_FORMAT_YYYY_MM_DD.parse(
                 bookingPage.getElementById( "reservation_check_in_date" ).getAttribute( "value" ) ) );
         alloc.setCheckoutDate( DATE_FORMAT_YYYY_MM_DD.parse(
                 bookingPage.getElementById( "reservation_check_out_date" ).getAttribute( "value" ) ) );
         LOGGER.debug( "  Checkin Date: " + alloc.getCheckinDate() );
         LOGGER.debug( "  Checkout Date: " + alloc.getCheckoutDate() );
-
-        // set the room type
-        DomElement roomSelect = bookingPage.getElementById( "reservation_reservation_room_types__room_type_id" );
-        for ( DomElement roomOption : roomSelect.getElementsByTagName( "option" ) ) {
-            if ( StringUtils.isNotBlank( roomOption.getAttribute( "selected" ) ) ) {
-                alloc.setRoomTypeId( Integer.parseInt( roomOption.getAttribute( "value" ) ) );
-                LOGGER.debug( "  Room Type: " + alloc.getRoomTypeId() );
-                break;
-            }
-        }
-
-        // set the rate plan if applicable
-        DomElement ratePlanSelect = bookingPage.getElementById( "reservation_reservation_room_types__rate_plan_id" );
-        for ( DomElement ratePlanOption : ratePlanSelect.getElementsByTagName( "option" ) ) {
-            if ( StringUtils.isNotBlank( ratePlanOption.getAttribute( "selected" ) ) ) {
-                alloc.setRatePlanName( StringUtils.trim( ratePlanOption.getTextContent() ) );
-                LOGGER.debug( "  Rate Plan: " + alloc.getRatePlanName() );
-                break;
-            }
-        }
-
-        // set the room assignment if applicable
-        roomSelect = bookingPage.getElementById( "reservation_reservation_room_types__room_id" );
-        if ( StringUtils.isNotBlank( roomSelect.getAttribute( "disabled" ) ) ) {
-            alloc.setRoom( "Unallocated" ); // not set if disabled 
-            LOGGER.debug( "  Room: " + alloc.getRoom() );
-        }
-        else {
-            for ( DomElement roomOption : roomSelect.getElementsByTagName( "option" ) ) {
-                if ( StringUtils.isNotBlank( roomOption.getAttribute( "selected" ) ) ) {
-                    alloc.setRoomId( Integer.parseInt( roomOption.getAttribute( "value" ) ) );
-                    alloc.setRoom( StringUtils.trim( roomOption.getTextContent() ) );
-                    LOGGER.debug( "  Room Id: " + alloc.getRoomId() );
-                    LOGGER.debug( "  Room: " + alloc.getRoom() );
-                    break;
-                }
-            }
-        }
 
         alloc.setNotes( StringUtils.trimToNull( bookingPage.getElementById( "reservation_notes" ).getTextContent() ) );
         LOGGER.debug( "  Notes: " + alloc.getNotes() );
@@ -463,6 +435,66 @@ public class BookingsPageScraper {
         amountSpan = bookingPage.getFirstByXPath("//div[label='Total Outstanding']/span");
         alloc.setPaymentOutstanding( StringUtils.trim( amountSpan.getTextContent() ) );
         LOGGER.debug( "  Total Outstanding: " + alloc.getPaymentOutstanding() );
+        
+        // for each of the room assignments, we'll need to create a new allocation record
+        final int roomAssignments = bookingPage.getByXPath( "//div[@class='reservation_room_type']").size();
+        for(int i = 1; i <= roomAssignments; i++) {
+            
+            // first create a duplicate allocation record that we will insert
+            Allocation newAllocation = new Allocation();
+            PropertyUtils.copyProperties( newAllocation, alloc );
+            
+            // set the room type
+            HtmlSelect roomSelect = bookingPage.getFirstByXPath( String.format( 
+                    "//div[@class='reservation_room_type'][%d]//select[@id='reservation_reservation_room_types__room_type_id']", i ) );
+            for ( HtmlOption roomOption : roomSelect.getOptions() ) {
+                if ( roomOption.isSelected() ) {
+                    newAllocation.setRoomTypeId( Integer.parseInt( roomOption.getValueAttribute() ) );
+                    LOGGER.debug( "  Room Type: " + roomOption.getTextContent() + " (" + newAllocation.getRoomTypeId() + ")" );
+                    break;
+                }
+            }
+
+            // set the rate plan if applicable
+            HtmlSelect ratePlanSelect = bookingPage.getFirstByXPath( String.format( 
+                    "//div[@class='reservation_room_type'][%d]//select[@id='reservation_reservation_room_types__rate_plan_id']", i ) );
+            for ( HtmlOption ratePlanOption : ratePlanSelect.getOptions() ) {
+                if ( ratePlanOption.isSelected() ) {
+                    newAllocation.setRatePlanName( StringUtils.trim( ratePlanOption.getTextContent() ) );
+                    LOGGER.debug( "  Rate Plan: " + newAllocation.getRatePlanName() );
+                    break;
+                }
+            }
+
+            // set the room assignment if applicable
+            roomSelect = bookingPage.getFirstByXPath( String.format( 
+                    "//div[@class='reservation_room_type'][%d]//select[@id='reservation_reservation_room_types__room_id']", i ) );
+            if ( roomSelect.isDisabled() ) {
+                newAllocation.setRoom( "Unallocated" ); // not set if disabled 
+                LOGGER.debug( "  Room: " + newAllocation.getRoom() );
+            }
+            else {
+                for ( HtmlOption roomOption : roomSelect.getOptions() ) {
+                    if ( roomOption.isSelected() ) {
+                        newAllocation.setRoomId( Integer.parseInt( roomOption.getValueAttribute() ) );
+
+                        // only supported for CRH
+                        CastleRockRoomBedMatcher roomMatcher = new CastleRockRoomBedMatcher( 
+                                StringUtils.trim( roomOption.getTextContent() ) );
+                        newAllocation.setRoom( roomMatcher.getRoom() );
+                        newAllocation.setBedName( roomMatcher.getBedName() );
+
+                        LOGGER.debug( "  Room Id: " + newAllocation.getRoomId() );
+                        LOGGER.debug( "  Room: " + newAllocation.getRoom() );
+                        LOGGER.debug( "  Bed Name: " + newAllocation.getBedName() );
+                        break;
+                    }
+                }
+            }
+
+            // insert the allocation to datastore
+            wordPressDAO.insertAllocation( newAllocation );
+        }
     }
 
     /**
@@ -555,9 +587,37 @@ public class BookingsPageScraper {
      * @throws IOException on read/write error
      */
 //    @Transactional
+    @Deprecated // this is taking too long; rewrite using #insertMissingHWBookings
     public void insertCancelledBookingsFor( int jobId, Date fromDate, Date toDate, String bookingRef ) throws IOException {
         HtmlPage bookingsPage = goToBookingPageForArrivals( fromDate, toDate, bookingRef, "cancelled" );
         insertBookings( jobId, bookingsPage );
+    }
+
+    /**
+     * Attempts to find and insert any bookings that are present in the HW scraped tables
+     * for the given job id but not in the LH calendar table for the same jobId.
+     * 
+     * @param jobId ID of DiffBookingEnginesJob
+     * @param checkinDate checkin date (of report)
+     * @throws IOException on web error
+     */
+    public void insertMissingHWBookings( int jobId, Date checkinDate ) throws IOException {
+        List<String> bookingRefs = wordPressDAO.findMissingHwBookingRefs( jobId, checkinDate );
+
+        // search for the booking reference within an 8 month window of their expected checkin date
+        Calendar startDate = Calendar.getInstance();
+        startDate.setTime( checkinDate );
+        startDate.add( Calendar.MONTH, -4 );
+
+        Calendar endDate = Calendar.getInstance();
+        endDate.setTime( checkinDate );
+        endDate.add( Calendar.MONTH, 4 );
+
+        // insert any missing records if found
+        for ( String bookingRef : bookingRefs ) {
+            HtmlPage bookingPage = goToBookingPageForArrivals( startDate.getTime(), endDate.getTime(), bookingRef, null );
+            insertBookings( jobId, bookingPage );
+        }
     }
 
     /**

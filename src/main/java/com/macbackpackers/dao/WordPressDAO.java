@@ -227,6 +227,16 @@ public interface WordPressDAO {
     public Integer getLastCompletedAllocationScraperJobId();
 
     /**
+     * Returns the HW booking references which don't appear in the calendar table for the given
+     * jobId.
+     * 
+     * @param jobId ID of (DiffBooking) job in HW dump/calendar tables that we're comparing
+     * @param checkinDate date for which the report is being run
+     * @return non-null list of HW booking references 
+     */
+    public List<String> findMissingHwBookingRefs( int jobId, Date checkinDate );
+
+    /**
      * Returns a list of reservation IDs which haven't been added to the guest comments report
      * table.
      * 

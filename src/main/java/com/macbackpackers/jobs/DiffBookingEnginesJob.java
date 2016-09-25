@@ -53,16 +53,12 @@ public class DiffBookingEnginesJob extends AbstractJob {
             bookingsScraper.updateBookingsFor( getId(), nextDate, null );
         }
 
-        // finally, don't forget about cancelled bookings
-        // include all cancelled bookings +/- 1 week
-        Calendar oneWeekAfter = Calendar.getInstance();
-        oneWeekAfter.setTime( checkinDate );
-        oneWeekAfter.add( Calendar.DATE, 7 );
-//FIXME: this is taking too long
-//        bookingsScraper.insertCancelledBookingsFor( getId(), oneWeekBefore.getTime(), oneWeekAfter.getTime(), null );
-
         // now dump the data from HW/HB
         hwScraper.dumpBookingsForArrivalDate( checkinDate );
+        
+        // find those bookings that don't have an entry in HW but none in LH
+        // this could be because the checkin date has moved or the reservation was cancelled
+        bookingsScraper.insertMissingHWBookings(getId(), checkinDate);
     }
 
     /**

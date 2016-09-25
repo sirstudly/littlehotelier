@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.IncorrectResultSetColumnCountException;
 import org.springframework.stereotype.Repository;
@@ -41,6 +42,9 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Autowired
     @Qualifier( "reportsSQL" )
     private Properties sql;
+
+    @Value( "${hostelworld.hostelnumber}" )
+    private String hostelNumber;
 
     @Override
     public void insertAllocation( Allocation alloc ) {
@@ -257,6 +261,29 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     public void insertHostelworldBooking( HostelworldBooking booking ) {
         sessionFactory.getCurrentSession().save( booking );
+    }
+    
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public List<String> findMissingHwBookingRefs( int jobId, Date checkinDate ) {
+        return sessionFactory.getCurrentSession().createNativeQuery(
+                "           SELECT CONCAT('HWL-" + hostelNumber + "-', b.booking_reference) "
+                        + "   FROM "
+                        + "       (SELECT * FROM wp_hw_booking b "
+                        + "         WHERE (SELECT MIN(d.booked_date) "
+                        + "                  FROM wp_hw_booking_dates d "
+                        + "                 WHERE b.id = d.hw_booking_id) = :checkinDate ) b "
+                        + "   LEFT OUTER JOIN "
+                        + "       (SELECT guest_name, booking_reference "
+                        + "          FROM wp_lh_calendar "
+                        + "         WHERE booking_source = 'Hostelworld Group' "
+                        + "           AND job_id = :jobId "
+                        + "         GROUP BY guest_name, booking_reference ) c "
+                        + "     ON CONCAT('HWL-" + hostelNumber + "-', b.booking_reference) = c.booking_reference "
+                        + "  WHERE c.booking_reference IS NULL" )
+                .setParameter( "checkinDate", checkinDate )
+                .setParameter( "jobId", jobId )
+                .getResultList();
     }
 
     @Override
