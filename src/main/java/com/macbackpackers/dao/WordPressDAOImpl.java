@@ -1,7 +1,6 @@
 
 package com.macbackpackers.dao;
 
-import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
@@ -25,6 +24,7 @@ import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.beans.MissingGuestComment;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
@@ -457,23 +457,31 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    @SuppressWarnings( "unchecked" )
-    public List<BigInteger> getReservationIdsWithoutEntryInGuestCommentsReport( int allocationScraperJobId ) {
-        List<BigInteger> reservationIds = sessionFactory.getCurrentSession().createNativeQuery(
-                "          SELECT c.reservation_id "
-                        + "  FROM wp_lh_calendar c "
-                        + "  LEFT OUTER JOIN wp_lh_rpt_guest_comments r "
-                        + "    ON c.reservation_id = r.reservation_id "
-                        + " WHERE c.job_id = :allocationScraperJobId "
-                        + "   AND r.reservation_id IS NULL "
-                        + "   AND c.reservation_id > 0" )
+    public List<MissingGuestComment> getAllocationsWithoutEntryInGuestCommentsReport( int allocationScraperJobId ) {
+        List<MissingGuestComment> allocations = sessionFactory.getCurrentSession().createQuery(
+                        "SELECT DISTINCT new com.macbackpackers.beans.MissingGuestComment(c.reservationId, c.bookingReference, c.checkinDate)"
+                        + "  FROM Allocation c "
+                        + "  LEFT OUTER JOIN GuestCommentReportEntry r "
+                        + "    ON c.reservationId = r.reservationId "
+                        + " WHERE c.jobId = :allocationScraperJobId "
+                        + "   AND c.bookingReference IS NOT NULL " // could be NULL if BookingScraperJob failed to run
+                        + "   AND r.reservationId IS NULL "
+                        + "   AND c.reservationId > 0"
+                        + "   AND NOT EXISTS( "
+                        // if this job failed earlier, don't include entries where we 
+                        // have a pending job to update the guest comment table
+                        + "         SELECT 1 FROM GuestCommentSaveJob gcj"
+                        + "           JOIN JobParameter gcjp ON gcj.id = gcjp.jobId"
+                        + "          WHERE gcjp.name = 'reservation_id'"
+                        + "            AND gcjp.value = c.reservationId"
+                        + "            AND gcj.status IN ('submitted', 'processing'))", MissingGuestComment.class )
                 .setParameter( "allocationScraperJobId", allocationScraperJobId )
                 .getResultList();
-        return reservationIds;
+        return allocations;
     }
 
     @Override
-    public void updateGuestCommentsForReservation( BigInteger reservationId, String comment ) {
+    public void updateGuestCommentsForReservation( int reservationId, String comment ) {
         sessionFactory.getCurrentSession()
                 .createNativeQuery( "INSERT INTO wp_lh_rpt_guest_comments ( reservation_id, comments ) "
                         + " VALUES ( :reservationId, :comments ) "

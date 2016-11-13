@@ -3,8 +3,8 @@ package com.macbackpackers.scrapers;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
-import java.math.BigInteger;
 import java.text.ParseException;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -12,6 +12,8 @@ import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.beanutils.PropertyUtils;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
@@ -22,8 +24,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
+import com.gargoylesoftware.htmlunit.TextPage;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
+import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlOption;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlSelect;
@@ -67,9 +71,6 @@ public class BookingsPageScraper {
 
     @Value( "${lilhotelier.url.bookings}" )
     private String bookingUrl;
-
-    @Value( "${lilhotelier.url.reservation}" )
-    private String bookingReservationUrl;
 
     /**
      * Goes to the booking page showing arrivals for the given date.
@@ -163,16 +164,6 @@ public class BookingsPageScraper {
                 .replaceAll( "__BOOKING_REF_ID__", bookingRefId == null ? "" : bookingRefId )
                 .replaceAll( "__DATE_TYPE__", "BookedOn" )
                 .replaceAll( "__STATUS__", status == null ? "" : status );
-    }
-
-    /**
-     * Returns the booking reservation detail URL for the given reservation ID.
-     * 
-     * @param reservationId LH reservation ID
-     * @return URL for detailed booking record
-     */
-    private String getBookingReservationURL( String reservationId ) {
-        return bookingReservationUrl.replaceAll( "__RESERVATION_ID__", reservationId );
     }
 
     /**
@@ -578,22 +569,6 @@ public class BookingsPageScraper {
     }
 
     /**
-     * Inserts the calendar records by querying the bookings page for the given date.
-     * 
-     * @param jobId the job ID to associate with this dump
-     * @param fromDate the date to start searching from
-     * @param toDate the end date to search to
-     * @param bookingRef (optional) booking reference (to narrow down the subset of records)
-     * @throws IOException on read/write error
-     */
-//    @Transactional
-    @Deprecated // this is taking too long; rewrite using #insertMissingHWBookings
-    public void insertCancelledBookingsFor( int jobId, Date fromDate, Date toDate, String bookingRef ) throws IOException {
-        HtmlPage bookingsPage = goToBookingPageForArrivals( fromDate, toDate, bookingRef, "cancelled" );
-        insertBookings( jobId, bookingsPage );
-    }
-
-    /**
      * Attempts to find and insert any bookings that are present in the HW scraped tables
      * for the given job id but not in the LH calendar table for the same jobId.
      * 
@@ -621,16 +596,34 @@ public class BookingsPageScraper {
     }
 
     /**
-     * Scrapes the guest comments field for the given reservation ID.
+     * Scrapes the guest comments field for the given booking.
      * 
-     * @param reservationId the reservation ID to scrape
+     * @param bookingRef the booking to load
+     * @param checkinDate the expected checkin date for the booking
      * @return the contents of the guest comments field
      * @throws IOException on read/write error
      */
-    public String getGuestCommentsForReservation( BigInteger reservationId ) throws IOException {
-        HtmlPage bookingPage = authService.goToPage( getBookingReservationURL(
-                String.valueOf( reservationId ) ), webClient );
-        DomElement elem = bookingPage.getElementById( "reservation_guest_comments" );
-        return elem == null ? null : StringUtils.trimToNull( elem.getTextContent() );
+    public String getGuestCommentsForReservation( String bookingRef, Date checkinDate ) throws IOException {
+        String url = bookingUrl
+                .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( checkinDate ) )
+                .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( checkinDate ) )
+                .replaceAll( "__BOOKING_REF_ID__", bookingRef )
+                .replaceAll( "__DATE_TYPE__", "CheckIn" )
+                .replaceAll( "__STATUS__", "" );
+        LOGGER.info( "Retrieving CSV file from: " + url );
+        HtmlPage thePage = authService.goToPage( url, webClient );
+        HtmlAnchor a = thePage.getFirstByXPath( "//a[@class='export']" );
+        TextPage txtPage = a.click();
+        String csvContent = txtPage.getContent();
+        Iterable<CSVRecord> records = CSVFormat.RFC4180
+                .withFirstRecordAsHeader().parse(new StringReader(csvContent));
+        
+        for (CSVRecord record : records) {
+            String comment = record.get("Guest comments");
+            LOGGER.info( "Guest comment: " + comment );
+            return StringUtils.trimToNull( comment );
+        }
+
+        throw new IllegalStateException("guest comment not found for booking " + bookingRef + " on " + checkinDate);
     }
 }

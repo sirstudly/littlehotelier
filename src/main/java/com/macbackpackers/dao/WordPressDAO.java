@@ -1,7 +1,6 @@
 
 package com.macbackpackers.dao;
 
-import java.math.BigInteger;
 import java.util.Date;
 import java.util.List;
 
@@ -13,6 +12,7 @@ import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.beans.MissingGuestComment;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
@@ -237,13 +237,13 @@ public interface WordPressDAO {
     public List<String> findMissingHwBookingRefs( int jobId, Date checkinDate );
 
     /**
-     * Returns a list of reservation IDs which haven't been added to the guest comments report
+     * Returns a list of Allocations which haven't been added to the guest comments report
      * table.
      * 
      * @param allocationScraperJobId the scraper job ID which was run
-     * @return non-null list of reservation IDs
+     * @return non-null list of bookings
      */
-    public List<BigInteger> getReservationIdsWithoutEntryInGuestCommentsReport( int allocationScraperJobId );
+    public List<MissingGuestComment> getAllocationsWithoutEntryInGuestCommentsReport( int allocationScraperJobId );
 
     /**
      * Inserts/updates the table for guest comments with the given guest comment.
@@ -251,7 +251,7 @@ public interface WordPressDAO {
      * @param reservationId ID of reservation to update
      * @param comment the guest comment (if applicable) for the reservation
      */
-    public void updateGuestCommentsForReservation( BigInteger reservationId, String comment );
+    public void updateGuestCommentsForReservation( int reservationId, String comment );
 
     /**
      * Returns the wordpress option for the given property.

@@ -2,6 +2,7 @@
 package com.macbackpackers.scrapers;
 
 import java.util.Calendar;
+import java.util.Date;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.config.LittleHotelierConfig;
 
 @RunWith( SpringJUnit4ClassRunner.class )
@@ -43,13 +45,18 @@ public class BookingsPageScraperTest {
     }
 
     @Test
-    public void testInsertCancelledBookings() throws Exception {
-        Calendar startDate = Calendar.getInstance();
-        startDate.set( Calendar.MONTH, 6 ); // july
-        startDate.set( Calendar.DATE, 28 );
-        startDate.set( Calendar.YEAR, 2015 );
-
-        scraper.insertCancelledBookingsFor( 1, startDate.getTime(), startDate.getTime(), null );
+    public void testGuestComments() throws Exception {
+        Calendar c = Calendar.getInstance();
+        c.set( Calendar.YEAR, 2016 );
+        c.set( Calendar.MONTH, 9 );
+        c.set( Calendar.DATE, 6 );
+        String comment = scraper.getGuestCommentsForReservation( "EXP-719896551", c.getTime() );
+        LOGGER.info( comment );
     }
-
+    
+    @Test
+    public void testCreateConfirmDepositJobs() throws Exception {
+        HtmlPage bookingsPage = scraper.goToBookingPageBookedOn( new Date(), "HWL" );
+        scraper.createConfirmDepositJobs( bookingsPage );
+    }
 }

@@ -22,9 +22,9 @@ public class CreateConfirmDepositAmountsJob extends AbstractJob {
         if ( job != null ) {
             for ( int reservationId : dao.getHostelworldHostelBookersUnpaidDepositReservations( job.getId() ) ) {
                 LOGGER.info( "Creating a ConfirmDepositAmountsJob for reservation_id " + reservationId );
-                Job tickDepositJob = new ConfirmDepositAmountsJob();
+                ConfirmDepositAmountsJob tickDepositJob = new ConfirmDepositAmountsJob();
                 tickDepositJob.setStatus( JobStatus.submitted );
-                tickDepositJob.setParameter( "reservation_id", String.valueOf( reservationId ) );
+                tickDepositJob.setReservationId( reservationId );
                 dao.insertJob( tickDepositJob );
             }
         }

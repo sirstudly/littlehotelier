@@ -40,7 +40,8 @@ CREATE TABLE `wp_lh_jobs` (
   `end_date` timestamp NULL DEFAULT NULL,
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_updated_date` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`job_id`)
+  PRIMARY KEY (`job_id`),
+  KEY `lh_j_classname` (`classname`) 
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 
@@ -49,7 +50,8 @@ CREATE TABLE `wp_lh_job_param` (
   `job_id` bigint(20) unsigned NOT NULL,
   `name` varchar(255) NOT NULL,
   `value` varchar(255) NOT NULL,
-  PRIMARY KEY (`job_param_id`)
+  PRIMARY KEY (`job_param_id`),
+  KEY `lh_j_job_id` (`job_id`)
 --  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)  -- removed cause of hibernate
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
@@ -634,6 +636,9 @@ CREATE TABLE `wp_lh_cleaner_task` (
   `description` text DEFAULT NULL,
   `default_hours` int(10) unsigned DEFAULT 0,
   `active_yn` char(1) DEFAULT NULL,
+  `show_in_daily_tasks_yn` char(1) DEFAULT NULL,
+  `sort_order` int(10) unsigned DEFAULT 0,
+  `frequency` int(10) unsigned DEFAULT 0,
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_updated_date` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`)

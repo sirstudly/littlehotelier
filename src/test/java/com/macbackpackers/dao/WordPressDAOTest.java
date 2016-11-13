@@ -23,6 +23,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.beans.MissingGuestComment;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.BookingScraperJob;
@@ -436,6 +437,15 @@ public class WordPressDAOTest {
     public void testGetOption() {
         Assert.assertEquals( "Just another WordPress site", dao.getOption( "blogdescription" ) );
         Assert.assertEquals( null, dao.getOption( "non.existent.key" ) );
+    }
+    
+    @Test
+    public void testGetAllocations() {
+        List<MissingGuestComment> allocations = dao.getAllocationsWithoutEntryInGuestCommentsReport( 472 );
+        for(MissingGuestComment a : allocations) {
+            LOGGER.info( "Reservation: " + a.getReservationId() );
+            LOGGER.info( "Booking Ref: " + a.getBookingReference() );
+        }
     }
 
 }
