@@ -55,6 +55,13 @@ public interface WordPressDAO {
     public Allocation fetchAllocation( int id ) throws EmptyResultDataAccessException;
 
     /**
+     * Deletes all Allocations for the given jobId.
+     * 
+     * @param jobId the records for the job to delete.
+     */
+    public void deleteAllocations( int jobId );
+
+    /**
      * Queries all existing allocations by job id and reservation id.
      * 
      * @param jobId ID of job that scraped the original allocation
@@ -260,4 +267,12 @@ public interface WordPressDAO {
      * @return option value or null if key doesn't exist
      */
     public String getOption( String property );
+    
+    /**
+     * Sets the wordpress option for the given property.
+     * 
+     * @param property name of key to get
+     * @param value value to set
+     */
+    public void setOption( String property, String value );
 }

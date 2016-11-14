@@ -447,5 +447,19 @@ public class WordPressDAOTest {
             LOGGER.info( "Booking Ref: " + a.getBookingReference() );
         }
     }
+    
+    @Test
+    public void testDeleteAllocations() {
+        dao.deleteAllocations( 109 );
+    }
+
+    @Test
+    public void testSetOption() {
+        dao.setOption( "tmp_del_me", "balls" );
+        Assert.assertEquals( dao.getOption( "tmp_del_me" ), "balls" );
+        dao.setOption( "tmp_del_me", "sticks" );
+        Assert.assertEquals( dao.getOption( "tmp_del_me" ), "sticks" );
+
+    }
 
 }

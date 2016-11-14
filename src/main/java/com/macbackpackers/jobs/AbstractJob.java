@@ -36,6 +36,15 @@ public abstract class AbstractJob extends Job {
     @Value( "${process.jobs.retries:3}" )
     @Transient
     private int numberRetries;
+    
+    /**
+     * Resets the job back to the 'unrun' state. We don't need this
+     * if {@link #processJob()} runs as a single transaction but
+     * due to server timeouts; this isn't usually so.
+     */
+    public void resetJob() throws Exception {
+        // override to implement
+    }
 
     /**
      * Do whatever it is we need to do.

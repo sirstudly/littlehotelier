@@ -74,6 +74,15 @@ public class WordPressDAOImpl implements WordPressDAO {
         }
     }
 
+    @Override
+    public void deleteAllocations( int jobId ) {
+        int rowsDeleted = sessionFactory.getCurrentSession()
+            .createQuery( "DELETE Allocation WHERE jobId = :jobId" )
+            .setParameter( "jobId", jobId )
+            .executeUpdate();
+        LOGGER.info( rowsDeleted + " allocation rows deleted." );
+    }
+
     @SuppressWarnings( "unchecked" )
     @Override
     public AllocationList queryAllocationsByJobIdAndReservationId( int jobId, int reservationId ) {
@@ -510,5 +519,17 @@ public class WordPressDAOImpl implements WordPressDAO {
             return null;
         }
         return sqlResult.get( 0 );
+    }
+
+    @Override
+    public void setOption( String property, String value ) {
+        sessionFactory.getCurrentSession().createNativeQuery(
+                "   INSERT INTO wp_options(option_name, option_value) "
+                + " VALUES (:name, :value) "
+                + " ON DUPLICATE KEY "
+                + " UPDATE option_name = :name, option_value = :value")
+            .setParameter( "name", property )
+            .setParameter( "value", value )
+            .executeUpdate();
     }
 }

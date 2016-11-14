@@ -59,6 +59,7 @@ public class ProcessorService {
             try {
                 LOGGER.info( "Processing job " + job.getId() );
                 dao.updateJobStatus( job.getId(), JobStatus.processing );
+                job.resetJob();
                 job.processJob();
                 LOGGER.info( "Finished job " + job.getId() );
                 dao.updateJobStatus( job.getId(), JobStatus.completed, JobStatus.processing );

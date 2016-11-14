@@ -7,6 +7,7 @@ import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.services.AuthenticationService;
 
 /**
@@ -21,12 +22,18 @@ public class UpdateLittleHotelierSettingsJob extends AbstractJob {
     @Transient
     private AuthenticationService authService;
 
+    @Autowired
+    @Transient
+    private WordPressDAO wordpressDAO;
+
     @Override
     public void processJob() throws Exception {
 
         // this will throw an exception if unable to login 
         // using the parameters specified by the job
         authService.doLogin( getParameter( "username" ), getParameter( "password" ) );
+        wordpressDAO.setOption( "hbo_lilho_username", getParameter( "username" ));
+        wordpressDAO.setOption( "hbo_lilho_password", getParameter( "password" ));
     }
 
     /**

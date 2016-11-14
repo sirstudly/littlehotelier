@@ -11,6 +11,7 @@ import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.scrapers.HostelworldScraper;
@@ -36,6 +37,15 @@ public class DiffBookingEnginesJob extends AbstractJob {
     @Autowired
     @Transient
     private BookingsPageScraper bookingsScraper;
+    
+    @Autowired
+    @Transient
+    private WordPressDAO wordpressDAO;
+
+    @Override
+    public void resetJob() throws Exception {
+        wordpressDAO.deleteAllocations( getId() );
+    }
 
     @Override
 //    @Transactional

@@ -7,6 +7,7 @@ import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.HostelworldScraper;
 
 /**
@@ -21,12 +22,18 @@ public class UpdateHostelworldSettingsJob extends AbstractJob {
     @Transient
     private HostelworldScraper hwScraper;
 
+    @Autowired
+    @Transient
+    private WordPressDAO wordpressDAO;
+
     @Override
     public void processJob() throws Exception {
 
         // this will throw an exception if unable to login 
         // using the parameters specified by the job
         hwScraper.doLogin( getParameter( "username" ), getParameter( "password" ) );
+        wordpressDAO.setOption( "hbo_hw_username", getParameter( "username" ));
+        wordpressDAO.setOption( "hbo_hw_password", getParameter( "password" ));
     }
 
     /**
