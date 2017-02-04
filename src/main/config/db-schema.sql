@@ -182,6 +182,24 @@ CREATE TABLE `wp_lh_rpt_guest_comments` (
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 
+CREATE TABLE `wp_pxpost_transaction` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `booking_reference` varchar(255) NOT NULL,
+  `post_date` timestamp NULL DEFAULT NULL,
+  `masked_card_number` varchar(255) DEFAULT NULL,
+  `payment_amount` decimal(10,2) NOT NULL,
+  `payment_request_xml` text DEFAULT NULL,
+  `payment_response_http_code` smallint(6) unsigned DEFAULT NULL,
+  `payment_response_xml` text DEFAULT NULL,
+  `payment_status_response_xml` text DEFAULT NULL,
+  `successful` tinyint(3) unsigned DEFAULT NULL,
+  `help_text` varchar(255) DEFAULT NULL, -- reason why txn failed
+  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_updated_date` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=200000 DEFAULT CHARSET=utf8;
+
+
 CREATE TABLE `wp_lh_rooms` (
   `id` bigint(20) unsigned NOT NULL,
   `room` varchar(50) DEFAULT NULL,
@@ -598,6 +616,10 @@ INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (4,'com.macbackpackers.jobs.HousekeepingJob','0 59 8 * * ?','Y',NULL,NOW());
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (5,'com.macbackpackers.jobs.HousekeepingJob','0 19 10 * * ?','Y',NULL,NOW());
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (6,'com.macbackpackers.jobs.BedCountJob','0 20 4 * * ?','Y',NULL,NOW());
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (7,'com.macbackpackers.jobs.DiffBookingEnginesJob','0 9 1 * * ?','Y',NULL,NOW());
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (8,'com.macbackpackers.jobs.DbPurgeJob','0 31 4 * * ?','Y',NULL,NOW());
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (9,'com.macbackpackers.jobs.GuestCommentsReportJob','0 59 6 * * ?','Y',NULL,NOW());
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (10,'com.macbackpackers.jobs.CreateBDCDepositChargeJob','0 00 22 * * ?','Y',NULL,NOW());
 
 INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (1,1,'booked_on_date','TODAY');
 INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (2,2,'selected_date','TODAY');
@@ -606,6 +628,9 @@ INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`)
 INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (5,4,'selected_date','TODAY');
 INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (6,5,'selected_date','TODAY');
 INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (7,6,'selected_date','TODAY-1');
+INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (8,7,'checkin_date','TODAY');
+INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (9,8,'days','90');
+INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (10,10,'days_back','14');
 */
 
 -- housekeeping

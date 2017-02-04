@@ -1,6 +1,7 @@
 
 package com.macbackpackers.dao;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hibernate.SessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +27,9 @@ import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.MissingGuestComment;
+import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.ScheduledJob;
+import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
@@ -162,6 +166,18 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @SuppressWarnings( "unchecked" )
     @Override
+    public <T extends AbstractJob> T getLastJobOfType( Class<T> jobType ) {
+        List<?> jobIds = sessionFactory.getCurrentSession()
+                .createQuery( "SELECT MAX(id) FROM AbstractJob WHERE classname = :classname" )
+                .setParameter( "classname", jobType.getName() )
+                .getResultList();
+        Integer jobId = jobIds.isEmpty() ? null : Integer.class.cast( jobIds.get( 0 ));
+        LOGGER.info( "Last " + jobType + ": " + (jobId == null ? "none" : jobId) );
+        return jobId == null ? null : (T) fetchJobById( jobId );
+    }
+
+    @SuppressWarnings( "unchecked" )
+    @Override
     public <T extends AbstractJob> T getLastCompletedJobOfType( Class<T> jobType ) {
         List<?> jobIds = sessionFactory.getCurrentSession()
                 .createQuery( "SELECT MAX(id) FROM AbstractJob WHERE classname = :classname AND status = :status" )
@@ -169,7 +185,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( "status", JobStatus.completed )
                 .getResultList();
         Integer jobId = jobIds.isEmpty() ? null : Integer.class.cast( jobIds.get( 0 ));
-        LOGGER.info( "Next job to process: " + (jobId == null ? "none" : jobId) );
+        LOGGER.info( "Last completed " + jobType + ": " + (jobId == null ? "none" : jobId) );
         return jobId == null ? null : (T) fetchJobById( jobId );
     }
 
@@ -427,6 +443,14 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     public void runSplitRoomsReservationsReport( int allocationScraperJobId ) {
         LOGGER.info( "Running report for job id: " + allocationScraperJobId );
+
+        // first remove any previous data in case we're running this again
+        int rowsDeleted = sessionFactory.getCurrentSession()
+                .createNativeQuery( "DELETE FROM wp_lh_rpt_split_rooms WHERE job_id = :jobId" )
+                .setParameter( "jobId", allocationScraperJobId )
+                .executeUpdate();
+        LOGGER.info( "Deleted " + rowsDeleted + " previous records from wp_lh_rpt_split_rooms" );
+
         sessionFactory.getCurrentSession()
                 .createNativeQuery( sql.getProperty( "reservations.split.rooms" ) )
                 .setParameter( "jobId", allocationScraperJobId )
@@ -436,15 +460,41 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     public void runUnpaidDepositReport( int allocationScraperJobId ) {
         LOGGER.info( "Running report for job id: " + allocationScraperJobId );
+
+        // first remove any previous data in case we're running this again
+        int rowsDeleted = sessionFactory.getCurrentSession()
+                .createNativeQuery( "DELETE FROM wp_lh_rpt_unpaid_deposit WHERE job_id = :jobId" )
+                .setParameter( "jobId", allocationScraperJobId )
+                .executeUpdate();
+        LOGGER.info( "Deleted " + rowsDeleted + " previous records from wp_lh_rpt_unpaid_deposit" );
+
         sessionFactory.getCurrentSession()
                 .createNativeQuery( sql.getProperty( "unpaid.deposit.report" ) )
                 .setParameter( "jobId", allocationScraperJobId )
                 .executeUpdate();
     }
+    
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public List<UnpaidDepositReportEntry> fetchUnpaidDepositReport( int allocationScraperJobId ) {
+        LOGGER.info( "Fetching last unpaid deposit report for allocation job id " + allocationScraperJobId );
+        return sessionFactory.getCurrentSession().createQuery(
+                "FROM UnpaidDepositReportEntry WHERE jobId = :jobId" )
+                .setParameter( "jobId", allocationScraperJobId )
+                .getResultList();
+    }
 
     @Override
     public void runGroupBookingsReport( int allocationScraperJobId ) {
         LOGGER.info( "Running report for job id: " + allocationScraperJobId );
+
+        // first remove any previous data in case we're running this again
+        int rowsDeleted = sessionFactory.getCurrentSession()
+                .createNativeQuery( "DELETE FROM wp_lh_group_bookings WHERE job_id = :jobId" )
+                .setParameter( "jobId", allocationScraperJobId )
+                .executeUpdate();
+        LOGGER.info( "Deleted " + rowsDeleted + " previous records from wp_lh_group_bookings" );
+
         sessionFactory.getCurrentSession()
                 .createNativeQuery( sql.getProperty( "group.bookings" ) )
                 .setParameter( "jobId", allocationScraperJobId )
@@ -531,5 +581,86 @@ public class WordPressDAOImpl implements WordPressDAO {
             .setParameter( "name", property )
             .setParameter( "value", value )
             .executeUpdate();
+    }
+
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public PxPostTransaction getLastPxPost( String bookingReference ) {
+        List<PxPostTransaction> results = sessionFactory.getCurrentSession().createQuery(
+                    "FROM PxPostTransaction px "
+                        + "  WHERE px.id IN ("
+                        + "        SELECT MAX(px2.id) "
+                        + "          FROM PxPostTransaction px2 "
+                        + "         WHERE px2.bookingReference = :bookingRef)" )
+                .setParameter( "bookingRef", bookingReference )
+                .getResultList();
+        return results.isEmpty() ? null : results.get( 0 );
+    }
+
+    @Override
+    public PxPostTransaction fetchPxPostTransaction( int txnId ) {
+        PxPostTransaction txn = (PxPostTransaction) sessionFactory.getCurrentSession().get( PxPostTransaction.class, txnId );
+        if ( txn == null ) {
+            throw new EmptyResultDataAccessException( "Unable to find PxPostTransaction with ID " + txn, 1 );
+        }
+        return txn;
+    }
+
+    @Override
+    public void updatePxPostStatus( int txnId, String maskedCardNumber, boolean successful, String statusXml ) {
+        PxPostTransaction txn = fetchPxPostTransaction( txnId );
+        if( maskedCardNumber != null ) {
+            txn.setMaskedCardNumber( maskedCardNumber );
+        }
+        txn.setSuccessful( successful );
+        txn.setPaymentStatusResponseXml( statusXml );
+        txn.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
+    }
+
+    @Override
+    public int insertNewPxPostTransaction( String bookingRef, BigDecimal amountToPay ) {
+        
+        if ( StringUtils.isBlank( bookingRef ) ) {
+            throw new IllegalArgumentException( "Booking Reference must not be null!" );
+        }
+
+        // amount must be present and positive
+        if ( amountToPay == null || amountToPay.compareTo( new BigDecimal( "0" ) ) <= 0 ) {
+            throw new IllegalArgumentException( "Invalid amount " + amountToPay );
+        }
+
+        PxPostTransaction pxpost = new PxPostTransaction();
+        pxpost.setBookingReference( bookingRef );
+        pxpost.setPaymentAmount( amountToPay );
+        sessionFactory.getCurrentSession().save( pxpost );
+        return pxpost.getId();
+    }
+    
+    @Override
+    public void updatePxPostTransaction( int txnId, String maskedCardNumber, String requestXML, 
+            int httpStatus, String responseXML, boolean successful, String helpText ) {
+        PxPostTransaction txn = fetchPxPostTransaction( txnId );
+        txn.setMaskedCardNumber( maskedCardNumber );
+        txn.setPaymentRequestXml( requestXML );
+        txn.setPaymentResponseHttpCode( httpStatus );
+        txn.setPaymentResponseXml( responseXML );
+        txn.setSuccessful( successful );
+        txn.setHelpText( helpText );
+        txn.setPostDate( new Timestamp( System.currentTimeMillis() ) );
+        txn.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
+    }
+
+    @Override
+    public int getPreviousNumberOfFailedTxns( String bookingRef, String maskedCardNumber ) {
+        return sessionFactory.getCurrentSession()
+                .createQuery( "SELECT COUNT(*) FROM PxPostTransaction "
+                        + "     WHERE bookingReference = :bookingRef "
+                        + "       AND maskedCardNumber = :maskedCardNumber "
+                        + "       AND successful = :successful ", Number.class )
+                .setParameter( "bookingRef", bookingRef )
+                .setParameter( "maskedCardNumber", maskedCardNumber )
+                .setParameter( "successful", Boolean.FALSE )
+                .getSingleResult()
+                .intValue();
     }
 }

@@ -5,7 +5,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
+import java.math.BigDecimal;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -36,6 +38,7 @@ import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.scrapers.matchers.CastleRockRoomBedMatcher;
@@ -125,7 +128,7 @@ public class BookingsPageScraper {
      * @throws IOException if credentials could not be loaded
      */
     public HtmlPage goToBookingPageBookedOn( Date date, String bookingRefId ) throws IOException {
-        String pageURL = getBookingsURLForBookedOnDate( date, bookingRefId, null );
+        String pageURL = getBookingsURLForBookedOnDate( date, date, bookingRefId, null );
         LOGGER.info( "Loading bookings page: " + pageURL );
         HtmlPage nextPage = authService.goToPage( pageURL, webClient );
         return nextPage;
@@ -152,15 +155,16 @@ public class BookingsPageScraper {
     /**
      * Returns the booking URL for all checkins occurring on the given date.
      * 
-     * @param date date to query
+     * @param fromDate date to query from
+     * @param toDate date to query to
      * @param bookingRefId a matching booking ref; can be "HWL" or "HBK" for example
      * @param status status of reservation (optional)
      * @return URL of bookings booked on on this date
      */
-    private String getBookingsURLForBookedOnDate( Date date, String bookingRefId, String status ) {
+    private String getBookingsURLForBookedOnDate( Date fromDate, Date toDate, String bookingRefId, String status ) {
         return bookingUrl
-                .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( date ) )
-                .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( date ) )
+                .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( fromDate ) )
+                .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( toDate ) )
                 .replaceAll( "__BOOKING_REF_ID__", bookingRefId == null ? "" : bookingRefId )
                 .replaceAll( "__DATE_TYPE__", "BookedOn" )
                 .replaceAll( "__STATUS__", status == null ? "" : status );
@@ -625,5 +629,69 @@ public class BookingsPageScraper {
         }
 
         throw new IllegalStateException("guest comment not found for booking " + bookingRef + " on " + checkinDate);
+    }
+
+    /**
+     * Queries all BDC reservations within the given dates where status = 'confirmed'
+     * and where no payment has been made yet (payment received = 0).
+     * 
+     * @param dateFrom from this booking date
+     * @param dateTo until this booking date (inclusive)
+     * @return non-null list of matched reservations (only the following fields are populated:
+     *                  guestName, checkinDate, checkoutDate, bookingRef, bookingSource, bookedDate, paymentTotal)
+     * @throws IOException on read/write error
+     * @throws ParseException on date parse error
+     */
+    public List<UnpaidDepositReportEntry> getUnpaidBDCReservations( Date dateFrom, Date dateTo ) throws IOException, ParseException {
+        String url = bookingUrl
+                .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( dateFrom ) )
+                .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( dateTo ) )
+                .replaceAll( "__BOOKING_REF_ID__", "BDC" )
+                .replaceAll( "__DATE_TYPE__", "BookedOn" )
+                .replaceAll( "__STATUS__", "confirmed" );
+        LOGGER.info( "Retrieving CSV file from: " + url );
+        HtmlPage thePage = authService.goToPage( url, webClient );
+        HtmlAnchor a = thePage.getFirstByXPath( "//a[@class='export']" );
+        TextPage txtPage = a.click();
+        String csvContent = txtPage.getContent();
+        Iterable<CSVRecord> records = CSVFormat.RFC4180
+                .withFirstRecordAsHeader().parse(new StringReader(csvContent));
+        
+        List<UnpaidDepositReportEntry> results = new ArrayList<UnpaidDepositReportEntry>();
+        final int GROUP_BOOKING_SIZE = Integer.parseInt( wordPressDAO.getOption( "hbo_group_booking_size" ) );
+        for ( CSVRecord csv : records ) {
+            String bookingRef = csv.get( "Booking reference" );
+            LOGGER.info( "Checking BDC reservation: " + bookingRef );
+
+            // check if we've already charged them
+            if ( false == "0".equals( csv.get( "Payment Received" ) ) ) {
+                LOGGER.info( "Already charged " + bookingRef + "; skipping..." );
+                continue;
+            }
+
+            // we should already be filtered on "confirmed" but just an extra sanity check
+            if ( false == "confirmed".equals( csv.get( "Status" ) ) ) {
+                LOGGER.info( bookingRef + " not at confirmed; skipping..." );
+                continue;
+            }
+
+            // group bookings needs approval so processed manually
+            if ( Integer.parseInt( csv.get( "Number of adults" ) ) >= GROUP_BOOKING_SIZE ) {
+                LOGGER.info( "Booking " + bookingRef + " has "
+                        + csv.get( "Number of adults" ) + " guests. Skipping..." );
+                continue;
+            }
+
+            UnpaidDepositReportEntry entry = new UnpaidDepositReportEntry();
+            entry.setBookingRef( bookingRef );
+            entry.setBookedDate( DATE_FORMAT_YYYY_MM_DD.parse( csv.get( "Booked on date" ) ) );
+            entry.setBookingSource( csv.get( "Channel name" ) );
+            entry.setGuestNames( csv.get( "Guest first name" ) + " " + csv.get( "Guest last name" ) );
+            entry.setCheckinDate( DATE_FORMAT_YYYY_MM_DD.parse( csv.get( "Check in date" ) ) );
+            entry.setCheckoutDate( DATE_FORMAT_YYYY_MM_DD.parse( csv.get( "Check out date" ) ) );
+            entry.setPaymentTotal( new BigDecimal( csv.get( "Payment total" ) ) );
+            results.add( entry );
+        }
+        return results;
     }
 }

@@ -1,6 +1,7 @@
 
 package com.macbackpackers.dao;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -8,6 +9,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.junit.Assert;
 import org.junit.Before;
@@ -24,11 +26,14 @@ import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.MissingGuestComment;
+import com.macbackpackers.beans.PxPostTransaction;
+import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.BookingScraperJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.HousekeepingJob;
+import com.macbackpackers.jobs.UnpaidDepositReportJob;
 
 @RunWith( SpringJUnit4ClassRunner.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
@@ -459,7 +464,78 @@ public class WordPressDAOTest {
         Assert.assertEquals( dao.getOption( "tmp_del_me" ), "balls" );
         dao.setOption( "tmp_del_me", "sticks" );
         Assert.assertEquals( dao.getOption( "tmp_del_me" ), "sticks" );
+    }
+    
+    @Test
+    public void testFetchUnpaidDepositReport() {
+        List<UnpaidDepositReportEntry> report = dao.fetchUnpaidDepositReport(136564);
+        LOGGER.info( "records found: " + report.size() );
+        for(UnpaidDepositReportEntry row : report) {
+            LOGGER.info( ToStringBuilder.reflectionToString( row ));
+            LOGGER.info( "Reservation " + row.getReservationId() );
+        }
+    } 
+    
+    @Test
+    public void testRunGroupBookingsReport() {
+        dao.runGroupBookingsReport( 137652 );   
+    }
+    
+    @Test
+    public void testGetLastJobOfType() {
+        UnpaidDepositReportJob j = dao.getLastJobOfType( UnpaidDepositReportJob.class );
+        LOGGER.info( "Job " + j.getId() + " found with status " + j.getStatus() );
+        LOGGER.info( "Allocation scraper job id: " + j.getAllocationScraperJobId() );
+        LOGGER.info( ToStringBuilder.reflectionToString( j ) );
+    }
+    
+    @Test
+    public void testGetPreviousNumberOfFailedTxns() {
+        Assert.assertEquals( 1, dao.getPreviousNumberOfFailedTxns( "BDC-12345680", "123456........89" ));
+        Assert.assertEquals( 0, dao.getPreviousNumberOfFailedTxns( "BDC-12345680", "123456........99" ));
+        Assert.assertEquals( 0, dao.getPreviousNumberOfFailedTxns( "BDC-12345681", "123456........89" ));
+        Assert.assertEquals( 0, dao.getPreviousNumberOfFailedTxns( "BDC-12345679", "123456........89" ));
+    }
+    
+    @Test
+    public void testPxPost() {
+        String bookingRef = "BDC-12345680";
+        PxPostTransaction txn = dao.getLastPxPost( bookingRef );
+        Assert.assertEquals( null, txn );
 
+        int txnId = dao.insertNewPxPostTransaction( bookingRef, new BigDecimal( "14.22" ) );
+        Assert.assertEquals( true, txnId > 0 );
+        
+        txn = dao.getLastPxPost( bookingRef );
+        Assert.assertEquals( bookingRef, txn.getBookingReference() );
+        Assert.assertEquals( new BigDecimal( "14.22" ), txn.getPaymentAmount() );
+        Assert.assertEquals( true, txn.getCreatedDate() != null );
+        Assert.assertEquals( txnId, txn.getId() );
+        
+        // update the record
+        dao.updatePxPostTransaction( txnId, "123456........89", 
+                "<Request>Test</Request>", 200, "<Response>Answered</Response>", 
+                true, "Help me!" );
+        
+        txn = dao.fetchPxPostTransaction( txnId );
+        Assert.assertEquals( txnId, txn.getId() );
+        Assert.assertEquals( bookingRef, txn.getBookingReference() );
+        Assert.assertEquals( "123456........89", txn.getMaskedCardNumber() );
+        Assert.assertEquals( new BigDecimal( "14.22" ), txn.getPaymentAmount() );
+        Assert.assertEquals( "<Request>Test</Request>", txn.getPaymentRequestXml() );
+        Assert.assertEquals( new Integer( 200 ), txn.getPaymentResponseHttpCode() );
+        Assert.assertEquals( "<Response>Answered</Response>", txn.getPaymentResponseXml() );
+        Assert.assertEquals( true, txn.getSuccessful() );
+        Assert.assertEquals( true, txn.getPostDate() != null );
+        Assert.assertEquals( "Help me!", txn.getHelpText() );
+        
+        // update using status
+        dao.updatePxPostStatus(txnId, null, false, "<Status>");
+        txn = dao.fetchPxPostTransaction( txnId );
+        Assert.assertEquals( txnId, txn.getId() );
+        Assert.assertEquals( bookingRef, txn.getBookingReference() );
+        Assert.assertEquals( "<Status>", txn.getPaymentStatusResponseXml() );
+        Assert.assertEquals( false, txn.getSuccessful() );
     }
 
 }

@@ -3,7 +3,9 @@ package com.macbackpackers.scrapers;
 
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -13,7 +15,9 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.config.LittleHotelierConfig;
+import com.macbackpackers.jobs.UnpaidDepositReportJob;
 
 @RunWith( SpringJUnit4ClassRunner.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
@@ -59,4 +63,21 @@ public class BookingsPageScraperTest {
         HtmlPage bookingsPage = scraper.goToBookingPageBookedOn( new Date(), "HWL" );
         scraper.createConfirmDepositJobs( bookingsPage );
     }
+
+    @Test
+    public void testGetUnpaidBDCReservations() throws Exception {
+        Calendar c = Calendar.getInstance();
+        c.set( Calendar.YEAR, 2017 );
+        c.set( Calendar.MONTH, 0 );
+        c.set( Calendar.DATE, 15 );
+        Date dateFrom = c.getTime();
+        c.set( Calendar.DATE, 30 );
+        Date dateTo = c.getTime();
+        List<UnpaidDepositReportEntry> records = scraper.getUnpaidBDCReservations( dateFrom, dateTo );
+        LOGGER.info( records.size() + " recs found" );
+        for( UnpaidDepositReportEntry entry : records ) {
+            LOGGER.info( ToStringBuilder.reflectionToString( entry ) );
+        }
+    }
+    
 }

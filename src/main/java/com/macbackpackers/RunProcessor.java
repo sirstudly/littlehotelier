@@ -55,6 +55,9 @@ public class RunProcessor
     // exclusive-file lock so only ever one instance of the processor is running
     private FileLock processorLock;
 
+    // make sure only one instance is running by checking a file-level lock
+    private boolean checkLock = true;
+
     /**
      * Process all jobs. If no jobs are available to be run, then pause for a configured period
      * before checking again.
@@ -66,24 +69,46 @@ public class RunProcessor
     private void processJobsLoopIndefinitely() throws IOException, ShutdownException, SchedulerException {
 
         while ( true ) {
-
-            // run all submitted jobs
-            processorService.processJobs();
-
-            // repeat indefinitely
             try {
+                // run all submitted jobs
+                processorService.processJobs();
+
+                // repeat indefinitely
                 Thread.sleep( repeatIntervalMillis );
             }
             catch ( InterruptedException e ) {
                 // ignored
             }
+            catch ( Exception ex ) {
+                LOGGER.error( "Received error but continuing...", ex );
+            }
         }
     }
 
+    /**
+     * Returns whether or not to check the lock before starting.
+     * 
+     * @return true to check file exclusivity lock; false to ignore
+     */
+    public boolean isCheckLock() {
+        return checkLock;
+    }
+
+    /**
+     * Sets the lock check.
+     * 
+     * @param checkLock true to check file exclusivity lock; false to ignore
+     */
+    public void setCheckLock( boolean checkLock ) {
+        this.checkLock = checkLock;
+    }
+
     private void acquireLock() throws IOException, ShutdownException {
-        processorLock = fileService.lockFile( new File( "processor.lock" ) );
-        if ( processorLock == null ) {
-            throw new ShutdownException( "Could not acquire exclusive lock; shutting down" );
+        if( isCheckLock() ) {
+            processorLock = fileService.lockFile( new File( "processor.lock" ) );
+            if ( processorLock == null ) {
+                throw new ShutdownException( "Could not acquire exclusive lock; shutting down" );
+            }
         }
     }
 
@@ -134,6 +159,7 @@ public class RunProcessor
         Options options = new Options();
         options.addOption( "h", "help", false, "Show this help message" );
         options.addOption( "S", "server", false, "server-mode; keep the processor running continuously" );
+        options.addOption( "n", "nolock", false, "allow multiple instances to run by ignoring exclusivity lock" );
 
         // parse the command line arguments
         CommandLine line = parser.parse( options, args );
@@ -144,13 +170,17 @@ public class RunProcessor
             formatter.printHelp( RunProcessor.class.getName(), options );
             return;
         }
-
+        
         TimeZone.setDefault( TimeZone.getTimeZone( "Europe/London" ) );
         LOGGER.info( "Starting processor... " + new Date() );
         AbstractApplicationContext context = new AnnotationConfigApplicationContext( LittleHotelierConfig.class );
 
         // make sure there is only ever one process running
         RunProcessor processor = context.getBean( RunProcessor.class );
+
+        if( line.hasOption( "n" )) {
+            processor.setCheckLock( false );
+        }
 
         try {
             // server-mode: keep the processor running

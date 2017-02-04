@@ -13,6 +13,7 @@ import org.quartz.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
@@ -23,7 +24,9 @@ import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.TestHarnessDAO;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
+import com.macbackpackers.jobs.BDCDepositChargeJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
+import com.macbackpackers.jobs.CreateBDCDepositChargeJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.DbPurgeJob;
 import com.macbackpackers.jobs.GroupBookingsReportJob;
@@ -50,10 +53,13 @@ public class ProcessorServiceTest {
     @Autowired
     Scheduler scheduler;
 
+    @Autowired
+    AutowireCapableBeanFactory autowireBeanFactory;
+    
     @Before
     public void setUp() {
-        LOGGER.info( "deleting test data" );
-        testDAO.deleteAllTransactionalData();
+//        LOGGER.info( "deleting test data" );
+//        testDAO.deleteAllTransactionalData();
     }
 
     @Test
@@ -234,5 +240,23 @@ public class ProcessorServiceTest {
             // expected exception
         }
     }
+    
+    @Test
+    public void testCreateBDCDepositChargeJob() throws Exception {
 
+        CreateBDCDepositChargeJob j = new CreateBDCDepositChargeJob();
+        j.setStatus( JobStatus.submitted );
+        j.setDaysBack( 7 );
+        dao.insertJob( j );
+        
+        // this should now run the job
+        processorService.processJobs();
+    }
+
+    @Test
+    public void testBDCDepositChargeJob() throws Exception {
+        BDCDepositChargeJob j = BDCDepositChargeJob.class.cast( dao.fetchJobById( 138571 ));
+        autowireBeanFactory.autowireBean( j ); // as job is an entity, wire up any spring collaborators 
+        j.processJob();
+    }
 }

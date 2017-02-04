@@ -1,6 +1,7 @@
 
 package com.macbackpackers.dao;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 
@@ -13,7 +14,9 @@ import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.MissingGuestComment;
+import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.ScheduledJob;
+import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
 
@@ -144,6 +147,14 @@ public interface WordPressDAO {
     public void updateScheduledJob( int jobId ) throws EmptyResultDataAccessException;
 
     /**
+     * Returns the most recent job of the given type.
+     * 
+     * @param jobType type of job
+     * @return last job or null if not found
+     */
+    public <T extends AbstractJob> T getLastJobOfType( Class<T> jobType );
+
+    /**
      * Returns the most recent completed job of the given type.
      * 
      * @param jobType type of job
@@ -172,6 +183,14 @@ public interface WordPressDAO {
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from
      */
     public void runUnpaidDepositReport( int allocationScraperJobId );
+    
+    /**
+     * Returns the last completed unpaid deposit report.
+     * 
+     * @param allocationScraperJobId job ID of the allocation scraper job to use data from
+     * @return unpaid deposit report or null if never run successfully
+     */
+    public List<UnpaidDepositReportEntry> fetchUnpaidDepositReport( int allocationScraperJobId );
 
     /**
      * Creates a report with all bookings with more than 5 guests.
@@ -275,4 +294,63 @@ public interface WordPressDAO {
      * @param value value to set
      */
     public void setOption( String property, String value );
+    
+    /**
+     * Fetch px post transaction record by primary key.
+     * 
+     * @param txnId unique transaction ID
+     * @return non-null transaction
+     */
+    public PxPostTransaction fetchPxPostTransaction( int txnId );
+
+    /**
+     * Returns the last px post transaction for a given booking reference.
+     * 
+     * @param bookingReference the LH booking reference
+     * @return the last px post transaction entry or null if not found
+     */
+    public PxPostTransaction getLastPxPost( String bookingReference );
+
+    /**
+     * Updates the status XML for the given record.
+     * 
+     * @param txnId unique transaction id
+     * @param maskedCardNumber the card used for the transaction
+     * @param successful whether the payment successful
+     * @param statusXml status XML
+     */
+    public void updatePxPostStatus( int txnId, String maskedCardNumber, boolean successful, String statusXml );
+
+    /**
+     * Inserts a new transaction into the PX Post table.
+     * 
+     * @param bookingRef the booking reference
+     * @param amountToPay amount being charged
+     * @return unique transaction id
+     */
+    public int insertNewPxPostTransaction( String bookingRef, BigDecimal amountToPay );
+
+    /**
+     * Updates the transaction after sending to the payment gateway.
+     * 
+     * @param txnId unique ID for the transaction
+     * @param maskedCardNumber the masked card number
+     * @param requestXML the XML sent to the payment gateway
+     * @param httpStatus the response HTTP code
+     * @param responseXML the response XML received from the payment gateway
+     * @param successful whether this transaction was successful or not
+     * @param helpText failure text (if applicable)
+     */
+    public void updatePxPostTransaction( int txnId, String maskedCardNumber, String requestXML, int httpStatus, 
+            String responseXML, boolean successful, String helpText );
+
+    /**
+     * Returns the number of failed transactions for the given booking reference and (masked) card
+     * number.
+     * 
+     * @param bookingRef e.g. BDC-123456789
+     * @param maskedCardNumber the partial card number to match
+     * @return number of failed payment attempts
+     */
+    public int getPreviousNumberOfFailedTxns( String bookingRef, String maskedCardNumber );
 }
