@@ -26,6 +26,11 @@ public class BedCountJob extends AbstractJob {
     private AllocationsPageScraper allocationScraper;
 
     @Override
+    public void resetJob() throws Exception {
+        dao.deleteAllocations( getId() );
+    }
+
+    @Override
     public void processJob() throws Exception {
         // we just need to scrape the data including the given date
         // the PHP form will do the rest

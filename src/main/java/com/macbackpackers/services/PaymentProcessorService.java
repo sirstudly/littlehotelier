@@ -107,8 +107,7 @@ public class PaymentProcessorService {
 
         // group bookings must be approved/charged manually
         int numberGuests = countNumberOfGuests( reservationPage );
-        int groupBookingSize = Integer.parseInt( wordpressDAO.getOption( "hbo_group_booking_size" ) );
-        if( numberGuests >= groupBookingSize ) {
+        if( numberGuests >= wordpressDAO.getGroupBookingSize() ) {
             LOGGER.info( "Booking " + bookingRef + " has " + numberGuests + " guests. Payment must be done manually for groups." );
             return;
         }

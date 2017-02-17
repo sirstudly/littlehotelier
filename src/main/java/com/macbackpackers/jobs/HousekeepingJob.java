@@ -26,6 +26,11 @@ public class HousekeepingJob extends AbstractJob {
     private AllocationsPageScraper allocationScraper;
 
     @Override
+    public void resetJob() throws Exception {
+        dao.deleteAllocations( getId() );
+    }
+
+    @Override
     public void processJob() throws Exception {
         // we just need to scrape new data for the given date (and previous day)
         // the PHP form will do the rest

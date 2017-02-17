@@ -100,6 +100,18 @@ public interface WordPressDAO {
      * @throws EmptyResultDataAccessException if record not found
      */
     public void updateJobStatus( int jobId, JobStatus status ) throws EmptyResultDataAccessException;
+    
+    /**
+     * Updates the given job from 'submitted' to 'processing' and sets the jobStartDate and
+     * jobEndDate. If the job is already at processing and the "processedBy" field matches this
+     * processor, then this is also included and the fields updated. This method can be used to
+     * "lock" a record for processing so another processor doesn't take it.
+     * 
+     * @param jobId the unique id of the job to update
+     * @return true if we managed to update the row; false if the job wasn't found or wasn't in the
+     *         correct state (if another processor had picked it up for example).
+     */
+    public boolean updateJobStatusToProcessing( int jobId );
 
     /**
      * Updates all job statuses of 'processing' to 'failed'.
@@ -286,7 +298,14 @@ public interface WordPressDAO {
      * @return option value or null if key doesn't exist
      */
     public String getOption( String property );
-    
+
+    /**
+     * Returns the minimum number of people considered a group.
+     *  
+     * @return group booking size
+     */
+    public int getGroupBookingSize();
+
     /**
      * Sets the wordpress option for the given property.
      * 

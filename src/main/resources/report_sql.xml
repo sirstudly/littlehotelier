@@ -62,8 +62,8 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
                 ) t
          WHERE reservation_id > 0 -- ignore room closures
       GROUP BY reservation_id, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, notes, viewed_yn
-        HAVING SUM(num_guests) >= 6
-     UNION ALL
+        HAVING SUM(num_guests) >= :groupSize
+     UNION
         -- also include bookings for 5 guests into 6 bed dorms
         SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, SUM(num_guests) `num_guests`, notes, viewed_yn
           FROM ( -- some duplicates may occur; remove them first

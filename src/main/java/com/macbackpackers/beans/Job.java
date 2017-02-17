@@ -45,8 +45,11 @@ public class Job {
     @Column( name = "end_date" )
     private Timestamp jobEndDate;
 
+    @Column( name = "processed_by" )
+    private String processedBy;
+
     @Column( name = "created_date" )
-    private Timestamp createdDate;
+    private Timestamp createdDate = new Timestamp( System.currentTimeMillis() );
 
     @Column( name = "last_updated_date" )
     private Timestamp lastUpdatedDate;
@@ -107,6 +110,14 @@ public class Job {
 
     public void setJobEndDate( Timestamp jobEndDate ) {
         this.jobEndDate = jobEndDate;
+    }
+
+    public String getProcessedBy() {
+        return processedBy;
+    }
+
+    public void setProcessedBy( String processedBy ) {
+        this.processedBy = processedBy;
     }
 
     public Timestamp getCreatedDate() {

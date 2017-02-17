@@ -38,6 +38,7 @@ CREATE TABLE `wp_lh_jobs` (
   `status` varchar(20) NOT NULL,
   `start_date` timestamp NULL DEFAULT NULL,
   `end_date` timestamp NULL DEFAULT NULL,
+  `processed_by` varchar(255) NULL,
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_updated_date` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`job_id`),

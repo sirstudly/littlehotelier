@@ -50,6 +50,9 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Value( "${hostelworld.hostelnumber}" )
     private String hostelNumber;
 
+    @Value( "${processor.id}" )
+    private String processorId;
+
     @Override
     public void insertAllocation( Allocation alloc ) {
         sessionFactory.getCurrentSession().save( alloc );
@@ -114,13 +117,35 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public boolean updateJobStatusToProcessing( int jobId ) {
+        // there should only be 1 row updated
+        // if not, another processor may have taken it so return false
+        return 1 == sessionFactory.getCurrentSession().createQuery(
+                "UPDATE AbstractJob "
+                        + "   SET status = :processing, "
+                        + "       jobStartDate = :now,"
+                        + "       jobEndDate = NULL,"
+                        + "       processedBy = :processedBy,"
+                        + "       lastUpdatedDate = :now"
+                        + " WHERE id = :jobId"
+                        + "   AND status = :submitted"
+                        + "    OR ( status = :processing AND processedBy = :processedBy)" )
+                .setParameter( "jobId", jobId )
+                .setParameter( "submitted", JobStatus.submitted )
+                .setParameter( "processing", JobStatus.processing )
+                .setParameter( "processedBy", processorId )
+                .setParameter( "now", new Timestamp( System.currentTimeMillis() ) )
+                .executeUpdate();
+    }
+
+    @Override
     public void updateJobStatus( int jobId, JobStatus status ) {
         updateJobStatus( fetchJobById( jobId ), status );
     }
 
     private void updateJobStatus( Job job, JobStatus status ) {
         if ( status == JobStatus.processing ) {
-            job.setJobStartDate( new Timestamp( System.currentTimeMillis() ) );
+            throw new UnsupportedOperationException( "Use updateJobStatusToProcessing()" );
         }
 
         if ( status == JobStatus.completed ) {
@@ -136,20 +161,29 @@ public class WordPressDAOImpl implements WordPressDAO {
         sessionFactory.getCurrentSession().createQuery(
                 "UPDATE AbstractJob "
                         + "   SET status = :failed, "
-                        + "       lastUpdatedDate = NOW()"
+                        + "       lastUpdatedDate = :now"
                         + " WHERE status = :processing" )
                 .setParameter( "failed", JobStatus.failed )
                 .setParameter( "processing", JobStatus.processing )
+                .setParameter( "now", new Timestamp( System.currentTimeMillis() ) )
                 .executeUpdate();
     }
 
     @Override
     public AbstractJob getNextJobToProcess() {
         // shutdown job has priority if present
+        // include any jobs that have been tagged as processing by us
+        // (since there should only ever be 1 unique one; we'll be re-running these jobs)
         List<?> jobIds = sessionFactory.getCurrentSession()
-                .createQuery( "SELECT id FROM AbstractJob WHERE status = :status "
-                        + " ORDER BY CASE WHEN classname = 'com.macbackpackers.jobs.ShutdownJob' THEN 0 ELSE 1 END, job_id" )
-                .setParameter( "status", JobStatus.submitted ).getResultList();
+                .createQuery( "SELECT id FROM AbstractJob "
+                        + "     WHERE status = :submittedStatus "
+                        + "        OR (status = :processingStatus AND processedBy = :processedBy)"
+                        + "     ORDER BY CASE WHEN classname = 'com.macbackpackers.jobs.ShutdownJob' THEN 0 ELSE 1 END, job_id" )
+                .setParameter( "submittedStatus", JobStatus.submitted )
+                .setParameter( "processingStatus", JobStatus.processing )
+                .setParameter( "processedBy", processorId )
+                .setMaxResults( 1 )
+                .getResultList();
         Integer jobId = jobIds.isEmpty() ? null : Integer.class.cast( jobIds.get( 0 ));
         LOGGER.info( "Next job to process: " + (jobId == null ? "none" : jobId) );
         return jobId == null ? null : fetchJobById( jobId );
@@ -498,6 +532,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         sessionFactory.getCurrentSession()
                 .createNativeQuery( sql.getProperty( "group.bookings" ) )
                 .setParameter( "jobId", allocationScraperJobId )
+                .setParameter( "groupSize", getGroupBookingSize() )
                 .executeUpdate();
     }
 
@@ -569,6 +604,12 @@ public class WordPressDAOImpl implements WordPressDAO {
             return null;
         }
         return sqlResult.get( 0 );
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public int getGroupBookingSize() {
+        return Integer.parseInt( getOption( "hbo_group_booking_size" ) );
     }
 
     @Override

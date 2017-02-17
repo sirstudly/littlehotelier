@@ -122,14 +122,20 @@ public class RunProcessor
      */
     public void runInServerMode() throws IOException, ShutdownException, SchedulerException {
         acquireLock();
-        dao.resetAllProcessingJobsToFailed();
+//        dao.resetAllProcessingJobsToFailed();
         scheduler.reloadScheduledJobs(); // load and start the scheduler
         processJobsLoopIndefinitely();
     }
 
+    /**
+     * Run the processor once executing any outstanding jobs.
+     * @throws IOException
+     * @throws ShutdownException
+     * @throws SchedulerException
+     */
     public void runInStandardMode() throws IOException, ShutdownException, SchedulerException {
         acquireLock();
-        dao.resetAllProcessingJobsToFailed();
+//        dao.resetAllProcessingJobsToFailed();
         processorService.processJobs();
     }
 

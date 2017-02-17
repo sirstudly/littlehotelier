@@ -53,12 +53,17 @@ public class ProcessorService {
 //    @Transactional( propagation = Propagation.REQUIRES_NEW )
     private void processJob( AbstractJob job ) {
 
+        LOGGER.info( "Attempting to lock job " + job.getId() );
+        if ( false == dao.updateJobStatusToProcessing( job.getId() ) ) {
+            LOGGER.info( "Could not lock job " + job.getId() + "; skipping" );
+            return;
+        }
+
         for ( int i = 0 ; i < job.getRetryCount() ; i++ ) {
             MDC.put( "jobId", String.valueOf( job.getId() ) ); // record the ID of this job for logging
 
             try {
-                LOGGER.info( "Processing job " + job.getId() );
-                dao.updateJobStatus( job.getId(), JobStatus.processing );
+                LOGGER.info( "Processing job " + job.getId() + "; Attempt " + (i + 1));
                 job.resetJob();
                 job.processJob();
                 LOGGER.info( "Finished job " + job.getId() );

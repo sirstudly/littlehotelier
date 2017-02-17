@@ -658,7 +658,6 @@ public class BookingsPageScraper {
                 .withFirstRecordAsHeader().parse(new StringReader(csvContent));
         
         List<UnpaidDepositReportEntry> results = new ArrayList<UnpaidDepositReportEntry>();
-        final int GROUP_BOOKING_SIZE = Integer.parseInt( wordPressDAO.getOption( "hbo_group_booking_size" ) );
         for ( CSVRecord csv : records ) {
             String bookingRef = csv.get( "Booking reference" );
             LOGGER.info( "Checking BDC reservation: " + bookingRef );
@@ -676,7 +675,7 @@ public class BookingsPageScraper {
             }
 
             // group bookings needs approval so processed manually
-            if ( Integer.parseInt( csv.get( "Number of adults" ) ) >= GROUP_BOOKING_SIZE ) {
+            if ( Integer.parseInt( csv.get( "Number of adults" ) ) >= wordPressDAO.getGroupBookingSize() ) {
                 LOGGER.info( "Booking " + bookingRef + " has "
                         + csv.get( "Number of adults" ) + " guests. Skipping..." );
                 continue;

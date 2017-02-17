@@ -32,6 +32,11 @@ public class AllocationScraperJob extends AbstractJob {
     }
 
     @Override
+    public void resetJob() throws Exception {
+        dao.deleteAllocations( getId() );
+    }
+
+    @Override
     public void processJob() throws Exception {
         allocationScraper.dumpAllocationsBetween( getId(), getStartDate(), getEndDate(), isTestMode() );
         insertBookingsScraperJobs();
