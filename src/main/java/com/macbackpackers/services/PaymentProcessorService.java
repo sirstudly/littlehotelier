@@ -67,21 +67,21 @@ public class PaymentProcessorService {
      * @param bookedOnDate date on which reservation was booked
      * @throws IOException on I/O error
      */
-    @SuppressWarnings( "unchecked" )
     public void processDepositPayment( String bookingRef, Date bookedOnDate ) throws IOException {
         LOGGER.info( "Processing payment for booking " + bookingRef );
         HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( bookedOnDate, bookingRef );
         
-        List<HtmlTableRow> rows = (List<HtmlTableRow>) bookingsPage.getByXPath( 
+        List<?> rows = bookingsPage.getByXPath( 
                 "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr[@class!='group_header']" );
         if(rows.size() != 1) {
             throw new IncorrectResultSizeDataAccessException("Unable to find unique booking " + bookingRef, 1);
         }
         // need the LH reservation ID before clicking on the row
-        int reservationId = Integer.parseInt( rows.get( 0 ).getAttribute( "data-id" ) );
+        HtmlTableRow row = HtmlTableRow.class.cast( rows.get( 0 ) );
+        int reservationId = Integer.parseInt( row.getAttribute( "data-id" ) );
         
         // click on the only reservation on the page
-        HtmlPage reservationPage = rows.get( 0 ).click();
+        HtmlPage reservationPage = row.click();
         reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
         
         // extra-paranoid; making sure booking ref matches the editing window

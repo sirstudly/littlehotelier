@@ -10,6 +10,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
+import java.io.Serializable;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
@@ -138,6 +139,32 @@ public class FileService {
     }
 
     /**
+     * Deserialise the previously serialised object from file if found.
+     * 
+     * @param filename name of file
+     * @param clazz the type of object it was
+     * @throws IOException on read error
+     */
+    public <T> T deserializeObjectFromFile( String filename, Class<T> clazz ) throws IOException {
+
+        File file = new File( filename );
+        LOGGER.info( "loading object from disk " + filename );
+        if ( file.exists() ) {
+            ObjectInputStream in = new ObjectInputStream( new FileInputStream( file ) );
+            try {
+                return clazz.cast( in.readObject() );
+            }
+            catch ( ClassNotFoundException e ) {
+                throw new IOException( "Unable to read object!", e );
+            }
+            finally {
+                in.close();
+            }
+        }
+        throw new FileNotFoundException( "File " + filename + " does not exist!" );
+    }
+
+    /**
      * Serialises the current cookies to disk.
      * 
      * @throws IOException on serialisation error
@@ -157,6 +184,22 @@ public class FileService {
         out.writeObject( webClient.getCookieManager().getCookies() );
         out.close();
     }
+    
+    /**
+     * Writes the given object to disk.
+     * 
+     * @param object object to serialize
+     * @param filename name of file to write to
+     * @throws IOException on serialisation error
+     */
+    public void serializeObjectToFile( Serializable object, String filename ) throws IOException {
+        LOGGER.info( "writing object to disk " + filename );
+        FileOutputStream fout = new FileOutputStream( filename );
+        ObjectOutputStream oos = new ObjectOutputStream( fout );
+        oos.writeObject( object );
+        oos.close();
+        fout.close();
+    }
 
     /**
      * Serialises the given page to disk so it can be loaded in later.
@@ -166,12 +209,7 @@ public class FileService {
      */
     public void serialisePageToDisk( HtmlPage page, String filename ) {
         try {
-            LOGGER.info( "serialising page to disk " + filename );
-            FileOutputStream fout = new FileOutputStream( filename );
-            ObjectOutputStream oos = new ObjectOutputStream( fout );
-            oos.writeObject( page );
-            oos.close();
-
+            serializeObjectToFile( page, filename );
         }
         catch ( FileNotFoundException e ) {
             LOGGER.error( "File not found.", e );

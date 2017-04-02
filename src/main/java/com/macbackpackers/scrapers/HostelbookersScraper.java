@@ -240,7 +240,7 @@ public class HostelbookersScraper {
             String fieldName = StringUtils.trim( tr.getHtmlElementDescendants().iterator().next().getTextContent() );
 
             if ( "Date".equalsIgnoreCase( fieldName ) ) {
-                Iterator<HtmlElement> itCell = tr.getHtmlElementsByTagName( "td" ).iterator();
+                Iterator<HtmlElement> itCell = tr.getElementsByTagName( "td" ).iterator();
                 itCell.next(); // skip field name
                 String bookingDate = StringUtils.trim( itCell.next().getTextContent() );
                 LOGGER.debug( fieldName + ": " + bookingDate );
@@ -256,28 +256,28 @@ public class HostelbookersScraper {
             String fieldName = StringUtils.trim( tr.getHtmlElementDescendants().iterator().next().getTextContent() );
 
             if ( "First name".equalsIgnoreCase( fieldName ) ) {
-                Iterator<HtmlElement> itCell = tr.getHtmlElementsByTagName( "td" ).iterator();
+                Iterator<HtmlElement> itCell = tr.getElementsByTagName( "td" ).iterator();
                 itCell.next(); // skip field name
                 firstName = StringUtils.trim( itCell.next().getTextContent() );
                 LOGGER.debug( fieldName + ": " + firstName );
             }
 
             else if ( "Last name".equalsIgnoreCase( fieldName ) ) {
-                Iterator<HtmlElement> itCell = tr.getHtmlElementsByTagName( "td" ).iterator();
+                Iterator<HtmlElement> itCell = tr.getElementsByTagName( "td" ).iterator();
                 itCell.next(); // skip field name
                 lastName = StringUtils.trim( itCell.next().getTextContent() );
                 LOGGER.debug( fieldName + ": " + lastName );
             }
 
             else if ( "Email".equalsIgnoreCase( fieldName ) ) {
-                Iterator<HtmlElement> itCell = tr.getHtmlElementsByTagName( "td" ).iterator();
+                Iterator<HtmlElement> itCell = tr.getElementsByTagName( "td" ).iterator();
                 itCell.next(); // skip field name
                 booking.setGuestEmail( StringUtils.trim( itCell.next().getTextContent() ) );
                 LOGGER.debug( fieldName + ": " + booking.getGuestEmail() );
             }
 
             else if ( "Phone".equalsIgnoreCase( fieldName ) ) {
-                Iterator<HtmlElement> itCell = tr.getHtmlElementsByTagName( "td" ).iterator();
+                Iterator<HtmlElement> itCell = tr.getElementsByTagName( "td" ).iterator();
                 itCell.next(); // skip field name
                 booking.setGuestPhone( StringUtils.trim( itCell.next().getTextContent() ) );
                 LOGGER.debug( fieldName + ": " + booking.getGuestPhone() );
@@ -292,14 +292,14 @@ public class HostelbookersScraper {
             String fieldName = StringUtils.trim( tr.getHtmlElementDescendants().iterator().next().getTextContent() );
 
             if ( "Arrival time".equalsIgnoreCase( fieldName ) ) {
-                Iterator<HtmlElement> itCell = tr.getHtmlElementsByTagName( "td" ).iterator();
+                Iterator<HtmlElement> itCell = tr.getElementsByTagName( "td" ).iterator();
                 itCell.next(); // skip field name
                 String arrivalTime = StringUtils.trim( itCell.next().getTextContent() );
                 LOGGER.debug( fieldName + ": " + arrivalTime );
             }
 
             else if ( "Gender".equalsIgnoreCase( fieldName ) ) {
-                Iterator<HtmlElement> itCell = tr.getHtmlElementsByTagName( "td" ).iterator();
+                Iterator<HtmlElement> itCell = tr.getElementsByTagName( "td" ).iterator();
                 itCell.next(); // skip field name
                 booking.setPersons( StringUtils.trim( itCell.next().getTextContent() ).replaceAll( "[\\s]+", " " ).replaceAll( " ,", "," ) );
                 LOGGER.debug( fieldName + ": " + booking.getPersons() );
@@ -312,7 +312,6 @@ public class HostelbookersScraper {
             HtmlElement tr = itRows.next();
 
             // Date, Room details, People, Cost, Total
-            @SuppressWarnings( "unchecked" )
             List<HtmlElement> cells = Arrays.<HtmlElement>asList( tr.getElementsByTagName( "td" ).toArray(new HtmlElement[0]) );
             if ( cells.size() == 5 && "bookingsummary".equals( tr.getAttribute( "id" ) ) == false ) {
 

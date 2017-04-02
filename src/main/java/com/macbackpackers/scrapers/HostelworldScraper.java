@@ -111,7 +111,7 @@ public class HostelworldScraper {
         passwordField.setValueAttribute( password );
 
         HtmlDivision loginButtonDiv = loginPage.getHtmlElementById( "loginButton" );
-        HtmlAnchor loginLink = (HtmlAnchor) loginButtonDiv.getHtmlElementsByTagName( "a" ).get( 0 );
+        HtmlAnchor loginLink = (HtmlAnchor) loginButtonDiv.getElementsByTagName( "a" ).get( 0 );
 
         HtmlPage nextPage = loginLink.click();
         LOGGER.info( "Finished logging in" );

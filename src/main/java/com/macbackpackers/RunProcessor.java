@@ -22,7 +22,6 @@ import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.stereotype.Component;
 
 import com.macbackpackers.config.LittleHotelierConfig;
-import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.ShutdownException;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.ProcessorService;
@@ -42,9 +41,6 @@ public class RunProcessor
 
     @Autowired
     private FileService fileService;
-
-    @Autowired
-    private WordPressDAO dao;
 
     @Autowired
     private SchedulerService scheduler;

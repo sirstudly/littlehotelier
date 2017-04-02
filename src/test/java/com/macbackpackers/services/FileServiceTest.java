@@ -42,6 +42,13 @@ public class FileServiceTest {
         int exitCode = p1.waitFor();
         Assert.assertEquals( "Expected first process to exit normally", 0, exitCode );
     }
+    
+    @Test
+    public void testSerializeDeserializeToFromFile() throws Exception {
+        Integer i = 2015;
+        fs.serializeObjectToFile( i, "test.object" );
+        Assert.assertEquals( new Integer( 2015 ), fs.deserializeObjectFromFile( "test.object", Integer.class ) );
+    }
 
     private static void sleep( int millis ) {
         Object lock = new Object();
