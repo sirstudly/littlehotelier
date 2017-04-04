@@ -17,7 +17,6 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.config.LittleHotelierConfig;
-import com.macbackpackers.jobs.UnpaidDepositReportJob;
 
 @RunWith( SpringJUnit4ClassRunner.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )

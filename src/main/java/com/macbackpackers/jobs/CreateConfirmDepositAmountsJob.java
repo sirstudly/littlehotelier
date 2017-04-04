@@ -4,7 +4,6 @@ package com.macbackpackers.jobs;
 import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 
-import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 
 /**

@@ -2,7 +2,6 @@
 package com.macbackpackers.jobs;
 
 import java.text.ParseException;
-import java.util.Calendar;
 import java.util.Date;
 
 import javax.persistence.DiscriminatorValue;
@@ -11,11 +10,7 @@ import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
-import com.macbackpackers.scrapers.BookingsPageScraper;
-import com.macbackpackers.scrapers.ReservationPageScraper;
-import com.macbackpackers.services.GmailService;
 import com.macbackpackers.services.PaymentProcessorService;
 
 /**
