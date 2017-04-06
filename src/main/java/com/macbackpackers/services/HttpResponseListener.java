@@ -7,5 +7,5 @@ import org.springframework.http.HttpStatus;
 
 public interface HttpResponseListener {
 
-    void traceResponse(HttpStatus status, String statusText, HttpHeaders headers, byte[] body) throws IOException;
+    void traceResponse(HttpStatus status, String statusText, HttpHeaders headers, String body) throws IOException;
 }

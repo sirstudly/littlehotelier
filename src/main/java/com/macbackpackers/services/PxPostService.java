@@ -134,7 +134,7 @@ public class PxPostService {
         
         RestTemplate restTemplate = new RestTemplate( new BufferingClientHttpRequestFactory( new SimpleClientHttpRequestFactory() ) );
         restTemplate.setInterceptors( Arrays.<ClientHttpRequestInterceptor> asList( 
-                new LoggingRequestInterceptor( reqListener, respListener ) ) );
+                new LoggingRequestInterceptor( reqListener, respListener, new PxPostCardMask() ) ) );
         
         HttpEntity<TxnRequest> request = new HttpEntity<>(txnReq, headers);
         ResponseEntity<TxnResponse> response = 

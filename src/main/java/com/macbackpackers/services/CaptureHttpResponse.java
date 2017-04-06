@@ -11,7 +11,7 @@ public class CaptureHttpResponse implements HttpResponseListener {
     private HttpStatus status;
     private String statusText;
     private HttpHeaders headers;
-    private byte[] body;
+    private String body;
 
     public HttpStatus getStatus() {
         return status;
@@ -37,16 +37,16 @@ public class CaptureHttpResponse implements HttpResponseListener {
         this.headers = headers;
     }
 
-    public byte[] getBody() {
+    public String getBody() {
         return body;
     }
 
-    public void setBody( byte[] body ) {
+    public void setBody( String body ) {
         this.body = body;
     }
 
     @Override
-    public void traceResponse( HttpStatus status, String statusText, HttpHeaders headers, byte[] body ) throws IOException {
+    public void traceResponse( HttpStatus status, String statusText, HttpHeaders headers, String body ) throws IOException {
         this.status = status;
         this.statusText = statusText;
         this.headers = headers;

@@ -21,6 +21,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlSpan;
 import com.gargoylesoftware.htmlunit.html.HtmlTableRow;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.DepositPayment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.xml.TxnResponse;
 import com.macbackpackers.dao.WordPressDAO;
@@ -40,13 +41,13 @@ public class PaymentProcessorService {
     
     private static final FastDateFormat DATETIME_FORMAT = FastDateFormat.getInstance( "dd/MM/yyyy HH:mm:ss" );
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
-    
+
     @Autowired
     private BookingsPageScraper bookingsPageScraper;
-    
+
     @Autowired
     private ReservationPageScraper reservationPageScraper;
-    
+
     @Autowired
     private WordPressDAO wordpressDAO;
 
@@ -54,11 +55,14 @@ public class PaymentProcessorService {
     private PxPostService pxPostService;
 
     @Autowired
+    private ExpediaApiService expediaService;
+
+    @Autowired
     private GmailService gmailService;
 
     /**
      * Attempt to charge the deposit payment for the given reservation. This method
-     * does nothing if the payment outstanding = payment total. It also checks whether
+     * does nothing if the payment outstanding != payment total. It also checks whether
      * there was already a previous attempt to charge the booking and updates LH payment
      * details if it was previously successful. To avoid multiple failed transactions, this 
      * method should only be called again if new card details have been updated.
@@ -112,12 +116,8 @@ public class PaymentProcessorService {
             return;
         }
 
-        LOGGER.info( "Retrieving customer card details" );
-        CardDetails ccDetails = reservationPageScraper.getCardDetails( reservationPage, reservationId );
-        
-        LOGGER.info( "Retrieving card security code" );
-        CardDetails ccDetailsFromGmail = gmailService.fetchBdcCardDetailsFromBookingRef( bookingRef );
-        ccDetails.setCvv( ccDetailsFromGmail.getCvv() ); // copying over security code
+        // get the deposit amount and full card details
+        DepositPayment depositPayment = retrieveCardDetails( bookingRef, reservationId, reservationPage );
         
         // see if we've tried to do this already
         // lookup transaction id(s) on payment table from booking ref
@@ -139,15 +139,9 @@ public class PaymentProcessorService {
                 }
             }
 
-            // before anything else, insert the txn record we will record against
-            HtmlSpan totalOutstanding = reservationPage.getFirstByXPath( "//div[@class='outstanding_total']/span" );
-            BigDecimal amountToPay = new BigDecimal( totalOutstanding.getTextContent().replaceAll( "£", "" ) );
-            amountToPay = amountToPay.multiply( new BigDecimal( "0.2" ) ).setScale( 2, RoundingMode.HALF_UP ); // 20% is deposit
-            if ( amountToPay.compareTo( new BigDecimal( "0" ) ) == 0 ) {
-                throw new IllegalStateException( "Amount payable is £0???" );
-            }
-            int txnId = wordpressDAO.insertNewPxPostTransaction( bookingRef, amountToPay );
-            processTransaction( reservationPage, txnId, bookingRef, ccDetails, amountToPay ); 
+            int txnId = wordpressDAO.insertNewPxPostTransaction( bookingRef, depositPayment.getDepositAmount() );
+            processTransaction( reservationPage, txnId, bookingRef, depositPayment.getCardDetails(), 
+                    depositPayment.getDepositAmount() ); 
         }
         // we actually did get a successful payment thru so LH is out of sync
         else if ( Boolean.TRUE.equals( pxpost.getSuccessful() ) ) {
@@ -167,7 +161,7 @@ public class PaymentProcessorService {
             // update the pxpost record
             wordpressDAO.updatePxPostStatus( pxpost.getId(), 
                     postStatus.getTransaction() == null ? null : postStatus.getTransaction().getCardNumber(), 
-                    postStatus.isSuccessful(), new String( statusResponse.getBody(), "UTF-8" ) );
+                    postStatus.isSuccessful(), statusResponse.getBody() );
 
             if( postStatus.isSuccessful() ) {
                 LOGGER.info( "Last transaction was successful, updating payment details in LH" );
@@ -178,9 +172,46 @@ public class PaymentProcessorService {
             }
             else { 
                 LOGGER.info( "Last transaction wasn't successful; trying again with the same card details" );
-                processTransaction( reservationPage, pxpost.getId(), bookingRef, ccDetails, 
+                processTransaction( reservationPage, pxpost.getId(), bookingRef, depositPayment.getCardDetails(), 
                         new BigDecimal( postStatus.getTransaction().getAmount() ) ); 
             }
+        }
+    }
+
+    /**
+     * Retrieve full card details for the given booking.
+     * @param bookingRef booking ref, e.g. BDC-12345678
+     * @param reservationId LH id for this reservation
+     * @param reservationPage the HtmlPage of the current reservation 
+     * @return full card details (not-null)
+     * @throws IOException on page load error
+     */
+    private DepositPayment retrieveCardDetails( String bookingRef, int reservationId, HtmlPage reservationPage ) throws IOException {
+        
+        // Booking.com
+        if ( bookingRef.startsWith( "BDC-" ) ) {
+            LOGGER.info( "Retrieving customer card details" );
+            CardDetails ccDetails = reservationPageScraper.getCardDetails( reservationPage, reservationId );
+
+            LOGGER.info( "Retrieving card security code" );
+            CardDetails ccDetailsFromGmail = gmailService.fetchBdcCardDetailsFromBookingRef( bookingRef );
+            ccDetails.setCvv( ccDetailsFromGmail.getCvv() ); // copying over security code
+
+            // calculate how much we need to change
+            HtmlSpan totalOutstanding = reservationPage.getFirstByXPath( "//div[@class='outstanding_total']/span" );
+            BigDecimal amountToPay = new BigDecimal( totalOutstanding.getTextContent().replaceAll( "£", "" ) );
+            amountToPay = amountToPay.multiply( new BigDecimal( "0.2" ) ).setScale( 2, RoundingMode.HALF_UP ); // 20% is deposit
+            if ( amountToPay.compareTo( new BigDecimal( "0" ) ) == 0 ) {
+                throw new IllegalStateException( "Amount payable is £0???" );
+            }
+            return new DepositPayment( amountToPay, ccDetails );
+        }
+        // Expedia
+        else if ( bookingRef.startsWith( "EXP-" ) ) {
+            return expediaService.returnCardDetailsForBooking( bookingRef );
+        }
+        else {
+            throw new IllegalStateException( "Attempting to retrieve unsupported booking! " + bookingRef );
         }
     }
 
@@ -211,7 +242,7 @@ public class PaymentProcessorService {
                 paymentTxn.getTransaction().getCardNumber(),
                 paymentRequest.getBody(),
                 paymentResponse.getStatus().value(),
-                new String(paymentResponse.getBody(), "UTF-8"),
+                paymentResponse.getBody(),
                 paymentTxn.isSuccessful(),
                 paymentTxn.getHelpText());
         

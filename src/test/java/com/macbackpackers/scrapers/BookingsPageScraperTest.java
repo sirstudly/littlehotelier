@@ -72,7 +72,7 @@ public class BookingsPageScraperTest {
         Date dateFrom = c.getTime();
         c.set( Calendar.DATE, 30 );
         Date dateTo = c.getTime();
-        List<UnpaidDepositReportEntry> records = scraper.getUnpaidBDCReservations( dateFrom, dateTo );
+        List<UnpaidDepositReportEntry> records = scraper.getUnpaidReservations( "BDC", dateFrom, dateTo );
         LOGGER.info( records.size() + " recs found" );
         for( UnpaidDepositReportEntry entry : records ) {
             LOGGER.info( ToStringBuilder.reflectionToString( entry ) );

@@ -632,9 +632,10 @@ public class BookingsPageScraper {
     }
 
     /**
-     * Queries all BDC reservations within the given dates where status = 'confirmed'
+     * Queries all reservations within the given dates where status = 'confirmed'
      * and where no payment has been made yet (payment received = 0).
      * 
+     * @param bookingRefMatch matching these booking refs
      * @param dateFrom from this booking date
      * @param dateTo until this booking date (inclusive)
      * @return non-null list of matched reservations (only the following fields are populated:
@@ -642,11 +643,11 @@ public class BookingsPageScraper {
      * @throws IOException on read/write error
      * @throws ParseException on date parse error
      */
-    public List<UnpaidDepositReportEntry> getUnpaidBDCReservations( Date dateFrom, Date dateTo ) throws IOException, ParseException {
+    public List<UnpaidDepositReportEntry> getUnpaidReservations( String bookingRefMatch, Date dateFrom, Date dateTo ) throws IOException, ParseException {
         String url = bookingUrl
                 .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( dateFrom ) )
                 .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( dateTo ) )
-                .replaceAll( "__BOOKING_REF_ID__", "BDC" )
+                .replaceAll( "__BOOKING_REF_ID__", bookingRefMatch )
                 .replaceAll( "__DATE_TYPE__", "BookedOn" )
                 .replaceAll( "__STATUS__", "confirmed" );
         LOGGER.info( "Retrieving CSV file from: " + url );
@@ -660,7 +661,7 @@ public class BookingsPageScraper {
         List<UnpaidDepositReportEntry> results = new ArrayList<UnpaidDepositReportEntry>();
         for ( CSVRecord csv : records ) {
             String bookingRef = csv.get( "Booking reference" );
-            LOGGER.info( "Checking BDC reservation: " + bookingRef );
+            LOGGER.info( "Checking " + bookingRefMatch + " reservation: " + bookingRef );
 
             // check if we've already charged them
             if ( false == "0".equals( csv.get( "Payment Received" ) ) ) {

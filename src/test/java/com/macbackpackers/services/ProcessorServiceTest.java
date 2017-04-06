@@ -24,11 +24,11 @@ import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.TestHarnessDAO;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
-import com.macbackpackers.jobs.BDCDepositChargeJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
-import com.macbackpackers.jobs.CreateBDCDepositChargeJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
+import com.macbackpackers.jobs.CreateDepositChargeJob;
 import com.macbackpackers.jobs.DbPurgeJob;
+import com.macbackpackers.jobs.DepositChargeJob;
 import com.macbackpackers.jobs.GroupBookingsReportJob;
 import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.jobs.SplitRoomReservationReportJob;
@@ -242,11 +242,11 @@ public class ProcessorServiceTest {
     }
     
     @Test
-    public void testCreateBDCDepositChargeJob() throws Exception {
+    public void testCreateDepositChargeJob() throws Exception {
 
-        CreateBDCDepositChargeJob j = new CreateBDCDepositChargeJob();
+        CreateDepositChargeJob j = new CreateDepositChargeJob();
         j.setStatus( JobStatus.submitted );
-        j.setDaysBack( 7 );
+        j.setDaysBack( 3 );
         dao.insertJob( j );
         
         // this should now run the job
@@ -255,7 +255,7 @@ public class ProcessorServiceTest {
 
     @Test
     public void testBDCDepositChargeJob() throws Exception {
-        BDCDepositChargeJob j = BDCDepositChargeJob.class.cast( dao.fetchJobById( 138571 ));
+        DepositChargeJob j = DepositChargeJob.class.cast( dao.fetchJobById( 138571 ));
         autowireBeanFactory.autowireBean( j ); // as job is an entity, wire up any spring collaborators 
         j.processJob();
     }

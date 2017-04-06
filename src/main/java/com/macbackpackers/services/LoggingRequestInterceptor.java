@@ -18,6 +18,7 @@ public class LoggingRequestInterceptor implements ClientHttpRequestInterceptor {
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
     private HttpRequestListener requestListener; // optional listener
     private HttpResponseListener responseListener; // optional listener
+    private CardMask cardMask; // optional card mask
 
     public LoggingRequestInterceptor() {
         // default constructor
@@ -28,10 +29,12 @@ public class LoggingRequestInterceptor implements ClientHttpRequestInterceptor {
      * 
      * @param reqListener (optional) request listener
      * @param respListener (optional) response listener
+     * @param cardMask (optional) card mask
      */
-    public LoggingRequestInterceptor( HttpRequestListener reqListener, HttpResponseListener respListener ) {
+    public LoggingRequestInterceptor( HttpRequestListener reqListener, HttpResponseListener respListener, CardMask cardMask ) {
         this.requestListener = reqListener;
         this.responseListener = respListener;
+        this.cardMask = cardMask;
     }
 
     @Override
@@ -59,16 +62,17 @@ public class LoggingRequestInterceptor implements ClientHttpRequestInterceptor {
 
     private void traceResponse( ClientHttpResponse response ) throws IOException {
         byte[] body = StreamUtils.copyToByteArray( response.getBody() );
+        String maskedBody = applyCardMask( new String( body, "UTF-8" ) );
         LOGGER.debug( "============================response begin==========================================" );
         LOGGER.debug( "Status code  : {}", response.getStatusCode() );
         LOGGER.debug( "Status text  : {}", response.getStatusText() );
         LOGGER.debug( "Headers      : {}", response.getHeaders() );
-        LOGGER.debug( "Response body: {}", new String(body, "UTF-8") );
+        LOGGER.debug( "Response body: {}", maskedBody );
         LOGGER.debug( "=======================response end=================================================" );
 
         if ( responseListener != null ) {
             responseListener.traceResponse( response.getStatusCode(), 
-                    response.getStatusText(), response.getHeaders(), body );
+                    response.getStatusText(), response.getHeaders(), new String( body, "UTF-8" )  );
         }
     }
 
@@ -78,35 +82,18 @@ public class LoggingRequestInterceptor implements ClientHttpRequestInterceptor {
      * @param xml the full XML to be masked
      * @return the XML will all CardNumber elements masked
      */
-    private static String applyCardMask( String xml ) {
-        String maskedString = xml;
-        final String CARD_MASK = "<CardNumber>(\\d+)</CardNumber>";
-        Pattern p = Pattern.compile( CARD_MASK );
-        Matcher m = p.matcher( maskedString );
-        while ( m.find() ) {
-            String cardNum = m.group( 1 );
-            maskedString = maskedString.replaceAll( cardNum, maskCardNumber( cardNum ) );
+    private String applyCardMask( String xml ) {
+        if(cardMask != null) {
+            String maskedString = xml;
+            Pattern p = Pattern.compile( cardMask.getCardMaskMatchRegex() );
+            Matcher m = p.matcher( maskedString );
+            while ( m.find() ) {
+                String cardNum = m.group( 1 );
+                maskedString = maskedString.replaceAll( cardNum, cardMask.replaceCardWith( cardNum ) );
+            }
+            return maskedString;
         }
-        return maskedString;
+        return xml;
     }
 
-    /**
-     * Masks a card number with periods. The first 6 and last 2 digits are left as is. e.g.
-     * 1234567890123456 will return 123456........56 If the passed in number is not a number or is
-     * not at least 8 characters, this will return the entire string masked with periods.
-     * 
-     * @param number The number in plain format
-     * @return The masked card number
-     */
-    private static String maskCardNumber( String number ) {
-
-        final String CARD_NUMBER_MASK = "(\\d{6})(\\d+)(\\d{2})";
-        Pattern p = Pattern.compile( CARD_NUMBER_MASK );
-        Matcher m = p.matcher( number );
-        if ( m.find() ) {
-            return m.group( 1 ) + StringUtils.repeat( '.', m.group( 2 ).length() ) + m.group( 3 );
-        }
-        // does not have at least 8 characters or not a number; mask entire string
-        return StringUtils.repeat( '.', number.length() );
-    }
 }

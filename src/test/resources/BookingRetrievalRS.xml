@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<BookingRetrievalRS xmlns="http://www.expediaconnect.com/EQC/BR/2014/01">
+	<Bookings>
+		<Booking id="818593204" type="Book" createDateTime="2017-04-01T08:18:00Z"
+			source="A-Expedia" status="confirmed" confirmNumber="EXP-818593204">
+			<Hotel id="9741780" />
+			<RoomStay roomTypeID="200878754" ratePlanID="204461494A">
+				<StayDate arrival="2017-04-21" departure="2017-04-23" />
+				<GuestCount adult="1" />
+				<PerDayRates currency="GBP">
+					<PerDayRate stayDate="2017-04-21" baseRate="8.00" />
+                    <PerDayRate stayDate="2017-04-22" baseRate="6.00" />
+				</PerDayRates>
+				<Total amountAfterTaxes="14.00" currency="GBP" />
+				<PaymentCard cardCode="MC" cardNumber="1234567890123456"
+					seriesCode="345" expireDate="1120">
+					<CardHolder name="lorena fonti" address="Any street1 Any street2"
+						city="Any city" stateProv="MA" country="US" postalCode="98004" />
+				</PaymentCard>
+			</RoomStay>
+			<PrimaryGuest>
+				<Name givenName="lorena" surname="fonti" />
+				<Phone countryCode="39" cityAreaCode="320" number="0547403" />
+				<Email>lorena.fonti@test.it</Email>
+			</PrimaryGuest>
+			<SpecialRequest code="5">Hotel Collect Booking Collect
+				Payment From Guest</SpecialRequest>
+			<SpecialRequest code="2.1">Non-Smoking</SpecialRequest>
+			<SpecialRequest code="1.40">1 bed</SpecialRequest>
+		</Booking>
+	</Bookings>
+</BookingRetrievalRS>

@@ -14,12 +14,12 @@ import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.services.PaymentProcessorService;
 
 /**
- * Job that checks whether a BDC reservation has paid their deposit and if not,
+ * Job that checks whether a reservation has paid their deposit and if not,
  * charge the deposit with their current card details.
  */
 @Entity
-@DiscriminatorValue( value = "com.macbackpackers.jobs.BDCDepositChargeJob" )
-public class BDCDepositChargeJob extends AbstractJob {
+@DiscriminatorValue( value = "com.macbackpackers.jobs.DepositChargeJob" )
+public class DepositChargeJob extends AbstractJob {
 
     @Autowired
     @Transient
@@ -31,7 +31,7 @@ public class BDCDepositChargeJob extends AbstractJob {
     }
 
     /**
-     * Returns the booking.com reference (BDC-XXXXXXXXX).
+     * Returns the booking reference (e.g. BDC-XXXXXXXXX).
      * 
      * @return non-null reference
      */
@@ -40,7 +40,7 @@ public class BDCDepositChargeJob extends AbstractJob {
     }
 
     /**
-     * Sets the booking.com reference.
+     * Sets the booking reference.
      * 
      * @param bookingRef e.g. BDC-123456789
      */
