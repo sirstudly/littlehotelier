@@ -3,14 +3,10 @@ package com.macbackpackers.services;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Scope;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -20,20 +16,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.html.HtmlButton;
-import com.gargoylesoftware.htmlunit.html.HtmlForm;
-import com.gargoylesoftware.htmlunit.html.HtmlHeading1;
-import com.gargoylesoftware.htmlunit.html.HtmlHeading4;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
-import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
-import com.gargoylesoftware.htmlunit.html.HtmlSpan;
-import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.DepositPayment;
 import com.macbackpackers.beans.expedia.Hotel;
@@ -44,12 +30,6 @@ import com.macbackpackers.beans.expedia.request.ParamSet;
 import com.macbackpackers.beans.expedia.response.BookingRetrievalRS;
 import com.macbackpackers.beans.expedia.response.PaymentCard;
 import com.macbackpackers.beans.expedia.response.RoomStay;
-import com.macbackpackers.config.LittleHotelierConfig;
-import com.macbackpackers.dao.WordPressDAO;
-import com.macbackpackers.exceptions.MissingUserDataException;
-import com.macbackpackers.exceptions.UnrecoverableFault;
-import com.macbackpackers.services.FileService;
-import com.macbackpackers.services.GmailService;
 
 @Service
 public class ExpediaApiService {
