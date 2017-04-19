@@ -1,16 +1,25 @@
 package com.macbackpackers.services;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
+import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.mail.MessagingException;
+import javax.mail.Session;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
+
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,6 +65,12 @@ public class GmailService {
     /** This is the OAuth 2.0 Client ID used to login to Gmail */
     @Value( "${gmail.oauth.client.id.file}" )
     private String oauthClientIdFile;
+    
+    @Value( "${gmail.sendfrom.address}" )
+    private String gmailSendAddress;
+    
+    @Value( "${gmail.sendfrom.name}" )
+    private String gmailSendName;
 
     /** The default gmail user to query */
     private static final String GMAIL_USER = "me";
@@ -80,7 +95,7 @@ public class GmailService {
      * at DATA_STORE_DIR
      */
     private static final List<String> SCOPES =
-        Arrays.asList(GmailScopes.GMAIL_READONLY);
+        Arrays.asList(GmailScopes.GMAIL_READONLY, GmailScopes.GMAIL_COMPOSE);
 
     public GmailService() {
         try {
@@ -211,6 +226,67 @@ public class GmailService {
     }
 
     /**
+     * Sends an email from the current email address.
+     * 
+     * @param toAddress email address of the receiver
+     * @param toName (optional) name for destination address
+     * @param subject subject of the email
+     * @param bodyText body text of the email
+     * @throws IOException on send error
+     * @throws MessagingException on message creation exception
+     */
+    public void sendEmail( String toAddress, String toName, String subject, String bodyText ) 
+            throws MessagingException, IOException {
+        Message message = createMessageWithEmail( createEmail( toAddress, toName, subject, bodyText ) );
+        message = connectAsClient().users().messages().send( GMAIL_USER, message ).execute();
+        LOGGER.info( "Sent message " + message.getId() + ": " + message.toPrettyString() );
+    }
+
+    /**
+     * Create a MimeMessage using the parameters provided.
+     *
+     * @param toAddress email address of the receiver
+     * @param toName (optional) name for destination address
+     * @param subject subject of the email
+     * @param bodyText body text of the email
+     * @return the MimeMessage to be used to send email
+     * @throws MessagingException
+     * @throws UnsupportedEncodingException address unparseable 
+     */
+    private MimeMessage createEmail( String toAddress, String toName, String subject, String bodyText ) throws MessagingException, UnsupportedEncodingException {
+        Properties props = new Properties();
+        Session session = Session.getDefaultInstance( props, null );
+        MimeMessage email = new MimeMessage( session );
+
+        email.setFrom( new InternetAddress( gmailSendAddress, gmailSendName ) );
+        InternetAddress emailDest = StringUtils.isBlank( toName ) ? 
+                new InternetAddress( toAddress ) : new InternetAddress( toAddress, toName );
+        email.addRecipient( javax.mail.Message.RecipientType.TO, emailDest );
+        email.setSubject( subject );
+        email.setContent( bodyText, "text/html; charset=utf-8" );
+        return email;
+    }
+
+    /**
+     * Create a message from an email.
+     *
+     * @param emailContent Email to be set to raw of message
+     * @return a message containing a base64url encoded email
+     * @throws IOException
+     * @throws MessagingException
+     */
+    public Message createMessageWithEmail( MimeMessage emailContent )
+            throws MessagingException, IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        emailContent.writeTo( buffer );
+        byte[] bytes = buffer.toByteArray();
+        String encodedEmail = Base64.encodeBase64URLSafeString( bytes );
+        Message message = new Message();
+        message.setRaw( encodedEmail );
+        return message;
+    }
+
+    /**
      * Returns the message body for the given message ID.
      *  
      * @param gmail the connected Gmail client
@@ -287,7 +363,7 @@ public class GmailService {
         // need to convert some characters first
         // http://stackoverflow.com/questions/24812139/base64-decoding-of-mime-email-not-working-gmail-api
         return input == null ? null : 
-            new String( Base64.getDecoder().decode( input.replace( '-', '+' ).replace( '_', '/' ) ) );
+            new String( java.util.Base64.getDecoder().decode( input.replace( '-', '+' ).replace( '_', '/' ) ) );
     }
 
     /**

@@ -27,10 +27,13 @@ import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CreateDepositChargeJob;
+import com.macbackpackers.jobs.CreateSendGuestCheckoutEmailJob;
+import com.macbackpackers.jobs.CreateTestGuestCheckoutEmailJob;
 import com.macbackpackers.jobs.DbPurgeJob;
 import com.macbackpackers.jobs.DepositChargeJob;
 import com.macbackpackers.jobs.GroupBookingsReportJob;
 import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
+import com.macbackpackers.jobs.SendAllUnsentEmailJob;
 import com.macbackpackers.jobs.SplitRoomReservationReportJob;
 import com.macbackpackers.jobs.UnpaidDepositReportJob;
 import com.macbackpackers.scrapers.BookingsPageScraper;
@@ -258,5 +261,37 @@ public class ProcessorServiceTest {
         DepositChargeJob j = DepositChargeJob.class.cast( dao.fetchJobById( 138571 ));
         autowireBeanFactory.autowireBean( j ); // as job is an entity, wire up any spring collaborators 
         j.processJob();
+    }
+    
+    @Test
+    public void testCreateSendGuestCheckoutEmailJob() throws Exception {
+        CreateSendGuestCheckoutEmailJob j = new CreateSendGuestCheckoutEmailJob();
+        Calendar checkoutDate = Calendar.getInstance();
+        checkoutDate.set( Calendar.DATE, 28 );
+        checkoutDate.set( Calendar.MONTH, Calendar.JANUARY );
+        checkoutDate.set( Calendar.YEAR, 2017 );
+        j.setCheckoutDate( checkoutDate.getTime() );
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+       
+        // this should now run the job
+        processorService.processJobs();
+    }
+
+    @Test
+    public void testSendAllUnsentEmailJob() throws Exception {
+        CreateTestGuestCheckoutEmailJob testJob = new CreateTestGuestCheckoutEmailJob();
+        testJob.setStatus( JobStatus.submitted );
+        testJob.setRecipientEmail( "ronchan@techie.com" );
+        testJob.setFirstName( "Ron" );
+        testJob.setLastName( "Chan" );
+        dao.insertJob( testJob );
+        
+        SendAllUnsentEmailJob j = new SendAllUnsentEmailJob();
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+       
+        // this should now run the job
+        processorService.processJobs();
     }
 }

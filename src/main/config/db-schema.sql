@@ -200,6 +200,19 @@ CREATE TABLE `wp_pxpost_transaction` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=200000 DEFAULT CHARSET=utf8;
 
+CREATE TABLE `wp_lh_send_email` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `email` varchar(255) NOT NULL,
+  `first_name` varchar(255) DEFAULT NULL,
+  `last_name` varchar(255) DEFAULT NULL,
+  `send_date` timestamp NULL DEFAULT NULL,
+  `send_subject` varchar(255) DEFAULT NULL,
+  `send_body` text DEFAULT NULL,
+  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_updated_date` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE (`email`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 CREATE TABLE `wp_lh_rooms` (
   `id` bigint(20) unsigned NOT NULL,

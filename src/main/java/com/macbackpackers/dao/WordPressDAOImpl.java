@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.jdbc.IncorrectResultSetColumnCountException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.MissingGuestComment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.ScheduledJob;
+import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
@@ -704,4 +706,65 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .getSingleResult()
                 .intValue();
     }
+
+    @Override
+    public boolean doesSendEmailEntryExist( String email ) {
+        return sessionFactory.getCurrentSession()
+                .createQuery( "SELECT COUNT(*) FROM SendEmailEntry WHERE email = :email", Number.class )
+                .setParameter( "email", email )
+                .getSingleResult().intValue() > 0;
+    }
+    
+    @Override
+    public void saveSendEmailEntry( SendEmailEntry record ) {
+        record.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
+        sessionFactory.getCurrentSession().saveOrUpdate( record );
+    }
+    
+    @Override
+    public void deleteSendEmailEntry( String emailAddress ) {
+        List<SendEmailEntry> matchedEntries = sessionFactory.getCurrentSession().createQuery(
+                "FROM SendEmailEntry WHERE email = :email", SendEmailEntry.class )
+            .setParameter( "email", emailAddress )
+            .getResultList();
+        
+        // delete all matched entries
+        for( SendEmailEntry entry : matchedEntries ) {
+            sessionFactory.getCurrentSession().delete( entry );
+        }
+    }
+    
+    @SuppressWarnings( "unchecked" )
+    @Override
+    public List<SendEmailEntry> fetchAllUnsentEmails() {
+        return sessionFactory.getCurrentSession().createQuery(
+                "FROM SendEmailEntry WHERE sendDate IS NULL" )
+                .getResultList();
+    }
+
+    @Override
+    public String getGuestCheckoutEmailSubject() {
+        return getNotNullOption( "hbo_guest_email_subject" );
+    }
+
+    @Override
+    public String getGuestCheckoutEmailTemplate() {
+        return getNotNullOption( "hbo_guest_email_template" );
+    }
+
+    /**
+     * Returns the option for the given key.
+     * 
+     * @param optionName option key
+     * @return non-null option value
+     * @throws IncorrectResultSizeDataAccessException if option does not exist or is null
+     */
+    private String getNotNullOption( String optionName ) throws IncorrectResultSizeDataAccessException {
+        String optionValue = getOption( optionName );
+        if ( optionValue == null ) {
+            throw new IncorrectResultSizeDataAccessException( "Missing option " + optionName, 1 );
+        }
+        return optionValue;
+    }
+
 }

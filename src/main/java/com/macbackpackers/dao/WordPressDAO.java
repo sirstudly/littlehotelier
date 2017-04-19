@@ -16,6 +16,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.MissingGuestComment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.ScheduledJob;
+import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
@@ -372,4 +373,46 @@ public interface WordPressDAO {
      * @return number of failed payment attempts
      */
     public int getPreviousNumberOfFailedTxns( String bookingRef, String maskedCardNumber );
+    
+    /**
+     * Checks whether we've already sent an email (or are ready to send) an email to the
+     * given address.
+     * @param email address to send to
+     * @return true if entry already exists, false otherwise
+     */
+    public boolean doesSendEmailEntryExist( String email );
+    
+    /**
+     * Creates the send email record specified.
+     * 
+     * @param record email record to save
+     */
+    public void saveSendEmailEntry( SendEmailEntry record );
+
+    /**
+     * Deletes all send email records by email address.
+     * 
+     * @param emailAddress matched email address
+     */
+    public void deleteSendEmailEntry( String emailAddress );
+
+    /**
+     * Returns all emails that haven't been sent yet.
+     * @return list of unsent email entries
+     */
+    public List<SendEmailEntry> fetchAllUnsentEmails();
+
+    /**
+     * Returns the email subject when sending emails to guests who have checked-out.
+     * 
+     * @return non-null email subject
+     */
+    public String getGuestCheckoutEmailSubject();
+
+    /**
+     * Returns the email template when sending emails to guests who have checked-out.
+     * 
+     * @return non-null email template
+     */
+    public String getGuestCheckoutEmailTemplate();
 }
