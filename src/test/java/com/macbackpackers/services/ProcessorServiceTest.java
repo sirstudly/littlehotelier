@@ -5,6 +5,7 @@ import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.Date;
 
+import org.hamcrest.Matchers;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
@@ -69,11 +71,10 @@ public class ProcessorServiceTest {
     public void testAllocationScraperJob() throws Exception {
 
         // setup a job to scrape allocation info
-        Job j = new AllocationScraperJob();
+        AllocationScraperJob j = new AllocationScraperJob();
         j.setStatus( JobStatus.submitted );
-        j.setParameter( "start_date", "2015-06-15 00:00:00" );
-        j.setParameter( "end_date", "2015-06-16 00:00:00" );
-        j.setParameter( "test_mode", "true" );
+        j.setStartDate( Calendar.getInstance().getTime() );
+        j.setDaysAhead( 27 );
         int jobId = dao.insertJob( j );
 
         // this should now run the job
@@ -127,13 +128,14 @@ public class ProcessorServiceTest {
     public void testCreateConfirmDepositAmountsJob() throws Exception {
 
         // setup the dependent job (no data)
-        Job j = new AllocationScraperJob();
-        j.setStatus( JobStatus.completed );
-        dao.insertJob( j );
+        Job asj = new AllocationScraperJob();
+        asj.setStatus( JobStatus.completed );
+        dao.insertJob( asj );
 
         // setup the job
-        j = new CreateConfirmDepositAmountsJob();
+        Job j = new CreateConfirmDepositAmountsJob();
         j.setStatus( JobStatus.submitted );
+        j.getDependentJobs().add( asj );
         int jobId = dao.insertJob( j );
 
         // this should now run the job
@@ -293,5 +295,16 @@ public class ProcessorServiceTest {
        
         // this should now run the job
         processorService.processJobs();
+    }
+    
+    @Test
+    @Transactional
+    public void testRetrieveDependentJobs() throws Exception {
+        CreateConfirmDepositAmountsJob j = dao.getLastJobOfType( CreateConfirmDepositAmountsJob.class );
+        LOGGER.info( "Found " + j.getDependentJobs().size() + " dependent jobs" );
+        Assert.assertThat( j.getDependentJobs().size(), Matchers.is( 1 ) );
+        Job dj = j.getDependentJobs().iterator().next();
+        Assert.assertThat( dj.getClass(), Matchers.is( AllocationScraperJob.class ) );
+        Assert.assertThat( dj.getId(), Matchers.is( j.getId() - 1 ) );
     }
 }

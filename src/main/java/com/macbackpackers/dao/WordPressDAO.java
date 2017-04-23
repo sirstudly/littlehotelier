@@ -64,6 +64,14 @@ public interface WordPressDAO {
      * @param jobId the records for the job to delete.
      */
     public void deleteAllocations( int jobId );
+    
+    /**
+     * Updates the jobId associated with the matching Allocation records.
+     * 
+     * @param oldAllocationJobId the *matching* jobId (on Allocation) to update
+     * @param newAllocationJobId the updated jobId to set
+     */
+    public void updateAllocationJobId( int oldAllocationJobId, int newAllocationJobId );
 
     /**
      * Queries all existing allocations by job id and reservation id.
@@ -120,7 +128,9 @@ public interface WordPressDAO {
     public void resetAllProcessingJobsToFailed();
 
     /**
-     * Returns the first job with a state of 'submitted'.
+     * Returns the first job with a state of 'submitted'. Side effect: when picking up the next job
+     * to process; if it is dependent on another job at failed/aborted, it will set the status of
+     * this job to aborted.
      * 
      * @return next job to run or null if no jobs to run
      */

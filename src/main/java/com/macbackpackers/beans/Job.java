@@ -5,6 +5,7 @@ import java.sql.Timestamp;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.DiscriminatorColumn;
 import javax.persistence.DiscriminatorType;
@@ -18,11 +19,9 @@ import javax.persistence.Id;
 import javax.persistence.Inheritance;
 import javax.persistence.InheritanceType;
 import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
-
-import org.hibernate.annotations.Cascade;
-import org.hibernate.annotations.CascadeType;
 
 @Entity
 @Table( name = "wp_lh_jobs" )
@@ -54,10 +53,12 @@ public class Job {
     @Column( name = "last_updated_date" )
     private Timestamp lastUpdatedDate;
 
-    @OneToMany( cascade = javax.persistence.CascadeType.ALL, fetch = FetchType.EAGER )
-    @JoinColumn( name = "job_id" )
-    @Cascade( { CascadeType.SAVE_UPDATE, CascadeType.DELETE } )
+    @OneToMany( cascade = { CascadeType.ALL }, fetch = FetchType.EAGER, mappedBy = "job" )
     private Set<JobParameter> parameters = new HashSet<JobParameter>();
+
+    @OneToMany( cascade = { CascadeType.ALL }, fetch = FetchType.LAZY )
+    @JoinTable( name = "wp_lh_job_dependency", joinColumns = @JoinColumn( name = "job_id" ), inverseJoinColumns = @JoinColumn( name = "depends_on_job_id" ) )
+    private Set<Job> dependentJobs = new HashSet<Job>();
 
     public int getId() {
         return id;
@@ -93,7 +94,7 @@ public class Job {
     }
 
     public void setParameter( String name, String value ) {
-        getParameters().add( new JobParameter( name, value ) );
+        getParameters().add( new JobParameter( this, name, value ) );
     }
 
     public Timestamp getJobStartDate() {
@@ -134,6 +135,14 @@ public class Job {
 
     public void setLastUpdatedDate( Timestamp lasterUpdatedDate ) {
         this.lastUpdatedDate = lasterUpdatedDate;
+    }
+
+    public Set<Job> getDependentJobs() {
+        return dependentJobs;
+    }
+
+    public void setDependentJobs( Set<Job> dependentJobs ) {
+        this.dependentJobs = dependentJobs;
     }
 
 }

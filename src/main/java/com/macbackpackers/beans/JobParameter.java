@@ -3,8 +3,11 @@ package com.macbackpackers.beans;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
 @Entity
@@ -16,8 +19,9 @@ public class JobParameter implements NameValuePair {
     @Column( name = "job_param_id" )
     private int id;
 
-    @Column( name = "job_id" )
-    private int jobId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "job_id")
+    private Job job;
 
     @Column( name = "name" )
     private String name;
@@ -29,7 +33,8 @@ public class JobParameter implements NameValuePair {
         // default constructor
     }
 
-    public JobParameter( String name, String value ) {
+    public JobParameter( Job job, String name, String value ) {
+        this.job = job;
         this.name = name;
         this.value = value;
     }
@@ -42,12 +47,12 @@ public class JobParameter implements NameValuePair {
         this.id = id;
     }
 
-    public int getJobId() {
-        return jobId;
+    public Job getJob() {
+        return job;
     }
 
-    public void setJobId( int jobId ) {
-        this.jobId = jobId;
+    public void setJob( Job job ) {
+        this.job = job;
     }
 
     @Override

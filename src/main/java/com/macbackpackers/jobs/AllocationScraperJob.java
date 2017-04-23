@@ -2,106 +2,71 @@
 package com.macbackpackers.jobs;
 
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 
 import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
-import javax.persistence.Transient;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 
 /**
- * Job that scrapes the allocation data for a particular date range.
+ * Job that initiates all allocation scraper jobs for a particular date range.
  *
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.AllocationScraperJob" )
 public class AllocationScraperJob extends AbstractJob {
 
-    @Autowired
-    @Transient
-    private AllocationsPageScraper allocationScraper;
-
-    public AllocationsPageScraper getAllocationPageScraper() {
-        return allocationScraper;
-    }
-
     @Override
-    public void resetJob() throws Exception {
-        dao.deleteAllocations( getId() );
-    }
-
-    @Override
+    @Transactional // no re-run on this job; all must go thru or nothing
     public void processJob() throws Exception {
-        allocationScraper.dumpAllocationsBetween( getId(), getStartDate(), getEndDate(), isTestMode() );
-        insertBookingsScraperJobs();
+        // dump calendar page(s)
+        List<AllocationScraperWorkerJob> allocationScraperJobs = insertAllocationScraperWorkerJobs();
+        insertCreateReportsJob( allocationScraperJobs );
     }
 
     /**
-     * We need additional jobs to update some fields by scraping the bookings pages and any reports
-     * that use this data. Create these jobs now.
+     * Create jobs to scrape the calendar page(s) from start date to end date.
+     * 
+     * @return List of created AllocationScraperWorkerJob
+     * @throws ParseException on date parse error from parameters
      */
-    private void insertBookingsScraperJobs() {
+    private List<AllocationScraperWorkerJob> insertAllocationScraperWorkerJobs() throws ParseException {
+        Calendar currentDate = Calendar.getInstance();
+        currentDate.setTime( getStartDate() );
+        List<AllocationScraperWorkerJob> jobs = new ArrayList<AllocationScraperWorkerJob>();
 
-        // create a separate job for each checkin_date for the given allocation records
-        // this will make it easier to re-run if any date fails
-        for ( Date checkinDate : dao.getCheckinDatesForAllocationScraperJobId( getId() ) ) {
-            BookingScraperJob bookingScraperJob = new BookingScraperJob();
-            bookingScraperJob.setStatus( JobStatus.submitted );
-            bookingScraperJob.setAllocationScraperJobId( getId() );
-            bookingScraperJob.setCheckinDate( checkinDate );
-            dao.insertJob( bookingScraperJob );
+        while ( currentDate.getTime().before( getEndDate() ) ) {
+            AllocationScraperWorkerJob workerJob = new AllocationScraperWorkerJob();
+            workerJob.setStatus( JobStatus.submitted );
+            workerJob.setAllocationScraperJobId( getId() );
+            workerJob.setStartDate( currentDate.getTime() );
+            dao.insertJob( workerJob );
+            jobs.add( workerJob );
+            currentDate.add( Calendar.DATE, 14 ); // calendar page shows 2 weeks at a time
         }
-
-        // insert jobs to create any reports
-        insertSplitRoomReportJob();
-        insertUnpaidDepositReportJob();
-        insertGroupBookingsReportJob();
-        insertHostelworldHostelBookersConfirmDepositJob();
+        return jobs;
     }
 
     /**
-     * Creates an additional job to run the split room report.
+     * Creates a job for consolidating results and running collating reports.
+     * 
+     * @param dependentJobs the jobs which need to complete successfully before running the jobs
+     *            being created
      */
-    private void insertSplitRoomReportJob() {
-        SplitRoomReservationReportJob splitRoomReportJob = new SplitRoomReservationReportJob();
-        splitRoomReportJob.setStatus( JobStatus.submitted );
-        splitRoomReportJob.setAllocationScraperJobId( getId() );
-        dao.insertJob( splitRoomReportJob );
-    }
-
-    /**
-     * Creates an additional job to run the unpaid deposit report.
-     */
-    private void insertUnpaidDepositReportJob() {
-        UnpaidDepositReportJob unpaidDepositRptJob = new UnpaidDepositReportJob();
-        unpaidDepositRptJob.setStatus( JobStatus.submitted );
-        unpaidDepositRptJob.setAllocationScraperJobId( getId() );
-        dao.insertJob( unpaidDepositRptJob );
-    }
-
-    /**
-     * Creates an additional job to run the group bookings report.
-     */
-    private void insertGroupBookingsReportJob() {
-        GroupBookingsReportJob groupBookingRptJob = new GroupBookingsReportJob();
-        groupBookingRptJob.setStatus( JobStatus.submitted );
-        groupBookingRptJob.setAllocationScraperJobId( getId() );
-        dao.insertJob( groupBookingRptJob );
-    }
-
-    /**
-     * Creates additional jobs to tick off any unpaid deposits for HW/HB.
-     */
-    private void insertHostelworldHostelBookersConfirmDepositJob() {
-        Job j = new CreateConfirmDepositAmountsJob();
-        j.setStatus( JobStatus.submitted );
-        dao.insertJob( j );
+    private void insertCreateReportsJob( List<? extends Job> dependentJobs ) {
+        CreateAllocationScraperReportsJob job = new CreateAllocationScraperReportsJob();
+        job.setStatus( JobStatus.submitted );
+        job.setAllocationScraperJobId( getId() );
+        job.getDependentJobs().addAll( dependentJobs );
+        dao.insertJob( job );
     }
 
     /**
@@ -154,18 +119,6 @@ public class AllocationScraperJob extends AbstractJob {
         Calendar cal = Calendar.getInstance();
         cal.add( Calendar.DATE, getDaysAhead() );
         return cal.getTime();
-    }
-
-    /**
-     * For testing, we may want to load from a previously serialised file (rather than scrape the
-     * page again which takes about 10 minutes). Default value is false, but if the "test_mode"
-     * parameter is set to true, then attempt to load from file first. If no file is found, then
-     * scrape the page again.
-     * 
-     * @return true if test mode, false otherwise
-     */
-    private boolean isTestMode() {
-        return "true".equalsIgnoreCase( getParameter( "test_mode" ) );
     }
 
 }

@@ -92,6 +92,16 @@ public class WordPressDAOImpl implements WordPressDAO {
         LOGGER.info( rowsDeleted + " allocation rows deleted." );
     }
 
+    @Override
+    public void updateAllocationJobId( int oldAllocationJobId, int newAllocationJobId ) {
+        int rowsUpdated = sessionFactory.getCurrentSession()
+                .createQuery( "UPDATE Allocation SET jobId = :newJobId WHERE jobId = :oldJobId" )
+                .setParameter( "oldJobId", oldAllocationJobId )
+                .setParameter( "newJobId", newAllocationJobId )
+                .executeUpdate();
+            LOGGER.info( rowsUpdated + " allocation rows updated." );
+    }
+
     @SuppressWarnings( "unchecked" )
     @Override
     public AllocationList queryAllocationsByJobIdAndReservationId( int jobId, int reservationId ) {
@@ -104,7 +114,7 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Override
     public int insertJob( Job job ) {
-        sessionFactory.getCurrentSession().save( job );
+        sessionFactory.getCurrentSession().saveOrUpdate( job );
         return job.getId();
     }
 
@@ -176,19 +186,38 @@ public class WordPressDAOImpl implements WordPressDAO {
         // shutdown job has priority if present
         // include any jobs that have been tagged as processing by us
         // (since there should only ever be 1 unique one; we'll be re-running these jobs)
-        List<?> jobIds = sessionFactory.getCurrentSession()
-                .createQuery( "SELECT id FROM AbstractJob "
+        List<AbstractJob> jobs = sessionFactory.getCurrentSession()
+                .createQuery( "FROM AbstractJob "
                         + "     WHERE status = :submittedStatus "
                         + "        OR (status = :processingStatus AND processedBy = :processedBy)"
-                        + "     ORDER BY CASE WHEN classname = 'com.macbackpackers.jobs.ShutdownJob' THEN 0 ELSE 1 END, job_id" )
+                        + "     ORDER BY CASE WHEN classname = 'com.macbackpackers.jobs.ShutdownJob' THEN 0 ELSE 1 END, job_id",
+                        AbstractJob.class )
                 .setParameter( "submittedStatus", JobStatus.submitted )
                 .setParameter( "processingStatus", JobStatus.processing )
                 .setParameter( "processedBy", processorId )
-                .setMaxResults( 1 )
                 .getResultList();
-        Integer jobId = jobIds.isEmpty() ? null : Integer.class.cast( jobIds.get( 0 ));
-        LOGGER.info( "Next job to process: " + (jobId == null ? "none" : jobId) );
-        return jobId == null ? null : fetchJobById( jobId );
+        
+        forAllJobs: for ( AbstractJob job : jobs ) {
+            // first check that all dependent jobs have completed successfully
+            for ( Job dependentJob : job.getDependentJobs() ) {
+                switch( dependentJob.getStatus()) {
+                    case submitted:
+                    case processing:
+                        continue forAllJobs; // need to wait until parent job finishes
+                    case failed:
+                    case aborted:
+                        // parent job failed/aborted so we abort 
+                        job.setStatus( JobStatus.aborted );
+                        continue forAllJobs;
+                    default: // (completed)
+                        // ok; just check remaining dependent jobs
+                }
+            }
+            
+            return job; // all dependent jobs are completed; this is the one
+        }
+
+        return null; // we couldn't find a job to process
     }
 
     @Override
@@ -293,6 +322,7 @@ public class WordPressDAOImpl implements WordPressDAO {
 
         // now delete from jobs
         deleteFromTablesByJobId( specifiedDate, "wp_lh_job_param" );
+        deleteFromTablesByJobId( specifiedDate, "wp_lh_job_dependency" );
 
         int rowsDeleted = sessionFactory.getCurrentSession()
                 .createNativeQuery( "DELETE FROM wp_lh_jobs WHERE last_updated_date < :specifiedDate" )

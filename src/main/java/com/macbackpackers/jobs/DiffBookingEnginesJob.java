@@ -56,7 +56,7 @@ public class DiffBookingEnginesJob extends AbstractJob {
         Calendar oneWeekBefore = Calendar.getInstance();
         oneWeekBefore.setTime( checkinDate );
         oneWeekBefore.add( Calendar.DATE, -7 );
-        allocationScraper.dumpAllocationsBetween( getId(), oneWeekBefore.getTime(), checkinDate, false );
+        allocationScraper.dumpAllocationsFrom( getId(), oneWeekBefore.getTime(), false );
 
         // and update the additional fields for the records
         for ( Date nextDate : dao.getCheckinDatesForAllocationScraperJobId( getId() ) ) {

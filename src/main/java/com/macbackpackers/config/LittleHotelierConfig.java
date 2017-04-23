@@ -12,12 +12,14 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.context.annotation.Scope;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
 import com.gargoylesoftware.htmlunit.WebClient;
 
 @Configuration
+@EnableTransactionManagement
 @ComponentScan( "com.macbackpackers" )
 @Import( DatabaseConfig.class )
 @PropertySource( "classpath:config.properties" )

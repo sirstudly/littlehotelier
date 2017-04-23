@@ -76,6 +76,18 @@ CREATE TABLE `wp_lh_scheduled_job_param` (
 --  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_scheduled_jobs`(`id`) -- removed cause of hibernate
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
+
+CREATE TABLE `wp_lh_job_dependency` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `job_id` bigint(20) unsigned NOT NULL,
+  `depends_on_job_id` bigint(20) unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `lh_jd_job_id` (`job_id`)
+--  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)  -- removed cause of hibernate
+--  FOREIGN KEY (`depends_on_job_id`) REFERENCES `wp_lh_jobs`(`job_id`)  -- removed cause of hibernate
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+
 -- reporting table for reservations split across multiple rooms of the same type
 CREATE TABLE `wp_lh_rpt_split_rooms` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,

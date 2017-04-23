@@ -103,39 +103,35 @@ public class AllocationsPageScraper {
     }
 
     /**
-     * Dumps the allocations between the given dates (inclusive). There may be some allocations
+     * Dumps the allocations starting on the given date (inclusive). There may be some allocations
      * beyond the end date if the span doesn't fall within an exact 2 week period as that is what is
      * currently shown on the calendar page.
      * 
      * @param jobId the job ID to associate with this dump
      * @param startDate the start date to check allocations for (inclusive)
-     * @param endDate the minimum date in which to include allocations for
      * @param useSerialisedDataIfAvailable check if we've already seen this page already and used
      *            the cached version if available.
      * @throws IOException on read/write error
      */
 //    @Transactional
-    public void dumpAllocationsBetween(
-            int jobId, Date startDate, Date endDate, boolean useSerialisedDataIfAvailable ) throws IOException {
+    public void dumpAllocationsFrom(
+            int jobId, Date startDate, boolean useSerialisedDataIfAvailable ) throws IOException {
 
         Calendar currentDate = Calendar.getInstance();
         currentDate.setTime( startDate );
 
-        while ( currentDate.getTime().before( endDate ) ) {
-            HtmlPage calendarPage;
-            String serialisedFileName = getCalendarPageSerialisedObjectFilename( currentDate.getTime() );
-            if ( useSerialisedDataIfAvailable
-                    && new File( serialisedFileName ).exists() ) {
-                calendarPage = fileService.loadPageFromDisk( serialisedFileName );
-            }
-            else {
-                // this takes about 10 minutes...
-                calendarPage = goToCalendarPage( currentDate.getTime() );
-            }
-
-            dumpAllocations( jobId, calendarPage );
-            currentDate.add( Calendar.DATE, 14 ); // calendar page shows 2 weeks at a time
+        HtmlPage calendarPage;
+        String serialisedFileName = getCalendarPageSerialisedObjectFilename( currentDate.getTime() );
+        if ( useSerialisedDataIfAvailable
+                && new File( serialisedFileName ).exists() ) {
+            calendarPage = fileService.loadPageFromDisk( serialisedFileName );
         }
+        else {
+            // this takes about 10 minutes...
+            calendarPage = goToCalendarPage( currentDate.getTime() );
+        }
+
+        dumpAllocations( jobId, calendarPage );
     }
 
     /**

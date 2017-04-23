@@ -63,13 +63,12 @@ public class AllocationsPageScraperTest {
     @Test
     public void testDumpCalendarPage() throws Exception {
         Date july27 = AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( "2015-07-27" );
-        Date aug03 = AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( "2015-08-03" );
 
         Job j = new AllocationScraperJob();
         j.setStatus( JobStatus.submitted );
         int jobId = dao.insertJob( j );
 
-        scraper.dumpAllocationsBetween( jobId, july27, aug03, false );
+        scraper.dumpAllocationsFrom( jobId, july27, false );
         dao.updateJobStatus( jobId, JobStatus.completed, JobStatus.submitted );
     }
 

@@ -4,5 +4,6 @@ public enum JobStatus {
     submitted,
     processing,
     completed,
-    failed
+    failed,
+    aborted
 }

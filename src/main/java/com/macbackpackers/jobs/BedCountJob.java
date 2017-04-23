@@ -38,7 +38,7 @@ public class BedCountJob extends AbstractJob {
         Calendar dayBefore = Calendar.getInstance();
         dayBefore.setTime( selectedDate );
         dayBefore.add( Calendar.DATE, -7 ); // go back a week
-        allocationScraper.dumpAllocationsBetween( getId(), dayBefore.getTime(), selectedDate, false );
+        allocationScraper.dumpAllocationsFrom( getId(), dayBefore.getTime(), false );
     }
 
     /**
