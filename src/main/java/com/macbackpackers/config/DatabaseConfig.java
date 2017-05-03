@@ -34,11 +34,20 @@ public class DatabaseConfig {
     @Value( "${processor.thread.count:1}" )
     private int threadCount;
 
-    @Value( "${db.poolsize.min:1}" )
+    @Value( "${db.poolsize.min}" )
     private int minPoolSize;
 
-    @Value( "${db.poolsize.max:20}" )
+    @Value( "${db.poolsize.max}" )
     private int maxPoolSize;
+
+    @Value( "${db.maxidletime}" )
+    private int maxIdleTime;
+    
+    @Value( "${db.idle.connection.test.period}" )
+    private int idleConnectionTestPeriod;
+
+    @Value( "${db.max.idle.time.excess.connections}" )
+    private int maxIdleTimeExcessConnections;
 
     @Value( "${db.url}" )
     private String url;
@@ -62,13 +71,17 @@ public class DatabaseConfig {
         ComboPooledDataSource ds = new ComboPooledDataSource();
         ds.setJdbcUrl( url );
         ds.setDriverClass( driverClass );
-        ds.setCheckoutTimeout( 60000 );
-//        ds.setUnreturnedConnectionTimeout( 600 ); // seconds
+// uncomment following to check for db connection leaks
+// http://www.mchange.com/projects/c3p0/#unreturnedConnectionTimeout
+//        ds.setUnreturnedConnectionTimeout( 600 ); // in seconds
 //        ds.setDebugUnreturnedConnectionStackTraces( true );
         ds.setUser( username );
         ds.setPassword( password );
         ds.setMinPoolSize( minPoolSize );
         ds.setMaxPoolSize( maxPoolSize );
+        ds.setMaxIdleTime( maxIdleTime );
+        ds.setIdleConnectionTestPeriod( idleConnectionTestPeriod );
+        ds.setMaxIdleTimeExcessConnections( maxIdleTimeExcessConnections );
         ds.setTestConnectionOnCheckout( true );
         ds.setPreferredTestQuery( "SELECT 1" );
         return ds;
