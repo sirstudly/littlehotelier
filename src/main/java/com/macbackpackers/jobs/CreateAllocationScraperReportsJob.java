@@ -59,8 +59,8 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
             bookingScraperJob.setStatus( JobStatus.submitted );
             bookingScraperJob.setAllocationScraperJobId( getAllocationScraperJobId() );
             bookingScraperJob.setCheckinDate( checkinDate );
-            dao.insertJob( bookingScraperJob );
-            jobs.add( bookingScraperJob );
+            int jobId = dao.insertJob( bookingScraperJob );
+            jobs.add( BookingScraperJob.class.cast( dao.fetchJobById( jobId ) ) );
         }
         return jobs;
     }

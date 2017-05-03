@@ -295,4 +295,12 @@ public class ReservationPageScraper {
             return cardNumber.getValueAttribute();
         }
     }
+
+    /**
+     * Close all open windows.
+     */
+    public void closeAllWindows() {
+        webClient.close();
+    }
+
 }

@@ -48,8 +48,8 @@ public class AllocationScraperJob extends AbstractJob {
             workerJob.setStatus( JobStatus.submitted );
             workerJob.setAllocationScraperJobId( getId() );
             workerJob.setStartDate( currentDate.getTime() );
-            dao.insertJob( workerJob );
-            jobs.add( workerJob );
+            int jobId = dao.insertJob( workerJob );
+            jobs.add( AllocationScraperWorkerJob.class.cast( dao.fetchJobById( jobId ) ) );
             currentDate.add( Calendar.DATE, 14 ); // calendar page shows 2 weeks at a time
         }
         return jobs;

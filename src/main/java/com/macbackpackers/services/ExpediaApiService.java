@@ -30,6 +30,7 @@ import com.macbackpackers.beans.expedia.request.ParamSet;
 import com.macbackpackers.beans.expedia.response.BookingRetrievalRS;
 import com.macbackpackers.beans.expedia.response.PaymentCard;
 import com.macbackpackers.beans.expedia.response.RoomStay;
+import com.macbackpackers.exceptions.MissingUserDataException;
 
 @Service
 public class ExpediaApiService {
@@ -67,13 +68,16 @@ public class ExpediaApiService {
     }
 
     /**
-     * Returns the card details for the given expedia booking.
+     * Returns the card details for the given expedia booking. This method is synchronized as we're
+     * only allowed one connection at a time to Expedia.
      * 
      * @param bookingRef expedia booking, e.g. EXP-123456789
      * @return deposit payment and matched card details for booking
      * @throws IOException on lookup error
+     * @throws MissingUserDataException if card details are missing from response
      */
-    public DepositPayment returnCardDetailsForBooking( String bookingRef ) throws IOException {
+    public synchronized DepositPayment returnCardDetailsForBooking( String bookingRef ) 
+            throws IOException, MissingUserDataException {
         String expediaId = bookingRef.startsWith( "EXP-" ) ? bookingRef.substring( 4 ) : bookingRef;
         
         CaptureHttpRequest paymentRequest = new CaptureHttpRequest();
@@ -100,10 +104,12 @@ public class ExpediaApiService {
             throw new IllegalStateException( "Missing RoomStay in response" );
         }
         else if ( roomStay.getPaymentCard() == null ) {
-            throw new IllegalStateException( "Missing PaymentCard in response" );
+            LOGGER.error( "Missing PaymentCard in response" );
+            throw new MissingUserDataException( "Card details no longer available on Expedia." );
         }
         else if ( roomStay.getPaymentCard().getCardHolder() == null ) {
-            throw new IllegalStateException( "Missing CardHolder in response" );
+            LOGGER.error( "Missing CardHolder in response" );
+            throw new MissingUserDataException( "Cardholder no longer available on Expedia." );
         }
 
         PaymentCard paymentCard = roomStay.getPaymentCard();

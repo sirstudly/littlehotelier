@@ -25,7 +25,6 @@ import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.exceptions.ShutdownException;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.ProcessorService;
-import com.macbackpackers.services.SchedulerService;
 
 /**
  * The main bootstrap for running all available jobs.
@@ -42,8 +41,8 @@ public class RunProcessor
     @Autowired
     private FileService fileService;
 
-    @Autowired
-    private SchedulerService scheduler;
+//    @Autowired
+//    private SchedulerService scheduler;
 
     @Value( "${processor.repeat.interval.ms:60000}" )
     private long repeatIntervalMillis;
@@ -53,33 +52,6 @@ public class RunProcessor
 
     // make sure only one instance is running by checking a file-level lock
     private boolean checkLock = true;
-
-    /**
-     * Process all jobs. If no jobs are available to be run, then pause for a configured period
-     * before checking again.
-     * 
-     * @throws IOException on lock read error
-     * @throws ShutdownException if shutdown has been requested
-     * @throws SchedulerException on scheduling exception
-     */
-    private void processJobsLoopIndefinitely() throws IOException, ShutdownException, SchedulerException {
-
-        while ( true ) {
-            try {
-                // run all submitted jobs
-                processorService.processJobs();
-
-                // repeat indefinitely
-                Thread.sleep( repeatIntervalMillis );
-            }
-            catch ( InterruptedException e ) {
-                // ignored
-            }
-            catch ( Exception ex ) {
-                LOGGER.error( "Received error but continuing...", ex );
-            }
-        }
-    }
 
     /**
      * Returns whether or not to check the lock before starting.
@@ -119,8 +91,8 @@ public class RunProcessor
     public void runInServerMode() throws IOException, ShutdownException, SchedulerException {
         acquireLock();
 //        dao.resetAllProcessingJobsToFailed();
-        scheduler.reloadScheduledJobs(); // load and start the scheduler
-        processJobsLoopIndefinitely();
+//        scheduler.reloadScheduledJobs(); // load and start the scheduler
+        processorService.processJobsLoopIndefinitely();
     }
 
     /**

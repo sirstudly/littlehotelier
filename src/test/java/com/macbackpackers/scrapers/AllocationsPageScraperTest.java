@@ -47,7 +47,7 @@ public class AllocationsPageScraperTest {
         // this should be the one we just added
         j = dao.getNextJobToProcess();
         Assert.assertEquals( HousekeepingJob.class, j.getClass() );
-        Assert.assertEquals( "submitted", j.getStatus() );
+        Assert.assertEquals( JobStatus.processing, j.getStatus() );
         Assert.assertNotNull( "created date not initialised", j.getCreatedDate() );
 
         LOGGER.info( "Running bedsheet job for " + j.getCreatedDate() );

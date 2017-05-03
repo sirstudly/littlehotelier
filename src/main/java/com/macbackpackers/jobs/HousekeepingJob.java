@@ -41,6 +41,11 @@ public class HousekeepingJob extends AbstractJob {
         allocationScraper.dumpAllocationsFrom( getId(), dayBefore.getTime(), false );
     }
 
+    @Override
+    public void finalizeJob() {
+        allocationScraper.closeAllWindows(); // cleans up JS threads
+    }
+
     /**
      * Gets the date to start scraping the allocation data (inclusive).
      * 

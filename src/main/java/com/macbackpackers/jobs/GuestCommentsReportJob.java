@@ -50,6 +50,11 @@ public class GuestCommentsReportJob extends AbstractJob {
         }
     }
 
+    @Override
+    public void finalizeJob() {
+        bookingsScraper.closeAllWindows(); // cleans up JS threads
+    }
+
     /**
      * Creates an additional job to update a single booking.
      * @param reservationId ID of reservation

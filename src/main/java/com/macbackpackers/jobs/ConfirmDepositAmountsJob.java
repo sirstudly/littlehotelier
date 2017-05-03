@@ -29,6 +29,11 @@ public class ConfirmDepositAmountsJob extends AbstractJob {
         reservationScraper.tickDeposit( reservationPage );
     }
 
+    @Override
+    public void finalizeJob() {
+        reservationScraper.closeAllWindows(); // cleans up JS threads
+    }
+
     public int getReservationId() {
         return Integer.parseInt( getParameter( "reservation_id" ) );
     }

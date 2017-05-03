@@ -56,7 +56,7 @@ public class Job {
     @OneToMany( cascade = { CascadeType.ALL }, fetch = FetchType.EAGER, mappedBy = "job" )
     private Set<JobParameter> parameters = new HashSet<JobParameter>();
 
-    @OneToMany( cascade = { CascadeType.ALL }, fetch = FetchType.LAZY )
+    @OneToMany( cascade = { CascadeType.MERGE }, fetch = FetchType.LAZY )
     @JoinTable( name = "wp_lh_job_dependency", joinColumns = @JoinColumn( name = "job_id" ), inverseJoinColumns = @JoinColumn( name = "depends_on_job_id" ) )
     private Set<Job> dependentJobs = new HashSet<Job>();
 

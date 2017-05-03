@@ -53,6 +53,11 @@ public class CreateSendGuestCheckoutEmailJob extends AbstractJob {
         }
     }
     
+    @Override
+    public void finalizeJob() {
+        bookingsScraper.closeAllWindows(); // cleans up JS threads
+    }
+
     public Date getCheckoutDate() throws ParseException {
         return AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "checkout_date" ) );
     }

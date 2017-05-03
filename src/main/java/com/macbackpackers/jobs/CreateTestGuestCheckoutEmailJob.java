@@ -30,6 +30,11 @@ public class CreateTestGuestCheckoutEmailJob extends AbstractJob {
     }
 
     @Override
+    public void finalizeJob() {
+        bookingsScraper.closeAllWindows(); // cleans up JS threads
+    }
+
+    @Override
     public int getRetryCount() {
         return 1; // don't try to send more than 1 email...
     }

@@ -60,6 +60,11 @@ public class CreateDepositChargeJob extends AbstractJob {
         }
     }
 
+    @Override
+    public void finalizeJob() {
+        scraper.closeAllWindows(); // cleans up JS threads
+    }
+
     /**
      * Returns the number of days back to check for records.
      * 

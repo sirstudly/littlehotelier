@@ -71,6 +71,13 @@ public class DiffBookingEnginesJob extends AbstractJob {
         bookingsScraper.insertMissingHWBookings(getId(), checkinDate);
     }
 
+    @Override
+    public void finalizeJob() {
+        allocationScraper.closeAllWindows(); // cleans up JS threads
+        hwScraper.closeAllWindows();
+        bookingsScraper.closeAllWindows();
+    }
+
     /**
      * Gets the checkin date to scrape the allocation data.
      * 

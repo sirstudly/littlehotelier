@@ -1,6 +1,11 @@
 
 package com.macbackpackers.services;
 
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -11,14 +16,15 @@ import org.springframework.stereotype.Service;
 
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.WordPressDAO;
-import com.macbackpackers.exceptions.ShutdownException;
 import com.macbackpackers.jobs.AbstractJob;
-import com.macbackpackers.jobs.ShutdownJob;
 
 @Service
 public class ProcessorService {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+    
+    @Value( "${processor.thread.count:1}" )
+    private int threadCount;
 
     @Autowired
     private WordPressDAO dao;
@@ -26,42 +32,91 @@ public class ProcessorService {
     @Autowired
     private AutowireCapableBeanFactory autowireBeanFactory;
 
+    @Value( "${processor.repeat.interval.ms:60000}" )
+    private long repeatIntervalMillis;
+
     @Value( "${process.jobs.backoff.millis:3000}" )
     private int backoffMillis; // time to wait before re-attempting failed job
 
     /**
-     * Checks for any housekeeping jobs that need to be run ('submitted') and processes them.
-     * 
-     * @throws ShutdownException if an immediate shutdown is requested
+     * Checks for any jobs that need to be run ('submitted') and processes them.
      */
-    public void processJobs() throws ShutdownException {
-        // find and run all submitted jobs
-        for ( AbstractJob job = dao.getNextJobToProcess() ; job != null ; job = dao.getNextJobToProcess() ) {
-            autowireBeanFactory.autowireBean( job ); // as job is an entity, wire up any spring collaborators 
-            processJob( job );
+    public void processJobs() {
 
-            // stop processing all other jobs if shutdown requested
-            if ( job instanceof ShutdownJob ) {
-                throw new ShutdownException();
+        // start thread pool
+        ExecutorService executor = Executors.newFixedThreadPool( threadCount );
+        CyclicBarrier barrier = new CyclicBarrier( threadCount );
+        for ( int i = 0 ; i < threadCount ; i++ ) {
+            JobProcessorThread th = new JobProcessorThread( barrier );
+            autowireBeanFactory.autowireBean( th );
+            executor.execute( th );
+        }
+        LOGGER.info( "Finished thread pool creation." );
+
+        // wait until all threads terminate nicely
+        executor.shutdown();
+        try {
+            if ( executor.awaitTermination( 1, TimeUnit.DAYS ) ) {
+                LOGGER.info( "All threads terminated." );
+            }
+            else {
+                LOGGER.info( "Timeout waiting for threads to terminate" );
+            }
+        }
+        catch ( InterruptedException e ) {
+            // ignored
+        }
+    }
+
+    /**
+     * Synchronize block around {@link WordPressDAO#getNextJobToProcess()} otherwise the transaction
+     * may not commit before the next thread runs.
+     * 
+     * @return next job or null if none found
+     */
+    public synchronized AbstractJob getNextJobToProcess() {
+        AbstractJob job = dao.getNextJobToProcess(); 
+        if( job != null ) {
+            autowireBeanFactory.autowireBean( job ); // as job is an entity, wire up any spring collaborators
+        }
+        return job;
+    }
+
+    /**
+     * Process all jobs. If no jobs are available to be run, then pause for a configured period
+     * before checking again.
+     * 
+     */
+    public void processJobsLoopIndefinitely() {
+        // start thread pool
+        ExecutorService executor = Executors.newFixedThreadPool( threadCount );
+        CyclicBarrier barrier = new CyclicBarrier( threadCount );
+        
+        while(true) {
+            for ( int i = 0 ; i < threadCount ; i++ ) {
+                JobProcessorThread th = new JobProcessorThread( barrier );
+                autowireBeanFactory.autowireBean( th );
+                executor.execute( th );
+            }
+            try {
+                Thread.sleep( repeatIntervalMillis ); // wait then repeat loop
+            }
+            catch ( InterruptedException e ) {
+                // ignore
             }
         }
     }
 
     /**
      * Runs the job and updates the status when complete.
+     * 
+     * @param job the job that will be executed
      */
 //    @Transactional( propagation = Propagation.REQUIRES_NEW )
-    private void processJob( AbstractJob job ) {
+    public void processJob( AbstractJob job ) {
 
-        LOGGER.info( "Attempting to lock job " + job.getId() );
-        if ( false == dao.updateJobStatusToProcessing( job.getId() ) ) {
-            LOGGER.info( "Could not lock job " + job.getId() + "; skipping" );
-            return;
-        }
-
+        MDC.put( "jobId", String.valueOf( job.getId() ) ); // record the ID of this job for logging
         for ( int i = 0 ; i < job.getRetryCount() ; i++ ) {
-            MDC.put( "jobId", String.valueOf( job.getId() ) ); // record the ID of this job for logging
-
             try {
                 LOGGER.info( "Processing job " + job.getId() + "; Attempt " + (i + 1));
                 job.resetJob();
@@ -87,9 +142,16 @@ public class ProcessorService {
                     }
                 }
             }
-            finally {
-                MDC.remove( "jobId" );
-            }
+        }
+
+        try {
+            job.finalizeJob();
+        }
+        catch ( Throwable ex ) {
+            LOGGER.error( "Error finalising job " + job.getId(), ex );
+        }
+        finally {
+            MDC.remove( "jobId" );
         }
     }
 }

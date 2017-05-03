@@ -29,6 +29,11 @@ public class UpdateHostelbookersSettingsJob extends AbstractJob {
         hbScraper.doLogin( getParameter( "username" ), getParameter( "password" ) );
     }
 
+    @Override
+    public void finalizeJob() {
+        hbScraper.closeAllWindows(); // cleans up JS threads
+    }
+
     /**
      * To avoid locking out the account, overrides method to retry only once.
      * 

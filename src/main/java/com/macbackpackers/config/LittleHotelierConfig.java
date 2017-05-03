@@ -85,9 +85,9 @@ public class LittleHotelierConfig {
         return webClient;
     }
 
-    @Bean
-    public Scheduler getScheduler() throws SchedulerException {
-        return StdSchedulerFactory.getDefaultScheduler();
-    }
+//    @Bean
+//    public Scheduler getScheduler() throws SchedulerException {
+//        return StdSchedulerFactory.getDefaultScheduler();
+//    }
 
 }

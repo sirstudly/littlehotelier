@@ -128,9 +128,10 @@ public interface WordPressDAO {
     public void resetAllProcessingJobsToFailed();
 
     /**
-     * Returns the first job with a state of 'submitted'. Side effect: when picking up the next job
-     * to process; if it is dependent on another job at failed/aborted, it will set the status of
-     * this job to aborted.
+     * Returns the first job with a state of 'submitted' and by virtue of having selecting it, sets
+     * the status to 'processing'. Additional side effect: when picking up the next job to process;
+     * if it is dependent on another job at failed/aborted, it will set the status of this job to
+     * aborted.
      * 
      * @return next job to run or null if no jobs to run
      */

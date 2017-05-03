@@ -23,7 +23,7 @@ import com.macbackpackers.jobs.quartz.CronJob;
 /**
  * CRON Service for scheduling jobs.
  */
-@Service
+//@Service
 public class SchedulerService {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );

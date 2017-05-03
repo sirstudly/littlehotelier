@@ -222,7 +222,7 @@ public class WordPressDAOTest {
 
         Assert.assertEquals( HousekeepingJob.class, jobView.getClass() );
         Assert.assertEquals( jobId, jobView.getId() );
-        Assert.assertEquals( j.getStatus(), jobView.getStatus() );
+        Assert.assertEquals( JobStatus.processing, jobView.getStatus() );
         Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
         Assert.assertNotNull( "last updated date not null", jobView.getLastUpdatedDate() );
     }

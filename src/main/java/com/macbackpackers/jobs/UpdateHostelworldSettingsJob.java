@@ -36,6 +36,11 @@ public class UpdateHostelworldSettingsJob extends AbstractJob {
         wordpressDAO.setOption( "hbo_hw_password", getParameter( "password" ));
     }
 
+    @Override
+    public void finalizeJob() {
+        hwScraper.closeAllWindows(); // cleans up JS threads
+    }
+
     /**
      * To avoid locking out the account, overrides method to retry only once.
      * 

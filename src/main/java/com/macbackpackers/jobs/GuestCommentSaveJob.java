@@ -32,6 +32,11 @@ public class GuestCommentSaveJob extends AbstractJob {
         dao.updateGuestCommentsForReservation( getReservationId(), comment );
     }
 
+    @Override
+    public void finalizeJob() {
+        bookingsScraper.closeAllWindows(); // cleans up JS threads
+    }
+
     public int getReservationId() {
         return Integer.parseInt( getParameter( "reservation_id" ));
     }

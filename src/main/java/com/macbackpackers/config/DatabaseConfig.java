@@ -6,9 +6,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
+import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 
-import org.hibernate.SessionFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,8 +16,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
-import org.springframework.orm.hibernate5.HibernateTransactionManager;
-import org.springframework.orm.hibernate5.LocalSessionFactoryBean;
+import org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.macbackpackers.exceptions.UnrecoverableFault;
@@ -27,6 +30,15 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
 @EnableTransactionManagement
 @PropertySource( "classpath:config.properties" )
 public class DatabaseConfig {
+
+    @Value( "${processor.thread.count:1}" )
+    private int threadCount;
+
+    @Value( "${db.poolsize.min:1}" )
+    private int minPoolSize;
+
+    @Value( "${db.poolsize.max:20}" )
+    private int maxPoolSize;
 
     @Value( "${db.url}" )
     private String url;
@@ -39,7 +51,7 @@ public class DatabaseConfig {
 
     @Value( "${db.driverclass}" )
     private String driverClass;
-
+    
     @Bean
     public static PropertySourcesPlaceholderConfigurer getPlaceHolderConfigurer() {
         return new PropertySourcesPlaceholderConfigurer();
@@ -50,30 +62,44 @@ public class DatabaseConfig {
         ComboPooledDataSource ds = new ComboPooledDataSource();
         ds.setJdbcUrl( url );
         ds.setDriverClass( driverClass );
+        ds.setCheckoutTimeout( 60000 );
+//        ds.setUnreturnedConnectionTimeout( 600 ); // seconds
+//        ds.setDebugUnreturnedConnectionStackTraces( true );
         ds.setUser( username );
         ds.setPassword( password );
-        ds.setMinPoolSize( 3 );
-        ds.setMaxPoolSize( 10 );
+        ds.setMinPoolSize( minPoolSize );
+        ds.setMaxPoolSize( maxPoolSize );
         ds.setTestConnectionOnCheckout( true );
         ds.setPreferredTestQuery( "SELECT 1" );
         return ds;
     }
 
     @Bean
-    @Autowired
-    @Qualifier( "txnDataSource" )
-    public LocalSessionFactoryBean getSessionFactory( DataSource dataSource ) throws IOException {
-        LocalSessionFactoryBean bean = new LocalSessionFactoryBean();
-        bean.setDataSource( dataSource );
-        bean.getHibernateProperties().putAll( getHibernateProperties() );
-        bean.setPackagesToScan( "com.macbackpackers.beans", "com.macbackpackers.jobs" );
-        return bean;
+    public PersistenceExceptionTranslationPostProcessor exceptionTranslation() {
+        return new PersistenceExceptionTranslationPostProcessor();
     }
 
-    @Bean
+    @Bean( name = "entityManagerFactory" )
     @Autowired
-    public HibernateTransactionManager getTransactionManager( SessionFactory sessionFactory ) {
-        return new HibernateTransactionManager( sessionFactory );
+    @Qualifier( "txnDataSource" )
+    public LocalContainerEntityManagerFactoryBean getLocalContainerEntityManagerFactoryBean( DataSource dataSource ) throws IOException {
+        LocalContainerEntityManagerFactoryBean emf = new LocalContainerEntityManagerFactoryBean();
+        emf.setDataSource( dataSource );
+        emf.setPackagesToScan( "com.macbackpackers.beans", "com.macbackpackers.jobs" );
+        emf.setJpaVendorAdapter( new HibernateJpaVendorAdapter() );
+        emf.setJpaProperties( getHibernateProperties() );
+        return emf;
+    }
+    
+    @Bean( name = "transactionManager" )
+    @Autowired
+    @Qualifier( "txnDataSource" )
+    public PlatformTransactionManager getTransactionManager( DataSource dataSource, EntityManagerFactory emf ) {
+        JpaTransactionManager tm = new JpaTransactionManager();
+        tm.setEntityManagerFactory( emf );
+        tm.setDataSource( dataSource );
+        tm.setDefaultTimeout( 60 );
+        return tm;
     }
     
     @Bean

@@ -337,6 +337,9 @@ public class AllocationsPageScraper {
         alloc.setCheckoutDate( checkoutDate.getTime() );
     }
 
+    /**
+     * Close all open windows.
+     */
     public void closeAllWindows() {
         webClient.close();
     }

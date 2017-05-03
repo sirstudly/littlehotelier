@@ -724,4 +724,12 @@ public class BookingsPageScraper {
         }
         return results;
     }
+
+    /**
+     * Close all open windows.
+     */
+    public void closeAllWindows() {
+        webClient.close();
+    }
+
 }

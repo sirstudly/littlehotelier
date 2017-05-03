@@ -35,6 +35,11 @@ public class ScrapeReservationsBookedOnJob extends AbstractJob {
         bookingScraper.createConfirmDepositJobs( bookingsPage );
     }
 
+    @Override
+    public void finalizeJob() {
+        bookingScraper.closeAllWindows(); // cleans up JS threads
+    }
+
     /**
      * Gets the booked on date to scrape for the booking data.
      * 

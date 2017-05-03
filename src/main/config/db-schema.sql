@@ -42,7 +42,8 @@ CREATE TABLE `wp_lh_jobs` (
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_updated_date` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`job_id`),
-  KEY `lh_j_classname` (`classname`) 
+  KEY `lh_j_classname` (`classname`),
+  KEY `lh_j_class_status` (`classname`, `status`) 
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 

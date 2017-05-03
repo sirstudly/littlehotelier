@@ -56,9 +56,6 @@ public class ProcessorServiceTest {
     TestHarnessDAO testDAO;
 
     @Autowired
-    Scheduler scheduler;
-
-    @Autowired
     AutowireCapableBeanFactory autowireBeanFactory;
     
     @Before
@@ -259,10 +256,20 @@ public class ProcessorServiceTest {
     }
 
     @Test
-    public void testBDCDepositChargeJob() throws Exception {
-        DepositChargeJob j = DepositChargeJob.class.cast( dao.fetchJobById( 138571 ));
-        autowireBeanFactory.autowireBean( j ); // as job is an entity, wire up any spring collaborators 
-        j.processJob();
+    public void testDepositChargeJob() throws Exception {
+        DepositChargeJob j = new DepositChargeJob();
+
+        j.setStatus( JobStatus.submitted );
+        Calendar bookingDate = Calendar.getInstance();
+        bookingDate.set( Calendar.DATE, 27 );
+        bookingDate.set( Calendar.MONTH, Calendar.APRIL );
+        bookingDate.set( Calendar.YEAR, 2017 );
+        j.setBookingDate( bookingDate.getTime() );
+        j.setBookingRef( "EXP-832394371" );
+        dao.insertJob( j );
+        
+        // this should now run the job
+        processorService.processJobs();
     }
     
     @Test

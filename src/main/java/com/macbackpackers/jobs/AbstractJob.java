@@ -47,6 +47,13 @@ public abstract class AbstractJob extends Job {
     }
 
     /**
+     * Cleans up any resources after <em>all attempts</em> to run the job have finished.
+     */
+    public void finalizeJob() {
+        // override to implement
+    }
+
+    /**
      * Do whatever it is we need to do.
      * 
      * @throws Exception

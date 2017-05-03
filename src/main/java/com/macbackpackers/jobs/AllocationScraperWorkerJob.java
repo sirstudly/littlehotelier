@@ -24,13 +24,14 @@ public class AllocationScraperWorkerJob extends AbstractJob {
     @Transient
     private AllocationsPageScraper allocationScraper;
 
-    public AllocationsPageScraper getAllocationPageScraper() {
-        return allocationScraper;
-    }
-
     @Override
     public void resetJob() throws Exception {
         dao.deleteAllocations( getId() );
+    }
+
+    @Override
+    public void finalizeJob() {
+        allocationScraper.closeAllWindows(); // cleans up JS threads
     }
 
     @Override

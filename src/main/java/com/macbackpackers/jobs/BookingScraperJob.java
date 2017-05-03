@@ -32,6 +32,11 @@ public class BookingScraperJob extends AbstractJob {
                 getAllocationScraperJobId(), getCheckinDate(), getCheckinDate(), isTestMode() );
     }
 
+    @Override
+    public void finalizeJob() {
+        bookingScraper.closeAllWindows(); // cleans up JS threads
+    }
+
     public int getAllocationScraperJobId() {
         return Integer.parseInt( getParameter( "allocation_scraper_job_id" ) );
     }

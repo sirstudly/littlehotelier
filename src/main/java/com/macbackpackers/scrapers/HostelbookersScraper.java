@@ -374,4 +374,11 @@ public class HostelbookersScraper {
         return bookingsUrl.replaceAll( "__DATE__", DATE_FORMAT_DD_MMMMM_YYYY.format( date ) );
     }
 
+    /**
+     * Close all open windows.
+     */
+    public void closeAllWindows() {
+        webClient.close();
+    }
+
 }
