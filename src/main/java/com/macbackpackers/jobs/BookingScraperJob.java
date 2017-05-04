@@ -9,7 +9,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 
@@ -26,15 +28,20 @@ public class BookingScraperJob extends AbstractJob {
     @Transient
     private BookingsPageScraper bookingScraper;
 
+    @Autowired
+    @Transient
+    @Qualifier( "webClient" )
+    private WebClient webClient;
+
     @Override
     public void processJob() throws Exception {
         bookingScraper.updateBookingsBetween(
-                getAllocationScraperJobId(), getCheckinDate(), getCheckinDate(), isTestMode() );
+                webClient, getAllocationScraperJobId(), getCheckinDate(), getCheckinDate() );
     }
 
     @Override
     public void finalizeJob() {
-        bookingScraper.closeAllWindows(); // cleans up JS threads
+        webClient.close(); // cleans up JS threads
     }
 
     public int getAllocationScraperJobId() {
@@ -62,18 +69,6 @@ public class BookingScraperJob extends AbstractJob {
      */
     public void setCheckinDate( Date checkinDate ) {
         setParameter( "checkin_date", AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ) );
-    }
-
-    /**
-     * For testing, we may want to load from a previously serialised file (rather than scrape the
-     * page again which takes about 10 minutes). Default value is false, but if the "test_mode"
-     * parameter is set to true, then attempt to load from file first. If no file is found, then
-     * scrape the page again.
-     * 
-     * @return true if test mode, false otherwise
-     */
-    public boolean isTestMode() {
-        return "true".equalsIgnoreCase( getParameter( "test_mode" ) );
     }
 
 }

@@ -6,9 +6,10 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.SendEmailEntry;
-import com.macbackpackers.scrapers.BookingsPageScraper;
 
 /**
  * Job that sends a copy of the guest checkout email to the target recipient
@@ -21,17 +22,13 @@ public class CreateTestGuestCheckoutEmailJob extends AbstractJob {
 
     @Autowired
     @Transient
-    private BookingsPageScraper bookingsScraper;
+    @Qualifier( "webClient" )
+    private WebClient webClient;
 
     @Override
     public void resetJob() throws Exception {
         // because email address has a unique constraint, delete any existing entries first
         dao.deleteSendEmailEntry( getRecipientEmail() );
-    }
-
-    @Override
-    public void finalizeJob() {
-        bookingsScraper.closeAllWindows(); // cleans up JS threads
     }
 
     @Override

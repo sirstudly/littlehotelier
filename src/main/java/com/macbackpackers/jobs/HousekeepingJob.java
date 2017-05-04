@@ -10,7 +10,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 
 /**
@@ -25,6 +27,11 @@ public class HousekeepingJob extends AbstractJob {
     @Transient
     private AllocationsPageScraper allocationScraper;
 
+    @Autowired
+    @Transient
+    @Qualifier( "webClientScriptingDisabled" )
+    private WebClient webClient;
+
     @Override
     public void resetJob() throws Exception {
         dao.deleteAllocations( getId() );
@@ -38,12 +45,12 @@ public class HousekeepingJob extends AbstractJob {
         Calendar dayBefore = Calendar.getInstance();
         dayBefore.setTime( selectedDate );
         dayBefore.add( Calendar.DATE, -1 );
-        allocationScraper.dumpAllocationsFrom( getId(), dayBefore.getTime(), false );
+        allocationScraper.dumpAllocationsFrom( webClient, getId(), dayBefore.getTime() );
     }
 
     @Override
     public void finalizeJob() {
-        allocationScraper.closeAllWindows(); // cleans up JS threads
+        webClient.close(); // cleans up JS threads
     }
 
     /**

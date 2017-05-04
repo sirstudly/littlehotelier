@@ -10,7 +10,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
@@ -29,6 +31,11 @@ public class DiffBookingEnginesJob extends AbstractJob {
     @Autowired
     @Transient
     private AllocationsPageScraper allocationScraper;
+
+    @Autowired
+    @Transient
+    @Qualifier( "webClient" )
+    private WebClient webClient;
 
     @Autowired
     @Transient
@@ -56,11 +63,11 @@ public class DiffBookingEnginesJob extends AbstractJob {
         Calendar oneWeekBefore = Calendar.getInstance();
         oneWeekBefore.setTime( checkinDate );
         oneWeekBefore.add( Calendar.DATE, -7 );
-        allocationScraper.dumpAllocationsFrom( getId(), oneWeekBefore.getTime(), false );
+        allocationScraper.dumpAllocationsFrom( webClient, getId(), oneWeekBefore.getTime() );
 
         // and update the additional fields for the records
         for ( Date nextDate : dao.getCheckinDatesForAllocationScraperJobId( getId() ) ) {
-            bookingsScraper.updateBookingsFor( getId(), nextDate, null );
+            bookingsScraper.updateBookingsFor( webClient, getId(), nextDate, null );
         }
 
         // now dump the data from HW/HB
@@ -68,14 +75,13 @@ public class DiffBookingEnginesJob extends AbstractJob {
         
         // find those bookings that don't have an entry in HW but none in LH
         // this could be because the checkin date has moved or the reservation was cancelled
-        bookingsScraper.insertMissingHWBookings(getId(), checkinDate);
+        bookingsScraper.insertMissingHWBookings( webClient, getId(), checkinDate );
     }
 
     @Override
     public void finalizeJob() {
-        allocationScraper.closeAllWindows(); // cleans up JS threads
+        webClient.close(); // cleans up JS threads
         hwScraper.closeAllWindows();
-        bookingsScraper.closeAllWindows();
     }
 
     /**

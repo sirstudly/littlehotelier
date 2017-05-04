@@ -11,7 +11,9 @@ import javax.persistence.Transient;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
@@ -28,6 +30,11 @@ public class CreateSendGuestCheckoutEmailJob extends AbstractJob {
     @Transient
     private BookingsPageScraper bookingsScraper;
 
+    @Autowired
+    @Transient
+    @Qualifier( "webClient" )
+    private WebClient webClient;
+
     @Override
     public void processJob() throws Exception {
         
@@ -35,7 +42,7 @@ public class CreateSendGuestCheckoutEmailJob extends AbstractJob {
         String emailTemplate = dao.getGuestCheckoutEmailTemplate();
         
         // retrieve all checkouts for the day
-        for( CSVRecord record : bookingsScraper.getAllCheckouts( "HWL", getCheckoutDate() ) ) {
+        for( CSVRecord record : bookingsScraper.getAllCheckouts( webClient, "HWL", getCheckoutDate() ) ) {
             LOGGER.info( "Booking ref: " + record.get( "Booking reference" ) );
             
             String email = record.get( "Guest email" );
@@ -55,7 +62,7 @@ public class CreateSendGuestCheckoutEmailJob extends AbstractJob {
     
     @Override
     public void finalizeJob() {
-        bookingsScraper.closeAllWindows(); // cleans up JS threads
+        webClient.close(); // cleans up JS threads
     }
 
     public Date getCheckoutDate() throws ParseException {

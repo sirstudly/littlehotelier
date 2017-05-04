@@ -6,13 +6,9 @@ import java.util.List;
 
 import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
-import javax.persistence.Transient;
-
-import org.springframework.beans.factory.annotation.Autowired;
 
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.MissingGuestComment;
-import com.macbackpackers.scrapers.BookingsPageScraper;
 
 /**
  * Updates the report table with all reservations where the guest has left a comment with the
@@ -22,10 +18,6 @@ import com.macbackpackers.scrapers.BookingsPageScraper;
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.GuestCommentsReportJob" )
 public class GuestCommentsReportJob extends AbstractJob {
-
-    @Autowired
-    @Transient
-    private BookingsPageScraper bookingsScraper;
 
     @Override
     public void processJob() throws Exception {
@@ -48,11 +40,6 @@ public class GuestCommentsReportJob extends AbstractJob {
         else {
             LOGGER.warn( "AllocationScraperJob hasn't been run yet" );
         }
-    }
-
-    @Override
-    public void finalizeJob() {
-        bookingsScraper.closeAllWindows(); // cleans up JS threads
     }
 
     /**

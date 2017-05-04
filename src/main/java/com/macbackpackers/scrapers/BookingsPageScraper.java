@@ -1,7 +1,6 @@
 
 package com.macbackpackers.scrapers;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
@@ -21,7 +20,6 @@ import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
@@ -43,7 +41,6 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.scrapers.matchers.CastleRockRoomBedMatcher;
 import com.macbackpackers.services.AuthenticationService;
-import com.macbackpackers.services.FileService;
 
 /**
  * Scrapes the bookings page
@@ -60,14 +57,7 @@ public class BookingsPageScraper {
     public static final FastDateFormat DATE_FORMAT_BOOKING_URL = FastDateFormat.getInstance( "dd+MMM+yyyy" );
 
     @Autowired
-    @Qualifier( "webClient" )
-    private WebClient webClient;
-
-    @Autowired
     private AuthenticationService authService;
-
-    @Autowired
-    private FileService fileService;
 
     @Autowired
     private WordPressDAO wordPressDAO;
@@ -78,24 +68,26 @@ public class BookingsPageScraper {
     /**
      * Goes to the booking page showing arrivals for the given date.
      * 
+     * @param webClient web client to use
      * @param date date to query
      * @return URL of bookings arriving on this date
      * @throws IOException if credentials could not be loaded
      */
-    public HtmlPage goToBookingPageForArrivals( Date date ) throws IOException {
-        return goToBookingPageForArrivals( date, null, null );
+    private HtmlPage goToBookingPageForArrivals( WebClient webClient, Date date ) throws IOException {
+        return goToBookingPageForArrivals( webClient, date, null, null );
     }
 
     /**
      * Goes to the booking page showing arrivals for the given date and booking reference.
      * 
+     * @param webClient web client to use
      * @param date date to query
      * @param bookingRef booking reference (optional)
      * @param status status of reservation (optional)
      * @return URL of bookings arriving on this date
      * @throws IOException if credentials could not be loaded
      */
-    public HtmlPage goToBookingPageForArrivals( Date date, String bookingRef, String status ) throws IOException {
+    public HtmlPage goToBookingPageForArrivals( WebClient webClient, Date date, String bookingRef, String status ) throws IOException {
         String pageURL = getBookingsURLForArrivalsByDate( date, date, bookingRef, status );
         LOGGER.info( "Loading bookings page: " + pageURL );
         return authService.goToPage( pageURL, webClient );
@@ -104,6 +96,7 @@ public class BookingsPageScraper {
     /**
      * Goes to the booking page showing arrivals for the given dates and booking reference.
      * 
+     * @param webClient web client to use
      * @param fromDate date to start query
      * @param toDate date to query to
      * @param bookingRef booking reference (optional)
@@ -111,7 +104,7 @@ public class BookingsPageScraper {
      * @return URL of bookings arriving on this date
      * @throws IOException if credentials could not be loaded
      */
-    public HtmlPage goToBookingPageForArrivals( Date fromDate, Date toDate, String bookingRef, String status ) throws IOException {
+    private HtmlPage goToBookingPageForArrivals( WebClient webClient, Date fromDate, Date toDate, String bookingRef, String status ) throws IOException {
         String pageURL = getBookingsURLForArrivalsByDate( fromDate, toDate, bookingRef, status );
         LOGGER.info( "Loading bookings page: " + pageURL );
         HtmlPage nextPage = authService.goToPage( pageURL, webClient );
@@ -122,12 +115,13 @@ public class BookingsPageScraper {
      * Goes to the booking page showing reservations that have been booked on the given date with a
      * matching booking ref.
      * 
+     * @param webClient web client to use
      * @param date date to query
      * @param bookingRefId a matching booking ref; can be "HWL" or "HBK" for example
      * @return URL of bookings booked on this date
      * @throws IOException if credentials could not be loaded
      */
-    public HtmlPage goToBookingPageBookedOn( Date date, String bookingRefId ) throws IOException {
+    public HtmlPage goToBookingPageBookedOn( WebClient webClient, Date date, String bookingRefId ) throws IOException {
         String pageURL = getBookingsURLForBookedOnDate( date, date, bookingRefId, null );
         LOGGER.info( "Loading bookings page: " + pageURL );
         HtmlPage nextPage = authService.goToPage( pageURL, webClient );
@@ -171,18 +165,6 @@ public class BookingsPageScraper {
     }
 
     /**
-     * Returns a unique filename for a given date to use when serilaising/deserialising page data
-     * when scraping.
-     * 
-     * @param date date of calendar page
-     * @return filename of calendar page on the given date
-     */
-    private static String getBookingPageSerialisedObjectFilename( Date date ) {
-        String dateAsString = DATE_FORMAT_YYYY_MM_DD.format( date );
-        return "bookings_page_" + dateAsString + ".ser";
-    }
-
-    /**
      * Updates the extended attributes on the existing allocation records for the given jobId.
      * 
      * @param jobId ID of job to update
@@ -190,95 +172,77 @@ public class BookingsPageScraper {
      */
     private void updateBookings( int jobId, HtmlPage bookingsPage ) {
         for ( DomElement tr : bookingsPage.getElementsByTagName( "tr" ) ) {
-            try {
-                String dataId = tr.getAttribute( "data-id" );
-                String styleClass = tr.getAttribute( "class" ); // read or unread
+            String dataId = tr.getAttribute( "data-id" );
+            String styleClass = tr.getAttribute( "class" ); // read or unread
 
-                if ( StringUtils.isNotBlank( dataId ) ) {
-                    LOGGER.debug( "Found record " + dataId + " " + styleClass );
+            if ( StringUtils.isNotBlank( dataId ) ) {
+                LOGGER.debug( "Found record " + dataId + " " + styleClass );
 
-                    // attempt to load the existing record if possible
-                    AllocationList allocList = wordPressDAO.queryAllocationsByJobIdAndReservationId(
-                            jobId, Integer.parseInt( dataId ) );
-                    if ( allocList.isEmpty() ) {
-                        // this may happen if there are additional records in the bookings page
-                        // that weren't in our list of allocations
-                        LOGGER.debug( "No allocation record found for reservation_id " + dataId + " and job " + jobId );
-                        continue;
-                    }
+                // attempt to load the existing record if possible
+                AllocationList allocList = wordPressDAO.queryAllocationsByJobIdAndReservationId(
+                        jobId, Integer.parseInt( dataId ) );
+                if ( allocList.isEmpty() ) {
+                    // this may happen if there are additional records in the bookings page
+                    // that weren't in our list of allocations
+                    LOGGER.debug( "No allocation record found for reservation_id " + dataId + " and job " + jobId );
+                    continue;
+                }
 
-                    // Because some reservations have multiple allocations
-                    // we'll be updating *all* records for that booking in this method.
-                    // The updateAllocationList() call below will update *all* matching records
-                    // by reservation_id and job_id
+                // Because some reservations have multiple allocations
+                // we'll be updating *all* records for that booking in this method.
+                // The updateAllocationList() call below will update *all* matching records
+                // by reservation_id and job_id
 
-                    // may want to improve this later if i split out the table so it's not flattened
-                    DomElement td = tr.getFirstElementChild();
+                // may want to improve this later if i split out the table so it's not flattened
+                DomElement td = tr.getFirstElementChild();
 
-                    // viewed_yn
-                    List<String> classAttrs = Arrays.<String> asList( tr.getAttribute( "class" ).split( "\\s" ) );
-                    if ( classAttrs.contains( "read" ) ) {
-                        allocList.setViewed( true );
-                    }
-                    else {
-                        allocList.setViewed( false );
-                    }
+                // viewed_yn
+                List<String> classAttrs = Arrays.<String> asList( tr.getAttribute( "class" ).split( "\\s" ) );
+                allocList.setViewed( classAttrs.contains( "read" ) );
 
-                    // status       
-                    DomElement span = td.getFirstElementChild();
-                    if ( span != null ) {
-                        LOGGER.debug( "  status: " + span.getAttribute( "class" ) );
-                        allocList.setStatus( span.getAttribute( "class" ) );
-                    }
-                    else {
-                        LOGGER.warn( "No span found in status? " );
-                    }
+                // status       
+                DomElement span = td.getFirstElementChild();
+                if ( span != null ) {
+                    LOGGER.debug( "  status: " + span.getAttribute( "class" ) );
+                }
 
-                    // existing record should already have the guest name(s)
-                    td = td.getNextElementSibling();
-                    LOGGER.debug( "  name: " + StringUtils.trim( td.getTextContent() ) );
+                // existing record should already have the guest name(s)
+                td = td.getNextElementSibling();
+                LOGGER.debug( "  name: " + StringUtils.trim( td.getTextContent() ) );
 
-                    td = td.getNextElementSibling();
-                    allocList.setBookingReference( StringUtils.trim( td.getTextContent() ) );
-                    LOGGER.debug( "  booking_reference: " + StringUtils.trim( td.getTextContent() ) );
+                td = td.getNextElementSibling();
+                LOGGER.debug( "  booking_reference: " + StringUtils.trim( td.getTextContent() ) );
 
-                    td = td.getNextElementSibling();
-                    allocList.setBookingSource( StringUtils.trim( td.getTextContent() ) );
-                    LOGGER.debug( "  booking_source: " + StringUtils.trim( td.getTextContent() ) );
+                td = td.getNextElementSibling();
+                LOGGER.debug( "  booking_source: " + StringUtils.trim( td.getTextContent() ) );
 
-                    td = td.getNextElementSibling();
-                    LOGGER.debug( "  guests: " + StringUtils.trim( td.getTextContent() ) );
+                td = td.getNextElementSibling();
+                LOGGER.debug( "  guests: " + StringUtils.trim( td.getTextContent() ) );
 
-                    // existing record should have checkin/checkout dates
-                    td = td.getNextElementSibling();
-                    LOGGER.debug( "  check in: " + StringUtils.trim( td.getTextContent() ) );
+                // existing record should have checkin/checkout dates
+                td = td.getNextElementSibling();
+                LOGGER.debug( "  check in: " + StringUtils.trim( td.getTextContent() ) );
 
-                    td = td.getNextElementSibling();
-                    LOGGER.debug( "  check out: " + StringUtils.trim( td.getTextContent() ) );
+                td = td.getNextElementSibling();
+                LOGGER.debug( "  check out: " + StringUtils.trim( td.getTextContent() ) );
 
-                    td = td.getNextElementSibling();
-                    allocList.setBookedDate( StringUtils.trim( td.getTextContent() ) );
-                    LOGGER.debug( "  booked on: " + StringUtils.trim( td.getTextContent() ) );
+                td = td.getNextElementSibling();
+                allocList.setBookedDate( StringUtils.trim( td.getTextContent() ) );
+                LOGGER.debug( "  booked on: " + StringUtils.trim( td.getTextContent() ) );
 
-                    td = td.getNextElementSibling();
-                    LOGGER.debug( "  total: " + StringUtils.trim( td.getTextContent() ) );
+                td = td.getNextElementSibling();
+                LOGGER.debug( "  total: " + StringUtils.trim( td.getTextContent() ) );
 
-                    td = td.getNextElementSibling();
-                    allocList.setEta( StringUtils.trim( td.getTextContent() ) );
-                    LOGGER.debug( "  ETA: " + StringUtils.trim( td.getTextContent() ) );
+                td = td.getNextElementSibling();
+                LOGGER.debug( "  ETA: " + StringUtils.trim( td.getTextContent() ) );
 
-                    td = td.getNextElementSibling();
-                    LOGGER.debug( "  number of 'rooms': " + StringUtils.trim( td.getTextContent() ) );
+                td = td.getNextElementSibling();
+                LOGGER.debug( "  number of 'rooms': " + StringUtils.trim( td.getTextContent() ) );
 
-                    // write the updated attributes to datastore
-                    wordPressDAO.updateAllocationList( allocList );
+                // write the updated attributes to datastore
+                wordPressDAO.updateAllocationList( allocList );
 
-                } // data-id isNotBlank
-
-            }
-            catch ( Exception ex ) {
-                LOGGER.error( "Exception handled.", ex );
-            }
+            } // data-id isNotBlank
         }
     }
 
@@ -308,12 +272,7 @@ public class BookingsPageScraper {
 
                     // viewed_yn
                     List<String> classAttrs = Arrays.<String> asList( tr.getAttribute( "class" ).split( "\\s" ) );
-                    if ( classAttrs.contains( "read" ) ) {
-                        alloc.setViewed( true );
-                    }
-                    else {
-                        alloc.setViewed( false );
-                    }
+                    alloc.setViewed( classAttrs.contains( "read" ) );
 
                     // status       
                     DomElement span = td.getFirstElementChild();
@@ -380,11 +339,11 @@ public class BookingsPageScraper {
                     
                     // click on booking to get booking details
                     HtmlPage bookingPage = HtmlSpan.class.cast( span ).click();
-                    webClient.waitForBackgroundJavaScript( 30000 );
+                    bookingPage.getWebClient().waitForBackgroundJavaScript( 30000 );
                     updateAllocationFromBookingDetailsPage( alloc, bookingPage );
                     
                     // go back to the summary page
-                    webClient.getWebWindows().get(0).getHistory().back();
+                    bookingPage.getWebClient().getWebWindows().get(0).getHistory().back();
 
                 } // data-id isNotBlank
 
@@ -527,33 +486,21 @@ public class BookingsPageScraper {
      * Updates the calendar records by querying the bookings page between the given dates
      * (inclusive) for the given job.
      * 
+     * @param webClient web client to use
      * @param jobId the job ID to associate with this dump
      * @param startDate the start date to check allocations for (inclusive)
      * @param endDate the end date in which to include allocations for
-     * @param useSerialisedDataIfAvailable check if we've already seen this page already and used
-     *            the cached version if available.
      * @throws IOException on read/write error
      */
 //    @Transactional
-    public void updateBookingsBetween(
-            int jobId, Date startDate, Date endDate, boolean useSerialisedDataIfAvailable ) throws IOException {
+    public void updateBookingsBetween( WebClient webClient, int jobId, Date startDate, Date endDate ) throws IOException {
 
         Calendar currentDate = Calendar.getInstance();
         currentDate.setTime( startDate );
 
         while ( currentDate.getTime().compareTo( endDate ) <= 0 ) {
-            HtmlPage bookingsPage;
-            String serialisedFileName = getBookingPageSerialisedObjectFilename( currentDate.getTime() );
-            if ( useSerialisedDataIfAvailable
-                    && new File( serialisedFileName ).exists() ) {
-                bookingsPage = fileService.loadPageFromDisk( serialisedFileName );
-            }
-            else {
-                // this may take a few minutes...
-                bookingsPage = goToBookingPageForArrivals( currentDate.getTime() );
-            }
-
-            updateBookings( jobId, bookingsPage );
+            // this may take a few minutes...
+            updateBookings( jobId, goToBookingPageForArrivals( webClient, currentDate.getTime() ) );
             currentDate.add( Calendar.DATE, 1 ); // keep going to the next day
         }
     }
@@ -561,14 +508,15 @@ public class BookingsPageScraper {
     /**
      * Updates the calendar records using by querying the bookings page for the given date and job.
      * 
+     * @param webClient web client to use
      * @param jobId the job ID to associate with this dump
      * @param arrivalDate the checkin-date to search on
      * @param bookingRef (optional) booking reference (to narrow down the subset of records)
      * @throws IOException on read/write error
      */
 //    @Transactional
-    public void updateBookingsFor( int jobId, Date arrivalDate, String bookingRef ) throws IOException {
-        HtmlPage bookingsPage = goToBookingPageForArrivals( arrivalDate, bookingRef, null );
+    public void updateBookingsFor( WebClient webClient, int jobId, Date arrivalDate, String bookingRef ) throws IOException {
+        HtmlPage bookingsPage = goToBookingPageForArrivals( webClient, arrivalDate, bookingRef, null );
         updateBookings( jobId, bookingsPage );
     }
 
@@ -576,11 +524,12 @@ public class BookingsPageScraper {
      * Attempts to find and insert any bookings that are present in the HW scraped tables
      * for the given job id but not in the LH calendar table for the same jobId.
      * 
+     * @param webClient web client to use
      * @param jobId ID of DiffBookingEnginesJob
      * @param checkinDate checkin date (of report)
      * @throws IOException on web error
      */
-    public void insertMissingHWBookings( int jobId, Date checkinDate ) throws IOException {
+    public void insertMissingHWBookings( WebClient webClient, int jobId, Date checkinDate ) throws IOException {
         List<String> bookingRefs = wordPressDAO.findMissingHwBookingRefs( jobId, checkinDate );
 
         // search for the booking reference within an 8 month window of their expected checkin date
@@ -594,7 +543,7 @@ public class BookingsPageScraper {
 
         // insert any missing records if found
         for ( String bookingRef : bookingRefs ) {
-            HtmlPage bookingPage = goToBookingPageForArrivals( startDate.getTime(), endDate.getTime(), bookingRef, null );
+            HtmlPage bookingPage = goToBookingPageForArrivals( webClient, startDate.getTime(), endDate.getTime(), bookingRef, null );
             insertBookings( jobId, bookingPage );
         }
     }
@@ -602,12 +551,13 @@ public class BookingsPageScraper {
     /**
      * Scrapes the guest comments field for the given booking.
      * 
+     * @param webClient web client to use
      * @param bookingRef the booking to load
      * @param checkinDate the expected checkin date for the booking
      * @return the contents of the guest comments field
      * @throws IOException on read/write error
      */
-    public String getGuestCommentsForReservation( String bookingRef, Date checkinDate ) throws IOException {
+    public String getGuestCommentsForReservation( WebClient webClient, String bookingRef, Date checkinDate ) throws IOException {
         String url = bookingUrl
                 .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( checkinDate ) )
                 .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( checkinDate ) )
@@ -635,6 +585,7 @@ public class BookingsPageScraper {
      * Queries all reservations within the given dates where status = 'confirmed'
      * and where no payment has been made yet (payment received = 0).
      * 
+     * @param webClient web client to use
      * @param bookingRefMatch matching these booking refs
      * @param dateFrom from this booking date
      * @param dateTo until this booking date (inclusive)
@@ -643,7 +594,8 @@ public class BookingsPageScraper {
      * @throws IOException on read/write error
      * @throws ParseException on date parse error
      */
-    public List<UnpaidDepositReportEntry> getUnpaidReservations( String bookingRefMatch, Date dateFrom, Date dateTo ) throws IOException, ParseException {
+    public List<UnpaidDepositReportEntry> getUnpaidReservations( 
+            WebClient webClient, String bookingRefMatch, Date dateFrom, Date dateTo ) throws IOException, ParseException {
         String url = bookingUrl
                 .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( dateFrom ) )
                 .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( dateTo ) )
@@ -698,12 +650,13 @@ public class BookingsPageScraper {
     /**
      * Returns the CSV records for all checkouts for the given date.
      * 
+     * @param webClient web client to use
      * @param bookingRef (optional) match on booking reference
      * @param checkoutDate date guest is checking-out
      * @return all bookings where the guest is checked-out
      * @throws IOException on parsing error
      */
-    public List<CSVRecord> getAllCheckouts( String bookingRef, Date checkoutDate ) throws IOException {
+    public List<CSVRecord> getAllCheckouts( WebClient webClient, String bookingRef, Date checkoutDate ) throws IOException {
         String url = bookingUrl
                 .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( checkoutDate ) )
                 .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( checkoutDate ) )
@@ -723,13 +676,6 @@ public class BookingsPageScraper {
             results.add( record );
         }
         return results;
-    }
-
-    /**
-     * Close all open windows.
-     */
-    public void closeAllWindows() {
-        webClient.close();
     }
 
 }

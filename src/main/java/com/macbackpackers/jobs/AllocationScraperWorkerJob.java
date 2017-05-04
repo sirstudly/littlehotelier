@@ -9,7 +9,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 
 /**
@@ -24,6 +26,11 @@ public class AllocationScraperWorkerJob extends AbstractJob {
     @Transient
     private AllocationsPageScraper allocationScraper;
 
+    @Autowired
+    @Transient
+    @Qualifier( "webClientScriptingDisabled" )
+    private WebClient webClient;
+
     @Override
     public void resetJob() throws Exception {
         dao.deleteAllocations( getId() );
@@ -31,12 +38,12 @@ public class AllocationScraperWorkerJob extends AbstractJob {
 
     @Override
     public void finalizeJob() {
-        allocationScraper.closeAllWindows(); // cleans up JS threads
+        webClient.close(); // cleans up JS threads
     }
 
     @Override
     public void processJob() throws Exception {
-        allocationScraper.dumpAllocationsFrom( getId(), getStartDate(), isTestMode() );
+        allocationScraper.dumpAllocationsFrom( webClient, getId(), getStartDate() );
     }
 
     /**
@@ -74,18 +81,6 @@ public class AllocationScraperWorkerJob extends AbstractJob {
      */
     public void setAllocationScraperJobId( int jobId ) {
         setParameter( "allocation_scraper_job_id", String.valueOf( jobId ) );
-    }
-
-    /**
-     * For testing, we may want to load from a previously serialised file (rather than scrape the
-     * page again which takes about 10 minutes). Default value is false, but if the "test_mode"
-     * parameter is set to true, then attempt to load from file first. If no file is found, then
-     * scrape the page again.
-     * 
-     * @return true if test mode, false otherwise
-     */
-    private boolean isTestMode() {
-        return "true".equalsIgnoreCase( getParameter( "test_mode" ) );
     }
 
 }

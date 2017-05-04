@@ -9,7 +9,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 
@@ -25,16 +27,21 @@ public class GuestCommentSaveJob extends AbstractJob {
     @Transient
     private BookingsPageScraper bookingsScraper;
 
+    @Autowired
+    @Transient
+    @Qualifier( "webClient" )
+    private WebClient webClient;
+
     @Override
     public void processJob() throws Exception {
         // scrape any user comments from the reservation and save it
-        String comment = bookingsScraper.getGuestCommentsForReservation( getBookingRef(), getCheckinDate() );
+        String comment = bookingsScraper.getGuestCommentsForReservation( webClient, getBookingRef(), getCheckinDate() );
         dao.updateGuestCommentsForReservation( getReservationId(), comment );
     }
 
     @Override
     public void finalizeJob() {
-        bookingsScraper.closeAllWindows(); // cleans up JS threads
+        webClient.close(); // cleans up JS threads
     }
 
     public int getReservationId() {

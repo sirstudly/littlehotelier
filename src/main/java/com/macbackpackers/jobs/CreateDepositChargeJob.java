@@ -12,7 +12,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.scrapers.BookingsPageScraper;
@@ -27,6 +29,11 @@ public class CreateDepositChargeJob extends AbstractJob {
     @Autowired
     @Transient
     private BookingsPageScraper scraper;
+
+    @Autowired
+    @Transient
+    @Qualifier( "webClient" )
+    private WebClient webClient;
 
     @Override
     public void processJob() throws Exception {
@@ -48,7 +55,7 @@ public class CreateDepositChargeJob extends AbstractJob {
      * @throws ParseException
      */
     private void createDepositChargeJobs( String bookingType, Date fromDate, Date toDate ) throws IOException, ParseException {
-        List<UnpaidDepositReportEntry> records = scraper.getUnpaidReservations( bookingType, fromDate, toDate );
+        List<UnpaidDepositReportEntry> records = scraper.getUnpaidReservations( webClient, bookingType, fromDate, toDate );
         LOGGER.info( records.size() + " " + bookingType + " records found" );
         for ( UnpaidDepositReportEntry entry : records ) {
             LOGGER.info( "Creating a DepositChargeJob for booking " + entry.getBookingRef() + " on " + entry.getBookedDate() );
@@ -62,7 +69,7 @@ public class CreateDepositChargeJob extends AbstractJob {
 
     @Override
     public void finalizeJob() {
-        scraper.closeAllWindows(); // cleans up JS threads
+        webClient.close(); // cleans up JS threads
     }
 
     /**

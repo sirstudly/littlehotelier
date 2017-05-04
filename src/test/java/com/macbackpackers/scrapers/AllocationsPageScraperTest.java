@@ -11,9 +11,11 @@ import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
@@ -31,12 +33,11 @@ public class AllocationsPageScraperTest {
     AllocationsPageScraper scraper;
 
     @Autowired
-    WordPressDAO dao;
+    @Qualifier( "webClientScriptingDisabled" )
+    WebClient webClient;
 
-    @Test
-    public void testGoToCalendarPage() throws Exception {
-        scraper.goToCalendarPage( new Date() );
-    }
+    @Autowired
+    WordPressDAO dao;
 
     @Test
     public void testInsertAndRunHousekeepingJob() throws Exception {
@@ -68,7 +69,7 @@ public class AllocationsPageScraperTest {
         j.setStatus( JobStatus.submitted );
         int jobId = dao.insertJob( j );
 
-        scraper.dumpAllocationsFrom( jobId, july27, false );
+        scraper.dumpAllocationsFrom( webClient, jobId, july27 );
         dao.updateJobStatus( jobId, JobStatus.completed, JobStatus.submitted );
     }
 

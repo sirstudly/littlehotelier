@@ -202,24 +202,6 @@ public class FileService {
     }
 
     /**
-     * Serialises the given page to disk so it can be loaded in later.
-     * 
-     * @param page page to serialise
-     * @param filename name of file to write to
-     */
-    public void serialisePageToDisk( HtmlPage page, String filename ) {
-        try {
-            serializeObjectToFile( page, filename );
-        }
-        catch ( FileNotFoundException e ) {
-            LOGGER.error( "File not found.", e );
-        }
-        catch ( IOException e ) {
-            LOGGER.error( "I/O error", e );
-        }
-    }
-
-    /**
      * Loads the page that was saved to disk earlier.
      * 
      * @param fileName name of serialised page to load

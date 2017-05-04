@@ -11,9 +11,11 @@ import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.config.LittleHotelierConfig;
@@ -27,12 +29,9 @@ public class BookingsPageScraperTest {
     @Autowired
     BookingsPageScraper scraper;
 
-    @Test
-    public void testGoToBookingPage() throws Exception {
-        Calendar c = Calendar.getInstance();
-        c.add( Calendar.MONTH, 2 );
-        scraper.goToBookingPageForArrivals( c.getTime() );
-    }
+    @Autowired
+    @Qualifier( "webClient" )
+    WebClient webClient;
 
     @Test
     public void testUpdateBookingPage() throws Exception {
@@ -44,7 +43,7 @@ public class BookingsPageScraperTest {
         endDate.add( Calendar.MONTH, 2 );
         endDate.add( Calendar.DATE, -1 );
 
-        scraper.updateBookingsBetween( 14, startDate.getTime(), endDate.getTime(), true );
+        scraper.updateBookingsBetween( webClient, 14, startDate.getTime(), endDate.getTime() );
     }
 
     @Test
@@ -53,13 +52,13 @@ public class BookingsPageScraperTest {
         c.set( Calendar.YEAR, 2016 );
         c.set( Calendar.MONTH, 9 );
         c.set( Calendar.DATE, 6 );
-        String comment = scraper.getGuestCommentsForReservation( "EXP-719896551", c.getTime() );
+        String comment = scraper.getGuestCommentsForReservation( webClient, "EXP-719896551", c.getTime() );
         LOGGER.info( comment );
     }
     
     @Test
     public void testCreateConfirmDepositJobs() throws Exception {
-        HtmlPage bookingsPage = scraper.goToBookingPageBookedOn( new Date(), "HWL" );
+        HtmlPage bookingsPage = scraper.goToBookingPageBookedOn( webClient, new Date(), "HWL" );
         scraper.createConfirmDepositJobs( bookingsPage );
     }
 
@@ -72,7 +71,7 @@ public class BookingsPageScraperTest {
         Date dateFrom = c.getTime();
         c.set( Calendar.DATE, 30 );
         Date dateTo = c.getTime();
-        List<UnpaidDepositReportEntry> records = scraper.getUnpaidReservations( "BDC", dateFrom, dateTo );
+        List<UnpaidDepositReportEntry> records = scraper.getUnpaidReservations( webClient, "BDC", dateFrom, dateTo );
         LOGGER.info( records.size() + " recs found" );
         for( UnpaidDepositReportEntry entry : records ) {
             LOGGER.info( ToStringBuilder.reflectionToString( entry ) );

@@ -1,7 +1,6 @@
 
 package com.macbackpackers.scrapers;
 
-import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.Calendar;
@@ -12,7 +11,6 @@ import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
@@ -27,7 +25,6 @@ import com.macbackpackers.scrapers.matchers.CastleRockRoomBedMatcher;
 import com.macbackpackers.scrapers.matchers.HSHRoomBedMatcher;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 import com.macbackpackers.services.AuthenticationService;
-import com.macbackpackers.services.FileService;
 
 /**
  * Scrapes the allocations page for the specified dates.
@@ -56,14 +53,7 @@ public class AllocationsPageScraper {
     public static final String POUND = "\u00a3";
 
     @Autowired
-    @Qualifier( "webClientScriptingDisabled" )
-    private WebClient webClient;
-
-    @Autowired
     private WordPressDAO dao;
-
-    @Autowired
-    private FileService fileService;
 
     @Autowired
     private AuthenticationService authService;
@@ -71,7 +61,7 @@ public class AllocationsPageScraper {
     @Value( "${lilhotelier.url.calendar}" )
     private String calendarUrl;
 
-    public HtmlPage goToCalendarPage( Date date ) throws IOException {
+    private HtmlPage goToCalendarPage( WebClient webClient, Date date ) throws IOException {
         String dateAsString = DATE_FORMAT_YYYY_MM_DD.format( date );
         String pageURL = calendarUrl + "?start_date=" + dateAsString;
         LOGGER.info( "Loading calendar page: " + pageURL );
@@ -81,57 +71,20 @@ public class AllocationsPageScraper {
     }
 
     /**
-     * Save the given page to disk so we can use it later (for debugging).
-     *
-     * @param page page to save
-     * @param date (for filename)
-     */
-    public void serialisePageToDisk( HtmlPage page, Date date ) {
-        fileService.serialisePageToDisk( page, getCalendarPageSerialisedObjectFilename( date ) );
-    }
-
-    /**
-     * Returns a unique filename for a given date to use when serilaising/deserialising page data
-     * when scraping.
-     * 
-     * @param date date of calendar page
-     * @return filename of calendar page on the given date
-     */
-    private static String getCalendarPageSerialisedObjectFilename( Date date ) {
-        String dateAsString = DATE_FORMAT_YYYY_MM_DD.format( date );
-        return "calendar_page_" + dateAsString + ".ser";
-    }
-
-    /**
      * Dumps the allocations starting on the given date (inclusive). There may be some allocations
      * beyond the end date if the span doesn't fall within an exact 2 week period as that is what is
      * currently shown on the calendar page.
      * 
+     * @param webClient web client instance to use
      * @param jobId the job ID to associate with this dump
      * @param startDate the start date to check allocations for (inclusive)
-     * @param useSerialisedDataIfAvailable check if we've already seen this page already and used
-     *            the cached version if available.
      * @throws IOException on read/write error
      */
 //    @Transactional
-    public void dumpAllocationsFrom(
-            int jobId, Date startDate, boolean useSerialisedDataIfAvailable ) throws IOException {
-
+    public void dumpAllocationsFrom( WebClient webClient, int jobId, Date startDate ) throws IOException {
         Calendar currentDate = Calendar.getInstance();
         currentDate.setTime( startDate );
-
-        HtmlPage calendarPage;
-        String serialisedFileName = getCalendarPageSerialisedObjectFilename( currentDate.getTime() );
-        if ( useSerialisedDataIfAvailable
-                && new File( serialisedFileName ).exists() ) {
-            calendarPage = fileService.loadPageFromDisk( serialisedFileName );
-        }
-        else {
-            // this takes about 10 minutes...
-            calendarPage = goToCalendarPage( currentDate.getTime() );
-        }
-
-        dumpAllocations( jobId, calendarPage );
+        dumpAllocations( jobId, goToCalendarPage( webClient, currentDate.getTime() ) );
     }
 
     /**
@@ -228,6 +181,7 @@ public class AllocationsPageScraper {
         LOGGER.debug( "  data-reservation_payment_oustanding: "
                 + span.getAttribute( "data-reservation_payment_oustanding" ) );
         LOGGER.debug( "  data-reservation_id: " + span.getAttribute( "data-reservation_id" ) );
+        LOGGER.debug( "  data-status: " + span.getAttribute( "data-status" ) );
         LOGGER.debug( "  data-rate_plan_name: " + span.getAttribute( "data-rate_plan_name" ) );
         LOGGER.debug( "  data-payment_status: " + span.getAttribute( "data-payment_status" ) );
         LOGGER.debug( "  data-description: " + span.getAttribute( "data-description" ) );
@@ -271,15 +225,7 @@ public class AllocationsPageScraper {
             alloc.setCheckoutDate( checkoutDate.getTime() );
         }
         else {
-            if ( StringUtils.contains( span.getAttribute( "class" ), "checked-in" ) ) {
-                alloc.setStatus( "checked-in" );
-            }
-            else if ( StringUtils.contains( span.getAttribute( "class" ), "checked-out" ) ) {
-                alloc.setStatus( "checked-out" );
-            }
-            else if ( StringUtils.contains( span.getAttribute( "class" ), "confirmed" ) ) {
-                alloc.setStatus( "confirmed" );
-            }
+            alloc.setStatus( span.getAttribute( "data-status" ) );
             alloc.setReservationId( Integer.parseInt( span.getAttribute( "data-reservation_id" ) ) );
             alloc.setGuestName( span.getAttribute( "data-guest_name" ) );
             alloc.setPaymentTotal( StringUtils.replaceChars( span.getAttribute( "data-reservation_payment_total" ), POUND + ",", "" ) );
@@ -287,6 +233,9 @@ public class AllocationsPageScraper {
             alloc.setRatePlanName( span.getAttribute( "data-rate_plan_name" ) );
             alloc.setPaymentStatus( span.getAttribute( "data-payment_status" ) );
             alloc.setNumberGuests( calculateNumberOfGuests( span ) );
+            alloc.setBookingSource( span.getAttribute( "data-channel_name" ) );
+            alloc.setBookingReference( span.getAttribute( "data-booking_reference" ) );
+            alloc.setEta( span.getAttribute( "data-arrival_time" ) );
             alloc.setNotes( StringUtils.trimToNull( span.getAttribute( "data-notes" ) ) );
         }
 
@@ -335,13 +284,6 @@ public class AllocationsPageScraper {
         LOGGER.debug( "checkout-date: " + checkoutDateStr );
         checkoutDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse( checkoutDateStr ) );
         alloc.setCheckoutDate( checkoutDate.getTime() );
-    }
-
-    /**
-     * Close all open windows.
-     */
-    public void closeAllWindows() {
-        webClient.close();
     }
 
 }

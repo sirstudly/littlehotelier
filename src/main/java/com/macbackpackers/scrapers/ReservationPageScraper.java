@@ -11,7 +11,6 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
@@ -48,10 +47,6 @@ public class ReservationPageScraper {
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
-    @Qualifier( "webClient" )
-    private WebClient webClient;
-
-    @Autowired
     private AuthenticationService authService;
 
     @Autowired
@@ -69,11 +64,12 @@ public class ReservationPageScraper {
     /**
      * Goes to the given reservation page.
      * 
+     * @param webClient the web client to use
      * @param reservationId ID of reservation
      * @return non-null page
      * @throws IOException on I/O error
      */
-    public HtmlPage goToReservationPage( int reservationId ) throws IOException {
+    public HtmlPage goToReservationPage( WebClient webClient, int reservationId ) throws IOException {
         String pageURL = getReservationURL( reservationId );
         LOGGER.info( "Loading reservations page: " + pageURL );
         HtmlPage nextPage = authService.goToPage( pageURL, webClient );
@@ -294,13 +290,6 @@ public class ReservationPageScraper {
             }
             return cardNumber.getValueAttribute();
         }
-    }
-
-    /**
-     * Close all open windows.
-     */
-    public void closeAllWindows() {
-        webClient.close();
     }
 
 }

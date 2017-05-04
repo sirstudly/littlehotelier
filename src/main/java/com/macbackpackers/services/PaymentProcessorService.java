@@ -12,10 +12,10 @@ import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.stereotype.Service;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlHeading3;
 import com.gargoylesoftware.htmlunit.html.HtmlInput;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
@@ -44,7 +44,10 @@ public class PaymentProcessorService {
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
 
     @Autowired
-    private AutowireCapableBeanFactory autowireBeanFactory;
+    private ReservationPageScraper reservationPageScraper;
+
+    @Autowired
+    private BookingsPageScraper bookingsPageScraper;
 
     @Autowired
     private WordPressDAO wordpressDAO;
@@ -65,13 +68,14 @@ public class PaymentProcessorService {
      * details if it was previously successful. To avoid multiple failed transactions, this 
      * method should only be called again if new card details have been updated.
      * 
+     * @param webClient web client to use
      * @param bookingRef booking reference e.g. BDC-123456789
      * @param bookedOnDate date on which reservation was booked
      * @throws IOException on I/O error
      */
-    public void processDepositPayment( String bookingRef, Date bookedOnDate ) throws IOException {
+    public void processDepositPayment( WebClient webClient, String bookingRef, Date bookedOnDate ) throws IOException {
         LOGGER.info( "Processing payment for booking " + bookingRef );
-        HtmlPage bookingsPage = getBookingsPageScraper().goToBookingPageBookedOn( bookedOnDate, bookingRef );
+        HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
         
         List<?> rows = bookingsPage.getByXPath( 
                 "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr[@class!='group_header']" );
@@ -114,7 +118,6 @@ public class PaymentProcessorService {
             return;
         }
 
-        ReservationPageScraper reservationPageScraper = getReservationsPageScraper();
         try {
             // get the deposit amount and full card details
             DepositPayment depositPayment = retrieveCardDetails( reservationPageScraper, bookingRef, reservationId, reservationPage );
@@ -309,24 +312,5 @@ public class PaymentProcessorService {
             throw new MissingUserDataException( "Unable to determine booking reference from " + reservationPage.getBaseURL());
         }
         return bookingRef;
-    }
-
-    /**
-     * Returns a new instance of ReservationPageScraper.
-     * 
-     * @return new ReservationPageScraper
-     */
-    private ReservationPageScraper getReservationsPageScraper() {
-        return autowireBeanFactory.createBean( ReservationPageScraper.class );
-    }
-    
-    /**
-     * Returns a new instance of BookingsPageScraper.
-     * 
-     * @return new BookingsPageScraper
-     */
-    private BookingsPageScraper getBookingsPageScraper() {
-        return autowireBeanFactory.createBean( BookingsPageScraper.class );
-        
     }
 }

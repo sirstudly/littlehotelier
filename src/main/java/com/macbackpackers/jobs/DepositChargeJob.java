@@ -9,7 +9,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.services.PaymentProcessorService;
 
@@ -25,9 +27,19 @@ public class DepositChargeJob extends AbstractJob {
     @Transient
     private PaymentProcessorService paymentProcessor;
     
+    @Autowired
+    @Transient
+    @Qualifier( "webClient" )
+    private WebClient webClient;
+
     @Override
     public void processJob() throws Exception {
-        paymentProcessor.processDepositPayment( getBookingRef(), getBookingDate() );
+        paymentProcessor.processDepositPayment( webClient, getBookingRef(), getBookingDate() );
+    }
+
+    @Override
+    public void finalizeJob() {
+        webClient.close(); // cleans up JS threads
     }
 
     /**

@@ -6,7 +6,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.scrapers.ReservationPageScraper;
 
@@ -23,15 +25,20 @@ public class ConfirmDepositAmountsJob extends AbstractJob {
     @Transient
     private ReservationPageScraper reservationScraper;
 
+    @Autowired
+    @Transient
+    @Qualifier( "webClient" )
+    private WebClient webClient;
+
     @Override
     public void processJob() throws Exception {
-        HtmlPage reservationPage = reservationScraper.goToReservationPage( getReservationId() );
+        HtmlPage reservationPage = reservationScraper.goToReservationPage( webClient, getReservationId() );
         reservationScraper.tickDeposit( reservationPage );
     }
 
     @Override
     public void finalizeJob() {
-        reservationScraper.closeAllWindows(); // cleans up JS threads
+        webClient.close(); // cleans up JS threads
     }
 
     public int getReservationId() {

@@ -9,13 +9,15 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 
 /**
- * Job which searches for bookings booked on a particular date (for HW/HB bookings) and creates a
+ * Job which searches for bookings booked on a particular date (for HW bookings) and creates a
  * confirm deposit job for any that haven't been done yet.
  */
 @Entity
@@ -26,18 +28,21 @@ public class ScrapeReservationsBookedOnJob extends AbstractJob {
     @Transient
     private BookingsPageScraper bookingScraper;
 
+    @Autowired
+    @Transient
+    @Qualifier( "webClient" )
+    private WebClient webClient;
+
     @Override
     public void processJob() throws Exception {
         Date bookedOnDate = getBookedOnDate();
-        HtmlPage bookingsPage = bookingScraper.goToBookingPageBookedOn( bookedOnDate, "HWL" );
-        bookingScraper.createConfirmDepositJobs( bookingsPage );
-        bookingsPage = bookingScraper.goToBookingPageBookedOn( bookedOnDate, "HBK" );
+        HtmlPage bookingsPage = bookingScraper.goToBookingPageBookedOn( webClient, bookedOnDate, "HWL" );
         bookingScraper.createConfirmDepositJobs( bookingsPage );
     }
 
     @Override
     public void finalizeJob() {
-        bookingScraper.closeAllWindows(); // cleans up JS threads
+        webClient.close(); // cleans up JS threads
     }
 
     /**
