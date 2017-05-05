@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -262,18 +263,23 @@ public class PaymentProcessorService {
             LOGGER.info( "PX Post was successful, updating LH payment details" );
             reservationPageScraper.addPayment( reservationPage, amountToPay, 
                     paymentTxn.getTransaction().getCardName(), true, 
-                    "PxPost transaction " + txnId + " successful. - " + DATETIME_FORMAT.format( new Date() ) );
+                    "PxPost transaction " + txnId + " successful. "
+                    + "DpsTxnRef: " + paymentTxn.getTransaction().getDpsTxnRef() 
+                    + " - " + DATETIME_FORMAT.format( new Date() ) );
         } 
         else {
             LOGGER.info( "PX Post was NOT successful; updating LH notes" );
             reservationPageScraper.appendNote( reservationPage, 
                 "~~~ " + DATETIME_FORMAT.format( new Date() ) + "\n" 
                 + "Transaction ID: " + txnId + "\n"
+                + "DpsTxnRef: " + paymentTxn.getTransaction().getDpsTxnRef() + "\n" 
                 + "Card: " + paymentTxn.getTransaction().getCardNumber() + "\n"
-                + "Response Code: " + paymentTxn.getResponseCode() + "\n"
+                + "Response Code (" + paymentTxn.getResponseCode() + "): " 
+                + StringUtils.trimToEmpty( paymentTxn.getResponseCodeText() ) + "\n"
                 + "Details: " + paymentTxn.getHelpText() + "\n"
                 + "~~~\n" );
         }
+
     }
 
     /**

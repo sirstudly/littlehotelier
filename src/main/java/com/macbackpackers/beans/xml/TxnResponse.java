@@ -50,6 +50,62 @@ public class TxnResponse {
     public String getResponseCode() {
         return responseCode;
     }
+    
+    /**
+     * Returns the error text from the response code value.
+     * Gleaned from the Interwebs; looks to be correct.
+     * 
+     * @return response code text (or null if not found)
+     */
+    public String getResponseCodeText() {
+        if ( getResponseCode() == null ) {
+            return null;
+        }
+        switch ( getResponseCode() ) {
+            case "00":
+                return "Transaction is approved and successful.";
+            case "01":
+                return "The transaction was not approved. Please contact the issuer of the credit card.";
+            case "04":
+                return "Refer To Card Issuer.";
+            case "05":
+                return "Card DECLINED on banks end.";
+            case "14":
+                return "Invalid Card Number.";
+            case "51":
+                return "Insufficient Funds.";
+            case "54":
+                return "Expired card or expiry date incorrect.";
+            case "58":
+                return "Function Not Permitted To Terminal.";
+            case "65":
+                return "Acceptor Contact Acquirer, Security.";
+            case "76":
+                return "Possible expiry date or pin problem. Not enough money on purchase.";
+            case "AK":
+                return "No BIN Range match found for card in port list / Auth not enabled on port.";
+            case "AQ":
+                //return "Amex is not enabled on the port.";
+                return "Amex not enabled. Charge manually using EFTPOS terminal."; // overriding default msg
+            case "AU":
+                return "Discover not Accepted.";
+            case "LR":
+                return "Local Risk Management Declined.";
+            case "NU":
+                return "Local Fail (Reject Card Number).";
+            case "QK":
+                return "Invalid Card Number invalid length. If live, it could be invalid expiry date.";
+            case "RC":
+                return "3D Secure error/Fusion Cancellation/FEP Declined.";
+            case "U9":
+                return "Uplink Timeout.";
+            case "Y7":
+                return "Invalid Card Number (Incorrect Length).";
+            case "YT":
+                return "Invalid CVC2.";
+        }
+        return null;
+    }
 
     public void setResponseCode( String responseCode ) {
         this.responseCode = responseCode;
