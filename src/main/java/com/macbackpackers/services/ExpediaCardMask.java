@@ -11,4 +11,9 @@ public class ExpediaCardMask extends CardMask {
         return "cardNumber=\"(\\d+)\"";
     }
 
+    @Override
+    public String getCardSecurityCodeRegex() {
+        return "seriesCode=\"(\\d+)\"";
+    }
+
 }

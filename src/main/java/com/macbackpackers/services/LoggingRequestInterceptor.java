@@ -84,12 +84,26 @@ public class LoggingRequestInterceptor implements ClientHttpRequestInterceptor {
     private String applyCardMask( String xml ) {
         if(cardMask != null) {
             String maskedString = xml;
-            Pattern p = Pattern.compile( cardMask.getCardMaskMatchRegex() );
-            Matcher m = p.matcher( maskedString );
+
+            StringBuffer buf = new StringBuffer();
+            Matcher m = Pattern.compile( cardMask.getCardMaskMatchRegex() ).matcher( maskedString );
             while ( m.find() ) {
-                String cardNum = m.group( 1 );
-                maskedString = maskedString.replaceAll( cardNum, cardMask.replaceCardWith( cardNum ) );
+                m.appendReplacement( buf, maskedString.substring( m.start(), m.start( 1 ) ) +
+                        cardMask.replaceCardWith( m.group( 1 ) ) +
+                        maskedString.substring( m.end( 1 ), m.end() ) );
             }
+            maskedString = m.appendTail( buf ).toString();
+            
+            // mask CVC/CVV code as well
+            buf = new StringBuffer();
+            m = Pattern.compile( cardMask.getCardSecurityCodeRegex() ).matcher( maskedString );
+            while ( m.find() ) {
+                m.appendReplacement( buf, maskedString.substring( m.start(), m.start( 1 ) ) +
+                        cardMask.replaceCardSecurityCodeWith( m.group( 1 ) ) +
+                        maskedString.substring( m.end( 1 ), m.end() ) );
+            }
+            maskedString = m.appendTail( buf ).toString();
+            
             return maskedString;
         }
         return xml;

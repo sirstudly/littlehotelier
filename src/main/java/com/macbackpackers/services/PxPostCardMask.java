@@ -11,4 +11,9 @@ public class PxPostCardMask extends CardMask {
         return "<CardNumber>(\\d+)</CardNumber>";
     }
 
+    @Override
+    public String getCardSecurityCodeRegex() {
+        return "<Cvc2>(\\d+)</Cvc2>";
+    }
+
 }

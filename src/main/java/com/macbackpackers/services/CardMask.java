@@ -20,6 +20,13 @@ public abstract class CardMask {
     public abstract String getCardMaskMatchRegex();
 
     /**
+     * Returns the regex that will match the contents of the CVC/CVV code (if specified).
+     * 
+     * @return regex with CVV/CVC in the first capturing group
+     */
+    public abstract String getCardSecurityCodeRegex();
+
+    /**
      * Masks a card number with periods. The first 6 and last 2 digits are left as is. e.g.
      * 1234567890123456 will return 123456........56 If the passed in number is not a number or is
      * not at least 8 characters, this will return the entire string masked with periods.
@@ -38,4 +45,14 @@ public abstract class CardMask {
         return StringUtils.repeat( '.', cardNum.length() );
     }
 
+    /**
+     * Masks the security code with periods.
+     * 
+     * @param securityCode the (non-null) value of the security code to mask
+     * @return periods equal to the length of securityCode
+     */
+    public String replaceCardSecurityCodeWith( String securityCode ) {
+        // mask out entire string
+        return StringUtils.repeat( '.', securityCode.length() );
+    }
 }
