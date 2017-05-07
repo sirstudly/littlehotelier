@@ -488,7 +488,12 @@ public class WordPressDAOTest {
         LOGGER.info( "Allocation scraper job id: " + j.getAllocationScraperJobId() );
         LOGGER.info( ToStringBuilder.reflectionToString( j ) );
     }
-    
+
+    @Test
+    public void testGetOutstandingJobCount() {
+        LOGGER.info( dao.getOutstandingJobCount() + " outstanding jobs" );
+    }
+
     @Test
     public void testGetPreviousNumberOfFailedTxns() {
         Assert.assertEquals( 1, dao.getPreviousNumberOfFailedTxns( "BDC-12345680", "123456........89" ));

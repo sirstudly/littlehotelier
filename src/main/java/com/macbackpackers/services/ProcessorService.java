@@ -43,6 +43,12 @@ public class ProcessorService {
      */
     public void processJobs() {
 
+        // check if we have anything to do first
+        if( dao.getOutstandingJobCount() == 0 ) {
+            LOGGER.info( "No outstanding jobs. Nothing to do." );
+            return;
+        }
+
         // start thread pool
         ExecutorService executor = Executors.newFixedThreadPool( threadCount );
         CyclicBarrier barrier = new CyclicBarrier( threadCount );

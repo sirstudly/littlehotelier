@@ -91,6 +91,13 @@ public interface WordPressDAO {
     public int insertJob( Job job );
 
     /**
+     * Returns the number of jobs at 'submitted' or 'processing'.
+     * 
+     * @return number of jobs
+     */
+    public long getOutstandingJobCount();
+
+    /**
      * Updates the status of the given job.
      * 
      * @param jobId PK of job

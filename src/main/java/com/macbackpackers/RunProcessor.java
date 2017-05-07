@@ -16,7 +16,6 @@ import org.quartz.SchedulerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.stereotype.Component;
@@ -43,9 +42,6 @@ public class RunProcessor
 
 //    @Autowired
 //    private SchedulerService scheduler;
-
-    @Value( "${processor.repeat.interval.ms:60000}" )
-    private long repeatIntervalMillis;
 
     // exclusive-file lock so only ever one instance of the processor is running
     private FileLock processorLock;

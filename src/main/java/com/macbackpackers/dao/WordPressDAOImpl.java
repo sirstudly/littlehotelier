@@ -120,6 +120,15 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public long getOutstandingJobCount() {
+        return em.createQuery( "SELECT COUNT(1) FROM AbstractJob "
+                + "     WHERE status IN (:submittedStatus, :processingStatus)", Long.class )
+                .setParameter( "submittedStatus", JobStatus.submitted )
+                .setParameter( "processingStatus", JobStatus.processing )
+                .getSingleResult();
+    }
+
+    @Override
     public void updateJobStatus( int jobId, JobStatus status, JobStatus prevStatus ) {
         AbstractJob job = fetchJobById( jobId );
         if ( prevStatus != job.getStatus() ) {
