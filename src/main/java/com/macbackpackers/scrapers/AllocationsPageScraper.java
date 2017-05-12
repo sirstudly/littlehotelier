@@ -244,6 +244,9 @@ public class AllocationsPageScraper {
         LOGGER.info( "Done allocation " + alloc.getReservationId() + ": " + alloc.getGuestName() );
         LOGGER.debug( alloc.toString() );
         dao.insertAllocation( alloc );
+
+        String comments = StringUtils.trimToNull( span.getAttribute( "data-guest_comments" ) );
+        dao.updateGuestCommentsForReservation( alloc.getReservationId(), comments );
     }
 
     /**

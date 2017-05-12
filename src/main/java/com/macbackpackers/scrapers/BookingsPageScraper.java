@@ -633,6 +633,12 @@ public class BookingsPageScraper {
                         + csv.get( "Number of adults" ) + " guests. Skipping..." );
                 continue;
             }
+            
+            if ( "BDC".equals( bookingRefMatch ) && StringUtils.trimToEmpty( csv.get( "Guest comments" ) )
+                    .contains( "You have received a virtual credit card for this reservation" ) ) {
+                LOGGER.info( "Virtual CC; to charge on day." );
+                continue;
+            }
 
             UnpaidDepositReportEntry entry = new UnpaidDepositReportEntry();
             entry.setBookingRef( bookingRef );

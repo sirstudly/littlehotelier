@@ -25,10 +25,11 @@ CREATE TABLE `wp_lh_calendar` (
   `viewed_yn` char(1) DEFAULT NULL,
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `lh_c_checkin` (`checkin_date`),
-  KEY `lh_c_checkout` (`checkout_date`),
+  KEY `lh_c_checkin` (`job_id`,`checkin_date`),
+  KEY `lh_c_checkout` (`job_id`,`checkout_date`),
   KEY `lh_c_jobid` (`job_id`),
-  KEY `lh_c_roomid` (`room_id`)
+  KEY `lh_c_jobid_reservationid` (`job_id`,`reservation_id`)
+  KEY `lh_c_roomid` (`job_id`,`room_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 

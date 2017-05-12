@@ -353,6 +353,24 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( "specifiedDate", specifiedDate )
                 .executeUpdate();
         LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from wp_lh_jobs" );
+        
+        rowsDeleted = em
+                // doesn't take into the date; just deletes all guest comments that
+                // are no longer present when running the allocation scraper job
+                .createNativeQuery( 
+                        "  DELETE m FROM wp_lh_rpt_guest_comments m "
+                        + "  LEFT OUTER JOIN wp_lh_calendar c "
+                        + "    ON m.reservation_id = c.reservation_id "
+                        // match up with the allocation scraper job that completed last by
+                        // finding the last completed SplitRoomReservationReportJob
+                        + "   AND c.job_id = (SELECT CAST(p.value AS UNSIGNED) FROM wp_lh_job_param p "
+                        + "                    WHERE p.job_id IN (SELECT MAX(j.job_id) FROM wp_lh_jobs j "
+                        + "                                        WHERE j.classname = 'com.macbackpackers.jobs.SplitRoomReservationReportJob' "
+                        + "                                          AND j.status = 'completed') "
+                        + "                    AND p.name = 'allocation_scraper_job_id') " +
+                        " WHERE c.reservation_id IS NULL" )
+                .executeUpdate();
+        LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from wp_lh_rpt_guest_comments" );
     }
 
     /**

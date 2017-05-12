@@ -107,6 +107,9 @@ public class ExpediaApiService {
             LOGGER.error( "Missing PaymentCard in response" );
             throw new MissingUserDataException( "Card details no longer available on Expedia." );
         }
+        else if ( "AX".equals( roomStay.getPaymentCard().getCardCode() ) ) {
+            throw new MissingUserDataException( "Amex not enabled. Charge manually using EFTPOS terminal." );
+        }
         else if ( roomStay.getPaymentCard().getCardHolder() == null ) {
             LOGGER.error( "Missing CardHolder in response" );
             throw new MissingUserDataException( "Cardholder no longer available on Expedia." );
