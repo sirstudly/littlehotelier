@@ -71,7 +71,7 @@ public class DiffBookingEnginesJob extends AbstractJob {
         }
 
         // now dump the data from HW/HB
-        hwScraper.dumpBookingsForArrivalDate( checkinDate );
+        hwScraper.dumpBookingsForArrivalDate( webClient, checkinDate );
         
         // find those bookings that don't have an entry in HW but none in LH
         // this could be because the checkin date has moved or the reservation was cancelled
@@ -81,7 +81,6 @@ public class DiffBookingEnginesJob extends AbstractJob {
     @Override
     public void finalizeJob() {
         webClient.close(); // cleans up JS threads
-        hwScraper.closeAllWindows();
     }
 
     /**

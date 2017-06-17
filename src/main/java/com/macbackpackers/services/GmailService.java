@@ -43,6 +43,7 @@ import com.google.api.services.gmail.model.ListMessagesResponse;
 import com.google.api.services.gmail.model.Message;
 import com.google.api.services.gmail.model.MessagePart;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 
 /**
@@ -146,8 +147,9 @@ public class GmailService {
      * @param bookingRef BDC booking reference
      * @return non-null card details (card details will be masked; last 4 digits visible)
      * @throws IOException on I/O error
+     * @throws MissingUserDataException if no email messages found for the given bookingRef
      */
-    public CardDetails fetchBdcCardDetailsFromBookingRef( String bookingRef ) throws IOException {
+    public CardDetails fetchBdcCardDetailsFromBookingRef( String bookingRef ) throws IOException, MissingUserDataException {
         
         if ( false == bookingRef.startsWith( "BDC-" ) ) {
             throw new IllegalArgumentException( "Unsupporting booking " + bookingRef );
@@ -155,6 +157,8 @@ public class GmailService {
 
         LOGGER.info( "Looking up BDC card details for booking " + bookingRef );
         String bookingId = bookingRef.substring( 4 ); // BDC-(bookingId)
+        // if the booking was split; just take everything before the dash
+        bookingId = findAndReturn( "([0-9]+)(\\-[0-9]{1})?", bookingId );
         Gmail service = connectAsClient();
         ListMessagesResponse listResponse = 
                 service.users().messages()
@@ -162,8 +166,8 @@ public class GmailService {
                 .setQ( String.format( BDC_MATCH_TEMPLATE, bookingId, bookingId ) )
                 .execute();
         List<Message> messages = listResponse.getMessages();
-        if ( messages.size() == 0 ) {
-            throw new EmptyResultDataAccessException( "No messages found for BDC " + bookingId, 1 );
+        if ( messages == null || messages.size() == 0 ) {
+            throw new MissingUserDataException( "No messages found for BDC " + bookingId );
         }
         else {
             LOGGER.info( messages.size() + " messages:" );
@@ -173,6 +177,7 @@ public class GmailService {
                 
                 try {
                     return new CardDetails(
+                            findAndReturn( "^Type \\.+: (.*)$", body ),
                             findAndReturn( "^Name \\.+: (.*)$", body ),
                             findAndReturn( "^Number \\.+: (.*)$", body ),
                             findAndReturn( "^Expiry \\.+: (.*)$", body ),
@@ -183,7 +188,7 @@ public class GmailService {
                 }
             }
         }
-        throw new EmptyResultDataAccessException( "No valid messages found with card details for BDC " + bookingId, 1 );
+        throw new MissingUserDataException( "No valid emails found with card details for BDC " + bookingId );
     }
 
     /**

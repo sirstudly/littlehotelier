@@ -10,6 +10,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
@@ -64,6 +65,15 @@ public interface WordPressDAO {
      * @param jobId the records for the job to delete.
      */
     public void deleteAllocations( int jobId );
+    
+    /**
+     * Deletes all cancelled Allocations for the given jobId.
+     * 
+     * @param jobId the records for the job to delete.
+     * @param checkinDateStart checkin date start (inclusive)
+     * @param checkinDateEnd checkin date end (inclusive)
+     */
+    public void deleteCancelledAllocations( int jobId, Date checkinDateStart, Date checkinDateEnd );
     
     /**
      * Updates the jobId associated with the matching Allocation records.
@@ -224,6 +234,14 @@ public interface WordPressDAO {
     public List<UnpaidDepositReportEntry> fetchUnpaidDepositReport( int allocationScraperJobId );
 
     /**
+     * Returns a List of all BDC bookings which use a prepaid "virtual" CC and where no payment has
+     * yet been taken. The data is retrieved from the last successful AllocationScraperJob.
+     * 
+     * @return non-null list of booking references
+     */
+    public List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithUnpaidDeposits();
+
+    /**
      * Creates a report with all bookings with more than 5 guests.
      * 
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from
@@ -260,6 +278,13 @@ public interface WordPressDAO {
      * @param checkinDate date of arrival
      */
     public void deleteHostelworldBookingsWithArrivalDate( Date checkinDate );
+
+    /**
+     * Deletes all HW bookings matching the given booked date.
+     * 
+     * @param bookedDate date of booking
+     */
+    public void deleteHostelworldBookingsWithBookedDate( Date bookedDate );
 
     /**
      * Deletes all HB bookings matching the given arrival date.

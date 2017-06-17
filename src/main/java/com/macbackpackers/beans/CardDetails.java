@@ -7,6 +7,7 @@ package com.macbackpackers.beans;
  */
 public class CardDetails {
 
+    private String cardType;
     private String name;
     private String cardNumber;
     private String expiry;
@@ -16,11 +17,20 @@ public class CardDetails {
         // default constructor
     }
     
-    public CardDetails(String name, String cardNumber, String expiry, String cvv) {
+    public CardDetails( String cardType, String name, String cardNumber, String expiry, String cvv ) {
+        this.cardType = cardType;
         this.name = name;
         this.cardNumber = cardNumber;
         this.expiry = expiry;
         this.cvv = cvv;
+    }
+
+    public String getCardType() {
+        return cardType;
+    }
+
+    public void setCardType( String cardType ) {
+        this.cardType = cardType;
     }
 
     public String getName() {

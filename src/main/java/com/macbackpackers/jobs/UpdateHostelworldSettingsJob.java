@@ -6,7 +6,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.HostelworldScraper;
 
@@ -26,19 +28,24 @@ public class UpdateHostelworldSettingsJob extends AbstractJob {
     @Transient
     private WordPressDAO wordpressDAO;
 
+    @Autowired
+    @Transient
+    @Qualifier( "webClientForHostelworldLogin" )
+    private WebClient webClient;
+
     @Override
     public void processJob() throws Exception {
 
         // this will throw an exception if unable to login 
         // using the parameters specified by the job
-        hwScraper.doLogin( getParameter( "username" ), getParameter( "password" ) );
+        hwScraper.doLogin( webClient, getParameter( "username" ), getParameter( "password" ) );
         wordpressDAO.setOption( "hbo_hw_username", getParameter( "username" ));
         wordpressDAO.setOption( "hbo_hw_password", getParameter( "password" ));
     }
 
     @Override
     public void finalizeJob() {
-        hwScraper.closeAllWindows(); // cleans up JS threads
+        webClient.close(); // cleans up JS threads
     }
 
     /**

@@ -17,18 +17,16 @@ import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Scope;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
-import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
-import com.gargoylesoftware.htmlunit.html.HtmlDivision;
 import com.gargoylesoftware.htmlunit.html.HtmlForm;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
+import com.gargoylesoftware.htmlunit.html.HtmlSubmitInput;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.gargoylesoftware.htmlunit.html.HtmlUnorderedList;
 import com.gargoylesoftware.htmlunit.util.Cookie;
@@ -39,7 +37,6 @@ import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.services.FileService;
 
 @Component
-@Scope( "prototype" )
 public class HostelworldScraper {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
@@ -52,15 +49,10 @@ public class HostelworldScraper {
 
     /** for saving login credentials */
     private static final String COOKIE_FILE = "hostelworld.cookies";
-
+    
     @Autowired
-    @Qualifier( "webClientForHostelworld" )
-    private WebClient webClient;
-
-    @Autowired
-    @Qualifier( "webClientForHostelworldLogin" )
-    private WebClient webClientForLogin;
-
+    private ApplicationContext context;
+    
     @Autowired
     private FileService fileService;
 
@@ -79,11 +71,12 @@ public class HostelworldScraper {
     /**
      * Logs into Hostelworld providing the necessary credentials.
      * 
+     * @param webClient web client
      * @return the page after login
      * @throws IOException
      */
-    public HtmlPage doLogin() throws IOException {
-        return doLogin(
+    public HtmlPage doLogin( WebClient webClient ) throws IOException {
+        return doLogin( webClient,
                 wordPressDAO.getOption( "hbo_hw_username" ),
                 wordPressDAO.getOption( "hbo_hw_password" ) );
     }
@@ -91,14 +84,15 @@ public class HostelworldScraper {
     /**
      * Logs into Hostelworld providing the necessary credentials.
      * 
+     * @param webClient web client to use
      * @param username user credentials
      * @param password user credentials
      * @return the page after login
      * @throws IOException
      */
-    public HtmlPage doLogin( String username, String password ) throws IOException {
+    public HtmlPage doLogin( WebClient webClient, String username, String password ) throws IOException {
         LOGGER.info( "Logging into Hostelworld" );
-        HtmlPage loginPage = webClientForLogin.getPage( loginUrl );
+        HtmlPage loginPage = webClient.getPage( loginUrl );
         HtmlForm form = loginPage.getFormByName( "loginForm" );
 
         HtmlTextInput hostelNumberField = form.getInputByName( "HostelNumber" );
@@ -109,9 +103,7 @@ public class HostelworldScraper {
         hostelNumberField.setValueAttribute( hostelNumber );
         usernameField.setValueAttribute( username );
         passwordField.setValueAttribute( password );
-
-        HtmlDivision loginButtonDiv = loginPage.getHtmlElementById( "loginButton" );
-        HtmlAnchor loginLink = (HtmlAnchor) loginButtonDiv.getElementsByTagName( "a" ).get( 0 );
+        HtmlSubmitInput loginLink = loginPage.getFirstByXPath( "//input[@type='submit' and @value='Login']" );
 
         HtmlPage nextPage = loginLink.click();
         LOGGER.info( "Finished logging in" );
@@ -124,24 +116,20 @@ public class HostelworldScraper {
 
         // save credentials to disk so we don't need to do this again
         // for the immediate future
-        fileService.writeCookiesToFile( webClientForLogin, COOKIE_FILE );
-
-        // now copy the cookies (with credentials) over to the web client
-        // the other web client has JS disabled so that it works faster
-        for ( Iterator<Cookie> i = webClientForLogin.getCookieManager().getCookies().iterator() ; i.hasNext() ; ) {
-            webClient.getCookieManager().addCookie( i.next() );
-        }
+        fileService.writeCookiesToFile( webClient, COOKIE_FILE );
         return nextPage;
     }
 
     /**
-     * Logs in and navigates to the given page.
+     * Logs in and navigates to the given page. Synchronized to avoid multiple simultaneous
+     * logins if there are a bunch of jobs scraping at the same time.
      * 
+     * @param webClient web client
      * @param url the HW page to go to
      * @return the accessed page
      * @throws IOException
      */
-    public HtmlPage gotoPage( String url ) throws IOException {
+    public synchronized HtmlPage gotoPage( WebClient webClient, String url ) throws IOException {
 
         // load most recent cookies from disk first
         fileService.loadCookiesFromFile( webClient, COOKIE_FILE );
@@ -150,12 +138,26 @@ public class HostelworldScraper {
 
         // if we got redirected, then login
         if ( LOGIN_PAGE_TITLE.equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
-            doLogin();
-            nextPage = webClient.getPage( url );
 
-            // if we still get redirected to the login page...
-            if ( LOGIN_PAGE_TITLE.equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
-                throw new UnrecoverableFault( "Unable to login to Hostelworld! Has the password changed?" );
+            // create a new web client just for logging in
+            WebClient webClientForLogin = context.getBean( "webClientForHostelworldLogin", WebClient.class );
+            try {
+                doLogin( webClientForLogin );
+                nextPage = webClientForLogin.getPage( url );
+
+                // if we still get redirected to the login page...
+                if ( LOGIN_PAGE_TITLE.equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
+                    throw new UnrecoverableFault( "Unable to login to Hostelworld! Has the password changed?" );
+                }
+
+                // now copy the cookies (with credentials) over to the web client
+                // the other web client has JS disabled so that it works faster
+                for ( Iterator<Cookie> i = webClientForLogin.getCookieManager().getCookies().iterator() ; i.hasNext() ; ) {
+                    webClient.getCookieManager().addCookie( i.next() );
+                }
+            }
+            finally {
+                webClientForLogin.close();
             }
         }
         return nextPage;
@@ -164,21 +166,50 @@ public class HostelworldScraper {
     /**
      * Dumps all HW bookings checking in on the given date.
      * 
+     * @param webClient web client
      * @param arrivalDate date of arrival
      * @throws IOException
      * @throws ParseException
      */
 //    @Transactional
-    public void dumpBookingsForArrivalDate( Date arrivalDate ) throws IOException, ParseException {
+    public void dumpBookingsForArrivalDate( WebClient webClient, Date arrivalDate ) throws IOException, ParseException {
 
         // first delete any existing bookings on the given arrival date
         wordPressDAO.deleteHostelworldBookingsWithArrivalDate( arrivalDate );
+        dumpBookings( webClient, getBookingsURLForArrivalsByDate( arrivalDate ) );
+    }
 
-        HtmlPage arrivalsPage = gotoPage( getBookingsURLForArrivalsByDate( arrivalDate ) );
+    /**
+     * Dumps all HW bookings booked on the given date.
+     * 
+     * @param webClient web client
+     * @param bookedDate date when reservation was booked
+     * @throws IOException
+     * @throws ParseException
+     */
+//    @Transactional
+    public void dumpBookingsForBookedDate( WebClient webClient, Date bookedDate ) throws IOException, ParseException {
+
+        // first delete any existing bookings on the given booked date
+        wordPressDAO.deleteHostelworldBookingsWithBookedDate( bookedDate );
+        dumpBookings( webClient, getBookingsURLForBookedByDate( bookedDate ) );
+    }
+
+    /**
+     * Dumps all HW bookings on the given bookings page.
+     * 
+     * @param webClient web client
+     * @param bookingsPageUrl URL of page containing all the <em>searched</em> booking entries
+     * @throws IOException
+     * @throws ParseException
+     */
+    private void dumpBookings( WebClient webClient, String bookingsPageUrl ) throws IOException, ParseException {
+
+        HtmlPage bookingsPage = gotoPage( webClient, bookingsPageUrl );
 
         // the anchor link has an extra quote that fucks up the HTML DOM so we will need to
         // extract the bookings using a regex
-        String bookingsPageHtml = arrivalsPage.getWebResponse().getContentAsString();
+        String bookingsPageHtml = bookingsPage.getWebResponse().getContentAsString();
 
         // now loop through the bookings, saving each one
         Pattern pattern = Pattern.compile( "\\/booking\\/view\\/([\\d]+)" );
@@ -186,20 +217,20 @@ public class HostelworldScraper {
         while ( matcher.find() ) {
             String bookingRef = matcher.group( 1 );
             LOGGER.info( "Booking Ref: " + bookingRef );
-            dumpSingleBooking( bookingRef );
+            dumpSingleBooking( webClient, bookingRef );
         }
-
     }
 
     /**
      * Writes a single booking to the database.
      * 
+     * @param webClient web client
      * @param bookingRef HW booking ref
      * @return the booking page that was saved
      * @throws IOException
      * @throws ParseException
      */
-    public HtmlPage dumpSingleBooking( String bookingRef ) throws IOException, ParseException {
+    public HtmlPage dumpSingleBooking( WebClient webClient, String bookingRef ) throws IOException, ParseException {
 
         HtmlPage bookingPage = webClient.getPage( "https://inbox.hostelworld.com/booking/view/" + bookingRef );
         List<?> custDetails = bookingPage.getByXPath( "//ul[@class='customer-details']" );
@@ -374,14 +405,18 @@ public class HostelworldScraper {
      * @return URL of bookings arriving on this date
      */
     private String getBookingsURLForArrivalsByDate( Date date ) {
-        return bookingsUrl.replaceAll( "__DATE__", DATE_FORMAT_YYYY_MM_DD.format( date ) );
+        return bookingsUrl.replaceAll( "__DATE__", DATE_FORMAT_YYYY_MM_DD.format( date ) )
+                .replaceAll( "__DATE_TYPE__", "arrivaldate" );
     }
-
+    
     /**
-     * Close all open windows.
+     * Returns the booking URL for all reservations booked on the given date.
+     * 
+     * @param date date to query
+     * @return URL of bookings booked on this date
      */
-    public void closeAllWindows() {
-        webClient.close();
+    private String getBookingsURLForBookedByDate( Date date ) {
+        return bookingsUrl.replaceAll( "__DATE__", DATE_FORMAT_YYYY_MM_DD.format( date ) )
+                .replaceAll( "__DATE_TYPE__", "bookeddate" );
     }
-
 }

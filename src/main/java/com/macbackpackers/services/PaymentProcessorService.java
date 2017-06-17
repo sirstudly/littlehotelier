@@ -13,6 +13,7 @@ import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.stereotype.Service;
 
@@ -22,13 +23,13 @@ import com.gargoylesoftware.htmlunit.html.HtmlInput;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlSpan;
 import com.gargoylesoftware.htmlunit.html.HtmlTableRow;
+import com.gargoylesoftware.htmlunit.html.HtmlTextArea;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.DepositPayment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.xml.TxnResponse;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
-import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.scrapers.ReservationPageScraper;
 
@@ -43,6 +44,10 @@ public class PaymentProcessorService {
     
     private static final FastDateFormat DATETIME_FORMAT = FastDateFormat.getInstance( "dd/MM/yyyy HH:mm:ss" );
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
+
+    /** Amount to charge BDC bookings. Either a percentage between 0-1 or "first_night". */
+    @Value( "${bdc.deposit.strategy}" )
+    private String bdcDepositStrategy;
 
     @Autowired
     private ReservationPageScraper reservationPageScraper;
@@ -74,7 +79,7 @@ public class PaymentProcessorService {
      * @param bookedOnDate date on which reservation was booked
      * @throws IOException on I/O error
      */
-    public void processDepositPayment( WebClient webClient, String bookingRef, Date bookedOnDate ) throws IOException {
+    public synchronized void processDepositPayment( WebClient webClient, String bookingRef, Date bookedOnDate ) throws IOException {
         LOGGER.info( "Processing payment for booking " + bookingRef );
         HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
         
@@ -121,7 +126,7 @@ public class PaymentProcessorService {
 
         try {
             // get the deposit amount and full card details
-            DepositPayment depositPayment = retrieveCardDetails( reservationPageScraper, bookingRef, reservationId, reservationPage );
+            DepositPayment depositPayment = retrieveCardDetails( bookingRef, reservationId, reservationPage );
             
             // see if we've tried to do this already
             // lookup transaction id(s) on payment table from booking ref
@@ -138,8 +143,9 @@ public class PaymentProcessorService {
                     LOGGER.info( "Last payment attempt failed" );
                     if( wordpressDAO.getPreviousNumberOfFailedTxns(
                             pxpost.getBookingReference(), 
-                            pxpost.getMaskedCardNumber()) > MAX_PAYMENT_ATTEMPTS ) {
-                        throw new UnrecoverableFault( "Max number of payment attempts reached" );
+                            pxpost.getMaskedCardNumber()) >= MAX_PAYMENT_ATTEMPTS ) {
+                        LOGGER.info( "Max number of payment attempts reached. Aborting." );
+                        return;
                     }
                 }
     
@@ -190,33 +196,30 @@ public class PaymentProcessorService {
     /**
      * Retrieve full card details for the given booking.
      * 
-     * @param reservationPageScraper scraper for reservations page
      * @param bookingRef booking ref, e.g. BDC-12345678
      * @param reservationId LH id for this reservation
      * @param reservationPage the HtmlPage of the current reservation 
      * @return full card details (not-null)
      * @throws IOException on page load error
      */
-    private DepositPayment retrieveCardDetails( ReservationPageScraper reservationPageScraper, 
-            String bookingRef, int reservationId, HtmlPage reservationPage ) throws IOException {
+    private DepositPayment retrieveCardDetails( String bookingRef, int reservationId, 
+            HtmlPage reservationPage ) throws IOException {
         
         // Booking.com
         if ( bookingRef.startsWith( "BDC-" ) ) {
-            LOGGER.info( "Retrieving customer card details" );
-            CardDetails ccDetails = reservationPageScraper.getCardDetails( reservationPage, reservationId );
-
             LOGGER.info( "Retrieving card security code" );
             CardDetails ccDetailsFromGmail = gmailService.fetchBdcCardDetailsFromBookingRef( bookingRef );
-            ccDetails.setCvv( ccDetailsFromGmail.getCvv() ); // copying over security code
 
-            // calculate how much we need to change
-            HtmlSpan totalOutstanding = reservationPage.getFirstByXPath( "//div[@class='outstanding_total']/span" );
-            BigDecimal amountToPay = new BigDecimal( totalOutstanding.getTextContent().replaceAll( "£", "" ) );
-            amountToPay = amountToPay.multiply( new BigDecimal( "0.2" ) ).setScale( 2, RoundingMode.HALF_UP ); // 20% is deposit
-            if ( amountToPay.compareTo( new BigDecimal( "0" ) ) == 0 ) {
-                throw new IllegalStateException( "Amount payable is £0???" );
+            // AMEX cards not supported
+            if( "AX".equals( ccDetailsFromGmail.getCardType() ) ) {
+                throw new MissingUserDataException( "Amex not enabled. Charge manually using EFTPOS terminal." );
             }
-            return new DepositPayment( amountToPay, ccDetails );
+
+            LOGGER.info( "Retrieving customer card details" );
+            CardDetails ccDetails = reservationPageScraper.getCardDetails( reservationPage, reservationId );
+            ccDetails.setExpiry( ccDetailsFromGmail.getExpiry() ); // copying over expiry
+            ccDetails.setCvv( ccDetailsFromGmail.getCvv() ); // copying over security code
+            return new DepositPayment( getBdcDepositChargeAmount( reservationPage ), ccDetails );
         }
         // Expedia
         else if ( bookingRef.startsWith( "EXP-" ) ) {
@@ -318,5 +321,50 @@ public class PaymentProcessorService {
             throw new MissingUserDataException( "Unable to determine booking reference from " + reservationPage.getBaseURL());
         }
         return bookingRef;
+    }
+
+    /**
+     * Retrieves the deposit amount to charge for the given BDC reservation.
+     * 
+     * @param reservationPage the HtmlPage of the current reservation
+     * @return deposit amount to charge reservation
+     */
+    public BigDecimal getBdcDepositChargeAmount( HtmlPage reservationPage ) {
+
+        // calculate how much we need to change
+        HtmlSpan totalOutstanding = reservationPage.getFirstByXPath( "//div[@class='outstanding_total']/span" );
+        BigDecimal amountOutstanding = new BigDecimal( totalOutstanding.getTextContent().replaceAll( "£", "" ) );
+        HtmlTextArea guestComments = reservationPage.getFirstByXPath( "//textarea[@id='reservation_guest_comments']" );
+
+        // either take first night, or a percentage amount
+        BigDecimal amountToPay;
+        if ( StringUtils.trimToEmpty( guestComments.getText() ).contains( 
+                "You have received a virtual credit card for this reservation" ) ) {
+            Pattern p = Pattern.compile( "The amount the guest prepaid to Booking\\.com is GBP ([0-9]+\\.[0-9]{2})" );
+            Matcher m = p.matcher( guestComments.getText() );
+            if ( m.find() ) {
+                amountToPay = new BigDecimal( m.group( 1 ) );
+            }
+            else {
+                throw new MissingUserDataException( "Missing prepaid amount in guest comments when attempting to charge deposit." );
+            }
+        }
+        else if ( "first_night".equals( bdcDepositStrategy ) ) {
+            amountToPay = reservationPageScraper.getAmountPayableForFirstNight( reservationPage );
+        }
+        else {
+            BigDecimal percentToCharge = new BigDecimal( bdcDepositStrategy );
+            amountToPay = amountOutstanding.multiply( percentToCharge ).setScale( 2, RoundingMode.HALF_UP );
+        }
+
+        // extra sanity checks
+        if ( amountToPay.compareTo( BigDecimal.ZERO ) == 0 ) {
+            throw new IllegalStateException( "Amount payable is £0???" );
+        }
+        else if ( amountToPay.compareTo( amountOutstanding ) > 0 ) {
+            throw new IllegalStateException( "Amount to pay " + amountToPay +
+                    " exceeds amount outstanding of " + amountOutstanding + "???" );
+        }
+        return amountToPay;
     }
 }

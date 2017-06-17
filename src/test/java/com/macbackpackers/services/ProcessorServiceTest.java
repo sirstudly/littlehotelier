@@ -10,7 +10,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.quartz.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,10 +28,14 @@ import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CreateDepositChargeJob;
+import com.macbackpackers.jobs.CreatePrepaidChargeJob;
+import com.macbackpackers.jobs.CreateScrapeCancelledBookingsJob;
 import com.macbackpackers.jobs.CreateSendGuestCheckoutEmailJob;
 import com.macbackpackers.jobs.CreateTestGuestCheckoutEmailJob;
 import com.macbackpackers.jobs.DbPurgeJob;
 import com.macbackpackers.jobs.DepositChargeJob;
+import com.macbackpackers.jobs.DumpHostelworldBookingsByArrivalDateJob;
+import com.macbackpackers.jobs.DumpHostelworldBookingsByBookedDateJob;
 import com.macbackpackers.jobs.GroupBookingsReportJob;
 import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.jobs.SendAllUnsentEmailJob;
@@ -261,15 +264,15 @@ public class ProcessorServiceTest {
 
         j.setStatus( JobStatus.submitted );
         Calendar bookingDate = Calendar.getInstance();
-        bookingDate.set( Calendar.DATE, 27 );
-        bookingDate.set( Calendar.MONTH, Calendar.APRIL );
+        bookingDate.set( Calendar.DATE, 5 );
+        bookingDate.set( Calendar.MONTH, Calendar.JUNE );
         bookingDate.set( Calendar.YEAR, 2017 );
         j.setBookingDate( bookingDate.getTime() );
-        j.setBookingRef( "EXP-832394371" );
+        j.setBookingRef( "BDC-1722452541" );
         dao.insertJob( j );
         
         // this should now run the job
-        processorService.processJobs();
+//        processorService.processJobs();
     }
     
     @Test
@@ -313,5 +316,58 @@ public class ProcessorServiceTest {
         Job dj = j.getDependentJobs().iterator().next();
         Assert.assertThat( dj.getClass(), Matchers.is( AllocationScraperJob.class ) );
         Assert.assertThat( dj.getId(), Matchers.is( j.getId() - 1 ) );
+    }
+    
+    @Test
+    public void testDumpHostelworldBookingsByArrivalDateJob() throws Exception {
+        Calendar checkinDate = Calendar.getInstance();
+        checkinDate.add( Calendar.DATE, 12 );
+        for(int i = 0; i < 120; i++) {
+            DumpHostelworldBookingsByArrivalDateJob j = new DumpHostelworldBookingsByArrivalDateJob();
+            j.setCheckinDate( checkinDate.getTime() );
+            j.setStatus( JobStatus.submitted );
+            dao.insertJob( j );
+            checkinDate.add( Calendar.DATE, 1 );
+        }
+    }
+
+    @Test
+    public void testDumpHostelworldBookingsByBookedDateJob() throws Exception {
+        Calendar bookedDate = Calendar.getInstance();
+        bookedDate.add( Calendar.DATE, -1 );
+        
+        DumpHostelworldBookingsByBookedDateJob j = new DumpHostelworldBookingsByBookedDateJob();
+        j.setBookedDate( bookedDate.getTime() );
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+        
+        bookedDate.add( Calendar.DATE, -1 );
+        j = new DumpHostelworldBookingsByBookedDateJob();
+        j.setBookedDate( bookedDate.getTime() );
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+        
+        bookedDate.add( Calendar.DATE, -1 );
+        j = new DumpHostelworldBookingsByBookedDateJob();
+        j.setBookedDate( bookedDate.getTime() );
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+        
+    }
+
+    @Test
+    public void testScrapeCancelledBookingsJob() throws Exception {
+        CreateScrapeCancelledBookingsJob j = new CreateScrapeCancelledBookingsJob();
+        j.setAllocationScraperJobId( 186689 );
+        j.setDaysAhead( 130 );
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void testCreatePrepaidChargeJob() throws Exception {
+        CreatePrepaidChargeJob j = new CreatePrepaidChargeJob();
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
     }
 }

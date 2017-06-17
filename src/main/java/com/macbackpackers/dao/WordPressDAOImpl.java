@@ -3,6 +3,8 @@ package com.macbackpackers.dao;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Properties;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
@@ -90,6 +93,21 @@ public class WordPressDAOImpl implements WordPressDAO {
         int rowsDeleted = em
             .createQuery( "DELETE Allocation WHERE jobId = :jobId" )
             .setParameter( "jobId", jobId )
+            .executeUpdate();
+        LOGGER.info( rowsDeleted + " allocation rows deleted." );
+    }
+
+    @Override
+    public void deleteCancelledAllocations( int jobId, Date checkinDateStart, Date checkinDateEnd ) {
+        int rowsDeleted = em
+            .createQuery( "DELETE Allocation "
+                    + "     WHERE jobId = :jobId "
+                    + "       AND status = 'cancelled' "
+                    + "       AND checkinDate >= :checkinDateStart "
+                    + "       AND checkinDate <= :checkinDateEnd" )
+            .setParameter( "jobId", jobId )
+            .setParameter( "checkinDateStart", checkinDateStart )
+            .setParameter( "checkinDateEnd", checkinDateEnd )
             .executeUpdate();
         LOGGER.info( rowsDeleted + " allocation rows deleted." );
     }
@@ -440,6 +458,27 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Override
     @SuppressWarnings( "unchecked" )
+    public void deleteHostelworldBookingsWithBookedDate( Date bookedDate ) {
+
+        // find all bookings matched by booked date
+        // we just need to compare the date portion
+        Calendar c = Calendar.getInstance();
+        c.setTime( bookedDate );
+        c.add( Calendar.DATE, 1 );
+        List<Integer> bookingIds = em.createQuery(
+                "           SELECT b.id "
+                        + "   FROM HostelworldBooking b"
+                        + "  WHERE DATE(:bookedDate) <= b.bookedDate"
+                        + "    AND DATE(:bookedDatePlus1) > b.bookedDate")
+                .setParameter( "bookedDate", bookedDate )
+                .setParameter( "bookedDatePlus1", c.getTime() )
+                .getResultList();
+
+        deleteHostelworldBookings( bookingIds );
+    }
+
+    @Override
+    @SuppressWarnings( "unchecked" )
     public void deleteHostelbookersBookingsWithArrivalDate( Date checkinDate ) {
 
         // find all bookings where the first (booked) date matches the checkin date
@@ -467,6 +506,7 @@ public class WordPressDAOImpl implements WordPressDAO {
 
         // now delete the records one by one since i couldn't figure out
         // how to do a cascade delete correctly
+        LOGGER.info( "Deleting " + bookingIds.size() + " records from HW bookings" );
         for ( Integer bookingId : bookingIds ) {
             em.createQuery(
                     "DELETE HostelworldBookingDate WHERE bookingId = :bookingId" )
@@ -579,15 +619,33 @@ public class WordPressDAOImpl implements WordPressDAO {
             .setParameter( "jobId", allocationScraperJobId )
             .executeUpdate();
     }
-    
+
     @Override
-    @SuppressWarnings( "unchecked" )
     public List<UnpaidDepositReportEntry> fetchUnpaidDepositReport( int allocationScraperJobId ) {
         LOGGER.info( "Fetching last unpaid deposit report for allocation job id " + allocationScraperJobId );
         return em.createQuery(
-                "FROM UnpaidDepositReportEntry WHERE jobId = :jobId" )
+                "FROM UnpaidDepositReportEntry WHERE jobId = :jobId", UnpaidDepositReportEntry.class )
                 .setParameter( "jobId", allocationScraperJobId )
                 .getResultList();
+    }
+    
+    @Override
+    public List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithUnpaidDeposits() {
+        Integer allocationScraperJobId = getLastCompletedAllocationScraperJobId();
+        if ( allocationScraperJobId != null ) {
+            return em.createQuery( 
+                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.bookingReference, c.bookedDate, r.comments ) "
+                    + "  FROM Allocation c "
+                    + " INNER JOIN GuestCommentReportEntry r "
+                    + "    ON c.reservationId = r.reservationId "
+                    + " WHERE c.jobId = :allocationScraperJobId "
+                    + "   AND c.paymentTotal = c.paymentOutstanding" // no deposit charged
+                    + "   AND r.comments LIKE 'You have received a virtual credit card for this reservation%'"
+                    + "   AND c.bookingReference LIKE 'BDC-%'", BookingWithGuestComments.class )
+                    .setParameter( "allocationScraperJobId", allocationScraperJobId )
+                    .getResultList();
+        }
+        return Collections.emptyList();
     }
 
     @Override

@@ -4,6 +4,7 @@ package com.macbackpackers.scrapers;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
@@ -21,6 +22,7 @@ import com.gargoylesoftware.htmlunit.WebResponse;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlButton;
 import com.gargoylesoftware.htmlunit.html.HtmlCheckBoxInput;
+import com.gargoylesoftware.htmlunit.html.HtmlDivision;
 import com.gargoylesoftware.htmlunit.html.HtmlInput;
 import com.gargoylesoftware.htmlunit.html.HtmlOption;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
@@ -61,6 +63,7 @@ public class ReservationPageScraper {
     @Value( "${lilhotelier.url.cardnumber}" )
     private String cardNumberLookupUrl;
 
+    public static final String POUND = AllocationsPageScraper.POUND;
     /**
      * Goes to the given reservation page.
      * 
@@ -132,14 +135,22 @@ public class ReservationPageScraper {
      */
     public void addPayment( HtmlPage reservationPage, BigDecimal amount, String cardType, 
             boolean isDeposit, String note) throws IOException {
-        HtmlAnchor addPayment = reservationPage.getFirstByXPath( "//a[@data-click='payment.add']" );
-        LOGGER.info( "Clicking add payment button" );
+
+        // virtual CCs (for BDC) will say 'Pending' rather than 'Completed Payments'
+        HtmlDivision div = reservationPage.getFirstByXPath( "//div[@class='payment-row']/div[1]" );
+        boolean isVirtualPayment = div != null && StringUtils.trimToEmpty( div.getTextContent() ).startsWith( "To Be Taken" );
+
+        // virtual CCs will have a different "add payment" button
+        HtmlAnchor addPayment = reservationPage.getFirstByXPath(
+                isVirtualPayment ? "//a[@data-click='pendingPayment.recordPayment']" : "//a[@data-click='payment.add']" );
+
+        LOGGER.info( "Clicking add payment button." + (isVirtualPayment ? " Prepaid amount to be taken." : "") );
         HtmlPage currentPage = addPayment.click();
         currentPage.getWebClient().waitForBackgroundJavaScript( 30000 );
         
         HtmlTextInput amountInput = HtmlTextInput.class.cast( currentPage.getElementById( "amount" ) );
         amountInput.setValueAttribute( amount.toString() );
-        
+
         // check if the card type is in our list first
         // do any replacement(s) beforehand
         LOGGER.info( "Card type is " + cardType );
@@ -158,7 +169,6 @@ public class ReservationPageScraper {
         }
         else {
             // card type not in our list, just select "Other"
-            // FIXME: not sure why this isn't working; default always sticks as Card/Visa
             HtmlOption otherOption = paymentSelect.getOptionByValue( "Other" );
             paymentSelect.setSelectedAttribute( otherOption, true );
         }
@@ -166,8 +176,10 @@ public class ReservationPageScraper {
         if( isDeposit ) {
             LOGGER.info( "Ticking deposit checkbox" );
             HtmlCheckBoxInput depositCheckbox = HtmlCheckBoxInput.class.cast( currentPage.getElementById( "payment_type" ) );
-            currentPage = depositCheckbox.click();
-            currentPage.getWebClient().waitForBackgroundJavaScript( 30000 );
+            if ( false == depositCheckbox.isChecked() ) {
+                currentPage = depositCheckbox.click();
+                currentPage.getWebClient().waitForBackgroundJavaScript( 30000 );
+            }
         }
         
         HtmlTextArea descriptionTxt = HtmlTextArea.class.cast( currentPage.getElementById( "description" )); 
@@ -191,8 +203,11 @@ public class ReservationPageScraper {
         HtmlTextArea notesTxt = HtmlTextArea.class.cast( 
                 reservationPage.getElementById( "reservation_notes" ));
         notesTxt.type( note + "\n" ); // need JS event change
+        reservationPage.setFocusedElement( null ); // remove focus on textarea to trigger onchange
+        reservationPage.getWebClient().waitForBackgroundJavaScript( 2000 ); // wait for page to update
         HtmlSubmitInput saveButton = reservationPage.getFirstByXPath( "//input[@value='Save']" );
         saveButton.click();
+        reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
     }
 
     /**
@@ -215,7 +230,7 @@ public class ReservationPageScraper {
         else { // we already have secure access so should be able to see the card details directly
             HtmlInput cardNumber = reservationPage.getFirstByXPath( "//input[@id='reservation_payment_card_number']" );
             if ( false == NumberUtils.isDigits( cardNumber.getValueAttribute() ) ) {
-                throw new MissingUserDataException( "Unable to retrieve card number : " + reservationPage.getUrl() );
+                throw new MissingUserDataException( "Unable to retrieve card number." );
             }
             cardDetails.setCardNumber( cardNumber.getValueAttribute() );
         }
@@ -232,14 +247,29 @@ public class ReservationPageScraper {
             throw new MissingUserDataException( "Unable to find card expiry year(" + expYear + " : " + reservationPage.getUrl() );
         }
         cardDetails.setExpiry( StringUtils.leftPad( expMonth, 2, "0" ) + expYear.substring( 2 ) );
-        
-        HtmlInput firstName = reservationPage.getFirstByXPath( "//input[@id='reservation_guest_first_name']" );
-        HtmlInput lastName = reservationPage.getFirstByXPath( "//input[@id='reservation_guest_last_name']" );
-        cardDetails.setName( firstName.getValueAttribute() + " " + lastName.getValueAttribute() );
+
+        HtmlInput cardholderName = reservationPage.getFirstByXPath( "//input[@id='reservation_payment_card_name']" );
+        cardDetails.setName( cardholderName.getValueAttribute() );
         
         return cardDetails;
     }
-    
+
+    /**
+     * Returns the first night payable on the reservations page.
+     * 
+     * @param reservationPage reservations page
+     * @return non-null amount payable on first night
+     */
+    public BigDecimal getAmountPayableForFirstNight( HtmlPage reservationPage ) {
+        List<?> divs = reservationPage.getByXPath( "//div[1]/input[@id='reservation_reservation_room_types__reservation_room_dates__date']/../div[2]" );
+        return divs.stream().map( o -> {
+            HtmlDivision div = HtmlDivision.class.cast( o );
+            String amount = StringUtils.replaceChars( div.getTextContent(), POUND, "" );
+            LOGGER.info( "Accumulating amount: " + amount );
+            return new BigDecimal( StringUtils.trim( amount ) );
+        } ).reduce( BigDecimal.ZERO, BigDecimal::add );
+    }
+
     /**
      * Clicks on the "view card details" link on the reservation page and fills in the
      * security token dialog with the email sent. Returns the card number for the current

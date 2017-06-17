@@ -42,13 +42,15 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
     </entry>
     <entry key="unpaid.deposit.report">
 		INSERT INTO wp_lh_rpt_unpaid_deposit( job_id, guest_name, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn, created_date )
-		SELECT job_id, GROUP_CONCAT( DISTINCT guest_name ) `guest_name`, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn, MAX(created_date) `created_date`
-		  FROM wp_lh_calendar f  
-		WHERE job_id = :jobId
-		AND payment_total = payment_outstanding
-		AND payment_total > 0
-		AND booking_source IN ('Booking.com', 'Expedia')
-		GROUP BY reservation_id, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn;
+		SELECT f.job_id, GROUP_CONCAT( DISTINCT f.guest_name ) `guest_name`, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn, MAX(f.created_date) `created_date`
+		  FROM wp_lh_calendar f
+		  LEFT OUTER JOIN wp_lh_rpt_guest_comments c ON f.reservation_id = c.reservation_id
+		 WHERE f.job_id = :jobId
+		   AND f.payment_total = f.payment_outstanding
+		   AND f.payment_total > 0
+		   AND f.booking_source IN ('Booking.com', 'Expedia')
+		   AND (c.comments IS NULL OR c.comments NOT LIKE 'You have received a virtual credit card for this reservation%')
+		 GROUP BY f.reservation_id, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn;
     </entry>
     <entry key="group.bookings">
 	    INSERT INTO `wp_lh_group_bookings` (job_id, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn)

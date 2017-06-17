@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
@@ -32,6 +33,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlOption;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlSelect;
 import com.gargoylesoftware.htmlunit.html.HtmlSpan;
+import com.gargoylesoftware.htmlunit.html.HtmlTableDataCell;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.Job;
@@ -64,6 +66,12 @@ public class BookingsPageScraper {
 
     @Value( "${lilhotelier.url.bookings}" )
     private String bookingUrl;
+
+    @Value( "${lilhotelier.url.reservation}" )
+    private String reservationUrl;
+
+    @Autowired
+    private ApplicationContext context;
 
     /**
      * Goes to the booking page showing arrivals for the given date.
@@ -264,7 +272,9 @@ public class BookingsPageScraper {
 
                     Allocation alloc = new Allocation();
                     alloc.setJobId( jobId );
-                    alloc.setDataHref( "/extranet/properties/533/reservations/" + dataId + "/edit" );
+                    alloc.setDataHref( reservationUrl
+                            .replace( "https://emea.littlehotelier.com", "" )
+                            .replace( "__RESERVATION_ID__", dataId ) );
                     alloc.setReservationId( Integer.parseInt( dataId ) );
 
                     // may want to improve this later if i split out the table so it's not flattened
@@ -545,6 +555,94 @@ public class BookingsPageScraper {
         for ( String bookingRef : bookingRefs ) {
             HtmlPage bookingPage = goToBookingPageForArrivals( webClient, startDate.getTime(), endDate.getTime(), bookingRef, null );
             insertBookings( jobId, bookingPage );
+        }
+    }
+
+    /**
+     * Attempts to find and insert any bookings that are present in the HW scraped tables
+     * for the given job id but not in the LH calendar table for the same jobId.
+     * 
+     * @param webClient web client to use
+     * @param jobId ID of DiffBookingEnginesJob
+     * @param checkinDateFrom checkin date start (inclusive)
+     * @param checkinDateTo checkin date end (inclusive)
+     * @throws IOException on web error
+     * @throws ParseException on date parse error
+     */
+    public void insertCancelledBookings( WebClient webClient, int jobId, Date checkinDateFrom, 
+            Date checkinDateTo ) throws IOException, ParseException {
+        String url = bookingUrl
+                .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( checkinDateFrom ) )
+                .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( checkinDateTo ) )
+                .replaceAll( "__BOOKING_REF_ID__", "" )
+                .replaceAll( "__DATE_TYPE__", "CheckIn" )
+                .replaceAll( "__STATUS__", "cancelled" );
+        LOGGER.info( "Retrieving CSV file from: " + url );
+        HtmlPage thePage = authService.goToPage( url, webClient );
+        HtmlAnchor a = thePage.getFirstByXPath( "//a[@class='export']" );
+        TextPage txtPage = a.click();
+        String csvContent = txtPage.getContent();
+        Iterable<CSVRecord> records = CSVFormat.RFC4180
+                .withFirstRecordAsHeader().parse(new StringReader(csvContent));
+        
+        for (CSVRecord record : records) {
+            LOGGER.info( "Inserting cancelled allocation for " + record.get( "Booking reference" ) );
+            Allocation alloc = new Allocation();
+            alloc.setJobId( jobId );
+            alloc.setViewed( true ); // not available
+            alloc.setStatus( record.get( "Status" ) );
+            alloc.setGuestName( record.get( "Guest first name" ) + " " + record.get( "Guest last name" ) );
+            alloc.setBookingReference( record.get( "Booking reference" ) );
+            alloc.setBookingSource( record.get( "Channel name" ) );
+            alloc.setNumberGuests( Integer.parseInt( record.get( "Number of adults" ) ) );
+            alloc.setBookedDate( DATE_FORMAT_YYYY_MM_DD.parse( record.get( "Booked on date" ) ) );
+            alloc.setEta( record.get( "Arrival time" ) );
+            alloc.setCheckinDate( DATE_FORMAT_YYYY_MM_DD.parse( record.get( "Check in date" ) ) );
+            alloc.setCheckoutDate( DATE_FORMAT_YYYY_MM_DD.parse( record.get( "Check out date" ) ) );
+            alloc.setPaymentTotal( record.get("Payment total") );
+            alloc.setPaymentOutstanding( record.get( "Payment outstanding" ) );
+            alloc.setRoom( "Unallocated" ); // cannot be null 
+
+            // we need the notes from the bookings page
+            updateAllocationWithBookingDetails( alloc );
+
+            // insert the allocation to datastore
+            wordPressDAO.insertAllocation( alloc );
+        }
+    }
+
+    /**
+     * Updates the allocation object with the missing details from the booking details page.
+     * 
+     * @param alloc allocation object being updated
+     * @throws IOException
+     */
+    private void updateAllocationWithBookingDetails( Allocation alloc ) throws IOException {
+
+        // instantiating new web client here due to excessive memory usage
+        // and resources not being released fast enough
+        try (WebClient bookingClient = context.getBean( "webClient", WebClient.class )) {
+            HtmlPage thePage = goToBookingPageForArrivals( bookingClient, 
+                    alloc.getCheckinDate(), alloc.getCheckinDate(), 
+                    alloc.getBookingReference(), alloc.getStatus() );
+
+            for ( DomElement tr : thePage.getElementsByTagName( "tr" ) ) {
+                String dataId = tr.getAttribute( "data-id" );
+                if ( StringUtils.isNotBlank( dataId ) ) {
+                    alloc.setReservationId( Integer.parseInt( dataId ) );
+                    alloc.setDataHref( reservationUrl
+                            .replace( "https://emea.littlehotelier.com", "" )
+                            .replace( "__RESERVATION_ID__", dataId ) );
+
+                    // click on booking to get booking details
+                    DomElement cell = tr.getFirstElementChild();
+                    HtmlPage bookingPage = HtmlTableDataCell.class.cast( cell ).click();
+                    bookingPage.getWebClient().waitForBackgroundJavaScript( 30000 );
+                    alloc.setNotes( StringUtils.trimToNull( 
+                            thePage.getElementById( "reservation_notes" ).getTextContent() ) );
+                    break; // there should only ever be one record anyways
+                }
+            }
         }
     }
 

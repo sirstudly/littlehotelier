@@ -474,11 +474,31 @@ public class WordPressDAOTest {
             LOGGER.info( ToStringBuilder.reflectionToString( row ));
             LOGGER.info( "Reservation " + row.getReservationId() );
         }
-    } 
+    }
+    
+    @Test
+    public void testFetchPrepaidBDCBookingsWithUnpaidDeposits() {
+        // find all BDC bookings with unpaid deposits that use a virtual CC
+        // and create a job for each of them
+        dao.fetchPrepaidBDCBookingsWithUnpaidDeposits()
+                .stream()
+                .filter( p -> p.isChargeableDateInPast() )
+                .forEach( a -> {
+                    LOGGER.info( "Booking " + a.getBookingReference() 
+                            + " is chargeable on " + a.getEarliestChargeDate() );
+                    LOGGER.info( ToStringBuilder.reflectionToString( a ) );
+                } );
+    }
     
     @Test
     public void testRunGroupBookingsReport() {
         dao.runGroupBookingsReport( 137652 );   
+    }
+    
+    @Test
+    public void testDeleteHostelworldBookingsWithBookedDate() {
+        Calendar c = Calendar.getInstance();
+        dao.deleteHostelworldBookingsWithBookedDate( c.getTime() );
     }
     
     @Test

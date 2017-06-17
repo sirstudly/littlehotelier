@@ -66,7 +66,7 @@ public class AllocationsPageScraper {
         String pageURL = calendarUrl + "?start_date=" + dateAsString;
         LOGGER.info( "Loading calendar page: " + pageURL );
         HtmlPage nextPage = authService.goToPage( pageURL, webClient );
-        LOGGER.debug( nextPage.asXml() );
+        LOGGER.trace( nextPage.asXml() );
         return nextPage;
     }
 
