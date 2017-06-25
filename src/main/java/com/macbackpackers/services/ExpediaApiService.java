@@ -21,7 +21,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import com.macbackpackers.beans.CardDetails;
-import com.macbackpackers.beans.DepositPayment;
+import com.macbackpackers.beans.Payment;
 import com.macbackpackers.beans.expedia.Hotel;
 import com.macbackpackers.beans.expedia.request.Authentication;
 import com.macbackpackers.beans.expedia.request.Booking;
@@ -76,7 +76,7 @@ public class ExpediaApiService {
      * @throws IOException on lookup error
      * @throws MissingUserDataException if card details are missing from response
      */
-    public synchronized DepositPayment returnCardDetailsForBooking( String bookingRef ) 
+    public synchronized Payment returnCardDetailsForBooking( String bookingRef ) 
             throws IOException, MissingUserDataException {
         String expediaId = bookingRef.startsWith( "EXP-" ) ? bookingRef.substring( 4 ) : bookingRef;
         
@@ -120,7 +120,7 @@ public class ExpediaApiService {
         cardDetails.setCardNumber( paymentCard.getCardNumber() );
         cardDetails.setCvv( paymentCard.getSeriesCode() );
         cardDetails.setExpiry( paymentCard.getExpireDate() );
-        return new DepositPayment( roomStay.getRateForFirstNight(), cardDetails );
+        return new Payment( roomStay.getRateForFirstNight(), cardDetails );
     }
 
     /**

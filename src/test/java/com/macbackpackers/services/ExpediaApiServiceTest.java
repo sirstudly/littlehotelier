@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import com.macbackpackers.beans.DepositPayment;
+import com.macbackpackers.beans.Payment;
 import com.macbackpackers.config.LittleHotelierConfig;
 
 @RunWith( SpringJUnit4ClassRunner.class )
@@ -23,7 +23,7 @@ public class ExpediaApiServiceTest {
 
     @Test
     public void testReturnCardDetailsForBooking() throws Exception {
-        DepositPayment cardDetails = service.returnCardDetailsForBooking( "819608075" );
+        Payment cardDetails = service.returnCardDetailsForBooking( "819608075" );
         LOGGER.debug( cardDetails.getCardDetails().getName() );
     }
 

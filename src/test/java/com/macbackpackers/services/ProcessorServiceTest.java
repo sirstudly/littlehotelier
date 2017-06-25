@@ -1,6 +1,7 @@
 
 package com.macbackpackers.services;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.Date;
@@ -37,6 +38,7 @@ import com.macbackpackers.jobs.DepositChargeJob;
 import com.macbackpackers.jobs.DumpHostelworldBookingsByArrivalDateJob;
 import com.macbackpackers.jobs.DumpHostelworldBookingsByBookedDateJob;
 import com.macbackpackers.jobs.GroupBookingsReportJob;
+import com.macbackpackers.jobs.NoShowChargeJob;
 import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.jobs.SendAllUnsentEmailJob;
 import com.macbackpackers.jobs.SplitRoomReservationReportJob;
@@ -368,6 +370,22 @@ public class ProcessorServiceTest {
     public void testCreatePrepaidChargeJob() throws Exception {
         CreatePrepaidChargeJob j = new CreatePrepaidChargeJob();
         j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void testCreateNoShowChargeJob() throws Exception {
+        NoShowChargeJob j = new NoShowChargeJob();
+        j.setStatus( JobStatus.submitted );
+
+        Calendar checkinDate = Calendar.getInstance();
+        checkinDate.set( Calendar.DATE, 22 );
+        checkinDate.set( Calendar.MONTH, Calendar.JUNE );
+        checkinDate.set( Calendar.YEAR, 2017 );
+        j.setCheckinDate( checkinDate.getTime() );
+
+        j.setBookingRef( "HWL-551-299874786" );
+        j.setAmount( new BigDecimal( "13.2" ) );
         dao.insertJob( j );
     }
 }

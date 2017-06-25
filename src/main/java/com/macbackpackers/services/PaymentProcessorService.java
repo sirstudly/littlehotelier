@@ -1,8 +1,11 @@
 package com.macbackpackers.services;
 
+import static com.macbackpackers.scrapers.AllocationsPageScraper.POUND;
+
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.ParseException;
 import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -18,6 +21,8 @@ import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.stereotype.Service;
 
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.html.HtmlDivision;
+import com.gargoylesoftware.htmlunit.html.HtmlForm;
 import com.gargoylesoftware.htmlunit.html.HtmlHeading3;
 import com.gargoylesoftware.htmlunit.html.HtmlInput;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
@@ -25,12 +30,14 @@ import com.gargoylesoftware.htmlunit.html.HtmlSpan;
 import com.gargoylesoftware.htmlunit.html.HtmlTableRow;
 import com.gargoylesoftware.htmlunit.html.HtmlTextArea;
 import com.macbackpackers.beans.CardDetails;
-import com.macbackpackers.beans.DepositPayment;
+import com.macbackpackers.beans.Payment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.xml.TxnResponse;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.BookingsPageScraper;
+import com.macbackpackers.scrapers.HostelworldScraper;
 import com.macbackpackers.scrapers.ReservationPageScraper;
 
 /**
@@ -54,6 +61,9 @@ public class PaymentProcessorService {
 
     @Autowired
     private BookingsPageScraper bookingsPageScraper;
+
+    @Autowired
+    private HostelworldScraper hostelworldScraper;
 
     @Autowired
     private WordPressDAO wordpressDAO;
@@ -82,25 +92,9 @@ public class PaymentProcessorService {
     public synchronized void processDepositPayment( WebClient webClient, String bookingRef, Date bookedOnDate ) throws IOException {
         LOGGER.info( "Processing payment for booking " + bookingRef );
         HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
-        
-        List<?> rows = bookingsPage.getByXPath( 
-                "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr[@class!='group_header']" );
-        if(rows.size() != 1) {
-            throw new IncorrectResultSizeDataAccessException("Unable to find unique booking " + bookingRef, 1);
-        }
-        // need the LH reservation ID before clicking on the row
-        HtmlTableRow row = HtmlTableRow.class.cast( rows.get( 0 ) );
-        int reservationId = Integer.parseInt( row.getAttribute( "data-id" ) );
-        
-        // click on the only reservation on the page
-        HtmlPage reservationPage = row.click();
-        reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
-        
-        // extra-paranoid; making sure booking ref matches the editing window
-        if ( false == bookingRef.equals( getBookingRef( reservationPage ) ) ) {
-            throw new IllegalStateException( "Booking references don't match!" );
-        }
-        
+        HtmlPage reservationPage = getReservationPage( webClient, bookingsPage, bookingRef, bookedOnDate );
+        int reservationId = getReservationId( reservationPage );
+
         // check if we've already received any payment on the payments tab
         HtmlSpan totalRecieved = reservationPage.getFirstByXPath( "//div[@class='received_total']/span" );
         if( false == "£0".equals( totalRecieved.getTextContent() )) {
@@ -126,70 +120,189 @@ public class PaymentProcessorService {
 
         try {
             // get the deposit amount and full card details
-            DepositPayment depositPayment = retrieveCardDetails( bookingRef, reservationId, reservationPage );
-            
-            // see if we've tried to do this already
-            // lookup transaction id(s) on payment table from booking ref
-            PxPostTransaction pxpost = wordpressDAO.getLastPxPost( bookingRef );
-    
-            // if this is the first time we're charging this booking or last attempt failed...
-            if ( pxpost == null || Boolean.FALSE.equals( pxpost.getSuccessful() )) {
-                
-                if ( pxpost == null ) {
-                    LOGGER.info( "We haven't charged this booking yet" );
-                } 
-                else {
-                    // abort if we have reached the maximum number of attempts
-                    LOGGER.info( "Last payment attempt failed" );
-                    if( wordpressDAO.getPreviousNumberOfFailedTxns(
-                            pxpost.getBookingReference(), 
-                            pxpost.getMaskedCardNumber()) >= MAX_PAYMENT_ATTEMPTS ) {
-                        LOGGER.info( "Max number of payment attempts reached. Aborting." );
-                        return;
-                    }
-                }
-    
-                int txnId = wordpressDAO.insertNewPxPostTransaction( bookingRef, depositPayment.getDepositAmount() );
-                processTransaction( reservationPageScraper, reservationPage, txnId, bookingRef, depositPayment.getCardDetails(), 
-                        depositPayment.getDepositAmount() ); 
-            }
-            // we actually did get a successful payment thru so LH is out of sync
-            else if ( Boolean.TRUE.equals( pxpost.getSuccessful() ) ) {
-                LOGGER.info( "Previous PX Post transaction was successful; updating LH" );
-                reservationPageScraper.addPayment( reservationPage, pxpost.getPaymentAmount(), "Other", true, 
-                        "PxPost transaction " + pxpost.getId() + " successful. - " 
-                        + DATETIME_FORMAT.format( new Date() ) );
-            }
-            else { // pxpost.isSuccessful() == null
-                // not sure if the last payment went through...
-                LOGGER.info( "Not sure if the last payment went through; requesting status of txn" );
-    
-                // first get px status (just in case we timed-out last time); verify not yet paid
-                CaptureHttpResponse statusResponse = new CaptureHttpResponse();
-                TxnResponse postStatus = pxPostService.getStatus( bookingRef, statusResponse );
-    
-                // update the pxpost record
-                wordpressDAO.updatePxPostStatus( pxpost.getId(), 
-                        postStatus.getTransaction() == null ? null : postStatus.getTransaction().getCardNumber(), 
-                        postStatus.isSuccessful(), statusResponse.getBody() );
-    
-                if( postStatus.isSuccessful() ) {
-                    LOGGER.info( "Last transaction was successful, updating payment details in LH" );
-                    reservationPageScraper.addPayment( reservationPage,
-                            new BigDecimal( postStatus.getTransaction().getAmount() ), 
-                            postStatus.getTransaction().getCardName(), true, 
-                            "PxPost transaction " + pxpost.getId() + " successful. - " + DATETIME_FORMAT.format( new Date() ) );
-                }
-                else { 
-                    LOGGER.info( "Last transaction wasn't successful; trying again with the same card details" );
-                    processTransaction( reservationPageScraper, reservationPage, pxpost.getId(), bookingRef, depositPayment.getCardDetails(), 
-                            new BigDecimal( postStatus.getTransaction().getAmount() ) ); 
-                }
-            }
+            Payment depositPayment = retrieveCardDetails( bookingRef, reservationId, reservationPage );
+            processPxPostTransaction( bookingRef, reservationId, depositPayment, true, reservationPage );
         }
         catch ( MissingUserDataException ex ) {
             reservationPageScraper.appendNote( reservationPage,
                     ex.getMessage() + " - " + DATETIME_FORMAT.format( new Date() ) + "\n" );
+        }
+    }
+
+    /**
+     * Attempt to charge the no-show amount for the given reservation. This method
+     * fails fast if the payment already received &gt= amount to charge . If
+     * there was already a previous attempt to charge the booking, this will update LH payment
+     * details so it is synced. 
+     * 
+     * @param lhWebClient web client to use for little hotelier
+     * @param hwlWebClient web client to use for hostelworld
+     * @param bookingRef booking reference e.g. BDC-123456789
+     * @param checkinDate date on which the booking was to arrive
+     * @param amountToCharge charge amount
+     * @throws IOException on I/O error
+     * @throws ParseException on parse error
+     */
+    public synchronized void processNoShowPayment( WebClient lhWebClient, WebClient hwlWebClient, String bookingRef, Date checkinDate, BigDecimal amountToCharge ) throws IOException, ParseException {
+        LOGGER.info( "Processing no-show payment for booking " + bookingRef );
+
+        // only support HWL at the moment
+        if ( false == bookingRef.startsWith( "HWL-" ) ) {
+            throw new UnrecoverableFault( "Unsupported booking source type" );
+        }
+
+        // attempt to charge less than or equal to zero?!
+        if ( amountToCharge.compareTo( BigDecimal.ZERO ) <= 0 ) {
+            throw new IllegalArgumentException( "Why the fuck are you trying to charge " + amountToCharge + "?!" );
+        }
+
+        HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageArrivedOn( lhWebClient, checkinDate, bookingRef );
+        HtmlPage reservationPage = getReservationPage( lhWebClient, bookingsPage, bookingRef, checkinDate );
+        int reservationId = getReservationId( reservationPage );
+
+        // cannot charge more than what is outstanding
+        HtmlSpan outstandingTotalSpan = reservationPage.getFirstByXPath( "//div[@class='outstanding_total']/span" );
+        BigDecimal outstandingTotal = new BigDecimal( outstandingTotalSpan.getTextContent().replaceAll( POUND, "" ) );
+        if ( amountToCharge.compareTo( outstandingTotal ) > 0 ) {
+            throw new UnrecoverableFault( "Payment exceeds total outstanding." );
+        }
+        
+        // check if we've already received any payment on the payments tab
+        HtmlDivision paymentDiv = reservationPage.getFirstByXPath( "//div[@class='payment-row']/div[@class='row']/div" );
+        if( paymentDiv != null && paymentDiv.getTextContent().contains( "PxPost transaction" ) ) {
+            throw new UnrecoverableFault( "Payment already exists. Has it already been charged?" );
+        }
+
+        try {
+            // get the full card details
+            Payment payment = retrieveHWCardDetails( hwlWebClient, bookingRef );
+            payment.setAmount( amountToCharge );
+            processPxPostTransaction( bookingRef, reservationId, payment, false, reservationPage );
+            reservationPageScraper.appendNote( reservationPage,
+                    "Charge attempt as no-show. --"  + DATETIME_FORMAT.format( new Date() ) + "\n" );
+        }
+        catch ( MissingUserDataException ex ) {
+            reservationPageScraper.appendNote( reservationPage,
+                    ex.getMessage() + " - " + DATETIME_FORMAT.format( new Date() ) + "\n" );
+        }
+    }
+    
+    /**
+     * Loads the reservation page for the given reservation.
+     * 
+     * @param webClient web client to use
+     * @param bookingsPage page with the current booking
+     * @param bookingRef booking reference e.g. BDC-123456789
+     * @param bookedOnDate date on which reservation was booked
+     * @return reservation page
+     * @throws IOException on I/O error
+     */
+    private HtmlPage getReservationPage( WebClient webClient, HtmlPage bookingsPage, String bookingRef, Date bookedOnDate ) throws IOException {
+
+        List<?> rows = bookingsPage.getByXPath(
+                "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr[@class!='group_header']" );
+        if ( rows.size() != 1 ) {
+            throw new IncorrectResultSizeDataAccessException( "Unable to find unique booking " + bookingRef, 1 );
+        }
+        // need the LH reservation ID before clicking on the row
+        HtmlTableRow row = HtmlTableRow.class.cast( rows.get( 0 ) );
+
+        // click on the only reservation on the page
+        HtmlPage reservationPage = row.click();
+        reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
+
+        // extra-paranoid; making sure booking ref matches the editing window
+        if ( false == bookingRef.equals( getBookingRef( reservationPage ) ) ) {
+            throw new IllegalStateException( "Booking references don't match!" );
+        }
+        return reservationPage;
+    }
+
+    /**
+     * Returns the reservation ID from the reservation page.
+     * 
+     * @param reservationPage pre-loaded reservation page
+     * @return reservation ID
+     */
+    private int getReservationId( HtmlPage reservationPage ) {
+        HtmlForm editform = reservationPage.getFirstByXPath( "//form[@id='edit_reservation']" );
+        String postActionUrl = editform.getAttribute( "action" );
+        int reservationId = Integer.parseInt( postActionUrl.substring( postActionUrl.lastIndexOf( '/' ) + 1 ) );
+        return reservationId;
+    }
+
+    /**
+     * Does the nitty-gritty of posting the transaction, or recovering if we've already attempted to
+     * do a post, updates the payment details in LH or leaves a note on the booking if the
+     * transaction was not approved.
+     * 
+     * @param bookingRef booking ref
+     * @param reservationId reservation ID
+     * @param payment amount being charged and card details
+     * @param isDeposit tick the deposit checkbox on LH if this is true
+     * @param reservationPage reservation page
+     * @throws IOException on I/O error
+     * @throws MissingUserDataException if we couldn't find the requisite information
+     */
+    private void processPxPostTransaction( String bookingRef,
+            int reservationId, Payment payment, boolean isDeposit, HtmlPage reservationPage ) throws IOException, MissingUserDataException {
+        // see if we've tried to do this already
+        // lookup transaction id(s) on payment table from booking ref
+        PxPostTransaction pxpost = wordpressDAO.getLastPxPost( bookingRef );
+
+        // if this is the first time we're charging this booking or last attempt failed...
+        if ( pxpost == null || Boolean.FALSE.equals( pxpost.getSuccessful() )) {
+            
+            if ( pxpost == null ) {
+                LOGGER.info( "We haven't charged this booking yet" );
+            } 
+            else {
+                // abort if we have reached the maximum number of attempts
+                LOGGER.info( "Last payment attempt failed" );
+                if( wordpressDAO.getPreviousNumberOfFailedTxns(
+                        pxpost.getBookingReference(), 
+                        pxpost.getMaskedCardNumber()) >= MAX_PAYMENT_ATTEMPTS ) {
+                    LOGGER.info( "Max number of payment attempts reached. Aborting." );
+                    return;
+                }
+            }
+
+            int txnId = wordpressDAO.insertNewPxPostTransaction( bookingRef, payment.getAmount() );
+            processTransaction( reservationPageScraper, reservationPage, txnId, bookingRef, 
+                    payment.getCardDetails(), payment.getAmount(), isDeposit ); 
+        }
+        // we actually did get a successful payment thru so LH is out of sync
+        else if ( Boolean.TRUE.equals( pxpost.getSuccessful() ) ) {
+            LOGGER.info( "Previous PX Post transaction was successful; updating LH" );
+            reservationPageScraper.addPayment( reservationPage, pxpost.getPaymentAmount(), "Other", isDeposit, 
+                    "PxPost transaction " + pxpost.getId() + " successful. - " 
+                    + DATETIME_FORMAT.format( new Date() ) );
+        }
+        else { // pxpost.isSuccessful() == null
+            // not sure if the last payment went through...
+            LOGGER.info( "Not sure if the last payment went through; requesting status of txn" );
+
+            // first get px status (just in case we timed-out last time); verify not yet paid
+            CaptureHttpResponse statusResponse = new CaptureHttpResponse();
+            TxnResponse postStatus = pxPostService.getStatus( bookingRef, statusResponse );
+
+            // update the pxpost record
+            wordpressDAO.updatePxPostStatus( pxpost.getId(), 
+                    postStatus.getTransaction() == null ? null : postStatus.getTransaction().getCardNumber(), 
+                    postStatus.isSuccessful(), statusResponse.getBody() );
+
+            if( postStatus.isSuccessful() ) {
+                LOGGER.info( "Last transaction was successful, updating payment details in LH" );
+                reservationPageScraper.addPayment( reservationPage,
+                        new BigDecimal( postStatus.getTransaction().getAmount() ), 
+                        postStatus.getTransaction().getCardName(), isDeposit, 
+                        "PxPost transaction " + pxpost.getId() + " successful. - " + DATETIME_FORMAT.format( new Date() ) );
+            }
+            else { 
+                LOGGER.info( "Last transaction wasn't successful; trying again with the same card details" );
+                processTransaction( reservationPageScraper, reservationPage, pxpost.getId(), bookingRef, payment.getCardDetails(), 
+                        new BigDecimal( postStatus.getTransaction().getAmount() ), isDeposit ); 
+            }
         }
     }
 
@@ -202,7 +315,7 @@ public class PaymentProcessorService {
      * @return full card details (not-null)
      * @throws IOException on page load error
      */
-    private DepositPayment retrieveCardDetails( String bookingRef, int reservationId, 
+    private Payment retrieveCardDetails( String bookingRef, int reservationId, 
             HtmlPage reservationPage ) throws IOException {
         
         // Booking.com
@@ -219,7 +332,7 @@ public class PaymentProcessorService {
             CardDetails ccDetails = reservationPageScraper.getCardDetails( reservationPage, reservationId );
             ccDetails.setExpiry( ccDetailsFromGmail.getExpiry() ); // copying over expiry
             ccDetails.setCvv( ccDetailsFromGmail.getCvv() ); // copying over security code
-            return new DepositPayment( getBdcDepositChargeAmount( reservationPage ), ccDetails );
+            return new Payment( getBdcDepositChargeAmount( reservationPage ), ccDetails );
         }
         // Expedia
         else if ( bookingRef.startsWith( "EXP-" ) ) {
@@ -228,6 +341,25 @@ public class PaymentProcessorService {
         else {
             throw new IllegalStateException( "Attempting to retrieve unsupported booking! " + bookingRef );
         }
+    }
+
+    /**
+     * Retrieve card details for the given HW booking.
+     * 
+     * @param webClient web client for hostelworld
+     * @param bookingRef e.g. HWL-555-123485758 
+     * @return full card details (not-null); amount is null
+     * @throws IOException on page load error
+     * @throws ParseException on parse error
+     */
+    private Payment retrieveHWCardDetails( WebClient webClient, String bookingRef ) throws IOException, ParseException {
+        
+        if ( bookingRef.startsWith( "HWL-" ) ) {
+            LOGGER.info( "Retrieving customer card details" );
+            CardDetails ccDetails = hostelworldScraper.getCardDetails( webClient, bookingRef );
+            return new Payment( null, ccDetails );
+        }
+        throw new UnrecoverableFault( "Not a HostelWorld booking: " + bookingRef );
     }
 
     /**
@@ -240,10 +372,11 @@ public class PaymentProcessorService {
      * @param bookingRef the booking ref (merchant reference in px post)
      * @param ccDetails customer card details
      * @param amountToPay amount being charged
+     * @param isDeposit tick the deposit checkbox on LH if this is true
      * @throws IOException on I/O error
      */
     private void processTransaction( ReservationPageScraper reservationPageScraper, HtmlPage reservationPage, 
-            int txnId, String bookingRef, CardDetails ccDetails, BigDecimal amountToPay ) throws IOException {
+            int txnId, String bookingRef, CardDetails ccDetails, BigDecimal amountToPay, boolean isDeposit ) throws IOException {
         LOGGER.info( "Processing transaction " + bookingRef + " for £" + amountToPay );
 
         // send through the payment
@@ -265,7 +398,7 @@ public class PaymentProcessorService {
         if(paymentTxn.isSuccessful()) {
             LOGGER.info( "PX Post was successful, updating LH payment details" );
             reservationPageScraper.addPayment( reservationPage, amountToPay, 
-                    paymentTxn.getTransaction().getCardName(), true, 
+                    paymentTxn.getTransaction().getCardName(), isDeposit, 
                     "PxPost transaction " + txnId + " successful. "
                     + "DpsTxnRef: " + paymentTxn.getTransaction().getDpsTxnRef() 
                     + " - " + DATETIME_FORMAT.format( new Date() ) );

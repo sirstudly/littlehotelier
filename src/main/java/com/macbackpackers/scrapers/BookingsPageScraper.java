@@ -125,12 +125,29 @@ public class BookingsPageScraper {
      * 
      * @param webClient web client to use
      * @param date date to query
-     * @param bookingRefId a matching booking ref; can be "HWL" or "HBK" for example
+     * @param bookingRef a matching booking ref; can be "HWL" or "HBK" for example
      * @return URL of bookings booked on this date
      * @throws IOException if credentials could not be loaded
      */
-    public HtmlPage goToBookingPageBookedOn( WebClient webClient, Date date, String bookingRefId ) throws IOException {
-        String pageURL = getBookingsURLForBookedOnDate( date, date, bookingRefId, null );
+    public HtmlPage goToBookingPageBookedOn( WebClient webClient, Date date, String bookingRef ) throws IOException {
+        String pageURL = getBookingsURLForBookedOnDate( date, date, bookingRef, null );
+        LOGGER.info( "Loading bookings page: " + pageURL );
+        HtmlPage nextPage = authService.goToPage( pageURL, webClient );
+        return nextPage;
+    }
+
+    /**
+     * Goes to the booking page showing reservations for arrivals on the given date with a
+     * matching booking ref.
+     * 
+     * @param webClient web client to use
+     * @param date date to query
+     * @param bookingRef a matching booking ref; can be "HWL" or "HBK" for example
+     * @return URL of bookings booked on this date
+     * @throws IOException if credentials could not be loaded
+     */
+    public HtmlPage goToBookingPageArrivedOn( WebClient webClient, Date date, String bookingRef ) throws IOException {
+        String pageURL = getBookingsURLForArrivalsByDate( date, date, bookingRef, null );
         LOGGER.info( "Loading bookings page: " + pageURL );
         HtmlPage nextPage = authService.goToPage( pageURL, webClient );
         return nextPage;

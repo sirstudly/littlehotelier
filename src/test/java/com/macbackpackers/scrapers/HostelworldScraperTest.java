@@ -44,4 +44,9 @@ public class HostelworldScraperTest {
     public void testLoginFailure() throws Exception {
         scraper.doLogin( webClient, "guest", "testpassword" );
     }
+
+    @Test
+    public void testGetCardDetails() throws Exception {
+        scraper.getCardDetails( webClient, "HWL-551-306023597" );
+    }
 }

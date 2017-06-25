@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,12 +25,14 @@ import org.springframework.stereotype.Component;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.html.HtmlForm;
+import com.gargoylesoftware.htmlunit.html.HtmlListItem;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
 import com.gargoylesoftware.htmlunit.html.HtmlSubmitInput;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.gargoylesoftware.htmlunit.html.HtmlUnorderedList;
 import com.gargoylesoftware.htmlunit.util.Cookie;
+import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.HostelworldBookingDate;
 import com.macbackpackers.dao.WordPressDAO;
@@ -345,6 +348,55 @@ public class HostelworldScraper {
         LOGGER.debug( "Adding HW Booking: " + ToStringBuilder.reflectionToString( hwBooking ) );
         wordPressDAO.insertHostelworldBooking( hwBooking );
         return bookingPage;
+    }
+
+    /**
+     * Retrieve the cardholder details from the given booking.
+     * 
+     * @param webClient web client
+     * @param bookingRef e.g. HWL-555-1234567
+     * @return the card details for the booking
+     * @throws ParseException
+     * @throws IOException
+     */
+    public CardDetails getCardDetails( WebClient webClient, String bookingRef ) throws ParseException, IOException {
+        Pattern p = Pattern.compile( "HWL-551-([\\d]+)" );
+        Matcher m = p.matcher( bookingRef );
+        if ( false == m.find() ) {
+            throw new ParseException( "WTF kind of booking is this? " + bookingRef, 0 );
+        }
+
+        CardDetails cardDetails = new CardDetails();
+        HtmlPage ccPage = gotoPage( webClient, "https://inbox.hostelworld.com/booking/ccdata/login/" + m.group( 1 ) );
+        HtmlTextInput userInput = ccPage.getFirstByXPath( "//input[@id='username']" );
+        userInput.setValueAttribute( wordPressDAO.getOption( "hbo_hw_username" ) );
+        HtmlPasswordInput passwordInput = ccPage.getFirstByXPath( "//input[@id='password']" );
+        passwordInput.setValueAttribute( wordPressDAO.getOption( "hbo_hw_password" ) );
+
+        HtmlSubmitInput submitButton = ccPage.getFirstByXPath( "//input[@value='Submit']" );
+        submitButton.click();
+
+        // cc details should be visible now if we view the booking
+        ccPage = gotoPage( webClient, "https://inbox.hostelworld.com/booking/view/" + m.group( 1 ) );
+        HtmlListItem item = ccPage.getFirstByXPath( "//h2[text()='Payment Details']/../ul/li[1]" );
+        cardDetails.setName( item.getTextContent().replaceAll( "Card Holder's Name : ", "" ) );
+
+        item = ccPage.getFirstByXPath( "//h2[text()='Payment Details']/../ul/li[2]" );
+        p = Pattern.compile( "([\\d]{2})/[\\d]{2}([\\d]{2})" );
+        m = p.matcher( item.getTextContent() );
+        if ( false == m.find() ) {
+            throw new ParseException( "Unable to get card expiry date", 0 );
+        }
+        cardDetails.setExpiry( m.group( 1 ) + m.group( 2 ) );
+
+        item = ccPage.getFirstByXPath( "//h2[text()='Payment Details']/../ul/li[4]" );
+        String cardNumber = item.getTextContent().replaceAll( "Credit Card Number : ", "" );
+        if ( false == NumberUtils.isDigits( cardNumber ) ) {
+            throw new ParseException( "Unable to get card number", 0 );
+        }
+        cardDetails.setCardNumber( cardNumber );
+
+        return cardDetails;
     }
 
     /**

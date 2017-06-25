@@ -1,6 +1,7 @@
 package com.macbackpackers.services;
 
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
 import java.util.Arrays;
 
 import org.slf4j.Logger;
@@ -85,12 +86,14 @@ public class PxPostService {
      */
     private TxnRequest constructPurchaseRequest(
             String txnId, String merchantRef, CardDetails cardDetails, BigDecimal amount) {
+
+        final DecimalFormat CURRENCY_FORMAT = new DecimalFormat("###0.00");
         TxnRequest req = new TxnRequest();
         req.setPostUsername( getPxPostUsername() );
         req.setPostPassword( getPxPostPassword() );
         req.setCardHolderName( cardDetails.getName() );
         req.setCardNumber( cardDetails.getCardNumber() );
-        req.setAmount( amount.toString() );
+        req.setAmount( CURRENCY_FORMAT.format( amount ) );
         req.setDateExpiry( cardDetails.getExpiry() );
         req.setCvc2( cardDetails.getCvv() );
         req.setCvc2Presence( cardDetails.getCvv() == null ? 
