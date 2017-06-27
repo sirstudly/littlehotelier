@@ -361,7 +361,7 @@ public class HostelworldScraper {
      * @throws IOException
      */
     public CardDetails getCardDetails( WebClient webClient, String bookingRef ) throws ParseException, IOException {
-        Pattern p = Pattern.compile( "HWL-551-([\\d]+)" );
+        Pattern p = Pattern.compile( "HWL-" + hostelNumber + "-([\\d]+)" );
         Matcher m = p.matcher( bookingRef );
         if ( false == m.find() ) {
             throw new ParseException( "WTF kind of booking is this? " + bookingRef, 0 );
