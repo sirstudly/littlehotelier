@@ -351,9 +351,11 @@ public class PaymentProcessorService {
      * @return full card details (not-null); amount is null
      * @throws IOException on page load error
      * @throws ParseException on parse error
+     * @throws MissingUserDataException if card details not found
      */
-    private Payment retrieveHWCardDetails( WebClient webClient, String bookingRef ) throws IOException, ParseException {
-        
+    private Payment retrieveHWCardDetails( WebClient webClient, String bookingRef )
+            throws IOException, ParseException, MissingUserDataException {
+
         if ( bookingRef.startsWith( "HWL-" ) ) {
             LOGGER.info( "Retrieving customer card details" );
             CardDetails ccDetails = hostelworldScraper.getCardDetails( webClient, bookingRef );

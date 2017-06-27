@@ -36,6 +36,7 @@ import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.HostelworldBookingDate;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.services.FileService;
 
@@ -379,6 +380,9 @@ public class HostelworldScraper {
         // cc details should be visible now if we view the booking
         ccPage = gotoPage( webClient, "https://inbox.hostelworld.com/booking/view/" + m.group( 1 ) );
         HtmlListItem item = ccPage.getFirstByXPath( "//h2[text()='Payment Details']/../ul/li[1]" );
+        if( item == null ) {
+            throw new MissingUserDataException( "Card details missing from HostelWorld." );
+        }
         cardDetails.setName( item.getTextContent().replaceAll( "Card Holder's Name : ", "" ) );
 
         item = ccPage.getFirstByXPath( "//h2[text()='Payment Details']/../ul/li[2]" );
