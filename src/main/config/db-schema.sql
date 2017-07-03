@@ -30,6 +30,7 @@ CREATE TABLE `wp_lh_calendar` (
   KEY `lh_c_jobid` (`job_id`),
   KEY `lh_c_jobid_reservationid` (`job_id`,`reservation_id`)
   KEY `lh_c_roomid` (`job_id`,`room_id`)
+  KEY `lh_c_booking_ref` (`booking_reference`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 

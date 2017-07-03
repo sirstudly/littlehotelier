@@ -264,9 +264,9 @@ public class ReservationPageScraper {
         List<?> divs = reservationPage.getByXPath( "//div[1]/input[@id='reservation_reservation_room_types__reservation_room_dates__date']/../div[2]" );
         return divs.stream().map( o -> {
             HtmlDivision div = HtmlDivision.class.cast( o );
-            String amount = StringUtils.replaceChars( div.getTextContent(), POUND, "" );
+            String amount = StringUtils.trim( StringUtils.replaceChars( div.getTextContent(), POUND, "" ) );
             LOGGER.info( "Accumulating amount: " + amount );
-            return new BigDecimal( StringUtils.trim( amount ) );
+            return new BigDecimal( amount );
         } ).reduce( BigDecimal.ZERO, BigDecimal::add );
     }
 

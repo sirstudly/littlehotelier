@@ -38,7 +38,7 @@ import com.macbackpackers.jobs.DepositChargeJob;
 import com.macbackpackers.jobs.DumpHostelworldBookingsByArrivalDateJob;
 import com.macbackpackers.jobs.DumpHostelworldBookingsByBookedDateJob;
 import com.macbackpackers.jobs.GroupBookingsReportJob;
-import com.macbackpackers.jobs.NoShowChargeJob;
+import com.macbackpackers.jobs.ManualChargeJob;
 import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.jobs.SendAllUnsentEmailJob;
 import com.macbackpackers.jobs.SplitRoomReservationReportJob;
@@ -375,17 +375,19 @@ public class ProcessorServiceTest {
 
     @Test
     public void testCreateNoShowChargeJob() throws Exception {
-        NoShowChargeJob j = new NoShowChargeJob();
+        ManualChargeJob j = new ManualChargeJob();
         j.setStatus( JobStatus.submitted );
+        j.setBookingRef( "HWL-551-299878913" );
+        j.setAmount( new BigDecimal( "17.16" ) );
+        j.setMessage( "No-show charge." );
+        dao.insertJob( j );
 
-        Calendar checkinDate = Calendar.getInstance();
-        checkinDate.set( Calendar.DATE, 22 );
-        checkinDate.set( Calendar.MONTH, Calendar.JUNE );
-        checkinDate.set( Calendar.YEAR, 2017 );
-        j.setCheckinDate( checkinDate.getTime() );
-
-        j.setBookingRef( "HWL-551-299874786" );
+        j = new ManualChargeJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingRef( "HWL-551-310580371" );
         j.setAmount( new BigDecimal( "13.2" ) );
+        j.setMessage( "No-show charge." );
         dao.insertJob( j );
     }
+
 }

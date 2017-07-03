@@ -112,7 +112,7 @@ public class BookingsPageScraper {
      * @return URL of bookings arriving on this date
      * @throws IOException if credentials could not be loaded
      */
-    private HtmlPage goToBookingPageForArrivals( WebClient webClient, Date fromDate, Date toDate, String bookingRef, String status ) throws IOException {
+    public HtmlPage goToBookingPageForArrivals( WebClient webClient, Date fromDate, Date toDate, String bookingRef, String status ) throws IOException {
         String pageURL = getBookingsURLForArrivalsByDate( fromDate, toDate, bookingRef, status );
         LOGGER.info( "Loading bookings page: " + pageURL );
         HtmlPage nextPage = authService.goToPage( pageURL, webClient );

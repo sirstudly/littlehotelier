@@ -2,8 +2,6 @@
 package com.macbackpackers.jobs;
 
 import java.math.BigDecimal;
-import java.text.ParseException;
-import java.util.Date;
 
 import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
@@ -13,16 +11,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import com.gargoylesoftware.htmlunit.WebClient;
-import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.services.PaymentProcessorService;
 
 /**
- * Job that charges a no-show amount on a booking with their current card details.
- * At the moment, this only HWL bookings are supported.
+ * Job that charges an amount on a booking with their current card details.
+ * At the moment, only HWL bookings are supported.
  */
 @Entity
-@DiscriminatorValue( value = "com.macbackpackers.jobs.NoShowChargeJob" )
-public class NoShowChargeJob extends AbstractJob {
+@DiscriminatorValue( value = "com.macbackpackers.jobs.ManualChargeJob" )
+public class ManualChargeJob extends AbstractJob {
 
     @Autowired
     @Transient
@@ -40,7 +37,7 @@ public class NoShowChargeJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        paymentProcessor.processNoShowPayment( lhWebClient, hwlWebClient, getBookingRef(), getCheckinDate(), getAmount() );
+        paymentProcessor.processManualPayment( lhWebClient, hwlWebClient, getBookingRef(), getAmount(), getMessage() );
     }
 
     @Override
@@ -50,7 +47,7 @@ public class NoShowChargeJob extends AbstractJob {
     }
 
     /**
-     * Returns the booking reference (e.g. BDC-XXXXXXXXX).
+     * Returns the booking reference (e.g. HWL-123-XXXXXXXXX).
      * 
      * @return non-null reference
      */
@@ -68,25 +65,6 @@ public class NoShowChargeJob extends AbstractJob {
     }
 
     /**
-     * Gets the date which this reservation was supposed to checkin.
-     * 
-     * @return non-null checkin date
-     * @throws ParseException on parse error
-     */
-    public Date getCheckinDate() throws ParseException {
-        return AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "checkin_date" ) );
-    }
-
-    /**
-     * Sets the date which this reservation was supposed to checkin.
-     * 
-     * @param checkinDate date to set
-     */
-    public void setCheckinDate( Date checkinDate ) {
-        setParameter( "checkin_date", AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ) );
-    }
-    
-    /**
      * Sets the amount to be charged.
      * 
      * @param amount non-zero charge amount
@@ -102,6 +80,24 @@ public class NoShowChargeJob extends AbstractJob {
      */
     public BigDecimal getAmount() {
         return new BigDecimal( getParameter( "amount" ) );
+    }
+
+    /**
+     * Returns the message to add to the notes.
+     * 
+     * @return (optional) message
+     */
+    public String getMessage() {
+        return getParameter( "message" );
+    }
+
+    /**
+     * Sets the message to add to the notes.
+     * 
+     * @param message message to add
+     */
+    public void setMessage( String message ) {
+        setParameter( "message", message );
     }
 
     @Override

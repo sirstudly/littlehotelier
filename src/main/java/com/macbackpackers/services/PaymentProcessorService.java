@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.ParseException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -92,7 +94,7 @@ public class PaymentProcessorService {
     public synchronized void processDepositPayment( WebClient webClient, String bookingRef, Date bookedOnDate ) throws IOException {
         LOGGER.info( "Processing payment for booking " + bookingRef );
         HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
-        HtmlPage reservationPage = getReservationPage( webClient, bookingsPage, bookingRef, bookedOnDate );
+        HtmlPage reservationPage = getReservationPage( webClient, bookingsPage, bookingRef );
         int reservationId = getReservationId( reservationPage );
 
         // check if we've already received any payment on the payments tab
@@ -138,12 +140,13 @@ public class PaymentProcessorService {
      * @param lhWebClient web client to use for little hotelier
      * @param hwlWebClient web client to use for hostelworld
      * @param bookingRef booking reference e.g. BDC-123456789
-     * @param checkinDate date on which the booking was to arrive
      * @param amountToCharge charge amount
+     * @param message a wee message to put in the notes (optional)
      * @throws IOException on I/O error
      * @throws ParseException on parse error
      */
-    public synchronized void processNoShowPayment( WebClient lhWebClient, WebClient hwlWebClient, String bookingRef, Date checkinDate, BigDecimal amountToCharge ) throws IOException, ParseException {
+    public synchronized void processManualPayment( WebClient lhWebClient, WebClient hwlWebClient, 
+            String bookingRef, BigDecimal amountToCharge, String message ) throws IOException, ParseException {
         LOGGER.info( "Processing no-show payment for booking " + bookingRef );
 
         // only support HWL at the moment
@@ -156,8 +159,13 @@ public class PaymentProcessorService {
             throw new IllegalArgumentException( "Why the fuck are you trying to charge " + amountToCharge + "?!" );
         }
 
-        HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageArrivedOn( lhWebClient, checkinDate, bookingRef );
-        HtmlPage reservationPage = getReservationPage( lhWebClient, bookingsPage, bookingRef, checkinDate );
+        // search from 1 month prior (card details only kept 1 week after checkin date for HW bookings)
+        // to 6 months in future (usually we only scan 4 months in the future)
+        Date dateFrom = Date.from( Instant.now().minus( Duration.ofDays( 30 ) ) );
+        Date dateTo = Date.from( Instant.now().plus( Duration.ofDays( 180 ) ) );
+
+        HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageForArrivals( lhWebClient, dateFrom, dateTo, bookingRef, null );
+        HtmlPage reservationPage = getReservationPage( lhWebClient, bookingsPage, bookingRef );
         int reservationId = getReservationId( reservationPage );
 
         // cannot charge more than what is outstanding
@@ -168,9 +176,10 @@ public class PaymentProcessorService {
         }
         
         // check if we've already received any payment on the payments tab
-        HtmlDivision paymentDiv = reservationPage.getFirstByXPath( "//div[@class='payment-row']/div[@class='row']/div" );
-        if( paymentDiv != null && paymentDiv.getTextContent().contains( "PxPost transaction" ) ) {
-            throw new UnrecoverableFault( "Payment already exists. Has it already been charged?" );
+        for ( Object paymentDiv : reservationPage.getByXPath( "//div[@class='payment-row']/div[@class='row']/div" ) ) {
+            if ( HtmlDivision.class.cast( paymentDiv ).getTextContent().contains( "PxPost transaction" ) ) {
+                throw new UnrecoverableFault( "Payment already exists. Has it already been charged?" );
+            }
         }
 
         try {
@@ -179,7 +188,7 @@ public class PaymentProcessorService {
             payment.setAmount( amountToCharge );
             processPxPostTransaction( bookingRef, reservationId, payment, false, reservationPage );
             reservationPageScraper.appendNote( reservationPage,
-                    "Charge attempt as no-show. --"  + DATETIME_FORMAT.format( new Date() ) + "\n" );
+                    message + " --"  + DATETIME_FORMAT.format( new Date() ) + "\n" );
         }
         catch ( MissingUserDataException ex ) {
             reservationPageScraper.appendNote( reservationPage,
@@ -197,10 +206,10 @@ public class PaymentProcessorService {
      * @return reservation page
      * @throws IOException on I/O error
      */
-    private HtmlPage getReservationPage( WebClient webClient, HtmlPage bookingsPage, String bookingRef, Date bookedOnDate ) throws IOException {
+    private HtmlPage getReservationPage( WebClient webClient, HtmlPage bookingsPage, String bookingRef ) throws IOException {
 
         List<?> rows = bookingsPage.getByXPath(
-                "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr[@class!='group_header']" );
+                "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr/td[@class='booking_reference' and text()='" + bookingRef + "']/.." );
         if ( rows.size() != 1 ) {
             throw new IncorrectResultSizeDataAccessException( "Unable to find unique booking " + bookingRef, 1 );
         }
