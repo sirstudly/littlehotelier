@@ -17,18 +17,18 @@ public class AuthenticationServiceTest {
     @Autowired
     AuthenticationService authService;
     
-    @Autowired 
+    @Autowired
     @Qualifier( "webClientScriptingDisabled" )
-    WebClient webClient;
+    private WebClient webClient;
 
     @Test
     public void testDoLogin() throws Exception {
-        authService.doLogin();
+        authService.doLogin( webClient );
     }
     
     @Test
     public void testGoToPageSkippingLogin() throws Exception {
-        authService.goToPage( "https://emea.littlehotelier.com/extranet/reports/summary?property_id=533", webClient );
+        authService.goToPage( "https://app.littlehotelier.com/extranet/reports/summary?property_id=533", webClient );
     }
 
     

@@ -6,7 +6,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.services.AuthenticationService;
 
@@ -26,17 +28,27 @@ public class UpdateLittleHotelierSettingsJob extends AbstractJob {
     @Transient
     private WordPressDAO wordpressDAO;
 
+    @Autowired
+    @Transient
+    @Qualifier( "webClientScriptingDisabled" )
+    private WebClient webClient;
+
     @Override
     public void processJob() throws Exception {
 
         // this will throw an exception if unable to login 
         // using the parameters specified by the job
-        authService.doLogin( getParameter( "username" ), getParameter( "password" ) );
+        authService.doLogin( webClient, getParameter( "username" ), getParameter( "password" ) );
         wordpressDAO.setOption( "hbo_lilho_username", getParameter( "username" ));
         wordpressDAO.setOption( "hbo_lilho_password", getParameter( "password" ));
     }
 
-    /**
+    @Override
+    public void finalizeJob() {
+        webClient.close(); // cleans up JS threads
+    }
+
+   /**
      * To avoid locking out the account, overrides method to retry only once.
      * 
      * @return 1

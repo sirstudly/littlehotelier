@@ -7,15 +7,14 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.html.HtmlButton;
 import com.gargoylesoftware.htmlunit.html.HtmlForm;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
-import com.gargoylesoftware.htmlunit.html.HtmlSubmitInput;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.UnrecoverableFault;
@@ -24,10 +23,6 @@ import com.macbackpackers.exceptions.UnrecoverableFault;
 public class AuthenticationService {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
-
-    @Autowired
-    @Qualifier( "webClientScriptingDisabled" )
-    private WebClient localWebClient;
 
     @Autowired
     private FileService fileService;
@@ -57,8 +52,7 @@ public class AuthenticationService {
         LOGGER.info( "Loading page: " + pageURL );
         HtmlPage nextPage = webClient.getPage( pageURL );
 
-        if( nextPage.getElementById( "user_session_username" ) != null
-                && nextPage.getElementById( "user_session_password" ) != null ) {
+        if ( "/login".equals( nextPage.getUrl().getPath() ) ) {
             LOGGER.warn( "Current credentials not valid?" );
             throw new UnrecoverableFault( "Unable to login using existing credentials. Has the password changed?" );
         }
@@ -68,35 +62,42 @@ public class AuthenticationService {
     /**
      * Logs into the application and writes the credentials to file so we don't have to do it again.
      * 
+     * @param webClient web client
      * @param username the username to use
      * @param password the password to use
      * @throws IOException on write error
      * @throws UnrecoverableFault if unable to login; cookie file not updated in this case
      */
-    public void doLogin( String username, String password ) throws IOException {
+    public void doLogin( WebClient webClient, String username, String password ) throws IOException {
 
-        HtmlPage loginPage = localWebClient.getPage( env.getProperty( "lilhotelier.url.login" ) );
+        HtmlPage loginPage = webClient.getPage( env.getProperty( "lilhotelier.url.login" ) );
 
         // The form doesn't have a name so just take the only one on the page
         List<HtmlForm> forms = loginPage.getForms();
         HtmlForm form = forms.iterator().next();
 
-        HtmlSubmitInput button = form.getInputByName( "commit" );
+        HtmlButton button = HtmlButton.class.cast( loginPage.getElementById( "login-btn" ) );
         HtmlTextInput usernameField = form.getInputByName( "username" );
-        HtmlPasswordInput passwordField = form.getInputByName( "password" );
-
-        // Change the value of the text field
         usernameField.setValueAttribute( username );
-        passwordField.setValueAttribute( password );
-
         HtmlPage nextPage = button.click();
-        LOGGER.info( "Finished logging in" );
 
-        if( nextPage.getElementById( "user_session_username" ) != null
-                && nextPage.getElementById( "user_session_password" ) != null ) {
-            throw new UnrecoverableFault( "Unable to login. Incorrect password?" );
+        if ( nextPage.getElementById( "password" ) == null ) {
+            throw new UnrecoverableFault( "Unable to login. Unable to find user login for that email." );
         }
-        fileService.writeCookiesToFile( localWebClient );
+
+        forms = nextPage.getForms();
+        form = forms.iterator().next();
+        HtmlPasswordInput passwordField = form.getInputByName( "password" );
+        passwordField.setValueAttribute( password );
+        button = HtmlButton.class.cast( nextPage.getElementById( "login-btn" ) );
+        nextPage = button.click();
+
+        if ( nextPage.getFirstByXPath( "//a[@class='login-button']" ) != null ) {
+            throw new UnrecoverableFault( "Unable to login. Password incorrect. " + nextPage.getUrl() );
+        }
+
+        LOGGER.info( "Finished logging in" );
+        fileService.writeCookiesToFile( webClient );
         loggedInLHUser = username;
     }
 
@@ -104,11 +105,13 @@ public class AuthenticationService {
      * Logs into the application using the environment properties and writes the credentials to file
      * so we don't have to do it again.
      * 
+     * @param webClient web client
      * @throws IOException on write error
      * @throws UnrecoverableFault if unable to login; cookie file not updated in this case
      */
-    public void doLogin() throws IOException {
-        doLogin( wordpressDAO.getOption( "hbo_lilho_username" ),
+    public void doLogin( WebClient webClient ) throws IOException {
+        doLogin( webClient,
+                wordpressDAO.getOption( "hbo_lilho_username" ),
                 wordpressDAO.getOption( "hbo_lilho_password" ) );
     }
 
