@@ -34,7 +34,7 @@ public class DepositChargeJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        paymentProcessor.processDepositPayment( webClient, getBookingRef(), getBookingDate() );
+        paymentProcessor.processDepositPayment( webClient, getId(), getBookingRef(), getBookingDate() );
     }
 
     @Override

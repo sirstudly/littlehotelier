@@ -219,21 +219,13 @@ public class ReservationPageScraper {
      */
     public CardDetails getCardDetails( HtmlPage reservationPage, int reservationId ) throws IOException {
         CardDetails cardDetails = new CardDetails();
-        HtmlAnchor viewCcDetails = reservationPage.getFirstByXPath( "//a[@id='view_cc_details']" );
-        
-        // if the "view card details" link is available; we don't yet have secure access yet
-        // so enable it if not (and get the card number)
-        if(viewCcDetails != null) {
-            LOGGER.info( "Card details currently hidden ); requesting security access" );
-            cardDetails.setCardNumber( enableSecurityAccess( reservationPage, reservationId ) );
-        } 
-        else { // we already have secure access so should be able to see the card details directly
-            HtmlInput cardNumber = reservationPage.getFirstByXPath( "//input[@id='reservation_payment_card_number']" );
-            if ( false == NumberUtils.isDigits( cardNumber.getValueAttribute() ) ) {
-                throw new MissingUserDataException( "Unable to retrieve card number." );
-            }
-            cardDetails.setCardNumber( cardNumber.getValueAttribute() );
+
+        // we should already have secure access so should be able to see the card details directly
+        HtmlInput cardNumber = reservationPage.getFirstByXPath( "//input[@id='reservation_payment_card_number']" );
+        if ( false == NumberUtils.isDigits( cardNumber.getValueAttribute() ) ) {
+            throw new MissingUserDataException( "Unable to retrieve card number." );
         }
+        cardDetails.setCardNumber( cardNumber.getValueAttribute() );
 
         HtmlOption expiryMonth = reservationPage.getFirstByXPath( "//select[@id='reservation_payment_card_expiry_month']/option[@selected='selected']" );
         String expMonth = expiryMonth.getValueAttribute();
@@ -281,7 +273,7 @@ public class ReservationPageScraper {
      * @throws IOException on I/O error
      * @throws MissingUserDataException if card details could not be retrieved
      */
-    private String enableSecurityAccess(HtmlPage reservationPage, int reservationId) throws IOException, MissingUserDataException {
+    public String enableSecurityAccess( HtmlPage reservationPage, int reservationId ) throws IOException, MissingUserDataException {
         HtmlAnchor viewCcDetails = reservationPage.getFirstByXPath( "//a[@id='view_cc_details']" );
         HtmlPage currentPage = viewCcDetails.click();
         reservationPage.getWebClient().waitForBackgroundJavaScript( 15000 ); // wait for email to be delivered

@@ -37,7 +37,7 @@ public class ManualChargeJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        paymentProcessor.processManualPayment( lhWebClient, hwlWebClient, getBookingRef(), getAmount(), getMessage() );
+        paymentProcessor.processManualPayment( lhWebClient, hwlWebClient, getId(), getBookingRef(), getAmount(), getMessage() );
     }
 
     @Override

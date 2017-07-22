@@ -14,6 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +24,7 @@ import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.stereotype.Service;
 
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlDivision;
 import com.gargoylesoftware.htmlunit.html.HtmlForm;
 import com.gargoylesoftware.htmlunit.html.HtmlHeading3;
@@ -87,11 +89,12 @@ public class PaymentProcessorService {
      * method should only be called again if new card details have been updated.
      * 
      * @param webClient web client to use
+     * @param jobId current job id
      * @param bookingRef booking reference e.g. BDC-123456789
      * @param bookedOnDate date on which reservation was booked
      * @throws IOException on I/O error
      */
-    public synchronized void processDepositPayment( WebClient webClient, String bookingRef, Date bookedOnDate ) throws IOException {
+    public synchronized void processDepositPayment( WebClient webClient, int jobId, String bookingRef, Date bookedOnDate ) throws IOException {
         LOGGER.info( "Processing payment for booking " + bookingRef );
         HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
         HtmlPage reservationPage = getReservationPage( webClient, bookingsPage, bookingRef );
@@ -120,10 +123,44 @@ public class PaymentProcessorService {
             return;
         }
 
+        // If we need the card details available, just do this ahead of time.
+        // This only needs to be done once in the currently active session.
+        // There was a problem before where the card details were being cleared out
+        // on the LH page whenever we saved the record after going through the steps
+        // to unhide the card details; we do this here and reload the page to avoid this
+        if ( bookingRef.startsWith( "BDC-" ) ) {
+            HtmlAnchor viewCcDetails = reservationPage.getFirstByXPath( "//a[@id='view_cc_details']" );
+
+            // if the "view card details" link is available; we don't yet have secure access yet
+            if ( viewCcDetails != null ) {
+                LOGGER.info( "Card details currently hidden ); requesting security access" );
+                try {
+                    String cardnum = reservationPageScraper.enableSecurityAccess( reservationPage, reservationId );
+                    if ( false == NumberUtils.isDigits( cardnum ) ) {
+                        // This is outside the try block as we don't want to modify the LH record if it fails here
+                        // problems with the card number being wiped out when we enable security access and then save it
+                        throw new MissingUserDataException( "Error retrieving card number from LH" );
+                    }
+
+                    // we should have access to the card details without having to press the "view" link now
+                    // so reload the reservation page and continue...
+                    bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
+                    reservationPage = getReservationPage( webClient, bookingsPage, bookingRef );
+                }
+                catch ( MissingUserDataException ex ) {
+                    // enableSecurityAccess messes up the current page so reload the reservation page and continue...
+                    bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
+                    reservationPage = getReservationPage( webClient, bookingsPage, bookingRef );
+                    reservationPageScraper.appendNote( reservationPage,
+                            ex.getMessage() + " - " + DATETIME_FORMAT.format( new Date() ) + "\n" );
+                }
+            }
+        }
+
         try {
             // get the deposit amount and full card details
             Payment depositPayment = retrieveCardDetails( bookingRef, reservationId, reservationPage );
-            processPxPostTransaction( bookingRef, reservationId, depositPayment, true, reservationPage );
+            processPxPostTransaction( jobId, bookingRef, reservationId, depositPayment, true, reservationPage );
         }
         catch ( MissingUserDataException ex ) {
             reservationPageScraper.appendNote( reservationPage,
@@ -139,13 +176,14 @@ public class PaymentProcessorService {
      * 
      * @param lhWebClient web client to use for little hotelier
      * @param hwlWebClient web client to use for hostelworld
+     * @param jobId current job id
      * @param bookingRef booking reference e.g. BDC-123456789
      * @param amountToCharge charge amount
      * @param message a wee message to put in the notes (optional)
      * @throws IOException on I/O error
      * @throws ParseException on parse error
      */
-    public synchronized void processManualPayment( WebClient lhWebClient, WebClient hwlWebClient, 
+    public synchronized void processManualPayment( WebClient lhWebClient, WebClient hwlWebClient, int jobId, 
             String bookingRef, BigDecimal amountToCharge, String message ) throws IOException, ParseException {
         LOGGER.info( "Processing no-show payment for booking " + bookingRef );
 
@@ -186,7 +224,7 @@ public class PaymentProcessorService {
             // get the full card details
             Payment payment = retrieveHWCardDetails( hwlWebClient, bookingRef );
             payment.setAmount( amountToCharge );
-            processPxPostTransaction( bookingRef, reservationId, payment, false, reservationPage );
+            processPxPostTransaction( jobId, bookingRef, reservationId, payment, false, reservationPage );
             reservationPageScraper.appendNote( reservationPage,
                     message + " --"  + DATETIME_FORMAT.format( new Date() ) + "\n" );
         }
@@ -245,6 +283,7 @@ public class PaymentProcessorService {
      * do a post, updates the payment details in LH or leaves a note on the booking if the
      * transaction was not approved.
      * 
+     * @param jobId current job id
      * @param bookingRef booking ref
      * @param reservationId reservation ID
      * @param payment amount being charged and card details
@@ -253,7 +292,7 @@ public class PaymentProcessorService {
      * @throws IOException on I/O error
      * @throws MissingUserDataException if we couldn't find the requisite information
      */
-    private void processPxPostTransaction( String bookingRef,
+    private void processPxPostTransaction( int jobId, String bookingRef,
             int reservationId, Payment payment, boolean isDeposit, HtmlPage reservationPage ) throws IOException, MissingUserDataException {
         // see if we've tried to do this already
         // lookup transaction id(s) on payment table from booking ref
@@ -276,7 +315,7 @@ public class PaymentProcessorService {
                 }
             }
 
-            int txnId = wordpressDAO.insertNewPxPostTransaction( bookingRef, payment.getAmount() );
+            int txnId = wordpressDAO.insertNewPxPostTransaction( jobId, bookingRef, payment.getAmount() );
             processTransaction( reservationPageScraper, reservationPage, txnId, bookingRef, 
                     payment.getCardDetails(), payment.getAmount(), isDeposit ); 
         }

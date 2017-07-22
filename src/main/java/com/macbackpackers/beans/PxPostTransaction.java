@@ -27,6 +27,9 @@ public class PxPostTransaction {
     @Column( name = "booking_reference" )
     private String bookingReference;
 
+    @Column( name = "job_id" )
+    private Integer jobId;
+
     @Column( name = "post_date" )
     private Timestamp postDate;
 
@@ -74,6 +77,14 @@ public class PxPostTransaction {
 
     public void setBookingReference( String bookingReference ) {
         this.bookingReference = bookingReference;
+    }
+
+    public Integer getJobId() {
+        return jobId;
+    }
+
+    public void setJobId( Integer jobId ) {
+        this.jobId = jobId;
     }
 
     public Timestamp getPostDate() {

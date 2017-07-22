@@ -1,7 +1,7 @@
 
 CREATE TABLE `wp_lh_calendar` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `job_id` bigint(2) unsigned DEFAULT NULL,
+  `job_id` bigint(20) unsigned DEFAULT NULL,
   `room_id` int(10) unsigned DEFAULT NULL,
   `room_type_id` int(10) unsigned DEFAULT NULL,
   `room` varchar(50) NOT NULL,
@@ -201,6 +201,7 @@ CREATE TABLE `wp_lh_rpt_guest_comments` (
 CREATE TABLE `wp_pxpost_transaction` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `booking_reference` varchar(255) NOT NULL,
+  `job_id` bigint(20) unsigned DEFAULT NULL,
   `post_date` timestamp NULL DEFAULT NULL,
   `masked_card_number` varchar(255) DEFAULT NULL,
   `payment_amount` decimal(10,2) NOT NULL,

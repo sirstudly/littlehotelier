@@ -787,7 +787,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    public int insertNewPxPostTransaction( String bookingRef, BigDecimal amountToPay ) {
+    public int insertNewPxPostTransaction( int jobId, String bookingRef, BigDecimal amountToPay ) {
         
         if ( StringUtils.isBlank( bookingRef ) ) {
             throw new IllegalArgumentException( "Booking Reference must not be null!" );
@@ -799,6 +799,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         }
 
         PxPostTransaction pxpost = new PxPostTransaction();
+        pxpost.setJobId( jobId );
         pxpost.setBookingReference( bookingRef );
         pxpost.setPaymentAmount( amountToPay );
         em.persist( pxpost );

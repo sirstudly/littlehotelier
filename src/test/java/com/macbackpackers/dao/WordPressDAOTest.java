@@ -528,7 +528,7 @@ public class WordPressDAOTest {
         PxPostTransaction txn = dao.getLastPxPost( bookingRef );
         Assert.assertEquals( null, txn );
 
-        int txnId = dao.insertNewPxPostTransaction( bookingRef, new BigDecimal( "14.22" ) );
+        int txnId = dao.insertNewPxPostTransaction( 0, bookingRef, new BigDecimal( "14.22" ) );
         Assert.assertEquals( true, txnId > 0 );
         
         txn = dao.getLastPxPost( bookingRef );

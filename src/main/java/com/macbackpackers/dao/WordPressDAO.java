@@ -387,11 +387,12 @@ public interface WordPressDAO {
     /**
      * Inserts a new transaction into the PX Post table.
      * 
+     * @param jobId current job id
      * @param bookingRef the booking reference
      * @param amountToPay amount being charged
      * @return unique transaction id
      */
-    public int insertNewPxPostTransaction( String bookingRef, BigDecimal amountToPay );
+    public int insertNewPxPostTransaction( int jobId, String bookingRef, BigDecimal amountToPay );
 
     /**
      * Updates the transaction after sending to the payment gateway.
