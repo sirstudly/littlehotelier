@@ -34,8 +34,8 @@ public class AuthenticationService {
     @Autowired
     private WordPressDAO wordpressDAO;
 
-    // the currently logged in LH user; so we don't have to requery the DB each time
-    private String loggedInLHUser;
+    // the current site name
+    private String siteName;
 
     /**
      * Loads the previous credentials and attempts to go to a specific page. If we get redirected
@@ -99,7 +99,6 @@ public class AuthenticationService {
 
         LOGGER.info( "Finished logging in" );
         fileService.writeCookiesToFile( webClient );
-        loggedInLHUser = username;
     }
 
     /**
@@ -123,10 +122,31 @@ public class AuthenticationService {
      * @return true if HSH, false otherwise
      */
     public boolean isHighStreetHostel() {
-        // saved locally on first-access; to prevent unnecessary DB calls
-        if ( loggedInLHUser == null ) {
-            loggedInLHUser = wordpressDAO.getOption( "hbo_lilho_username" );
-        }
-        return StringUtils.startsWithIgnoreCase( loggedInLHUser, "highstreet" );
+        return "highstreethostel".equals( getSiteName() );
     }
+
+    /**
+     * Checks whether the details saved are for royal mile backpackers. Some things are just
+     * different there...
+     * 
+     * @return true if RMB, false otherwise
+     */
+    public boolean isRoyalMileBackpackers() {
+        return "royalmile".equals( getSiteName() );
+    }
+
+    /**
+     * Returns the site name (everything after the hostname for wordpress).
+     * 
+     * @return non-null site name
+     */
+    private String getSiteName() {
+        // saved locally on first-access; to prevent unnecessary DB calls
+        if ( siteName == null ) {
+            String homeurl = wordpressDAO.getOption( "home" );
+            siteName = homeurl.substring( StringUtils.lastIndexOf( homeurl, '/' ) + 1 );
+        }
+        return siteName;
+    }
+
 }

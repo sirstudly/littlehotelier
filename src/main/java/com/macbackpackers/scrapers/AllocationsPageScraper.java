@@ -23,6 +23,7 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.matchers.CastleRockRoomBedMatcher;
 import com.macbackpackers.scrapers.matchers.HSHRoomBedMatcher;
+import com.macbackpackers.scrapers.matchers.RMBRoomBedMatcher;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 import com.macbackpackers.services.AuthenticationService;
 
@@ -193,6 +194,9 @@ public class AllocationsPageScraper {
         RoomBedMatcher matcher;
         if ( authService.isHighStreetHostel() ) {
             matcher = new HSHRoomBedMatcher( currentBedName );
+        }
+        else if ( authService.isRoyalMileBackpackers() ) {
+            matcher = new RMBRoomBedMatcher( currentBedName );
         }
         else {
             matcher = new CastleRockRoomBedMatcher( currentBedName );

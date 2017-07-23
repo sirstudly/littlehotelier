@@ -28,8 +28,8 @@ CREATE TABLE `wp_lh_calendar` (
   KEY `lh_c_checkin` (`job_id`,`checkin_date`),
   KEY `lh_c_checkout` (`job_id`,`checkout_date`),
   KEY `lh_c_jobid` (`job_id`),
-  KEY `lh_c_jobid_reservationid` (`job_id`,`reservation_id`)
-  KEY `lh_c_roomid` (`job_id`,`room_id`)
+  KEY `lh_c_jobid_reservationid` (`job_id`,`reservation_id`),
+  KEY `lh_c_roomid` (`job_id`,`room_id`),
   KEY `lh_c_booking_ref` (`booking_reference`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
@@ -213,7 +213,8 @@ CREATE TABLE `wp_pxpost_transaction` (
   `help_text` varchar(255) DEFAULT NULL, -- reason why txn failed
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_updated_date` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `job_id_idx` (`job_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=200000 DEFAULT CHARSET=utf8;
 
 CREATE TABLE `wp_lh_send_email` (
@@ -637,6 +638,23 @@ INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`roo
 
 *************** END HSH ***************/
 
+ /***  START RMB *********
+ 
+UPDATE wp_lh_rooms
+   SET capacity = 10, room_type = 'F', active_yn = 'Y' WHERE room IN ( 'LM' );
+UPDATE wp_lh_rooms
+   SET capacity = 4, room_type = 'MX', active_yn = 'Y' WHERE room IN ( 'T' );
+UPDATE wp_lh_rooms
+   SET capacity = 8, room_type = 'LT_MIXED', active_yn = 'Y' WHERE room IN ( 'SW' );
+UPDATE wp_lh_rooms
+   SET capacity = 8, room_type = 'MX', active_yn = 'Y' WHERE room IN ( 'Fr', 'GC', 'HW' );
+
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (1,'Unallocated',NULL,10,2713,'F','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (2,'Unallocated',NULL,8,2715,'F','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (3,'Unallocated',NULL,8,2716,'MX','N');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (4,'Unallocated',NULL,4,2717,'MX','N');
+
+*************** END RMB ***************/
  
 -- scheduled jobs
 /*
@@ -649,7 +667,8 @@ INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (7,'com.macbackpackers.jobs.DiffBookingEnginesJob','0 9 1 * * ?','Y',NULL,NOW());
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (8,'com.macbackpackers.jobs.DbPurgeJob','0 31 4 * * ?','Y',NULL,NOW());
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (9,'com.macbackpackers.jobs.GuestCommentsReportJob','0 59 6 * * ?','Y',NULL,NOW());
-INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (10,'com.macbackpackers.jobs.CreateBDCDepositChargeJob','0 00 22 * * ?','Y',NULL,NOW());
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (10,'com.macbackpackers.jobs.CreateDepositChargeJob','0 00 22 * * ?','Y',NULL,NOW());
+INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (11,'com.macbackpackers.jobs.CreatePrepaidChargeJob','0 2 3 * * ?','Y',NULL,NOW());
 
 INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (1,1,'booked_on_date','TODAY');
 INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (2,2,'selected_date','TODAY');

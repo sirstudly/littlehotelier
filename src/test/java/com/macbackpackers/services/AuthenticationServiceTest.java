@@ -2,6 +2,8 @@ package com.macbackpackers.services;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
@@ -14,6 +16,8 @@ import com.macbackpackers.config.LittleHotelierConfig;
 @ContextConfiguration(classes = LittleHotelierConfig.class)
 public class AuthenticationServiceTest {
     
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+
     @Autowired
     AuthenticationService authService;
     
@@ -24,6 +28,11 @@ public class AuthenticationServiceTest {
     @Test
     public void testDoLogin() throws Exception {
         authService.doLogin( webClient );
+    }
+    
+    @Test
+    public void testIsRoyalMileBackpackers() throws Exception {
+        LOGGER.info( "Is RMB? " + authService.isRoyalMileBackpackers() );
     }
     
     @Test
