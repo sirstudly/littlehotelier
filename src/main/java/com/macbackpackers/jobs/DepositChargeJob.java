@@ -81,7 +81,7 @@ public class DepositChargeJob extends AbstractJob {
     
     @Override
     public int getRetryCount() {
-        return 1; // only attempt to charge card once!
+        return 2; // don't attempt too many times
     }
 
 }
