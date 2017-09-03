@@ -1,11 +1,14 @@
 
 package com.macbackpackers.services;
 
+import java.io.IOException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -22,7 +25,9 @@ import com.macbackpackers.jobs.AbstractJob;
 public class ProcessorService {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
-    
+
+    private static final Object CLASS_LEVEL_LOCK = new Object();
+
     @Value( "${processor.thread.count:1}" )
     private int threadCount;
 
@@ -37,6 +42,12 @@ public class ProcessorService {
 
     @Value( "${process.jobs.backoff.millis:3000}" )
     private int backoffMillis; // time to wait before re-attempting failed job
+
+    @Value( "${processor.job.log.localdir}" )
+    private String localLogDirectory; // current log directory
+
+    @Value( "${processor.job.log.copyto:}" )
+    private String destinationLogLocation; // where to copy log files (optional)
 
     /**
      * Checks for any jobs that need to be run ('submitted') and processes them.
@@ -157,7 +168,35 @@ public class ProcessorService {
             LOGGER.error( "Error finalising job " + job.getId(), ex );
         }
         finally {
-            MDC.remove( "jobId" );
+            try {
+                copyJobLogToRemoteHost( job.getId() );
+            }
+            catch ( Throwable th ) {
+                LOGGER.error( "Failed to copy log for job " + job.getId(), th );
+            }
+            finally {
+                MDC.remove( "jobId" );
+            }
+        }
+    }
+
+    /**
+     * Copies the log file from this host to the remote host in {@code destinationLogLocation}.
+     * 
+     * @param jobId ID of the job to copy
+     * @throws InterruptedException on process timeout
+     * @throws IOException on copy error
+     */
+    private void copyJobLogToRemoteHost( int jobId ) throws InterruptedException, IOException {
+        // only allow one copy job to take place at a time system-wide
+        synchronized ( CLASS_LEVEL_LOCK ) {
+            if ( false == SystemUtils.IS_OS_WINDOWS && StringUtils.isNotBlank( destinationLogLocation ) ) {
+                String cmd = "scp " + localLogDirectory + "/job-" + jobId + ".log " + destinationLogLocation;
+                LOGGER.info( "Copying log file" );
+                Process p = Runtime.getRuntime().exec( cmd );
+                int exitVal = p.waitFor();
+                LOGGER.info( "Log file copy completed with exit code(" + exitVal + ")" );
+            }
         }
     }
 }

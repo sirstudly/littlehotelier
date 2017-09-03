@@ -10,6 +10,7 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.macbackpackers.dao.WordPressDAO;
 
@@ -20,6 +21,10 @@ public class DbPurgeJob extends AbstractJob {
     @Autowired
     @Transient
     private WordPressDAO dao;
+
+    @Value( "${processor.job.log.localdir}" )
+    @Transient
+    private String localLogDirectory;
 
     @Override
     public void processJob() throws Exception {
@@ -37,14 +42,11 @@ public class DbPurgeJob extends AbstractJob {
      * @param specifiedDate keep files newer than this date
      */
     protected void deleteLogFilesOlderThan( Date specifiedDate ) {
-        String logDirectory = dao.getOption( "hbo_log_directory" );
-        if ( logDirectory != null ) {
-            for ( File f : new File( logDirectory ).listFiles() ) {
-                if ( f.getName().matches( "job-(\\d+)\\.txt" )
-                        && f.lastModified() < specifiedDate.getTime() ) {
-                    LOGGER.info( "Deleting log file " + f.getName() );
-                    f.delete();
-                }
+        for ( File f : new File( localLogDirectory ).listFiles() ) {
+            if ( f.getName().matches( "job-(\\d+)\\.txt" )
+                    && f.lastModified() < specifiedDate.getTime() ) {
+                LOGGER.info( "Deleting log file " + f.getName() );
+                f.delete();
             }
         }
     }
