@@ -167,7 +167,7 @@ public class GmailService {
                 .execute();
         List<Message> messages = listResponse.getMessages();
         if ( messages == null || messages.size() == 0 ) {
-            throw new MissingUserDataException( "No messages found for BDC " + bookingId );
+            throw new MissingUserDataException( "No email messages found for BDC " + bookingId );
         }
         else {
             LOGGER.info( messages.size() + " messages:" );
