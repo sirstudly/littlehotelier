@@ -54,6 +54,7 @@ public class PaymentProcessorService {
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
     
     private static final FastDateFormat DATETIME_FORMAT = FastDateFormat.getInstance( "dd/MM/yyyy HH:mm:ss" );
+    private static final FastDateFormat DATETIME_STANDARD = FastDateFormat.getInstance( "yyyy-MM-dd HH:mm:ss" );
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
 
     /** Amount to charge BDC bookings. Either a percentage between 0-1 or "first_night". */
@@ -130,6 +131,12 @@ public class PaymentProcessorService {
         // to unhide the card details; we do this here and reload the page to avoid this
         if ( bookingRef.startsWith( "BDC-" ) ) {
             HtmlAnchor viewCcDetails = reservationPage.getFirstByXPath( "//a[@id='view_cc_details']" );
+
+            // BDC may have a cancellation grace period; don't charge within this period
+            if ( isWithinCancellationGracePeriod( reservationPage ) ) {
+                LOGGER.info( "Booking " + bookingRef + " is within the cancellation grace period. Skipping charge for now..." );
+                return;
+            }
 
             // if the "view card details" link is available; we don't yet have secure access yet
             if ( viewCcDetails != null ) {
@@ -210,7 +217,7 @@ public class PaymentProcessorService {
         HtmlSpan outstandingTotalSpan = reservationPage.getFirstByXPath( "//div[@class='outstanding_total']/span" );
         BigDecimal outstandingTotal = new BigDecimal( outstandingTotalSpan.getTextContent().replaceAll( POUND, "" ) );
         if ( amountToCharge.compareTo( outstandingTotal ) > 0 ) {
-            throw new UnrecoverableFault( "Payment exceeds total outstanding." );
+            throw new UnrecoverableFault( "Request to charge " + amountToCharge + " exceeds LH total outstanding (" + outstandingTotal + ")." );
         }
         
         // check if we've already received any payment on the payments tab
@@ -549,5 +556,28 @@ public class PaymentProcessorService {
                     " exceeds amount outstanding of " + amountOutstanding + "???" );
         }
         return amountToPay;
+    }
+
+    /**
+     * Checks whether the given BDC reservation is within the cancellation grace period.
+     * 
+     * @param reservationPage pre-loaded reservation page
+     * @return true if within grace period, false otherwise
+     * @throws IOException on parse error
+     */
+    private boolean isWithinCancellationGracePeriod( HtmlPage reservationPage ) throws IOException {
+        HtmlTextArea guestComments = reservationPage.getFirstByXPath( "//textarea[@id='reservation_guest_comments']" );
+        Pattern p = Pattern.compile( "Reservation has a cancellation grace period. Do not charge if cancelled before (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})" );
+        Matcher m = p.matcher( guestComments.getText() );
+        if ( m.find() ) {
+            try {
+                Date earliestChargeDate = DATETIME_STANDARD.parse( m.group( 1 ) );
+                return earliestChargeDate.after( new Date() );
+            }
+            catch ( ParseException e ) {
+                throw new IOException( e );
+            }
+        }
+        return false;
     }
 }
