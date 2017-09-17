@@ -204,14 +204,14 @@ public class ReservationPageScraper {
                 reservationPage.getElementById( "reservation_notes" ));
         notesTxt.type( note + "\n" ); // need JS event change
         reservationPage.setFocusedElement( null ); // remove focus on textarea to trigger onchange
-        reservationPage.getWebClient().waitForBackgroundJavaScript( 2000 ); // wait for page to update
+        reservationPage.getWebClient().waitForBackgroundJavaScript( 15000 ); // wait for page to update
         HtmlSubmitInput saveButton = reservationPage.getFirstByXPath( "//input[@value='Save']" );
         saveButton.click();
         reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
     }
 
     /**
-     * Returns the card details from the reservation page.
+     * Returns the card details from the reservation page. Expiry is only populated if available.
      * 
      * @param reservationPage the currently open reservation page
      * @return non-null card number
@@ -228,19 +228,29 @@ public class ReservationPageScraper {
         cardDetails.setCardNumber( cardNumber.getValueAttribute() );
 
         HtmlOption expiryMonth = reservationPage.getFirstByXPath( "//select[@id='reservation_payment_card_expiry_month']/option[@selected='selected']" );
-        String expMonth = expiryMonth.getValueAttribute();
-        if(false == NumberUtils.isDigits( expMonth )) {
-            throw new MissingUserDataException( "Unable to find card expiry month(" + expMonth + ") : " + reservationPage.getUrl() );
+        String expMonth = expiryMonth == null ? null : expiryMonth.getValueAttribute();
+        String validatedExpiryMonth = null;
+        if ( expMonth == null || false == NumberUtils.isDigits( expMonth ) ) {
+            LOGGER.warn( "Unable to find card expiry month(" + expMonth + ") : " + reservationPage.getUrl() );
+        }
+        else {
+            validatedExpiryMonth = StringUtils.leftPad( expMonth, 2, "0" );
         }
         
         HtmlOption expiryYear = reservationPage.getFirstByXPath( "//select[@id='reservation_payment_card_expiry_year']/option[@selected='selected']" );
-        String expYear = expiryYear.getValueAttribute();
-        if(false == NumberUtils.isDigits( expYear )) {
-            throw new MissingUserDataException( "Unable to find card expiry year(" + expYear + " : " + reservationPage.getUrl() );
+        String expYear = expiryYear == null ? null : expiryYear.getValueAttribute();
+        if ( expYear == null || false == NumberUtils.isDigits( expYear ) ) {
+            LOGGER.warn( "Unable to find card expiry year(" + expYear + ") : " + reservationPage.getUrl() );
         }
-        cardDetails.setExpiry( StringUtils.leftPad( expMonth, 2, "0" ) + expYear.substring( 2 ) );
+        else if ( validatedExpiryMonth != null ) {
+            // only populate if we have a valid month/year
+            cardDetails.setExpiry( validatedExpiryMonth + expYear.substring( 2 ) );
+        }
 
         HtmlInput cardholderName = reservationPage.getFirstByXPath( "//input[@id='reservation_payment_card_name']" );
+        if ( cardholderName == null ) {
+            throw new MissingUserDataException( "Missing cardholder name on booking." );
+        }
         cardDetails.setName( cardholderName.getValueAttribute() );
         
         return cardDetails;
