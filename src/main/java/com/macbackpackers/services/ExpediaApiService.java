@@ -139,8 +139,14 @@ public class ExpediaApiService {
         headers.setAccept(Arrays.asList(MediaType.APPLICATION_XML, MediaType.TEXT_XML));
         
         RestTemplate restTemplate = new RestTemplate( new BufferingClientHttpRequestFactory( new SimpleClientHttpRequestFactory() ) );
-        restTemplate.setInterceptors( Arrays.<ClientHttpRequestInterceptor> asList( 
-                new LoggingRequestInterceptor( reqListener, respListener, new ExpediaCardMask() ) ) );
+        restTemplate.setInterceptors( Arrays.<ClientHttpRequestInterceptor> asList(
+                new LoggingRequestInterceptor( reqListener, respListener, new ExpediaCardMask(),
+                        new RegexMask( "(username=\")([^\"]*)(\")", m -> {
+                            return m.find() ? m.group( 1 ) + "********" + m.group( 3 ) : null;
+                        } ),
+                        new RegexMask( "(password=\")([^\"]*)(\")", m -> {
+                            return m.find() ? m.group( 1 ) + "********" + m.group( 3 ) : null;
+                        } ) ) ) );
         
         HttpEntity<BookingRetrievalRQ> request = new HttpEntity<>(bookingReq, headers);
         ResponseEntity<BookingRetrievalRS> response = 

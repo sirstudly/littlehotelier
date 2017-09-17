@@ -136,9 +136,15 @@ public class PxPostService {
         headers.setAccept(Arrays.asList(MediaType.APPLICATION_XML, MediaType.TEXT_XML));
         
         RestTemplate restTemplate = new RestTemplate( new BufferingClientHttpRequestFactory( new SimpleClientHttpRequestFactory() ) );
-        restTemplate.setInterceptors( Arrays.<ClientHttpRequestInterceptor> asList( 
-                new LoggingRequestInterceptor( reqListener, respListener, new PxPostCardMask() ) ) );
-        
+        restTemplate.setInterceptors( Arrays.<ClientHttpRequestInterceptor> asList(
+                new LoggingRequestInterceptor( reqListener, respListener, new PxPostCardMask(),
+                        new RegexMask( "(<PostUsername>)(.*)(</PostUsername>)", m -> {
+                            return m.find() ? m.group( 1 ) + "********" + m.group( 3 ) : null;
+                        } ),
+                        new RegexMask( "(<PostPassword>)(.*)(</PostPassword>)", m -> {
+                            return m.find() ? m.group( 1 ) + "********" + m.group( 3 ) : null;
+                        } ) ) ) );
+
         HttpEntity<TxnRequest> request = new HttpEntity<>(txnReq, headers);
         ResponseEntity<TxnResponse> response = 
                 restTemplate.exchange(getPxPostUrl(), HttpMethod.POST, request, TxnResponse.class );

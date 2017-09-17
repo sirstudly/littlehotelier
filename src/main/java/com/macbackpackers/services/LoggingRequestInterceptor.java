@@ -18,6 +18,7 @@ public class LoggingRequestInterceptor implements ClientHttpRequestInterceptor {
     private HttpRequestListener requestListener; // optional listener
     private HttpResponseListener responseListener; // optional listener
     private CardMask cardMask; // optional card mask
+    private RegexMask[] requestMasks; // optional requests masks
 
     public LoggingRequestInterceptor() {
         // default constructor
@@ -30,10 +31,11 @@ public class LoggingRequestInterceptor implements ClientHttpRequestInterceptor {
      * @param respListener (optional) response listener
      * @param cardMask (optional) card mask
      */
-    public LoggingRequestInterceptor( HttpRequestListener reqListener, HttpResponseListener respListener, CardMask cardMask ) {
+    public LoggingRequestInterceptor( HttpRequestListener reqListener, HttpResponseListener respListener, CardMask cardMask, RegexMask... requestMasks ) {
         this.requestListener = reqListener;
         this.responseListener = respListener;
         this.cardMask = cardMask;
+        this.requestMasks = requestMasks;
     }
 
     @Override
@@ -46,6 +48,11 @@ public class LoggingRequestInterceptor implements ClientHttpRequestInterceptor {
 
     private void traceRequest( HttpRequest request, byte[] body ) throws IOException {
         String maskedBody = applyCardMask( new String( body, "UTF-8" ) );
+        if ( requestMasks != null ) {
+            for ( RegexMask regexMask : requestMasks ) {
+                maskedBody = regexMask.applyMask( maskedBody );
+            }
+        }
         LOGGER.debug( "===========================request begin================================================" );
         LOGGER.debug( "URI         : {}", request.getURI() );
         LOGGER.debug( "Method      : {}", request.getMethod() );
