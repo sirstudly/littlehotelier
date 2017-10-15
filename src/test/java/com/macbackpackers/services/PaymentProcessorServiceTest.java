@@ -47,7 +47,7 @@ public class PaymentProcessorServiceTest {
         c.set( Calendar.YEAR, 2017 );
         c.set( Calendar.MONTH, 0 );
         c.set( Calendar.DATE, 22 );
-        paymentService.processDepositPayment( webClient, "BDC-1850350118", c.getTime() );
+        paymentService.processDepositPayment( webClient, 12, "BDC-1850350118", c.getTime() );
         LOGGER.info( "done" );
     }
     
@@ -81,4 +81,31 @@ public class PaymentProcessorServiceTest {
         LOGGER.info( "Amount to charge: " + amountToCharge );
     }
 
+    @Test
+    public void testSyncLastPxPostTransactionInLH() throws Exception {
+
+        // This is a valid successful txn in PxPost (UAT) : 1508959296186
+        String bookingRef = "EXP-924636178";
+        Calendar c = Calendar.getInstance();
+        c.set( Calendar.YEAR, 2017 );
+        c.set( Calendar.MONTH, Calendar.OCTOBER );
+        c.set( Calendar.DATE, 13 );
+
+        HtmlPage bookingsPage = bookingScraper.goToBookingPageBookedOn( webClient, c.getTime(), bookingRef );
+
+        List<?> rows = bookingsPage.getByXPath(
+                "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr/td[@class='booking_reference' and text()='" + bookingRef + "']/.." );
+        if ( rows.size() != 1 ) {
+            throw new IncorrectResultSizeDataAccessException( "Unable to find unique booking " + bookingRef, 1 );
+        }
+        // need the LH reservation ID before clicking on the row
+        HtmlTableRow row = HtmlTableRow.class.cast( rows.get( 0 ) );
+
+        // click on the only reservation on the page
+        HtmlPage reservationPage = row.click();
+
+        // this should add the payment details to the LH reservation above
+        bookingRef = "HWL-123-1234567";
+        paymentService.syncLastPxPostTransactionInLH( bookingRef, true, reservationPage );
+    }
 }

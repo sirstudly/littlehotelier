@@ -55,17 +55,21 @@ public class GmailService {
     
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
-    /** Application name. */
-    private static final String APPLICATION_NAME =
-        "Query Email using Gmail API";
-
     /** Directory to store user credentials for this application. */
     @Value( "${user.credentials.directory}" )
     private String userCredentialsDirectory;
 
+    /** Directory to store user credentials for manager's account. */
+    @Value( "${user.credentials.manager.directory}" )
+    private String userCredentialsManagerDirectory;
+
     /** This is the OAuth 2.0 Client ID used to login to Gmail */
     @Value( "${gmail.oauth.client.id.file}" )
     private String oauthClientIdFile;
+    
+    /** This is the OAuth 2.0 Client ID used to login to Gmail for the manager's account */
+    @Value( "${gmail.oauth.client.id.manager.file}" )
+    private String oauthClientIdManagerFile;
     
     @Value( "${gmail.sendfrom.address}" )
     private String gmailSendAddress;
@@ -78,6 +82,8 @@ public class GmailService {
 
     /** String for matching emails against Booking.com */
     private final String BDC_MATCH_TEMPLATE = "(subject:\"Booking.com Booking # %s\" OR subject:\"Booking.com Modification for Booking # %s\") from:noreply@littlehotelier.com";
+    
+    private final String AGODA_PASSCODE_TEMPLATE = "subject:\"One-time passcode for YCS login\"";
     
     /** String for matching emails for LH security access */
     private final String LH_SECURITY_ACCESS = "subject:\"LittleHotelier - Security access required\" from:noreply@littlehotelier.com in:inbox"; 
@@ -95,7 +101,7 @@ public class GmailService {
      * If modifying these scopes, delete your previously saved credentials
      * at DATA_STORE_DIR
      */
-    private static final List<String> SCOPES =
+    private static final List<String> READ_SEND_SCOPES =
         Arrays.asList(GmailScopes.GMAIL_READONLY, GmailScopes.GMAIL_COMPOSE);
 
     public GmailService() {
@@ -108,24 +114,26 @@ public class GmailService {
     }
 
     /**
-     * Creates an authorized Credential object. First time this runs will open
-     * a web window to confirm authorisation. This only needs to be done once
-     * and the credentials can be copied elsewhere.
+     * Creates an authorized Credential object. First time this runs will open a web window to
+     * confirm authorisation. This only needs to be done once and the credentials can be copied
+     * elsewhere.
      * 
+     * @param directory directory holding credentials
+     * @param scopes requested scopes
      * @return an authorized Credential object.
      * @throws IOException
      */
-    public Credential authorize() throws IOException {
+    public Credential authorize( String directory, List<String> scopes ) throws IOException {
         // Build flow and trigger user authorization request.
         GoogleAuthorizationCodeFlow flow =
                 new GoogleAuthorizationCodeFlow.Builder(
-                        HTTP_TRANSPORT, JSON_FACTORY, getGmailClientSecret(), SCOPES)
-                .setDataStoreFactory(getCredentialsDataStoreFactory())
+                        HTTP_TRANSPORT, JSON_FACTORY, getGmailClientSecret(), scopes )
+                .setDataStoreFactory(getCredentialsDataStoreFactory( directory ))
                 .setAccessType("offline")
                 .build();
         Credential credential = new AuthorizationCodeInstalledApp(
             flow, new LocalServerReceiver()).authorize("user");
-        LOGGER.info( "Credentials saved to " + userCredentialsDirectory );
+        LOGGER.info( "Credentials saved to " + directory );
         return credential;
     }
 
@@ -135,9 +143,22 @@ public class GmailService {
      * @throws IOException
      */
     public Gmail connectAsClient() throws IOException {
-        Credential credential = authorize();
+        Credential credential = authorize( userCredentialsDirectory, READ_SEND_SCOPES );
         return new Gmail.Builder(HTTP_TRANSPORT, JSON_FACTORY, credential)
-                .setApplicationName(APPLICATION_NAME)
+                .setApplicationName( "Query Email using Gmail API" )
+                .build();
+    }
+
+    /**
+     * Build and return an authorized Gmail client service.
+     * @return an authorized Gmail client service
+     * @throws IOException
+     */
+    public Gmail connectAsManagerClient() throws IOException {
+        Credential credential = authorize( userCredentialsManagerDirectory,
+                Arrays.asList( GmailScopes.GMAIL_READONLY ) );
+        return new Gmail.Builder( HTTP_TRANSPORT, JSON_FACTORY, credential )
+                .setApplicationName( "CRH Manager Gmail API" )
                 .build();
     }
 
@@ -189,6 +210,47 @@ public class GmailService {
             }
         }
         throw new MissingUserDataException( "No valid emails found with card details for BDC " + bookingId );
+    }
+
+    /**
+     * Fetch the passcode from Agoda if this is the first time logging in.
+     * 
+     * @return non-null passcode
+     * @throws IOException on I/O error
+     * @throws MissingUserDataException if no email messages found
+     */
+    public String fetchAgodaPasscode() throws IOException, MissingUserDataException {
+        
+        LOGGER.info( "Looking up Agoda passcode" );
+        Gmail service = connectAsManagerClient();
+        ListMessagesResponse listResponse = 
+                service.users().messages()
+                .list( GMAIL_USER )
+                .setQ( AGODA_PASSCODE_TEMPLATE )
+                .execute();
+        List<Message> messages = listResponse.getMessages();
+        if ( messages == null || messages.size() == 0 ) {
+            throw new MissingUserDataException( "No email messages found for Agoda passcode" );
+        }
+        else {
+            LOGGER.info( messages.size() + " messages:" );
+            for ( Message message : messages ) {
+                LOGGER.info( message.getId() + " - " + message.getThreadId() );
+                String body = fetchMessageBody( service, message.getId() );
+                if ( body == null ) {
+                    throw new EmptyResultDataAccessException( "No messages body found for Agoda passcode", 1 );
+                }
+                
+                try {
+                    LOGGER.info( body );
+                    return findAndReturn( "^\\s*(\\d{6})$", body );
+                }
+                catch ( EmptyResultDataAccessException e ) {
+                    LOGGER.info( "Unable to find card details for messsageId " + message.getId() + "; continuing", e );
+                }
+            }
+        }
+        throw new MissingUserDataException( "No valid emails found with Agoda passcode" );
     }
 
     /**
@@ -316,7 +378,7 @@ public class GmailService {
      * @return the decoded message body or null if not found
      * @throws IOException on I/O error
      */
-    private String fetchMessageBody(Gmail gmail, String messageId) throws IOException {
+    private String fetchMessageBody( Gmail gmail, String messageId ) throws IOException {
         Message fullMessage = gmail.users().messages().get(GMAIL_USER, messageId).setFormat("full").execute();
         LOGGER.debug( fullMessage.toPrettyString() );
         
@@ -374,13 +436,14 @@ public class GmailService {
     /**
      * Returns the data store factory used to store user credentials for this application.
      * 
+     * @param directory directory holding credentials
      * @return non-null directory name
      * @throws IOException on initialisation error
      */
-    public DataStoreFactory getCredentialsDataStoreFactory() throws IOException {
-        File dir = new File( userCredentialsDirectory );
+    public DataStoreFactory getCredentialsDataStoreFactory( String directory ) throws IOException {
+        File dir = new File( directory );
         if( false == dir.exists() || false == dir.isDirectory() ) {
-            throw new UnrecoverableFault( "Directory " + userCredentialsDirectory + " does not exist!" );
+            throw new UnrecoverableFault( "Directory " + directory + " does not exist!" );
         }
         return new FileDataStoreFactory( dir );
     }

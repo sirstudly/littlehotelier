@@ -5,6 +5,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -66,7 +67,7 @@ public class BookingsPageScraperTest {
     public void testGetUnpaidBDCReservations() throws Exception {
         Calendar c = Calendar.getInstance();
         c.set( Calendar.YEAR, 2017 );
-        c.set( Calendar.MONTH, 0 );
+        c.set( Calendar.MONTH, Calendar.JANUARY );
         c.set( Calendar.DATE, 15 );
         Date dateFrom = c.getTime();
         c.set( Calendar.DATE, 30 );
@@ -74,6 +75,22 @@ public class BookingsPageScraperTest {
         List<UnpaidDepositReportEntry> records = scraper.getUnpaidReservations( webClient, "BDC", dateFrom, dateTo );
         LOGGER.info( records.size() + " recs found" );
         for( UnpaidDepositReportEntry entry : records ) {
+            LOGGER.info( ToStringBuilder.reflectionToString( entry ) );
+        }
+    }
+    
+    @Test
+    public void testGetAgodaReservations() throws Exception {
+        Calendar c = Calendar.getInstance();
+        c.set( Calendar.YEAR, 2017 );
+        c.set( Calendar.MONTH, Calendar.OCTOBER );
+        c.set( Calendar.DATE, 7 );
+        Date dateFrom = c.getTime();
+        c.set( Calendar.DATE, 15 );
+        Date dateTo = c.getTime();
+        List<CSVRecord> records = scraper.getAgodaReservations( webClient, dateFrom, dateTo );
+        LOGGER.info( records.size() + " recs found" );
+        for( CSVRecord entry : records ) {
             LOGGER.info( ToStringBuilder.reflectionToString( entry ) );
         }
     }

@@ -798,5 +798,36 @@ public class BookingsPageScraper {
         }
         return results;
     }
+    
+    /**
+     * Returns the CSV records for all Agoda reservations between the given dates.
+     * 
+     * @param webClient web client to use
+     * @param bookingRef (optional) match on booking reference
+     * @param checkoutDate date guest is checking-out
+     * @return all bookings where the guest is checked-out
+     * @throws IOException on parsing error
+     */
+    public List<CSVRecord> getAgodaReservations( WebClient webClient, Date checkinDate, Date checkoutDate ) throws IOException {
+        String url = bookingUrl
+                .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( checkinDate ) )
+                .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( checkoutDate ) )
+                .replaceAll( "__BOOKING_REF_ID__", "AGO" )
+                .replaceAll( "__DATE_TYPE__", "CheckIn" )
+                .replaceAll( "__STATUS__", "" );
+        LOGGER.info( "Retrieving CSV file from: " + url );
+        HtmlPage thePage = authService.goToPage( url, webClient );
+        HtmlAnchor a = thePage.getFirstByXPath( "//a[@class='export']" );
+        TextPage txtPage = a.click();
+        String csvContent = txtPage.getContent();
+        Iterable<CSVRecord> records = CSVFormat.RFC4180
+                .withFirstRecordAsHeader().parse(new StringReader(csvContent));
+        
+        List<CSVRecord> results = new ArrayList<CSVRecord>(); 
+        for (CSVRecord record : records) {
+            results.add( record );
+        }
+        return results;
+    }
 
 }

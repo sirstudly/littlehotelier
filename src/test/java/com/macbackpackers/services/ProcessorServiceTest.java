@@ -27,6 +27,7 @@ import com.macbackpackers.dao.TestHarnessDAO;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
+import com.macbackpackers.jobs.CreateAgodaChargeJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CreateDepositChargeJob;
 import com.macbackpackers.jobs.CreatePrepaidChargeJob;
@@ -387,6 +388,14 @@ public class ProcessorServiceTest {
         j.setBookingRef( "HWL-551-310580371" );
         j.setAmount( new BigDecimal( "13.2" ) );
         j.setMessage( "No-show charge." );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void testCreateChargeAgodaJob() throws Exception {
+        CreateAgodaChargeJob j = new CreateAgodaChargeJob();
+        j.setStatus( JobStatus.submitted );
+        j.setDaysBack( 7 );
         dao.insertJob( j );
     }
 
