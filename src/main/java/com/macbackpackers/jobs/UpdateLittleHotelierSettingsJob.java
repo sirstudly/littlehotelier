@@ -30,7 +30,7 @@ public class UpdateLittleHotelierSettingsJob extends AbstractJob {
 
     @Autowired
     @Transient
-    @Qualifier( "webClientScriptingDisabled" )
+    @Qualifier( "webClient" )
     private WebClient webClient;
 
     @Override

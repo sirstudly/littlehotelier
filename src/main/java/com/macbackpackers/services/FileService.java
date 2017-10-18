@@ -139,6 +139,18 @@ public class FileService {
     }
 
     /**
+     * Taken from Chrome (Under Developer Tools, Application, Cookies). I've just wrote the
+     * cookie.file after loading these and copied it manually to the server until I sort out how to
+     * login properly in LH.
+     * 
+     * @param webClient the web client
+     */
+    public void loadCookiesForHighStreet( WebClient webClient ) {
+        webClient.getCookieManager().addCookie( new Cookie( "app.littlehotelier.com", "_littlehotelier_session",
+                "VzlPZTNQdjhOZTFnd2orU2VpQXBvMGNSV1ZWM3N0VXN5VVl0Y21RNUhVQmx1bXhaODc0VkxZdjZodmpkaktxMUdYU0xYOTlZbVV6Q0ZqcitDbVQ1eXVzRVRRZktuMnhrcm9LcDFmWmJKY3ExZE1OV0lwZ3IyNTlEOE9nTDdaR2V4VnpVUjFUUnNTQXIxcVp0V0cvamRkYlQ3ZGdNWGU2SXprZnRzZmlRcUdnRlZBaGl2SVhnaFp1MGdpdE5UUlJmV2U5WEJrMEMvTVhBV21FWEhZUmIyeGZ4U1k3eGIvQ2xiY3JnY0hLZFRMMkV6SzFvVXh6QVdPMEk1aFhqaWRSY3BjWllwR0g5UGxPSWJWUzMvOWxFbTYrTXA3SlhSNUt1blJzWVBEc1Bremc0MWNjWVMzS2pMTVpBeUJ3YlVaMHc4S3pHTFFOZE9kNEhEWnpmUDgyTmdmcG50QnlrMEoybjJMVVduRDRla2FkVjRnUVgxeGo4aTAyeVA5ZkxYK2I3L1lyUmJEcFJheXlBbUNPZDdNcHJ4NWJXU0tZek9KV3RIeHBtRnhsRTBKa0xPSFRQZnNnMVhST1hJRXJUTTZtK2FUY09tbG01eHZORytTTzAvSVVTUndEY0xpZWRxT0xDNGpTZWF6dEhPRVlYb3gvU1RtRUJscjJ5a093TUtNTk8tLXpLQUx3M2dsMElXODVmSkRRbkJEUlE9PQ%3D%3D--ff9ae910ea02d77a91a0be3f057eed65a07178ab" ) );
+    }
+
+    /**
      * Deserialise the previously serialised object from file if found.
      * 
      * @param filename name of file

@@ -71,4 +71,8 @@ public class BookingScraperJob extends AbstractJob {
         setParameter( "checkin_date", AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ) );
     }
 
+    @Override
+    public int getRetryCount() {
+        return 10;
+    }
 }

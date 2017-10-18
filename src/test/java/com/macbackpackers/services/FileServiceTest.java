@@ -10,9 +10,11 @@ import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.config.LittleHotelierConfig;
 
 @RunWith( SpringJUnit4ClassRunner.class )
@@ -20,6 +22,10 @@ import com.macbackpackers.config.LittleHotelierConfig;
 public class FileServiceTest {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( FileServiceTest.class );
+
+    @Autowired
+    @Qualifier( "webClient" )
+    WebClient webClient;
 
     @Autowired
     FileService fs;
@@ -87,4 +93,9 @@ public class FileServiceTest {
         lock.release();
     }
 
+    @Test
+    public void writeCookiesForHighstreet() throws Exception {
+        fs.loadCookiesForHighStreet( webClient );
+        fs.writeCookiesToFile( webClient );
+    }
 }
