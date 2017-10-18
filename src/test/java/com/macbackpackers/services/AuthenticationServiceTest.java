@@ -10,6 +10,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.config.LittleHotelierConfig;
 
 @RunWith(SpringJUnit4ClassRunner.class)
@@ -22,12 +23,14 @@ public class AuthenticationServiceTest {
     AuthenticationService authService;
     
     @Autowired
-    @Qualifier( "webClientScriptingDisabled" )
+    @Qualifier( "webClient" )
     private WebClient webClient;
 
     @Test
     public void testDoLogin() throws Exception {
         authService.doLogin( webClient );
+        HtmlPage page = authService.goToPage( "https://app.littlehotelier.com/extranet/reports/summary?property_id=526", webClient );
+        LOGGER.debug( page.asXml() );
     }
     
     @Test
@@ -37,8 +40,8 @@ public class AuthenticationServiceTest {
     
     @Test
     public void testGoToPageSkippingLogin() throws Exception {
-        authService.goToPage( "https://app.littlehotelier.com/extranet/reports/summary?property_id=533", webClient );
+        HtmlPage page = authService.goToPage( "https://app.littlehotelier.com/extranet/reports/summary?property_id=526", webClient );
+        LOGGER.debug( page.asXml() );
     }
 
-    
 }

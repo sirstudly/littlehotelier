@@ -41,9 +41,10 @@ public class LittleHotelierConfig {
         webClient.getOptions().setJavaScriptEnabled( true );
         webClient.getOptions().setCssEnabled( false );
         webClient.getOptions().setRedirectEnabled( true );
-        webClient.getOptions().setUseInsecureSSL(true);
+        webClient.getOptions().setUseInsecureSSL( true );
         webClient.setAjaxController( new NicelyResynchronizingAjaxController() );
-        webClient.getOptions().setTimeout( 30000 );
+        webClient.getOptions().setTimeout( 60000 );
+        webClient.setJavaScriptTimeout( 60000 );
         return webClient;
     }
 
@@ -59,7 +60,7 @@ public class LittleHotelierConfig {
     @Bean( name = "webClientForHostelworld" )
     @Scope( "prototype" )
     public WebClient getWebClientForHostelworld() {
-        WebClient webClient = new WebClient( BrowserVersion.FIREFOX_45 );
+        WebClient webClient = new WebClient( BrowserVersion.FIREFOX_52 );
         webClient.getOptions().setTimeout( 120000 );
         webClient.getOptions().setRedirectEnabled( true );
         webClient.getOptions().setJavaScriptEnabled( false );

@@ -45,9 +45,9 @@ public class PaymentProcessorServiceTest {
     public void testPayment() throws Exception {
         Calendar c = Calendar.getInstance();
         c.set( Calendar.YEAR, 2017 );
-        c.set( Calendar.MONTH, 0 );
-        c.set( Calendar.DATE, 22 );
-        paymentService.processDepositPayment( webClient, "BDC-1850350118", c.getTime() );
+        c.set( Calendar.MONTH, Calendar.JULY );
+        c.set( Calendar.DATE, 16 );
+        paymentService.processDepositPayment( webClient, 0, "BDC-1552110982", c.getTime() );
         LOGGER.info( "done" );
     }
     

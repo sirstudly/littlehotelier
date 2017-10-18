@@ -55,6 +55,7 @@ public class AuthenticationService {
 
         if ( "/login".equals( nextPage.getUrl().getPath() ) ) {
             LOGGER.warn( "Current credentials not valid?" );
+            LOGGER.debug( nextPage.asXml() );
             throw new UnrecoverableFault( "Unable to login using existing credentials. Has the password changed?" );
         }
         return nextPage;
@@ -77,27 +78,20 @@ public class AuthenticationService {
         List<HtmlForm> forms = loginPage.getForms();
         HtmlForm form = forms.iterator().next();
 
-        HtmlButton button = HtmlButton.class.cast( loginPage.getElementById( "login-btn" ) );
         HtmlTextInput usernameField = form.getInputByName( "username" );
         usernameField.setValueAttribute( username );
-        HtmlPage nextPage = button.click();
-
-        if ( nextPage.getElementById( "password" ) == null ) {
-            throw new UnrecoverableFault( "Unable to login. Unable to find user login for that email." );
-        }
-
-        forms = nextPage.getForms();
-        form = forms.iterator().next();
         HtmlPasswordInput passwordField = form.getInputByName( "password" );
         passwordField.setValueAttribute( password );
-        button = HtmlButton.class.cast( nextPage.getElementById( "login-btn" ) );
-        nextPage = button.click();
+
+        HtmlButton button = HtmlButton.class.cast( loginPage.getElementById( "login-btn" ) );
+        HtmlPage nextPage = button.click();
 
         if ( nextPage.getFirstByXPath( "//a[@class='login-button']" ) != null ) {
             throw new UnrecoverableFault( "Unable to login. Password incorrect. " + nextPage.getUrl() );
         }
 
         LOGGER.info( "Finished logging in" );
+        LOGGER.debug( nextPage.asXml() );
         fileService.writeCookiesToFile( webClient );
     }
 

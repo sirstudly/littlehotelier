@@ -375,6 +375,14 @@ public class PaymentProcessorService {
         
         // Booking.com
         if ( bookingRef.startsWith( "BDC-" ) ) {
+
+            // quick check if it's AMEX (not supported)
+            HtmlSpan cardSpan = HtmlSpan.class.cast( reservationPage.getFirstByXPath(
+                    "//input[@id='reservation_payment_card_number']/following-sibling::span" ) );
+            if ( cardSpan != null && cardSpan.getAttribute( "class" ).contains( "fa-cc-amex" ) ) {
+                throw new MissingUserDataException( "Amex not enabled. Charge manually using EFTPOS terminal." );
+            }
+
             LOGGER.info( "Retrieving card security code" );
             CardDetails ccDetailsFromGmail = gmailService.fetchBdcCardDetailsFromBookingRef( bookingRef );
 
@@ -502,7 +510,7 @@ public class PaymentProcessorService {
     private String getBookingRef( HtmlPage reservationPage ) throws MissingUserDataException {
         HtmlHeading3 heading = reservationPage.getFirstByXPath( "//h3[@class='webui-popover-title']" );
         Pattern p = Pattern.compile( "Edit Reservation - (.*)" );
-        Matcher m = p.matcher( heading.getTextContent() );
+        Matcher m = p.matcher( heading.getTextContent() ); // CRH job 240239 fails with NPE here
         String bookingRef;
         if(m.find()) {
             bookingRef = m.group( 1 );

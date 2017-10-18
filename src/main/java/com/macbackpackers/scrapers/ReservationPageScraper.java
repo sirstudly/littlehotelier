@@ -200,14 +200,44 @@ public class ReservationPageScraper {
      */
     public void appendNote( HtmlPage reservationPage, String note ) throws IOException {
         LOGGER.info( "Appending note to reservation: " + note );
+        
+        HtmlPage currentPage = reservationPage;
         HtmlTextArea notesTxt = HtmlTextArea.class.cast( 
-                reservationPage.getElementById( "reservation_notes" ));
+                currentPage.getElementById( "reservation_notes" ));
+        if ( notesTxt == null ) {
+            LOGGER.warn( "Unable to find reservation_notes element, attempting to reload page." );
+            String rawHtml = currentPage.asXml();
+            LOGGER.info( rawHtml.replaceAll( "[0-9]{16}", "XXXXXXXXXXXXXXXX" ) );
+            currentPage = HtmlPage.class.cast( reservationPage.getWebClient().getCurrentWindow().getEnclosedPage() );
+            LOGGER.info( "Reloading page..." );
+            currentPage = HtmlPage.class.cast( currentPage.refresh() );
+            LOGGER.info( "Waiting for javascript..." );
+            currentPage.getWebClient().waitForBackgroundJavaScript( 60000 ); // wait for page to update
+            LOGGER.info( "Finished waiting for JS..." );
+            notesTxt = HtmlTextArea.class.cast( currentPage.getElementById( "reservation_notes" ) );
+            if( notesTxt == null ) {
+                LOGGER.info( "Hiya! Failed to append note. But everything else worked ok." );
+                rawHtml = currentPage.asXml();
+                LOGGER.info( rawHtml.replaceAll( "[0-9]{16}", "XXXXXXXXXXXXXXXX" ) );
+            }
+        }
+
+        // we only need to show this message once
+        if ( note.startsWith( "Amex not enabled" ) && notesTxt.getText().contains( "Amex not enabled" ) ) {
+            LOGGER.info( "Amex message already present; skipping..." );
+            return;
+        }
         notesTxt.type( note + "\n" ); // need JS event change
-        reservationPage.setFocusedElement( null ); // remove focus on textarea to trigger onchange
-        reservationPage.getWebClient().waitForBackgroundJavaScript( 15000 ); // wait for page to update
-        HtmlSubmitInput saveButton = reservationPage.getFirstByXPath( "//input[@value='Save']" );
-        saveButton.click();
-        reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
+        currentPage.setFocusedElement( null ); // remove focus on textarea to trigger onchange
+        currentPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to update
+        HtmlSubmitInput saveButton = currentPage.getFirstByXPath( "//input[@value='Save']" );
+        if ( saveButton == null ) {
+            LOGGER.info( "Unable to update notes, but everything else is OK!" );
+        }
+        else {
+            saveButton.click(); // CRH job 240247 NPE (there was a JS pause of 15 sec prior to calling this)
+            currentPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
+        }
     }
 
     /**
@@ -291,7 +321,7 @@ public class ReservationPageScraper {
         securityToken.type( gmailService.fetchLHSecurityToken() );
         HtmlInput submitToken = reservationPage.getFirstByXPath( "//input[@class='confirm_token']" );
         currentPage = submitToken.click();
-        currentPage.getWebClient().waitForBackgroundJavaScript( 10000 );
+        currentPage.getWebClient().waitForBackgroundJavaScript( 30000 );
         
         // couldn't get the card number from the reservation page
         // this will lookup the card number using the JSON page (found using the data-url from the control)
