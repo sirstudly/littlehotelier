@@ -38,7 +38,7 @@ public class UpdateLittleHotelierSettingsJob extends AbstractJob {
 
         // this will throw an exception if unable to login 
         // using the parameters specified by the job
-        authService.doLogin( webClient, getParameter( "username" ), getParameter( "password" ) );
+//        authService.doLogin( webClient, getParameter( "username" ), getParameter( "password" ) );
         wordpressDAO.setOption( "hbo_lilho_username", getParameter( "username" ));
         wordpressDAO.setOption( "hbo_lilho_password", getParameter( "password" ));
     }
