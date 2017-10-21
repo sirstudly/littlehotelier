@@ -66,7 +66,7 @@ public class BookingsPageScraperTest {
     public void testGetUnpaidBDCReservations() throws Exception {
         Calendar c = Calendar.getInstance();
         c.set( Calendar.YEAR, 2017 );
-        c.set( Calendar.MONTH, 0 );
+        c.set( Calendar.MONTH, Calendar.JANUARY );
         c.set( Calendar.DATE, 15 );
         Date dateFrom = c.getTime();
         c.set( Calendar.DATE, 30 );
@@ -77,5 +77,14 @@ public class BookingsPageScraperTest {
             LOGGER.info( ToStringBuilder.reflectionToString( entry ) );
         }
     }
-    
+
+    @Test
+    public void testUpdateBookingsBetween() throws Exception {
+        Calendar c = Calendar.getInstance();
+        c.set( Calendar.YEAR, 2017 );
+        c.set( Calendar.MONTH, Calendar.OCTOBER );
+        c.set( Calendar.DATE, 24 );
+        scraper.updateBookingsBetween(
+                webClient, 11729, c.getTime(), c.getTime() );
+    }
 }
