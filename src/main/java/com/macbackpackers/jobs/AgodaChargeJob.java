@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.macbackpackers.scrapers.AgodaScraper;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.services.PaymentProcessorService;
 
@@ -27,10 +28,10 @@ public class AgodaChargeJob extends AbstractJob {
     @Transient
     private PaymentProcessorService paymentProcessor;
     
-//    @Autowired
-//    @Transient
-//    private AgodaScraper scraper;
-//
+    @Autowired
+    @Transient
+    private AgodaScraper scraper;
+
     @Autowired
     @Transient
     @Qualifier( "webClient" )
@@ -38,7 +39,7 @@ public class AgodaChargeJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-//        paymentProcessor.processDepositPayment( webClient, getId(), getBookingRef(), getBookingDate() );
+        paymentProcessor.processAgodaPayment( webClient, getId(), getBookingRef(), getCheckinDate() );
     }
 
     @Override

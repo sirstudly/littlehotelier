@@ -38,7 +38,7 @@ public class CreateAgodaChargeJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         Calendar c = Calendar.getInstance();
-        c.add( Calendar.DATE, -7 );
+        c.add( Calendar.DATE, -1 );
         Date toDate = c.getTime(); // yesterday
         c.add( Calendar.DATE, getDaysBack() * -1 );
         Date fromDate = c.getTime();

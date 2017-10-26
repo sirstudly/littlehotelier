@@ -189,12 +189,12 @@ public class PaymentProcessorService {
      * @param webClient web client used for LH
      * @param jobId current job id
      * @param bookingRef booking reference e.g. BDC-123456789
-     * @param bookedOnDate date on which reservation was booked
+     * @param checkinDate date on which reservation starts
      * @throws IOException on I/O error
      */
-    public void processAgodaPayment( WebClient webClient, int jobId, String bookingRef, Date bookedOnDate ) throws IOException {
+    public void processAgodaPayment( WebClient webClient, int jobId, String bookingRef, Date checkinDate ) throws IOException {
         LOGGER.info( "Processing payment for booking " + bookingRef );
-        HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
+        HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageArrivedOn( webClient, checkinDate, bookingRef );
         HtmlPage reservationPage = getReservationPage( webClient, bookingsPage, bookingRef );
 
         // first, ensure LH and our PxPost table are in sync
@@ -202,7 +202,7 @@ public class PaymentProcessorService {
 
         // check we have something to charge
         BigDecimal chargeAmount = getAgodaChargeAmount( reservationPage );
-        if ( chargeAmount.compareTo( BigDecimal.ZERO ) >= 0 ) {
+        if ( chargeAmount.compareTo( BigDecimal.ZERO ) <= 0 ) {
             LOGGER.info( "Nothing to charge!" );
         }
         else {
