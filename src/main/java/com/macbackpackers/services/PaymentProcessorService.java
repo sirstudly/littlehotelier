@@ -106,7 +106,7 @@ public class PaymentProcessorService {
     public synchronized void processDepositPayment( WebClient webClient, int jobId, String bookingRef, Date bookedOnDate ) throws IOException {
         LOGGER.info( "Processing payment for booking " + bookingRef );
         HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
-        HtmlPage reservationPage = getReservationPage( webClient, bookingsPage, bookingRef );
+        HtmlPage reservationPage = reservationPageScraper.getReservationPage( webClient, bookingsPage, bookingRef );
         int reservationId = getReservationId( reservationPage );
 
         // check if we've already received any payment on the payments tab
@@ -160,12 +160,12 @@ public class PaymentProcessorService {
                     // we should have access to the card details without having to press the "view" link now
                     // so reload the reservation page and continue...
                     bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
-                    reservationPage = getReservationPage( webClient, bookingsPage, bookingRef );
+                    reservationPage = reservationPageScraper.getReservationPage( webClient, bookingsPage, bookingRef );
                 }
                 catch ( MissingUserDataException ex ) {
                     // enableSecurityAccess messes up the current page so reload the reservation page and continue...
                     bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
-                    reservationPage = getReservationPage( webClient, bookingsPage, bookingRef );
+                    reservationPage = reservationPageScraper.getReservationPage( webClient, bookingsPage, bookingRef );
                     reservationPageScraper.appendNote( reservationPage,
                             ex.getMessage() + " - " + DATETIME_FORMAT.format( new Date() ) + "\n" );
                 }
@@ -195,7 +195,7 @@ public class PaymentProcessorService {
     public void processAgodaPayment( WebClient webClient, int jobId, String bookingRef, Date checkinDate ) throws IOException {
         LOGGER.info( "Processing payment for booking " + bookingRef );
         HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageArrivedOn( webClient, checkinDate, bookingRef );
-        HtmlPage reservationPage = getReservationPage( webClient, bookingsPage, bookingRef );
+        HtmlPage reservationPage = reservationPageScraper.getReservationPage( webClient, bookingsPage, bookingRef );
 
         // first, ensure LH and our PxPost table are in sync
         syncLastPxPostTransactionInLH( bookingRef, false, reservationPage );
@@ -247,7 +247,7 @@ public class PaymentProcessorService {
         Date dateTo = Date.from( Instant.now().plus( Duration.ofDays( 180 ) ) );
 
         HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageForArrivals( lhWebClient, dateFrom, dateTo, bookingRef, null );
-        HtmlPage reservationPage = getReservationPage( lhWebClient, bookingsPage, bookingRef );
+        HtmlPage reservationPage = reservationPageScraper.getReservationPage( lhWebClient, bookingsPage, bookingRef );
 
         // cannot charge more than what is outstanding
         HtmlSpan outstandingTotalSpan = reservationPage.getFirstByXPath( "//div[@class='outstanding_total']/span" );
@@ -277,37 +277,6 @@ public class PaymentProcessorService {
         }
     }
     
-    /**
-     * Loads the reservation page for the given reservation.
-     * 
-     * @param webClient web client to use
-     * @param bookingsPage page with the current booking
-     * @param bookingRef booking reference e.g. BDC-123456789
-     * @param bookedOnDate date on which reservation was booked
-     * @return reservation page
-     * @throws IOException on I/O error
-     */
-    private HtmlPage getReservationPage( WebClient webClient, HtmlPage bookingsPage, String bookingRef ) throws IOException {
-
-        List<?> rows = bookingsPage.getByXPath(
-                "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr/td[@class='booking_reference' and text()='" + bookingRef + "']/.." );
-        if ( rows.size() != 1 ) {
-            throw new IncorrectResultSizeDataAccessException( "Unable to find unique booking " + bookingRef, 1 );
-        }
-        // need the LH reservation ID before clicking on the row
-        HtmlTableRow row = HtmlTableRow.class.cast( rows.get( 0 ) );
-
-        // click on the only reservation on the page
-        HtmlPage reservationPage = row.click();
-        reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
-
-        // extra-paranoid; making sure booking ref matches the editing window
-        if ( false == bookingRef.equals( getBookingRef( reservationPage ) ) ) {
-            throw new IllegalStateException( "Booking references don't match!" );
-        }
-        return reservationPage;
-    }
-
     /**
      * Returns the reservation ID from the reservation page.
      * 
@@ -604,27 +573,6 @@ public class PaymentProcessorService {
         }
         LOGGER.info("found " + numberGuests + " guests");
         return numberGuests;
-    }
-
-    /**
-     * Retrieves to booking reference from the given reservation page.
-     * 
-     * @param reservationPage the page to check
-     * @return non-null booking reference
-     * @throws MissingUserDataException if booking ref not found
-     */
-    private String getBookingRef( HtmlPage reservationPage ) throws MissingUserDataException {
-        HtmlHeading3 heading = reservationPage.getFirstByXPath( "//h3[@class='webui-popover-title']" );
-        Pattern p = Pattern.compile( "Edit Reservation - (.*)" );
-        Matcher m = p.matcher( heading.getTextContent() ); // CRH job 240239 fails with NPE here
-        String bookingRef;
-        if(m.find()) {
-            bookingRef = m.group( 1 );
-        }
-        else {
-            throw new MissingUserDataException( "Unable to determine booking reference from " + reservationPage.getBaseURL());
-        }
-        return bookingRef;
     }
 
     /**

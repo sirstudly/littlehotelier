@@ -40,6 +40,7 @@ import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
+import com.macbackpackers.scrapers.AgodaScraper;
 
 @Repository
 @Transactional
@@ -642,6 +643,27 @@ public class WordPressDAOImpl implements WordPressDAO {
                     + "   AND c.paymentTotal = c.paymentOutstanding" // no deposit charged
                     + "   AND r.comments LIKE 'You have received a virtual credit card for this reservation%'"
                     + "   AND c.bookingReference LIKE 'BDC-%'", BookingWithGuestComments.class )
+                    .setParameter( "allocationScraperJobId", allocationScraperJobId )
+                    .getResultList();
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<BookingWithGuestComments> fetchAgodaBookingsMissingNoChargeNote() {
+        Integer allocationScraperJobId = getLastCompletedAllocationScraperJobId();
+        if ( allocationScraperJobId != null ) {
+            return em.createQuery(
+                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.bookingReference, c.bookedDate, r.comments ) "
+                            + "  FROM Allocation c "
+                            + " INNER JOIN GuestCommentReportEntry r "
+                            + "    ON c.reservationId = r.reservationId "
+                            + " WHERE c.jobId = :allocationScraperJobId "
+                            + "   AND (r.comments NOT LIKE '%" + AgodaScraper.NO_CHARGE_NOTE + "%' "
+                                    + "OR c.notes NOT LIKE '%" + AgodaScraper.NO_CHARGE_NOTE + "%')"
+                            + "   AND c.bookingSource = 'Agoda'"
+                            + "   AND c.status = 'confirmed'",
+                    BookingWithGuestComments.class )
                     .setParameter( "allocationScraperJobId", allocationScraperJobId )
                     .getResultList();
         }

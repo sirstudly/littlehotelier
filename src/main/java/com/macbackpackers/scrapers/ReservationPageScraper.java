@@ -4,8 +4,11 @@ package com.macbackpackers.scrapers;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -14,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
+import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.Page;
@@ -23,11 +27,13 @@ import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlButton;
 import com.gargoylesoftware.htmlunit.html.HtmlCheckBoxInput;
 import com.gargoylesoftware.htmlunit.html.HtmlDivision;
+import com.gargoylesoftware.htmlunit.html.HtmlHeading3;
 import com.gargoylesoftware.htmlunit.html.HtmlInput;
 import com.gargoylesoftware.htmlunit.html.HtmlOption;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlSelect;
 import com.gargoylesoftware.htmlunit.html.HtmlSubmitInput;
+import com.gargoylesoftware.htmlunit.html.HtmlTableRow;
 import com.gargoylesoftware.htmlunit.html.HtmlTextArea;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.google.gson.Gson;
@@ -56,6 +62,9 @@ public class ReservationPageScraper {
     
     @Autowired
     private FileService fileService;
+
+    @Autowired
+    private BookingsPageScraper bookingsPageScraper;
 
     @Value( "${lilhotelier.url.reservation}" )
     private String reservationUrl;
@@ -352,6 +361,93 @@ public class ReservationPageScraper {
             }
             return cardNumber.getValueAttribute();
         }
+    }
+
+    /**
+     * Loads the reservation page for the given reservation.
+     * 
+     * @param webClient web client to use
+     * @param bookingsPage page with the current booking
+     * @param bookingRef booking reference e.g. BDC-123456789
+     * @param bookedOnDate date on which reservation was booked
+     * @return reservation page
+     * @throws IOException on I/O error
+     */
+    public HtmlPage getReservationPage( WebClient webClient, HtmlPage bookingsPage, String bookingRef ) throws IOException {
+
+        List<?> rows = bookingsPage.getByXPath(
+                "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr/td[@class='booking_reference' and text()='" + bookingRef + "']/.." );
+        if ( rows.size() != 1 ) {
+            throw new IncorrectResultSizeDataAccessException( "Unable to find unique booking " + bookingRef, 1 );
+        }
+        // need the LH reservation ID before clicking on the row
+        HtmlTableRow row = HtmlTableRow.class.cast( rows.get( 0 ) );
+
+        // click on the only reservation on the page
+        HtmlPage reservationPage = row.click();
+        reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
+
+        // extra-paranoid; making sure booking ref matches the editing window
+        if ( false == bookingRef.equals( getBookingRef( reservationPage ) ) ) {
+            throw new IllegalStateException( "Booking references don't match!" );
+        }
+        return reservationPage;
+    }
+
+    /**
+     * Adds the no-charge note to the given Agoda booking.
+     * 
+     * @param webClient the web client
+     * @param bookingRef e.g. AGO-12345678
+     * @param bookedDate the date the reservation was booked
+     * @throws IOException on I/O error
+     */
+    public void updateGuestCommentsAndNotesForAgoda( WebClient webClient, String bookingRef, Date bookedDate ) throws IOException {
+        HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedDate, bookingRef );
+        HtmlPage reservationPage = getReservationPage( webClient, bookingsPage, bookingRef );
+        HtmlTextArea guestComments = reservationPage.getFirstByXPath( "//textarea[@id='reservation_guest_comments']" );
+
+        boolean hasChanges = false;
+        if ( false == guestComments.getTextContent().contains( AgodaScraper.NO_CHARGE_NOTE ) ) {
+            guestComments.type( AgodaScraper.NO_CHARGE_NOTE + "\n" ); // need JS event change
+            reservationPage.setFocusedElement( null ); // remove focus on textarea to trigger onchange
+            hasChanges = true;
+        }
+
+        HtmlTextArea reservationNotes = reservationPage.getFirstByXPath( "//textarea[@id='reservation_notes']" );
+        if ( false == reservationNotes.getTextContent().contains( AgodaScraper.NO_CHARGE_NOTE ) ) {
+            reservationNotes.type( AgodaScraper.NO_CHARGE_NOTE + "\n" ); // need JS event change
+            reservationPage.setFocusedElement( null ); // remove focus on textarea to trigger onchange
+            hasChanges = true;
+        }
+
+        if( hasChanges ) {
+            reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to update
+            HtmlSubmitInput saveButton = reservationPage.getFirstByXPath( "//input[@value='Save']" );
+            saveButton.click();
+            reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
+        }
+    }
+
+    /**
+     * Retrieves to booking reference from the given reservation page.
+     * 
+     * @param reservationPage the page to check
+     * @return non-null booking reference
+     * @throws MissingUserDataException if booking ref not found
+     */
+    private String getBookingRef( HtmlPage reservationPage ) throws MissingUserDataException {
+        HtmlHeading3 heading = reservationPage.getFirstByXPath( "//h3[@class='webui-popover-title']" );
+        Pattern p = Pattern.compile( "Edit Reservation - (.*)" );
+        Matcher m = p.matcher( heading.getTextContent() ); // CRH job 240239 fails with NPE here
+        String bookingRef;
+        if(m.find()) {
+            bookingRef = m.group( 1 );
+        }
+        else {
+            throw new MissingUserDataException( "Unable to determine booking reference from " + reservationPage.getBaseURL());
+        }
+        return bookingRef;
     }
 
 }

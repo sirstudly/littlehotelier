@@ -8,6 +8,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.time.FastDateFormat;
@@ -563,4 +564,15 @@ public class WordPressDAOTest {
         Assert.assertEquals( false, txn.getSuccessful() );
     }
 
+    @Test
+    public void testFetchAgodaBookingsMissingNoChargeNote() {
+        final AtomicInteger counter = new AtomicInteger( 0 );
+        dao.fetchAgodaBookingsMissingNoChargeNote()
+                .stream()
+                .forEach( p -> {
+                    LOGGER.info( p.getBookingReference() + " " + p.getGuestComment() );
+                    counter.incrementAndGet();
+                } );
+        LOGGER.info( "Found " + counter + " records" );
+    }
 }

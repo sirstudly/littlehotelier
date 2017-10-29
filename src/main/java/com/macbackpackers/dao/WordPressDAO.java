@@ -242,6 +242,14 @@ public interface WordPressDAO {
     public List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithUnpaidDeposits();
 
     /**
+     * Retrieves all Agoda bookings that don't have a no charge note in either the user comments nor
+     * notes sections.
+     * 
+     * @return non-null list
+     */
+    public List<BookingWithGuestComments> fetchAgodaBookingsMissingNoChargeNote();
+
+    /**
      * Creates a report with all bookings with more than 5 guests.
      * 
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from
