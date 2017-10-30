@@ -59,17 +59,9 @@ public class GmailService {
     @Value( "${user.credentials.directory}" )
     private String userCredentialsDirectory;
 
-    /** Directory to store user credentials for manager's account. */
-    @Value( "${user.credentials.manager.directory}" )
-    private String userCredentialsManagerDirectory;
-
     /** This is the OAuth 2.0 Client ID used to login to Gmail */
     @Value( "${gmail.oauth.client.id.file}" )
     private String oauthClientIdFile;
-    
-    /** This is the OAuth 2.0 Client ID used to login to Gmail for the manager's account */
-    @Value( "${gmail.oauth.client.id.manager.file}" )
-    private String oauthClientIdManagerFile;
     
     @Value( "${gmail.sendfrom.address}" )
     private String gmailSendAddress;
@@ -150,19 +142,6 @@ public class GmailService {
     }
 
     /**
-     * Build and return an authorized Gmail client service.
-     * @return an authorized Gmail client service
-     * @throws IOException
-     */
-    public Gmail connectAsManagerClient() throws IOException {
-        Credential credential = authorize( userCredentialsManagerDirectory,
-                Arrays.asList( GmailScopes.GMAIL_READONLY ) );
-        return new Gmail.Builder( HTTP_TRANSPORT, JSON_FACTORY, credential )
-                .setApplicationName( "CRH Manager Gmail API" )
-                .build();
-    }
-
-    /**
      * Fetch the card details from the BDC email with the given booking reference.
      * 
      * @param bookingRef BDC booking reference
@@ -222,7 +201,7 @@ public class GmailService {
     public String fetchAgodaPasscode() throws IOException, MissingUserDataException {
         
         LOGGER.info( "Looking up Agoda passcode" );
-        Gmail service = connectAsManagerClient();
+        Gmail service = connectAsClient();
         ListMessagesResponse listResponse = 
                 service.users().messages()
                 .list( GMAIL_USER )
