@@ -25,6 +25,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.TestHarnessDAO;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.jobs.AgodaChargeJob;
 import com.macbackpackers.jobs.AgodaNoChargeNoteJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
@@ -389,6 +390,19 @@ public class ProcessorServiceTest {
         j.setBookingRef( "HWL-551-310580371" );
         j.setAmount( new BigDecimal( "13.2" ) );
         j.setMessage( "No-show charge." );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void testAgodaChargeJob() throws Exception {
+        AgodaChargeJob j = new AgodaChargeJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingRef( "AGO-236618912" );
+        Calendar checkinDate = Calendar.getInstance();
+        checkinDate.set( Calendar.DATE, 29 );
+        checkinDate.set( Calendar.MONTH, Calendar.OCTOBER );
+        checkinDate.set( Calendar.YEAR, 2017 );
+        j.setCheckinDate( checkinDate.getTime() );
         dao.insertJob( j );
     }
 
