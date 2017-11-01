@@ -659,8 +659,8 @@ public class WordPressDAOImpl implements WordPressDAO {
                             + " INNER JOIN GuestCommentReportEntry r "
                             + "    ON c.reservationId = r.reservationId "
                             + " WHERE c.jobId = :allocationScraperJobId "
-                            + "   AND (r.comments NOT LIKE '%" + AgodaScraper.NO_CHARGE_NOTE + "%' "
-                                    + "OR c.notes NOT LIKE '%" + AgodaScraper.NO_CHARGE_NOTE + "%')"
+                            + "   AND (IFNULL(r.comments, '') NOT LIKE '%" + AgodaScraper.NO_CHARGE_NOTE + "%' "
+                                    + "OR IFNULL(c.notes, '') NOT LIKE '%" + AgodaScraper.NO_CHARGE_NOTE + "%')"
                             + "   AND c.bookingSource = 'Agoda'"
                             + "   AND c.status = 'confirmed'",
                     BookingWithGuestComments.class )
