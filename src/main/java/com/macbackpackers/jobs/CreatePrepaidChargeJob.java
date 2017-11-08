@@ -21,7 +21,8 @@ public class CreatePrepaidChargeJob extends AbstractJob {
         // and create a job for each of them if they're currently chargeable
         dao.fetchPrepaidBDCBookingsWithUnpaidDeposits()
                 .stream()
-                .filter( p -> p.isChargeableDateInPast() )
+                // include bookings that are about to arrive (in case we couldn't charge them yet)
+                .filter( p -> p.isChargeableDateInPast() || p.isCheckinDateTodayOrTomorrow() )
                 .forEach( a -> {
                     LOGGER.info( "Creating a DepositChargeJob for booking " + a.getBookingReference() 
                             + " chargeable on " + a.getEarliestChargeDate() );

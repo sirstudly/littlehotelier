@@ -9,8 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import com.gargoylesoftware.htmlunit.WebClient;
-import com.macbackpackers.dao.WordPressDAO;
-import com.macbackpackers.services.AuthenticationService;
+import com.macbackpackers.services.FileService;
 
 /**
  * Job that updates the settings for LittleHotelier.
@@ -22,11 +21,7 @@ public class UpdateLittleHotelierSettingsJob extends AbstractJob {
 
     @Autowired
     @Transient
-    private AuthenticationService authService;
-
-    @Autowired
-    @Transient
-    private WordPressDAO wordpressDAO;
+    private FileService fileService;
 
     @Autowired
     @Transient
@@ -38,9 +33,14 @@ public class UpdateLittleHotelierSettingsJob extends AbstractJob {
 
         // this will throw an exception if unable to login 
         // using the parameters specified by the job
-        authService.doLogin( webClient, getParameter( "username" ), getParameter( "password" ) );
-        wordpressDAO.setOption( "hbo_lilho_username", getParameter( "username" ));
-        wordpressDAO.setOption( "hbo_lilho_password", getParameter( "password" ));
+        // *disabled for now - not working*
+//        authService.doLogin( webClient, getParameter( "username" ), getParameter( "password" ) );
+        dao.setOption( "hbo_lilho_username", getParameter( "username" ));
+        dao.setOption( "hbo_lilho_password", getParameter( "password" ));
+
+        // update the session cookie and write it to disk
+        fileService.addLittleHotelierSessionCookie( webClient, dao.getOption( "hbo_lilho_session" ) );
+        fileService.writeCookiesToFile( webClient );
     }
 
     @Override

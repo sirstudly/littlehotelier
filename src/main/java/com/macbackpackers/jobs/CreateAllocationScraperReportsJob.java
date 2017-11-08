@@ -41,6 +41,7 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         insertUnpaidDepositReportJob( bookingScraperJobs );
         insertGroupBookingsReportJob( bookingScraperJobs );
         insertHostelworldHostelBookersConfirmDepositJob();
+        insertCreateAgodaNoChargeNoteJob( bookingScraperJobs );
     }
 
     /**
@@ -115,6 +116,19 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         CreateConfirmDepositAmountsJob j = new CreateConfirmDepositAmountsJob();
         j.setStatus( JobStatus.submitted );
         j.setAllocationScraperJobId( getAllocationScraperJobId() );
+        dao.insertJob( j );
+    }
+
+    /**
+     * Creates jobs to add a no-charge note to all Agoda bookings.
+     * 
+     * @param dependentJobs the jobs which need to complete successfully before running the jobs
+     *            being created
+     */
+    private void insertCreateAgodaNoChargeNoteJob( List<? extends Job> dependentJobs ) {
+        CreateAgodaNoChargeNoteJob j = new CreateAgodaNoChargeNoteJob();
+        j.getDependentJobs().addAll( dependentJobs );
+        j.setStatus( JobStatus.submitted );
         dao.insertJob( j );
     }
 

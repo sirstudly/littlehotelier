@@ -59,12 +59,29 @@ public class AllocationsPageScraper {
     @Autowired
     private AuthenticationService authService;
 
-    @Value( "${lilhotelier.url.calendar}" )
-    private String calendarUrl;
+    @Value( "${lilhotelier.propertyid}" )
+    private String lhPropertyId;
 
+    /**
+     * Returns the URL for the calendar page.
+     * 
+     * @return calendar URL
+     */
+    private String getCalendarURL() {
+        return String.format( "https://app.littlehotelier.com/extranet/properties/%s/calendar", lhPropertyId );
+    }
+
+    /**
+     * Loads the calendar page starting from the given date.
+     * 
+     * @param webClient the web client to use
+     * @param date start (checkin date)
+     * @return loaded page
+     * @throws IOException on load error
+     */
     private HtmlPage goToCalendarPage( WebClient webClient, Date date ) throws IOException {
         String dateAsString = DATE_FORMAT_YYYY_MM_DD.format( date );
-        String pageURL = calendarUrl + "?start_date=" + dateAsString;
+        String pageURL = getCalendarURL() + "?start_date=" + dateAsString;
         LOGGER.info( "Loading calendar page: " + pageURL );
         HtmlPage nextPage = authService.goToPage( pageURL, webClient );
         LOGGER.trace( nextPage.asXml() );
@@ -244,6 +261,7 @@ public class AllocationsPageScraper {
         }
 
         alloc.setDataHref( span.getAttribute( "data-href" ) );
+        alloc.setViewed( true ); // this attribute doesn't appear to be present anymore in LH
 
         LOGGER.info( "Done allocation " + alloc.getReservationId() + ": " + alloc.getGuestName() );
         LOGGER.debug( alloc.toString() );

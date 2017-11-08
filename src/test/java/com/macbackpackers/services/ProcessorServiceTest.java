@@ -25,8 +25,11 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.TestHarnessDAO;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.jobs.AgodaChargeJob;
+import com.macbackpackers.jobs.AgodaNoChargeNoteJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
+import com.macbackpackers.jobs.CreateAgodaNoChargeNoteJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CreateDepositChargeJob;
 import com.macbackpackers.jobs.CreatePrepaidChargeJob;
@@ -390,4 +393,36 @@ public class ProcessorServiceTest {
         dao.insertJob( j );
     }
 
+    @Test
+    public void testAgodaChargeJob() throws Exception {
+        AgodaChargeJob j = new AgodaChargeJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingRef( "AGO-236618912" );
+        Calendar checkinDate = Calendar.getInstance();
+        checkinDate.set( Calendar.DATE, 29 );
+        checkinDate.set( Calendar.MONTH, Calendar.OCTOBER );
+        checkinDate.set( Calendar.YEAR, 2017 );
+        j.setCheckinDate( checkinDate.getTime() );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void testAgodaNoChargeNoteJob() throws Exception {
+        AgodaNoChargeNoteJob j = new AgodaNoChargeNoteJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingRef( "AGO-205348018" );
+        Calendar bookedDate = Calendar.getInstance();
+        bookedDate.set( Calendar.DATE, 25 );
+        bookedDate.set( Calendar.MONTH, Calendar.SEPTEMBER );
+        bookedDate.set( Calendar.YEAR, 2017 );
+        j.setBookedDate( bookedDate.getTime() );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void testCreateAgodaNoChargeNoteJob() throws Exception {
+        CreateAgodaNoChargeNoteJob j = new CreateAgodaNoChargeNoteJob();
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+    }
 }

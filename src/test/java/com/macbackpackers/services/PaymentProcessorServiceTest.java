@@ -36,6 +36,10 @@ public class PaymentProcessorServiceTest {
     WebClient webClient;
 
     @Autowired
+    @Qualifier( "webClientForHostelworld" )
+    WebClient hwWebClient;
+
+    @Autowired
     WordPressDAO dao;
     
     @Autowired
@@ -45,9 +49,9 @@ public class PaymentProcessorServiceTest {
     public void testPayment() throws Exception {
         Calendar c = Calendar.getInstance();
         c.set( Calendar.YEAR, 2017 );
-        c.set( Calendar.MONTH, Calendar.JULY );
-        c.set( Calendar.DATE, 16 );
-        paymentService.processDepositPayment( webClient, 0, "BDC-1552110982", c.getTime() );
+        c.set( Calendar.MONTH, Calendar.OCTOBER );
+        c.set( Calendar.DATE, 26 );
+        paymentService.processDepositPayment( webClient, 0, "BDC-1264569063", c.getTime() );
         LOGGER.info( "done" );
     }
     
@@ -81,4 +85,37 @@ public class PaymentProcessorServiceTest {
         LOGGER.info( "Amount to charge: " + amountToCharge );
     }
 
+    @Test
+    public void testSyncLastPxPostTransactionInLH() throws Exception {
+
+        // This is a valid successful txn in PxPost (UAT) : 1508959296186
+        String bookingRef = "EXP-924636178";
+        Calendar c = Calendar.getInstance();
+        c.set( Calendar.YEAR, 2017 );
+        c.set( Calendar.MONTH, Calendar.OCTOBER );
+        c.set( Calendar.DATE, 13 );
+
+        HtmlPage bookingsPage = bookingScraper.goToBookingPageBookedOn( webClient, c.getTime(), bookingRef );
+
+        List<?> rows = bookingsPage.getByXPath(
+                "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr/td[@class='booking_reference' and text()='" + bookingRef + "']/.." );
+        if ( rows.size() != 1 ) {
+            throw new IncorrectResultSizeDataAccessException( "Unable to find unique booking " + bookingRef, 1 );
+        }
+        // need the LH reservation ID before clicking on the row
+        HtmlTableRow row = HtmlTableRow.class.cast( rows.get( 0 ) );
+
+        // click on the only reservation on the page
+        HtmlPage reservationPage = row.click();
+
+        // this should add the payment details to the LH reservation above
+        bookingRef = "HWL-123-1234567";
+        paymentService.syncLastPxPostTransactionInLH( bookingRef, true, reservationPage );
+    }
+
+    @Test
+    public void testProcessManualPayment() throws Exception {
+        paymentService.processManualPayment( webClient, hwWebClient, 0,
+                "HWL-552-320209037", new BigDecimal( "0.01" ), "Testing -rc" );
+    }
 }

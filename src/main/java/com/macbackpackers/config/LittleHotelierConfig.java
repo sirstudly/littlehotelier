@@ -1,9 +1,6 @@
 
 package com.macbackpackers.config;
 
-import org.quartz.Scheduler;
-import org.quartz.SchedulerException;
-import org.quartz.impl.StdSchedulerFactory;
 import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -17,6 +14,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 @Configuration
 @EnableTransactionManagement
@@ -84,6 +83,12 @@ public class LittleHotelierConfig {
         webClient.getOptions().setCssEnabled( false );
         webClient.getOptions().setUseInsecureSSL( true );
         return webClient;
+    }
+
+    @Bean
+    public Gson getGsonSingleton() {
+        // these are thread safe
+        return new GsonBuilder().create();
     }
 
 //    @Bean

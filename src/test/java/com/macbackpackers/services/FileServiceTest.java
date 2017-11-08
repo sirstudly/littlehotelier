@@ -2,6 +2,7 @@
 package com.macbackpackers.services;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.channels.FileLock;
 
 import org.junit.Assert;
@@ -54,6 +55,12 @@ public class FileServiceTest {
         Integer i = 2015;
         fs.serializeObjectToFile( i, "test.object" );
         Assert.assertEquals( new Integer( 2015 ), fs.deserializeObjectFromFile( "test.object", Integer.class ) );
+    }
+    
+    @Test
+    public void dumpLHSessionId() throws IOException {
+        fs.loadCookiesFromFile( webClient );
+        LOGGER.info( webClient.getCookieManager().getCookie( "_littlehotelier_session" ).getValue() );
     }
 
     private static void sleep( int millis ) {

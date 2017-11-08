@@ -139,6 +139,18 @@ public class FileService {
     }
 
     /**
+     * Taken from Chrome (Under Developer Tools, Application, Cookies). Having trouble logging into
+     * LH using just username and password.
+     * 
+     * @param webClient the web client
+     * @param sessionId a pre-logged in session
+     */
+    public void addLittleHotelierSessionCookie( WebClient webClient, String sessionId ) {
+        webClient.getCookieManager().addCookie( new Cookie(
+                "app.littlehotelier.com", "_littlehotelier_session", sessionId ) );
+    }
+
+    /**
      * Deserialise the previously serialised object from file if found.
      * 
      * @param filename name of file

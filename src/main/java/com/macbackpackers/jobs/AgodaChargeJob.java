@@ -1,4 +1,3 @@
-
 package com.macbackpackers.jobs;
 
 import java.text.ParseException;
@@ -12,31 +11,35 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.macbackpackers.scrapers.AgodaScraper;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
-import com.macbackpackers.scrapers.BookingsPageScraper;
+import com.macbackpackers.services.PaymentProcessorService;
+
 
 /**
- * Job that scrapes the booking data for a particular date range and updates the allocation records
- * from a previous AllocationScraperJob.
- *
+ * Job that checks whether a reservation has paid their deposit and if not,
+ * charge the deposit with their current card details.
  */
 @Entity
-@DiscriminatorValue( value = "com.macbackpackers.jobs.BookingScraperJob" )
-public class BookingScraperJob extends AbstractJob {
+@DiscriminatorValue( value = "com.macbackpackers.jobs.AgodaChargeJob" )
+public class AgodaChargeJob extends AbstractJob {
 
     @Autowired
     @Transient
-    private BookingsPageScraper bookingScraper;
+    private PaymentProcessorService paymentProcessor;
+    
+    @Autowired
+    @Transient
+    private AgodaScraper scraper;
 
     @Autowired
     @Transient
-    @Qualifier( "webClientScriptingDisabled" )
+    @Qualifier( "webClient" )
     private WebClient webClient;
 
     @Override
     public void processJob() throws Exception {
-        bookingScraper.updateBookingsBetween(
-                webClient, getAllocationScraperJobId(), getCheckinDate(), getCheckinDate() );
+        paymentProcessor.processAgodaPayment( webClient, getId(), getBookingRef(), getCheckinDate() );
     }
 
     @Override
@@ -44,16 +47,26 @@ public class BookingScraperJob extends AbstractJob {
         webClient.close(); // cleans up JS threads
     }
 
-    public int getAllocationScraperJobId() {
-        return Integer.parseInt( getParameter( "allocation_scraper_job_id" ) );
-    }
-
-    public void setAllocationScraperJobId( int jobId ) {
-        setParameter( "allocation_scraper_job_id", String.valueOf( jobId ) );
+    /**
+     * Returns the booking reference (e.g. AGO-XXXXXXXXX).
+     * 
+     * @return non-null reference
+     */
+    public String getBookingRef() {
+        return getParameter( "booking_ref" );
     }
 
     /**
-     * Gets the checkin date to scrape the allocation data.
+     * Sets the booking reference.
+     * 
+     * @param bookingRef e.g. AGO-123456789
+     */
+    public void setBookingRef( String bookingRef ) {
+        setParameter( "booking_ref", bookingRef );
+    }
+
+    /**
+     * Gets the checkin date to scrape the reservations.
      * 
      * @return non-null date parameter
      * @throws ParseException
@@ -63,7 +76,7 @@ public class BookingScraperJob extends AbstractJob {
     }
 
     /**
-     * Sets the checkin date to scrape the allocation data.
+     * Sets the checkin date to scrape reservations.
      * 
      * @param checkinDate non-null date
      */
@@ -73,6 +86,6 @@ public class BookingScraperJob extends AbstractJob {
 
     @Override
     public int getRetryCount() {
-        return 10;
+        return 2; // don't attempt too many times
     }
 }

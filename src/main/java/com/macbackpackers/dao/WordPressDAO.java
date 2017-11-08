@@ -10,6 +10,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
@@ -242,6 +243,14 @@ public interface WordPressDAO {
     public List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithUnpaidDeposits();
 
     /**
+     * Retrieves all Agoda bookings that don't have a no charge note in either the user comments nor
+     * notes sections.
+     * 
+     * @return non-null list
+     */
+    public List<BookingWithGuestComments> fetchAgodaBookingsMissingNoChargeNote();
+
+    /**
      * Creates a report with all bookings with more than 5 guests.
      * 
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from
@@ -253,9 +262,9 @@ public interface WordPressDAO {
      * deducted from the total.
      * 
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from
-     * @return non-null list of reservation IDs
+     * @return non-null list of reservations
      */
-    public List<Integer> getHostelworldHostelBookersUnpaidDepositReservations( int allocationScraperJobId );
+    public List<BookingByCheckinDate> getHostelworldHostelBookersUnpaidDepositReservations( int allocationScraperJobId );
 
     /**
      * Returns the checkin dates for all allocations found by the given AllocationScraper job ID.
