@@ -36,6 +36,10 @@ public class PaymentProcessorServiceTest {
     WebClient webClient;
 
     @Autowired
+    @Qualifier( "webClientForHostelworld" )
+    WebClient hwWebClient;
+
+    @Autowired
     WordPressDAO dao;
     
     @Autowired
@@ -45,9 +49,9 @@ public class PaymentProcessorServiceTest {
     public void testPayment() throws Exception {
         Calendar c = Calendar.getInstance();
         c.set( Calendar.YEAR, 2017 );
-        c.set( Calendar.MONTH, Calendar.JULY );
-        c.set( Calendar.DATE, 16 );
-        paymentService.processDepositPayment( webClient, 0, "BDC-1552110982", c.getTime() );
+        c.set( Calendar.MONTH, Calendar.OCTOBER );
+        c.set( Calendar.DATE, 26 );
+        paymentService.processDepositPayment( webClient, 0, "BDC-1264569063", c.getTime() );
         LOGGER.info( "done" );
     }
     
@@ -107,5 +111,11 @@ public class PaymentProcessorServiceTest {
         // this should add the payment details to the LH reservation above
         bookingRef = "HWL-123-1234567";
         paymentService.syncLastPxPostTransactionInLH( bookingRef, true, reservationPage );
+    }
+
+    @Test
+    public void testProcessManualPayment() throws Exception {
+        paymentService.processManualPayment( webClient, hwWebClient, 0,
+                "HWL-552-320209037", new BigDecimal( "0.01" ), "Testing -rc" );
     }
 }

@@ -6,6 +6,7 @@ import javax.persistence.Entity;
 
 import org.springframework.transaction.annotation.Transactional;
 
+import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.JobStatus;
 
 /**
@@ -19,11 +20,12 @@ public class CreateConfirmDepositAmountsJob extends AbstractJob {
     @Override
     @Transactional // no re-run on this job; all must go thru or nothing
     public void processJob() throws Exception {
-        for ( int reservationId : dao.getHostelworldHostelBookersUnpaidDepositReservations( getAllocationScraperJobId() ) ) {
-            LOGGER.info( "Creating a ConfirmDepositAmountsJob for reservation_id " + reservationId );
+        for ( BookingByCheckinDate booking : dao.getHostelworldHostelBookersUnpaidDepositReservations( getAllocationScraperJobId() ) ) {
+            LOGGER.info( "Creating a ConfirmDepositAmountsJob for reservation " + booking.getBookingRef() );
             ConfirmDepositAmountsJob tickDepositJob = new ConfirmDepositAmountsJob();
             tickDepositJob.setStatus( JobStatus.submitted );
-            tickDepositJob.setReservationId( reservationId );
+            tickDepositJob.setBookingRef( booking.getBookingRef() );
+            tickDepositJob.setCheckinDate( booking.getCheckinDate() );
             dao.insertJob( tickDepositJob );
         }
     }

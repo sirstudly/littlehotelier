@@ -59,7 +59,11 @@ public class BookingsPageScraperTest {
     
     @Test
     public void testCreateConfirmDepositJobs() throws Exception {
-        HtmlPage bookingsPage = scraper.goToBookingPageBookedOn( webClient, new Date(), "HWL" );
+        Calendar c = Calendar.getInstance();
+        c.set( Calendar.YEAR, 2017 );
+        c.set( Calendar.MONTH, Calendar.NOVEMBER );
+        c.set( Calendar.DATE, 3 );
+        HtmlPage bookingsPage = scraper.goToBookingPageBookedOn( webClient, c.getTime(), "HWL" );
         scraper.createConfirmDepositJobs( bookingsPage );
     }
 

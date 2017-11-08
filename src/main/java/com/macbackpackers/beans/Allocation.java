@@ -27,7 +27,7 @@ public class Allocation {
 
     private final static Logger LOGGER = LoggerFactory.getLogger( Allocation.class );
 
-    public static final FastDateFormat DATE_FORMAT_BOOKED_DATE = FastDateFormat.getInstance( "dd MMM yyyy" );
+    public static final FastDateFormat DATE_FORMAT_BOOKED_DATE = FastDateFormat.getInstance( "dd-MM-yy" );
 
     @Id
     @GeneratedValue( strategy = GenerationType.AUTO )
@@ -283,32 +283,16 @@ public class Allocation {
     }
 
     /**
-     * Converts a date of format Mmm-dd to a Date (in the past). As we're missing the year, we need
-     * to take the current year (unless by doing so we get a date in the future). If so, then
-     * subtract a year off the date so it's in the past.
+     * Converts a date of format dd-MM-yy to a Date.
      * 
-     * @param monthDayString date in format Mmm-dd
+     * @param bookingDate date in format dd-MM-yy
      */
-    public void setBookedDate( String monthDayString ) {
+    public void setBookedDate( String bookingDate ) {
         try {
-            Calendar c = Calendar.getInstance();
-            int year = c.get( Calendar.YEAR );
-            java.util.Date bookedDate = DATE_FORMAT_BOOKED_DATE.parse( monthDayString + " " + year );
-
-            // if booked date is now in the future, then we got the wrong year
-            // put it back a year
-            if ( bookedDate.after( c.getTime() ) ) {
-                c.setTime( bookedDate );
-                c.add( Calendar.YEAR, -1 );
-                setBookedDate( c.getTime() );
-            }
-            else {
-                setBookedDate( bookedDate );
-            }
-
+            this.bookedDate = DATE_FORMAT_BOOKED_DATE.parse( bookingDate ); 
         }
         catch ( ParseException ex ) {
-            LOGGER.error( "Unable to read date " + monthDayString, ex );
+            LOGGER.error( "Unable to read date " + bookingDate, ex );
             // swallow error and continue...
         }
     }

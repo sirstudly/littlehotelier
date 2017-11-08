@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
@@ -314,15 +315,15 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @SuppressWarnings( "unchecked" )
     @Override
-    public List<Integer> getHostelworldHostelBookersUnpaidDepositReservations( int allocationScraperJobId ) {
+    public List<BookingByCheckinDate> getHostelworldHostelBookersUnpaidDepositReservations( int allocationScraperJobId ) {
         LOGGER.info( "Querying unpaid reservations for allocation job : " + allocationScraperJobId );
         return em.createQuery(
-                "SELECT reservationId " +
+                "SELECT new com.macbackpackers.beans.BookingByCheckinDate(bookingReference, reservationId, checkinDate) " +
                         "  FROM Allocation " +
                         "WHERE jobId = :jobId " +
                         "  AND paymentTotal = paymentOutstanding " +
                         "  AND bookingSource IN ( 'Hostelworld', 'Hostelbookers', 'Hostelworld Group' ) " +
-                        "GROUP BY reservationId" )
+                        "GROUP BY reservationId", BookingByCheckinDate.class )
                 .setParameter( "jobId", allocationScraperJobId )
                 .getResultList();
     }
@@ -635,7 +636,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         Integer allocationScraperJobId = getLastCompletedAllocationScraperJobId();
         if ( allocationScraperJobId != null ) {
             return em.createQuery( 
-                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.bookingReference, c.bookedDate, r.comments ) "
+                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.bookingReference, c.checkinDate, c.bookedDate, r.comments ) "
                     + "  FROM Allocation c "
                     + " INNER JOIN GuestCommentReportEntry r "
                     + "    ON c.reservationId = r.reservationId "
@@ -654,7 +655,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         Integer allocationScraperJobId = getLastCompletedAllocationScraperJobId();
         if ( allocationScraperJobId != null ) {
             return em.createQuery(
-                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.bookingReference, c.bookedDate, r.comments ) "
+                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.bookingReference, c.checkinDate, c.bookedDate, r.comments ) "
                             + "  FROM Allocation c "
                             + " INNER JOIN GuestCommentReportEntry r "
                             + "    ON c.reservationId = r.reservationId "

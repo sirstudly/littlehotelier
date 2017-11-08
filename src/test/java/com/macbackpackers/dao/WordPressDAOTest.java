@@ -24,6 +24,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.macbackpackers.beans.Allocation;
+import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.MissingGuestComment;
@@ -259,11 +260,11 @@ public class WordPressDAOTest {
         insertTestAllocation( 3, 16, "Expedia", "22.22", "22.22" );
 
         // execute
-        List<Integer> reservationIds = dao.getHostelworldHostelBookersUnpaidDepositReservations( 3 );
-        Assert.assertEquals( "size", 2, reservationIds.size() );
-        Assert.assertEquals( "reservation ids",
-                new HashSet<Integer>( Arrays.asList( 10, 14 ) ),
-                new HashSet<Integer>( reservationIds ) );
+        List<BookingByCheckinDate> reservations = dao.getHostelworldHostelBookersUnpaidDepositReservations( 3 );
+        reservations.stream().forEach( p ->
+            LOGGER.info( ToStringBuilder.reflectionToString( p ) ) );
+
+        Assert.assertEquals( "size", 2, reservations.size() );
     }
 
     @Test

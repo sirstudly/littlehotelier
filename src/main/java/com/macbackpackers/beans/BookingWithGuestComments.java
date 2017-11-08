@@ -2,6 +2,7 @@
 package com.macbackpackers.beans;
 
 import java.text.ParseException;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,6 +16,7 @@ import org.apache.commons.lang3.time.FastDateFormat;
 public class BookingWithGuestComments {
 
     private String bookingReference;
+    private Date checkinDate; // the date of checkin
     private Date bookedDate; // the date the reservation was created
     private String guestComment;
 
@@ -23,8 +25,9 @@ public class BookingWithGuestComments {
             Pattern.compile( "You may charge it as of ([0-9]{4}\\-[0-9]{2}\\-[0-9]{2})." );
     private static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
 
-    public BookingWithGuestComments( String bookingRef, Date bookedDate, String guestComment ) {
+    public BookingWithGuestComments( String bookingRef, Date checkinDate, Date bookedDate, String guestComment ) {
         this.bookingReference = bookingRef;
+        this.checkinDate = checkinDate;
         this.bookedDate = bookedDate;
         this.guestComment = guestComment;
     }
@@ -35,6 +38,14 @@ public class BookingWithGuestComments {
 
     public void setBookingReference( String bookingReference ) {
         this.bookingReference = bookingReference;
+    }
+
+    public Date getCheckinDate() {
+        return checkinDate;
+    }
+
+    public void setCheckinDate( Date checkinDate ) {
+        this.checkinDate = checkinDate;
     }
 
     public Date getBookedDate() {
@@ -81,5 +92,19 @@ public class BookingWithGuestComments {
      */
     public boolean isChargeableDateInPast() {
         return getEarliestChargeDate().before( new Date() );
+    }
+
+    /**
+     * Pretty much as it says.
+     * 
+     * @return true if so, false if not
+     */
+    public boolean isCheckinDateTodayOrTomorrow() {
+        Calendar c = Calendar.getInstance();
+        c.add( Calendar.DATE, -1 ); // checkin date is at midnight
+        Date today = c.getTime();
+        c.add( Calendar.DATE, 1 ); // before tomorrow at 23:59:59
+        Date tomorrow = c.getTime();
+        return getCheckinDate().after( today ) && getCheckinDate().before( tomorrow );
     }
 }

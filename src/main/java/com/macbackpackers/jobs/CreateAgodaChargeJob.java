@@ -4,6 +4,7 @@ package com.macbackpackers.jobs;
 import static com.macbackpackers.scrapers.AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -56,8 +57,8 @@ public class CreateAgodaChargeJob extends AbstractJob {
             // need to charge all bookings that:
             // a) have been checked-in and payment outstanding > 0
             // b) are confirmed and checkin-date is at least one day in the past and payment received = 0
-            if ( ("checked-in".equals( status ) && paymentOutstanding.compareTo( BigDecimal.ZERO ) > 0)
-                    || ("confirmed".equals( status ) && checkinDate.before( toDate ) && paymentReceived.equals( BigDecimal.ZERO ) ) ) {
+            if ( (Arrays.asList( "checked-in", "checked-out" ).contains( status ) && paymentOutstanding.compareTo( BigDecimal.ZERO ) > 0)
+                    || ("confirmed".equals( status ) && checkinDate.before( toDate ) && paymentReceived.equals( BigDecimal.ZERO )) ) {
 
                 LOGGER.info( "Creating a AgodaChargeJob for booking " + bookingRef );
                 AgodaChargeJob agodaChargeJob = new AgodaChargeJob();

@@ -8,6 +8,7 @@ import java.math.RoundingMode;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -21,18 +22,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
-import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.stereotype.Service;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlDivision;
-import com.gargoylesoftware.htmlunit.html.HtmlForm;
-import com.gargoylesoftware.htmlunit.html.HtmlHeading3;
 import com.gargoylesoftware.htmlunit.html.HtmlInput;
+import com.gargoylesoftware.htmlunit.html.HtmlItalic;
+import com.gargoylesoftware.htmlunit.html.HtmlLabel;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlSpan;
-import com.gargoylesoftware.htmlunit.html.HtmlTableRow;
 import com.gargoylesoftware.htmlunit.html.HtmlTextArea;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.Payment;
@@ -106,18 +105,19 @@ public class PaymentProcessorService {
     public synchronized void processDepositPayment( WebClient webClient, int jobId, String bookingRef, Date bookedOnDate ) throws IOException {
         LOGGER.info( "Processing payment for booking " + bookingRef );
         HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
+        webClient.waitForBackgroundJavaScript( 30000 );
         HtmlPage reservationPage = reservationPageScraper.getReservationPage( webClient, bookingsPage, bookingRef );
-        int reservationId = getReservationId( reservationPage );
+        int reservationId = reservationPageScraper.getReservationId( reservationPage );
 
         // check if we've already received any payment on the payments tab
-        HtmlSpan totalRecieved = reservationPage.getFirstByXPath( "//div[@class='received_total']/span" );
+        HtmlSpan totalRecieved = reservationPage.getFirstByXPath( "//span[contains(@class,'total_received')]" );
         if( false == "£0".equals( totalRecieved.getTextContent() )) {
             LOGGER.info( "Payment of " + totalRecieved.getTextContent() + " already received for booking " + bookingRef + "." );
             return; // nothing to do
         } 
 
         // only process bookings at "Confirmed"
-        HtmlSpan statusSpan = reservationPage.getFirstByXPath( "//span[@class='status']/span" );
+        HtmlSpan statusSpan = reservationPage.getFirstByXPath( "//span[@class='confirmed-status']" );
         if ( statusSpan == null || false == "Confirmed".equals( statusSpan.getTextContent() ) ) {
             LOGGER.info( "Booking " + bookingRef + " is at status "
                     + (statusSpan == null ? null : statusSpan.getTextContent())
@@ -138,7 +138,7 @@ public class PaymentProcessorService {
         // on the LH page whenever we saved the record after going through the steps
         // to unhide the card details; we do this here and reload the page to avoid this
         if ( bookingRef.startsWith( "BDC-" ) ) {
-            HtmlAnchor viewCcDetails = reservationPage.getFirstByXPath( "//a[@id='view_cc_details']" );
+            HtmlAnchor viewCcDetails = reservationPage.getFirstByXPath( "//a[@class='view-card-details']" );
 
             // BDC may have a cancellation grace period; don't charge within this period
             if ( isWithinCancellationGracePeriod( reservationPage ) ) {
@@ -175,6 +175,14 @@ public class PaymentProcessorService {
         try {
             // get the deposit amount and full card details
             Payment depositPayment = retrieveCardDetails( bookingRef, reservationId, reservationPage );
+
+            // if for some reason, we fucked up our calculation, this will throw an error!
+            HtmlSpan outstandingTotalSpan = reservationPage.getFirstByXPath( "//span[contains(@class,'total_outstanding')]" );
+            BigDecimal outstandingTotal = new BigDecimal( outstandingTotalSpan.getTextContent().replaceAll( POUND, "" ) );
+            if ( depositPayment.getAmount().compareTo( outstandingTotal ) > 0 ) {
+                throw new UnrecoverableFault( "Calculated amount to charge " + depositPayment.getAmount() + " exceeds LH total outstanding (" + outstandingTotal + ")." );
+            }
+
             processPxPostTransaction( jobId, bookingRef, depositPayment, true, reservationPage );
         }
         catch ( MissingUserDataException ex ) {
@@ -250,14 +258,14 @@ public class PaymentProcessorService {
         HtmlPage reservationPage = reservationPageScraper.getReservationPage( lhWebClient, bookingsPage, bookingRef );
 
         // cannot charge more than what is outstanding
-        HtmlSpan outstandingTotalSpan = reservationPage.getFirstByXPath( "//div[@class='outstanding_total']/span" );
+        HtmlSpan outstandingTotalSpan = reservationPage.getFirstByXPath( "//span[contains(@class,'total_outstanding')]" );
         BigDecimal outstandingTotal = new BigDecimal( outstandingTotalSpan.getTextContent().replaceAll( POUND, "" ) );
         if ( amountToCharge.compareTo( outstandingTotal ) > 0 ) {
             throw new UnrecoverableFault( "Request to charge " + amountToCharge + " exceeds LH total outstanding (" + outstandingTotal + ")." );
         }
         
         // check if we've already received any payment on the payments tab
-        for ( Object paymentDiv : reservationPage.getByXPath( "//div[@class='payment-row']/div[@class='row']/div" ) ) {
+        for ( Object paymentDiv : reservationPage.getByXPath( "//div[contains(@class,'payment-row')]//div[contains(@class,'payment-label-bottom')]" ) ) {
             if ( HtmlDivision.class.cast( paymentDiv ).getTextContent().contains( "PxPost transaction" ) ) {
                 throw new UnrecoverableFault( "Payment already exists. Has it already been charged?" );
             }
@@ -277,19 +285,6 @@ public class PaymentProcessorService {
         }
     }
     
-    /**
-     * Returns the reservation ID from the reservation page.
-     * 
-     * @param reservationPage pre-loaded reservation page
-     * @return reservation ID
-     */
-    private int getReservationId( HtmlPage reservationPage ) {
-        HtmlForm editform = reservationPage.getFirstByXPath( "//form[@id='edit_reservation']" );
-        String postActionUrl = editform.getAttribute( "action" );
-        int reservationId = Integer.parseInt( postActionUrl.substring( postActionUrl.lastIndexOf( '/' ) + 1 ) );
-        return reservationId;
-    }
-
     /**
      * Does the nitty-gritty of posting the transaction, or recovering if we've already attempted to
      * do a post, updates the payment details in LH or leaves a note on the booking if the
@@ -320,10 +315,15 @@ public class PaymentProcessorService {
             } 
             else {
                 // abort if we have reached the maximum number of attempts
+                // unless checkin date is today/tomorrow (in which case, try again)
+                Calendar tomorrow = Calendar.getInstance();
+                tomorrow.add( Calendar.DATE, 2 ); // set to 2 as we're comparing checkin date at midnight
                 LOGGER.info( "Last payment attempt failed" );
-                if( wordpressDAO.getPreviousNumberOfFailedTxns(
-                        pxpost.getBookingReference(), 
-                        pxpost.getMaskedCardNumber()) >= MAX_PAYMENT_ATTEMPTS ) {
+                if ( wordpressDAO.getPreviousNumberOfFailedTxns(
+                        pxpost.getBookingReference(),
+                        pxpost.getMaskedCardNumber() ) >= MAX_PAYMENT_ATTEMPTS
+                        && reservationPageScraper.getCheckinDate( reservationPage ).after( tomorrow.getTime() ) ) {
+
                     LOGGER.info( "Max number of payment attempts reached. Aborting." );
                     return;
                 }
@@ -452,8 +452,7 @@ public class PaymentProcessorService {
         if ( bookingRef.startsWith( "BDC-" ) ) {
 
             // quick check if it's AMEX (not supported)
-            HtmlSpan cardSpan = HtmlSpan.class.cast( reservationPage.getFirstByXPath(
-                    "//input[@id='reservation_payment_card_number']/following-sibling::span" ) );
+            HtmlItalic cardSpan = HtmlItalic.class.cast( reservationPage.getFirstByXPath( "//span[@class='card-logo']/i" ) );
             if ( cardSpan != null && cardSpan.getAttribute( "class" ).contains( "fa-cc-amex" ) ) {
                 throw new MissingUserDataException( "Amex not enabled. Charge manually using EFTPOS terminal." );
             }
@@ -565,7 +564,7 @@ public class PaymentProcessorService {
      * @return number of guests
      */
     private int countNumberOfGuests( HtmlPage reservationPage ) {
-        List<?> guests = reservationPage.getByXPath( "//input[@id='reservation_reservation_room_types__number_adults']" );
+        List<?> guests = reservationPage.getByXPath( "//input[@id='number_adults']" );
         int numberGuests = 0;
         for(Object elem : guests) {
             HtmlInput guestInput = HtmlInput.class.cast( elem );
@@ -584,9 +583,9 @@ public class PaymentProcessorService {
     public BigDecimal getBdcDepositChargeAmount( HtmlPage reservationPage ) {
 
         // calculate how much we need to change
-        HtmlSpan totalOutstanding = reservationPage.getFirstByXPath( "//div[@class='outstanding_total']/span" );
+        HtmlSpan totalOutstanding = reservationPage.getFirstByXPath( "//span[contains(@class,'total_outstanding')]" );
         BigDecimal amountOutstanding = new BigDecimal( totalOutstanding.getTextContent().replaceAll( "£", "" ) );
-        HtmlTextArea guestComments = reservationPage.getFirstByXPath( "//textarea[@id='reservation_guest_comments']" );
+        HtmlTextArea guestComments = reservationPage.getFirstByXPath( "//textarea[@id='guest_comments']" );
 
         // either take first night, or a percentage amount
         BigDecimal amountToPay;
@@ -634,22 +633,20 @@ public class PaymentProcessorService {
         // 2) if booking is confirmed (not checked-in), we need to charge the first night
         // In both these cases, the reservation should be in the past (but we don't check this here)
 
-        HtmlSpan statusSpan = reservationPage.getFirstByXPath( "//span[@class='status']/span" );
-        if ( "Checked in".equals( statusSpan.getTextContent() ) ) {
-            HtmlSpan outstandingTotalSpan = reservationPage.getFirstByXPath( "//div[@class='outstanding_total']/span" );
+        if ( reservationPage.getFirstByXPath( "//span[@class='checked-in-status' or @class='checked-out-status']" ) != null ) {
+            HtmlSpan outstandingTotalSpan = reservationPage.getFirstByXPath( "//span[contains(@class,'total_outstanding')]" );
             return new BigDecimal( outstandingTotalSpan.getTextContent().replaceAll( POUND, "" ) );
         }
 
         // charge first night (less anything already paid)
-        if ( "Confirmed".equals( statusSpan.getTextContent() ) ) {
-            HtmlSpan totalRecievedSpan = reservationPage.getFirstByXPath( "//div[@class='received_total']/span" );
+        if ( reservationPage.getFirstByXPath( "//span[@class='confirmed-status']" ) != null ) {
+            HtmlSpan totalRecievedSpan = reservationPage.getFirstByXPath( "//span[contains(@class,'total_received')]" );
             BigDecimal totalReceived = new BigDecimal( totalRecievedSpan.getTextContent().replaceAll( POUND, "" ) );
             BigDecimal amountFirstNight = reservationPageScraper.getAmountPayableForFirstNight( reservationPage );
             return amountFirstNight.subtract( totalReceived ).max( BigDecimal.ZERO );
         }
-        
-        LOGGER.info( "Booking is at status " + statusSpan.getTextContent()
-                + "; There is nothing payable." );
+        HtmlLabel label = reservationPage.getFirstByXPath( "//div[@class='rrd-info-panel']/label" );
+        LOGGER.info( "Booking is at " + label.getTextContent() + "; There is nothing payable." );
 
         return BigDecimal.ZERO;
     }
@@ -675,7 +672,7 @@ public class PaymentProcessorService {
      * @throws IOException on parse error
      */
     private boolean isWithinCancellationGracePeriod( HtmlPage reservationPage ) throws IOException {
-        HtmlTextArea guestComments = reservationPage.getFirstByXPath( "//textarea[@id='reservation_guest_comments']" );
+        HtmlTextArea guestComments = reservationPage.getFirstByXPath( "//textarea[@id='guest_comments']" );
         Pattern p = Pattern.compile( "Reservation has a cancellation grace period. Do not charge if cancelled before (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})" );
         Matcher m = p.matcher( guestComments.getText() );
         if ( m.find() ) {

@@ -92,6 +92,7 @@ public class AgodaScraper {
         HtmlAnchor loginLink = loginPage.getFirstByXPath( "//a[@type='submit' and @title='Login']" );
 
         HtmlPage nextPage = loginLink.click();
+        nextPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
 
         // if this is the first time logging in, retrieve and enter the passcode if requested
         HtmlInput passcodeInput = HtmlInput.class.cast( nextPage.getElementById( "passcode" ) );
