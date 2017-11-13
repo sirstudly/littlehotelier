@@ -51,6 +51,7 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.services.AuthenticationService;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.GmailService;
+import com.macbackpackers.services.LHJsonCardMask;
 
 /**
  * Scrapes an individual reservation page
@@ -277,19 +278,22 @@ public class ReservationPageScraper {
 
         Gson gson = new GsonBuilder().setDateFormat( "yyyy-MM-dd'T'HH:mm:ss.SSS+00:00" ).create();
         String jsonRequest = gson.toJson( new RecordPaymentRequest( reservationId, cardType, amount, note, isDeposit ) );
-        LOGGER.info( "Recording payment in LH: " + jsonRequest );
 
-        WebRequest req = constructDefaultRequest( HttpMethod.POST, paymentsURL, reservationPage, jsonRequest );
-        Page redirectPage = reservationPage.getWebClient().getPage( req );
-        WebResponse webResponse = redirectPage.getWebResponse();
-        if ( webResponse.getContentType().equalsIgnoreCase( "application/json" ) ) {
-            LOGGER.info( "Successful response probably?" );
-            LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-        }
-        else {
-            LOGGER.error( webResponse.getContentAsString() );
-            throw new IOException( "Unexpected response type: " + webResponse.getContentType() );
-        }
+        LOGGER.info( "Recording payment in LH" );
+        sendJsonRequest( reservationPage.getWebClient(),
+                constructDefaultRequest( HttpMethod.POST, paymentsURL, reservationPage, jsonRequest ) );
+    }
+
+    /**
+     * Logs/masks the given web response and returns the contents.
+     * 
+     * @param webResponse web response
+     * @return text content
+     */
+    private String logJsonWebResponse( WebResponse webResponse ) {
+        String response = webResponse.getContentAsString();
+        LOGGER.info( new LHJsonCardMask().applyCardMask( response ) );
+        return response;
     }
 
     /**
@@ -364,10 +368,12 @@ public class ReservationPageScraper {
         Page redirectPage = webClient.getPage( webRequest );
         WebResponse webResponse = redirectPage.getWebResponse();
         if ( webResponse.getContentType().equalsIgnoreCase( "application/json" ) ) {
-            String response = redirectPage.getWebResponse().getContentAsString();
-            LOGGER.info( "Successful response probably?" );
-            LOGGER.info( response );
-            return gson.fromJson( response, JsonElement.class ).getAsJsonObject();
+            LOGGER.info( "Received application/json response" );
+            JsonObject responseObj = gson.fromJson( logJsonWebResponse( webResponse ), JsonElement.class ).getAsJsonObject();
+            if ( responseObj.get( "errors" ) != null && false == responseObj.get( "errors" ).getAsJsonObject().entrySet().isEmpty() ) {
+                throw new IllegalStateException( "One or more errors found in response." );
+            }
+            return responseObj;
         }
         else {
             LOGGER.error( webResponse.getContentAsString() );

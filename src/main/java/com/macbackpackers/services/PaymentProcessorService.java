@@ -8,6 +8,7 @@ import java.math.RoundingMode;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -116,9 +117,9 @@ public class PaymentProcessorService {
             return; // nothing to do
         } 
 
-        // only process bookings at "Confirmed"
-        HtmlSpan statusSpan = reservationPage.getFirstByXPath( "//span[@class='confirmed-status']" );
-        if ( statusSpan == null || false == "Confirmed".equals( statusSpan.getTextContent() ) ) {
+        // only process bookings at "Confirmed" or "Checked-in"
+        HtmlSpan statusSpan = reservationPage.getFirstByXPath( "//td[@class='status']/span" );
+        if ( false == Arrays.asList( "Confirmed", "Checked-in" ).contains( statusSpan.getTextContent() ) ) {
             LOGGER.info( "Booking " + bookingRef + " is at status "
                     + (statusSpan == null ? null : statusSpan.getTextContent())
                     + "; skipping payment processing" );
@@ -317,7 +318,7 @@ public class PaymentProcessorService {
                 // abort if we have reached the maximum number of attempts
                 // unless checkin date is today/tomorrow (in which case, try again)
                 Calendar tomorrow = Calendar.getInstance();
-                tomorrow.add( Calendar.DATE, 2 ); // set to 2 as we're comparing checkin date at midnight
+                tomorrow.add( Calendar.DATE, 1 );
                 LOGGER.info( "Last payment attempt failed" );
                 if ( wordpressDAO.getPreviousNumberOfFailedTxns(
                         pxpost.getBookingReference(),

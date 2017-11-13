@@ -109,13 +109,6 @@ public class AgodaScraper {
 
         LOGGER.info( "Finished logging in" );
         nextPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
-        LOGGER.debug( nextPage.asXml() );
-
-        // if we get redirected to the login page again...
-        if ( nextPage.getElementById( "Password" ) != null ) {
-            LOGGER.debug( nextPage.asXml() );
-            throw new UnrecoverableFault( "Unable to login to Agoda. Incorrect password?" );
-        }
 
         // save credentials to disk so we don't need to do this again
         // for the immediate future

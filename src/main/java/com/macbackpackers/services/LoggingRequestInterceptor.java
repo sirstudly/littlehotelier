@@ -1,8 +1,6 @@
 package com.macbackpackers.services;
 
 import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,35 +81,14 @@ public class LoggingRequestInterceptor implements ClientHttpRequestInterceptor {
     }
 
     /**
-     * Masks all CardNumber elements within the given XML keeping the first 6 and last 2 characters.
+     * Masks all CardNumber elements within the given XML (if applicable).
      * 
      * @param xml the full XML to be masked
      * @return the XML will all CardNumber elements masked
      */
     private String applyCardMask( String xml ) {
-        if(cardMask != null) {
-            String maskedString = xml;
-
-            StringBuffer buf = new StringBuffer();
-            Matcher m = Pattern.compile( cardMask.getCardMaskMatchRegex() ).matcher( maskedString );
-            while ( m.find() ) {
-                m.appendReplacement( buf, maskedString.substring( m.start(), m.start( 1 ) ) +
-                        cardMask.replaceCardWith( m.group( 1 ) ) +
-                        maskedString.substring( m.end( 1 ), m.end() ) );
-            }
-            maskedString = m.appendTail( buf ).toString();
-            
-            // mask CVC/CVV code as well
-            buf = new StringBuffer();
-            m = Pattern.compile( cardMask.getCardSecurityCodeRegex() ).matcher( maskedString );
-            while ( m.find() ) {
-                m.appendReplacement( buf, maskedString.substring( m.start(), m.start( 1 ) ) +
-                        cardMask.replaceCardSecurityCodeWith( m.group( 1 ) ) +
-                        maskedString.substring( m.end( 1 ), m.end() ) );
-            }
-            maskedString = m.appendTail( buf ).toString();
-            
-            return maskedString;
+        if ( cardMask != null ) {
+            return cardMask.applyCardSecurityCodeMask( cardMask.applyCardMask( xml ) );
         }
         return xml;
     }

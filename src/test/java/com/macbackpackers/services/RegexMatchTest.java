@@ -1,9 +1,12 @@
+
 package com.macbackpackers.services;
 
+import java.io.File;
+
+import org.apache.commons.io.FileUtils;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 public class RegexMatchTest {
 
@@ -25,7 +28,7 @@ public class RegexMatchTest {
         String passMasked = mask.applyMask( userMasked );
         LOGGER.info( passMasked );
     }
-    
+
     @Test
     public void testPxPostLoginMask() throws Exception {
         String input = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Txn><PostUsername>MyPostUser</PostUsername><PostPassword>MyP05tPa55w0rd</PostPassword><CardHolderName>Joe Bloggs</CardHolderName><CardNumber>444433........11</CardNumber><Amount>14.30</Amount><DateExpiry>1119</DateExpiry><Cvc2>...</Cvc2><Cvc2Presence>1</Cvc2Presence><InputCurrency>GBP</InputCurrency><TxnType>Purchase</TxnType><TxnId>7717717</TxnId><MerchantReference>EXP-98765432</MerchantReference></Txn>";
@@ -43,4 +46,16 @@ public class RegexMatchTest {
         LOGGER.info( passMasked );
     }
 
+    @Test
+    public void testLHJsonCardMask() throws Exception {
+        LOGGER.info( new LHJsonCardMask().applyCardMask(
+                FileUtils.readFileToString( new File( "test_load_page.json" ), "UTF-8" ) ) );
+    }
+
+    @Test
+    public void testExpediaCardMask() throws Exception {
+        ExpediaCardMask cm = new ExpediaCardMask();
+        LOGGER.info( cm.applyCardSecurityCodeMask( cm.applyCardMask(
+                FileUtils.readFileToString( new File( "expedia_response_ex.xml" ), "UTF-8" ) ) ) );
+    }
 }

@@ -1,6 +1,8 @@
 
 package com.macbackpackers.services;
 
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,5 +56,45 @@ public abstract class CardMask {
     public String replaceCardSecurityCodeWith( String securityCode ) {
         // mask out entire string
         return StringUtils.repeat( '.', securityCode.length() );
+    }
+
+    /**
+     * Applies this card mask regex to the given text.
+     * 
+     * @param textToApply text to mask
+     * @return masked text
+     */
+    public String applyCardMask( String textToApply ) {
+        return applyMask( textToApply, this::getCardMaskMatchRegex, this::replaceCardWith );
+    }
+
+    /**
+     * Applies this card security code regex to the given text.
+     * 
+     * @param textToApply text to mask
+     * @return masked text
+     */
+    public String applyCardSecurityCodeMask( String textToApply ) {
+        return applyMask( textToApply, this::getCardSecurityCodeRegex, this::replaceCardSecurityCodeWith );
+    }
+
+    /**
+     * Applies the given mask regex to the given text and returns it.
+     * 
+     * @param textToApply (unmasked) text
+     * @param regex the regex pattern that matches what is to masked
+     * @param replaceWithFn function that replaces any matching groups in {@code regex}
+     * @return the masked text
+     */
+    public String applyMask( String textToApply, Supplier<String> regex,
+            Function<String, String> replaceWithFn ) {
+        StringBuffer buf = new StringBuffer();
+        Matcher m = Pattern.compile( regex.get() ).matcher( textToApply );
+        while ( m.find() ) {
+            m.appendReplacement( buf, textToApply.substring( m.start(), m.start( 1 ) ) +
+                    replaceWithFn.apply( m.group( 1 ) ) +
+                    textToApply.substring( m.end( 1 ), m.end() ) );
+        }
+        return m.appendTail( buf ).toString();
     }
 }
