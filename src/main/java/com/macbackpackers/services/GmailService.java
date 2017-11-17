@@ -240,7 +240,7 @@ public class GmailService {
      * @throws EmptyResultDataAccessException if no message found
      */
     public String fetchLHSecurityToken() throws IOException, EmptyResultDataAccessException {
-        for(int i = 0; i < 3; i++) {
+        for(int i = 0; i < 8; i++) {
             Gmail service = connectAsClient();
             ListMessagesResponse listResponse = 
                     service.users().messages()
@@ -262,6 +262,7 @@ public class GmailService {
             
             // email hasn't arrived yet? backoff.. 30 sec
             try {
+                LOGGER.info( "Email hasn't arrived yet, waiting a bit..." );
                 Thread.sleep( 30000 );
             }
             catch ( InterruptedException e ) {
@@ -436,6 +437,9 @@ public class GmailService {
     public GoogleClientSecrets getGmailClientSecret() throws IOException {
         // Load client secrets.
         InputStream in = getClass().getResourceAsStream( oauthClientIdFile );
+        if( in == null ) {
+            throw new NullPointerException( "Unable to find OAuth client id file: " + oauthClientIdFile );
+        }
         GoogleClientSecrets clientSecrets = 
                 GoogleClientSecrets.load( JSON_FACTORY, new InputStreamReader( in ) );
         return clientSecrets;

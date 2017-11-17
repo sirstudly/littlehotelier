@@ -16,7 +16,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,27 +148,8 @@ public class PaymentProcessorService {
 
             // if the "view card details" link is available; we don't yet have secure access yet
             if ( viewCcDetails != null ) {
-                LOGGER.info( "Card details currently hidden ); requesting security access" );
-                try {
-                    String cardnum = reservationPageScraper.enableSecurityAccess( reservationPage, reservationId );
-                    if ( false == NumberUtils.isDigits( cardnum ) ) {
-                        // This is outside the try block as we don't want to modify the LH record if it fails here
-                        // problems with the card number being wiped out when we enable security access and then save it
-                        throw new MissingUserDataException( "Error retrieving card number from LH" );
-                    }
-
-                    // we should have access to the card details without having to press the "view" link now
-                    // so reload the reservation page and continue...
-                    bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
-                    reservationPage = reservationPageScraper.getReservationPage( webClient, bookingsPage, bookingRef );
-                }
-                catch ( MissingUserDataException ex ) {
-                    // enableSecurityAccess messes up the current page so reload the reservation page and continue...
-                    bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedOnDate, bookingRef );
-                    reservationPage = reservationPageScraper.getReservationPage( webClient, bookingsPage, bookingRef );
-                    reservationPageScraper.appendNote( reservationPage,
-                            ex.getMessage() + " - " + DATETIME_FORMAT.format( new Date() ) + "\n" );
-                }
+                LOGGER.info( "Card details currently hidden; requesting security access" );
+                reservationPageScraper.enableSecurityAccess( reservationPage, reservationId );
             }
         }
 
@@ -228,22 +208,18 @@ public class PaymentProcessorService {
      * details so it is synced. 
      * 
      * @param lhWebClient web client to use for little hotelier
-     * @param hwlWebClient web client to use for hostelworld
      * @param jobId current job id
      * @param bookingRef booking reference e.g. BDC-123456789
      * @param amountToCharge charge amount
      * @param message a wee message to put in the notes (optional)
+     * @param useCardDetailsFromLH override the card details with those taken from LH
      * @throws IOException on I/O error
      * @throws ParseException on parse error
      */
-    public synchronized void processManualPayment( WebClient lhWebClient, WebClient hwlWebClient, int jobId, 
-            String bookingRef, BigDecimal amountToCharge, String message ) throws IOException, ParseException {
-        LOGGER.info( "Processing no-show payment for booking " + bookingRef );
-
-        // only support HWL at the moment
-        if ( false == bookingRef.startsWith( "HWL-" ) ) {
-            throw new UnrecoverableFault( "Unsupported booking source type" );
-        }
+    public synchronized void processManualPayment( WebClient lhWebClient, int jobId, 
+            String bookingRef, BigDecimal amountToCharge, String message, boolean useCardDetailsFromLH ) throws IOException, ParseException {
+        LOGGER.info( "Processing manual payment for booking " + bookingRef + " for " + amountToCharge );
+        LOGGER.info( message );
 
         // attempt to charge less than or equal to zero?!
         if ( amountToCharge.compareTo( BigDecimal.ZERO ) <= 0 ) {
@@ -274,8 +250,31 @@ public class PaymentProcessorService {
 
         try {
             // get the full card details
-            Payment payment = retrieveHWCardDetails( hwlWebClient, bookingRef );
-            payment.setAmount( amountToCharge );
+            CardDetails ccDetails = null;
+            if( bookingRef.startsWith( "HWL-" ) && false == useCardDetailsFromLH ) {
+                LOGGER.info( "Retrieving HWL customer card details" );
+                ccDetails = retrieveHWCardDetails( bookingRef );
+            }
+            else if ( bookingRef.startsWith( "EXP-" ) && false == useCardDetailsFromLH ) {
+                LOGGER.info( "Retrieving EXP customer card details" );
+                ccDetails = expediaService.returnCardDetailsForBooking( bookingRef ).getCardDetails();
+            }
+            else if ( bookingRef.startsWith( "AGO-" ) && false == useCardDetailsFromLH ) {
+                LOGGER.info( "Retrieving AGO customer card details" );
+                ccDetails = retrieveAgodaCardDetails( reservationPage, bookingRef );
+            }
+            else {
+                int reservationId = reservationPageScraper.getReservationId( reservationPage );
+                HtmlAnchor viewCcDetails = reservationPage.getFirstByXPath( "//a[@class='view-card-details']" );
+                // if the "view card details" link is available; we don't yet have secure access yet
+                if ( viewCcDetails != null ) {
+                    LOGGER.info( "Card details currently hidden; requesting security access" );
+                    reservationPageScraper.enableSecurityAccess( reservationPage, reservationId );
+                }
+                // get the full card details
+                ccDetails = reservationPageScraper.getCardDetails( reservationPage, reservationId );
+            }
+            Payment payment = new Payment( amountToCharge, ccDetails );
             processPxPostTransaction( jobId, bookingRef, payment, false, reservationPage );
             reservationPageScraper.appendNote( reservationPage,
                     message + " --"  + DATETIME_FORMAT.format( new Date() ) + "\n" );
@@ -491,15 +490,10 @@ public class PaymentProcessorService {
      * @throws ParseException on parse error
      * @throws MissingUserDataException if card details not found
      */
-    private Payment retrieveHWCardDetails( WebClient webClient, String bookingRef )
-            throws IOException, ParseException, MissingUserDataException {
-
-        if ( bookingRef.startsWith( "HWL-" ) ) {
-            LOGGER.info( "Retrieving customer card details" );
-            CardDetails ccDetails = hostelworldScraper.getCardDetails( webClient, bookingRef );
-            return new Payment( null, ccDetails );
+    private CardDetails retrieveHWCardDetails( String bookingRef ) throws ParseException, IOException {
+        try( WebClient hwlWebClient = context.getBean( "webClientForHostelworld", WebClient.class ) ) {
+            return hostelworldScraper.getCardDetails( hwlWebClient, bookingRef );
         }
-        throw new UnrecoverableFault( "Not a HostelWorld booking: " + bookingRef );
     }
 
     /**

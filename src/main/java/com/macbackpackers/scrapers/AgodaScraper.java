@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.HttpMethod;
@@ -92,7 +91,7 @@ public class AgodaScraper {
         HtmlAnchor loginLink = loginPage.getFirstByXPath( "//a[@type='submit' and @title='Login']" );
 
         HtmlPage nextPage = loginLink.click();
-        nextPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
+        nextPage.getWebClient().waitForBackgroundJavaScript( 60000 ); // wait for page to load
 
         // if this is the first time logging in, retrieve and enter the passcode if requested
         HtmlInput passcodeInput = HtmlInput.class.cast( nextPage.getElementById( "passcode" ) );
@@ -104,11 +103,10 @@ public class AgodaScraper {
             passcodeInput.type( passcode );
             HtmlAnchor btnSubmitPasscode = HtmlAnchor.class.cast( nextPage.getElementById( "btnSubmitPasscode" ) );
             nextPage = btnSubmitPasscode.click();
+            nextPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
             LOGGER.info( "Submitted passcode to Agoda" );
         }
-
         LOGGER.info( "Finished logging in" );
-        nextPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
 
         // save credentials to disk so we don't need to do this again
         // for the immediate future

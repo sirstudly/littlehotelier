@@ -30,20 +30,15 @@ public class ManualChargeJob extends AbstractJob {
     @Qualifier( "webClient" )
     private WebClient lhWebClient;
 
-    @Autowired
-    @Transient
-    @Qualifier( "webClientForHostelworld" )
-    private WebClient hwlWebClient;
-
     @Override
     public void processJob() throws Exception {
-        paymentProcessor.processManualPayment( lhWebClient, hwlWebClient, getId(), getBookingRef(), getAmount(), getMessage() );
+        paymentProcessor.processManualPayment( lhWebClient, getId(),
+                getBookingRef(), getAmount(), getMessage(), isCardDetailsOverrideEnabled() );
     }
 
     @Override
     public void finalizeJob() {
         lhWebClient.close(); // cleans up JS threads
-        hwlWebClient.close(); // cleans up JS threads
     }
 
     /**
@@ -98,6 +93,26 @@ public class ManualChargeJob extends AbstractJob {
      */
     public void setMessage( String message ) {
         setParameter( "message", message );
+    }
+
+    /**
+     * Returns true if the card details in LH override any other way of looking up card details.
+     * Only applicable for supported bookings.
+     * 
+     * @return true if override enabled, false otherwise
+     */
+    public boolean isCardDetailsOverrideEnabled() {
+        return "true".equals( getParameter( "use_lh_card_details" ) );
+    }
+
+    /**
+     * Sets if the card details in LH override any other way of looking up card details. Only
+     * applicable for supported bookings.
+     * 
+     * @param overrideCardDetails true if override enabled, false otherwise
+     */
+    public void setCardDetailsOverrideEnabled( boolean overrideCardDetails ) {
+        setParameter( "use_lh_card_details", String.valueOf( overrideCardDetails ) );
     }
 
     @Override

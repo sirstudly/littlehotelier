@@ -4,10 +4,10 @@ package com.macbackpackers.scrapers;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.text.ParseException;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,7 +44,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import com.google.gson.reflect.TypeToken;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.json.RecordPaymentRequest;
 import com.macbackpackers.exceptions.MissingUserDataException;
@@ -307,6 +306,7 @@ public class ReservationPageScraper {
      */
     private WebRequest constructDefaultRequest( HttpMethod httpMethod, URL url, HtmlPage currentPage, String requestBody ) {
         WebRequest paymentsRequest = new WebRequest( url, httpMethod );
+        paymentsRequest.setCharset( Charset.forName( "UTF-8" ) ); // important! or error on server
         paymentsRequest.setAdditionalHeader( "Accept", "application/json, text/javascript, */*; q=0.01" );
         paymentsRequest.setAdditionalHeader( "Content-Type", "application/json" );
         paymentsRequest.setAdditionalHeader( "Accept-Language", "en-GB,en-US;q=0.8,en;q=0.6" );
@@ -489,10 +489,12 @@ public class ReservationPageScraper {
 
         // we should already have secure access so should be able to see the card details directly
         HtmlInput cardNumber = reservationPage.getFirstByXPath( "//input[@id='payment_card_number']" );
-        if ( false == NumberUtils.isDigits( cardNumber.getValueAttribute() ) ) {
+        String validatedCardNumber = StringUtils.replaceAll( cardNumber.getValueAttribute(), "\\s", "" );
+        if ( false == NumberUtils.isDigits( validatedCardNumber ) ||
+                StringUtils.isBlank( validatedCardNumber ) ) {
             throw new MissingUserDataException( "Unable to retrieve card number." );
         }
-        cardDetails.setCardNumber( cardNumber.getValueAttribute() );
+        cardDetails.setCardNumber( validatedCardNumber );
 
         HtmlSelect expiryMonth = reservationPage.getFirstByXPath( "//select[@id='payment_card_expiry_month']" );
         String expMonth = expiryMonth == null ? null : expiryMonth.getDefaultValue();
@@ -582,11 +584,10 @@ public class ReservationPageScraper {
      * 
      * @param reservationPage the current reservation we're looking at
      * @param reservationId the unique reservation ID for this reservation
-     * @return non-null card number
      * @throws IOException on I/O error
      * @throws MissingUserDataException if card details could not be retrieved
      */
-    public String enableSecurityAccess( HtmlPage reservationPage, int reservationId ) throws IOException, MissingUserDataException {
+    public void enableSecurityAccess( HtmlPage reservationPage, int reservationId ) throws IOException, MissingUserDataException {
         HtmlAnchor viewCcDetails = reservationPage.getFirstByXPath( "//a[@class='view-card-details']" );
         HtmlPage currentPage = viewCcDetails.click();
         reservationPage.getWebClient().waitForBackgroundJavaScript( 15000 ); // wait for email to be delivered
@@ -594,10 +595,19 @@ public class ReservationPageScraper {
         securityToken.type( gmailService.fetchLHSecurityToken() );
         HtmlAnchor submitToken = reservationPage.getFirstByXPath( "//a[text()='Confirm']" );
         currentPage = submitToken.click();
-        currentPage.getWebClient().waitForBackgroundJavaScript( 30000 );
+        currentPage.getWebClient().waitForBackgroundJavaScript( 45000 );
 
-        // couldn't get the card number from the reservation page
+        // check if the view card details link has been removed
+        viewCcDetails = reservationPage.getFirstByXPath( "//a[@class='view-card-details']" );
+        if ( viewCcDetails != null ) {
+            throw new MissingUserDataException( "Error attempting to enable card details in LH" );
+        }
+
+        // we have the card details; save the current web client so we don't have to go through this again
+        fileService.writeCookiesToFile( currentPage.getWebClient() );
+
         // this will lookup the card number using the JSON page (found using the data-url from the control)
+        /* This actually works still but I don't think it's necessary anymore
         Page cardNumberPage = currentPage.getWebClient().openWindow(
                 new URL( getCardLookupURL( reservationId ) ), "newJsonWindow" ).getEnclosedPage();
 
@@ -607,7 +617,7 @@ public class ReservationPageScraper {
             Map<String, String> cardNumberResponseMap = new Gson().fromJson(
                     cardNumberJson, new TypeToken<Map<String, String>>() {}.getType() );
 
-            String cardNum = cardNumberResponseMap.get( "cc_number" );
+            String cardNum = StringUtils.replaceAll( cardNumberResponseMap.get( "cc_number" ), "\\s", "" );
             if ( false == NumberUtils.isDigits( cardNum ) ) {
                 throw new MissingUserDataException( "Unable to retrieve card number : " + reservationPage.getUrl() );
             }
@@ -616,15 +626,7 @@ public class ReservationPageScraper {
             fileService.writeCookiesToFile( reservationPage.getWebClient() );
             return cardNum;
         }
-        else { // we didn't get a JSON response; the page has probably updated directly so reload it
-            currentPage = HtmlPage.class.cast( currentPage.refresh() );
-            currentPage.getWebClient().waitForBackgroundJavaScript( 30000 );
-            HtmlInput cardNumber = reservationPage.getFirstByXPath( "//input[@id='reservation_payment_card_number']" );
-            if ( false == NumberUtils.isDigits( cardNumber.getValueAttribute() ) ) {
-                throw new MissingUserDataException( "Unable to retrieve card number : " + reservationPage.getUrl() );
-            }
-            return cardNumber.getValueAttribute();
-        }
+        */
     }
 
     /**

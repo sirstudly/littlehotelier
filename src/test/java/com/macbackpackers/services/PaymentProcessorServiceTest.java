@@ -36,10 +36,6 @@ public class PaymentProcessorServiceTest {
     WebClient webClient;
 
     @Autowired
-    @Qualifier( "webClientForHostelworld" )
-    WebClient hwWebClient;
-
-    @Autowired
     WordPressDAO dao;
     
     @Autowired
@@ -115,7 +111,7 @@ public class PaymentProcessorServiceTest {
 
     @Test
     public void testProcessManualPayment() throws Exception {
-        paymentService.processManualPayment( webClient, hwWebClient, 0,
-                "HWL-552-320209037", new BigDecimal( "0.01" ), "Testing -rc" );
+        paymentService.processManualPayment( webClient, 0,
+                "HWL-551-336647714", new BigDecimal( "0.01" ), "Testing -rc", true );
     }
 }
