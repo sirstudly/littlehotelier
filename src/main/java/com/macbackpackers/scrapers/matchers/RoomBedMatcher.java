@@ -7,16 +7,11 @@ package com.macbackpackers.scrapers.matchers;
 public interface RoomBedMatcher {
 
     /**
-     * Returns the name of the bed within the room.
+     * Extracts the room/bed from the single label used in LH.
      * 
-     * @return bed name (can be null for a private room)
+     * @param roomBedLabel LH room/bed
+     * @return non-null room/bed assignment from label
      */
-    public String getBedName();
+    BedAssignment parse( String roomBedLabel );
 
-    /**
-     * Returns the name of the room.
-     * 
-     * @return room name (not-null)
-     */
-    public String getRoom();
 }

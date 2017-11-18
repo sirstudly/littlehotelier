@@ -27,7 +27,7 @@ public class HSHRoomBedMatcherTest {
     }
 
     private void assertRoomAndBed( String label, String expectedRoom, String expectedBed ) {
-        HSHRoomBedMatcher matcher = new HSHRoomBedMatcher( label );
+        BedAssignment matcher = new HSHRoomBedMatcher().parse( label );
         Assert.assertEquals( "room not matched", expectedRoom, matcher.getRoom() );
         Assert.assertEquals( "bed not matched", expectedBed, matcher.getBedName() );
     }

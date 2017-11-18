@@ -9,9 +9,6 @@ import java.util.regex.Pattern;
  */
 public class HSHRoomBedMatcher implements RoomBedMatcher {
 
-    private String room;
-    private String bedName;
-
     /**
      * These are the different room labels that LH has set up. The first bit of the room label must
      * start with one of these...
@@ -23,12 +20,11 @@ public class HSHRoomBedMatcher implements RoomBedMatcher {
             "LOTR", "T3M", "TMNT", "F&V", "Zoo"
     };
 
-    /**
-     * Default constructor.
-     * 
-     * @param roomLabel label for this bed/room in LH
-     */
-    public HSHRoomBedMatcher( String roomLabel ) {
+    @Override
+    public BedAssignment parse( String roomLabel ) {
+
+        String room = null;
+        String bedName = null;
 
         // for room 6, we setup a specific match
         Pattern p = Pattern.compile( "6([0-9]{2}.*)$" );
@@ -52,16 +48,6 @@ public class HSHRoomBedMatcher implements RoomBedMatcher {
         if ( room == null ) {
             room = roomLabel;
         }
+        return new BedAssignment( room, bedName );
     }
-
-    @Override
-    public String getBedName() {
-        return bedName;
-    }
-
-    @Override
-    public String getRoom() {
-        return room;
-    }
-
 }

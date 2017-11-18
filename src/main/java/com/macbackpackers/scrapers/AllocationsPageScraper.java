@@ -21,9 +21,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.UnrecoverableFault;
-import com.macbackpackers.scrapers.matchers.CastleRockRoomBedMatcher;
-import com.macbackpackers.scrapers.matchers.HSHRoomBedMatcher;
-import com.macbackpackers.scrapers.matchers.RMBRoomBedMatcher;
+import com.macbackpackers.scrapers.matchers.BedAssignment;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 import com.macbackpackers.services.AuthenticationService;
 
@@ -58,6 +56,9 @@ public class AllocationsPageScraper {
 
     @Autowired
     private AuthenticationService authService;
+
+    @Autowired
+    private RoomBedMatcher roomBedMatcher;
 
     @Value( "${lilhotelier.propertyid}" )
     private String lhPropertyId;
@@ -207,32 +208,14 @@ public class AllocationsPageScraper {
         LOGGER.debug( "  data-notes: " + span.getAttribute( "data-notes" ) );
         LOGGER.debug( "  data-guest_name: " + span.getAttribute( "data-guest_name" ) );
 
-        // split room/bed name
-        RoomBedMatcher matcher;
-        if ( authService.isHighStreetHostel() ) {
-            matcher = new HSHRoomBedMatcher( currentBedName );
-        }
-        else if ( authService.isRoyalMileBackpackers() ) {
-            matcher = new RMBRoomBedMatcher( currentBedName );
-        }
-        else {
-            matcher = new CastleRockRoomBedMatcher( currentBedName );
-        }
-
         Allocation alloc = new Allocation();
         alloc.setJobId( jobId );
         alloc.setRoomId( dataRoomId );
         alloc.setRoomTypeId( dataRoomTypeId );
-        alloc.setRoom( matcher.getRoom() );
-        alloc.setBedName( matcher.getBedName() );
-
-        try {
-            setCheckInOutDates( alloc, dataDate, span );
-        }
-        catch ( ParseException e ) {
-            // can't do anything if the date isn't formatted correctly
-            throw new UnrecoverableFault( e );
-        }
+        BedAssignment bedAssignment = roomBedMatcher.parse( currentBedName );
+        alloc.setRoom( bedAssignment.getRoom() );
+        alloc.setBedName( bedAssignment.getBedName() );
+        setCheckInOutDates( alloc, dataDate, span );
 
         // check for "room closures"
         if ( StringUtils.contains( span.getAttribute( "class" ), "room_closure" ) ) {
@@ -285,30 +268,36 @@ public class AllocationsPageScraper {
 
     /**
      * Sets the checkin/checkout dates on the allocation based on the String values in the form.
+     * Throws UnrecoverableFault on parse exception.
      * 
      * @param alloc object to update
      * @param dataDate this is the date in the html table we are currently processing, in format
      *            yyyy-MM-dd
      * @param reservationSpan HTML span of the reservation within the calendar page
-     * @throws ParseException on date parse error
      */
-    private void setCheckInOutDates( Allocation alloc, String dataDate, DomElement reservationSpan ) throws ParseException {
+    private void setCheckInOutDates( Allocation alloc, String dataDate, DomElement reservationSpan ) {
 
-        // if the start date is defined, then use that. otherwise use the date passed in.
-        // usually the start date only appears if the record appears off-screen
-        Calendar checkinDate = Calendar.getInstance();
-        String checkinDateStr = StringUtils.trimToNull( reservationSpan.getAttribute( "data-start-date" ) );
-        LOGGER.debug( "checkin-date: " + checkinDateStr );
-        checkinDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse(
-                checkinDateStr != null ? checkinDateStr : dataDate ) );
-        alloc.setCheckinDate( checkinDate.getTime() );
+        try {
+            // if the start date is defined, then use that. otherwise use the date passed in.
+            // usually the start date only appears if the record appears off-screen
+            Calendar checkinDate = Calendar.getInstance();
+            String checkinDateStr = StringUtils.trimToNull( reservationSpan.getAttribute( "data-start-date" ) );
+            LOGGER.debug( "checkin-date: " + checkinDateStr );
+            checkinDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse(
+                    checkinDateStr != null ? checkinDateStr : dataDate ) );
+            alloc.setCheckinDate( checkinDate.getTime() );
 
-        // adjust checkout date by number of nights
-        Calendar checkoutDate = Calendar.getInstance();
-        String checkoutDateStr = StringUtils.trimToNull( reservationSpan.getAttribute( "data-end-date" ) );
-        LOGGER.debug( "checkout-date: " + checkoutDateStr );
-        checkoutDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse( checkoutDateStr ) );
-        alloc.setCheckoutDate( checkoutDate.getTime() );
+            // adjust checkout date by number of nights
+            Calendar checkoutDate = Calendar.getInstance();
+            String checkoutDateStr = StringUtils.trimToNull( reservationSpan.getAttribute( "data-end-date" ) );
+            LOGGER.debug( "checkout-date: " + checkoutDateStr );
+            checkoutDate.setTime( DATE_FORMAT_YYYY_MM_DD.parse( checkoutDateStr ) );
+            alloc.setCheckoutDate( checkoutDate.getTime() );
+        }
+        catch ( ParseException e ) {
+            // can't do anything if the date isn't formatted correctly
+            throw new UnrecoverableFault( e );
+        }
     }
 
 }

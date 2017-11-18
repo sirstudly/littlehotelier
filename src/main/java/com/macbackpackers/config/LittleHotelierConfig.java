@@ -1,6 +1,7 @@
 
 package com.macbackpackers.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -16,6 +17,7 @@ import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 
 @Configuration
 @EnableTransactionManagement
@@ -23,6 +25,9 @@ import com.google.gson.GsonBuilder;
 @Import( DatabaseConfig.class )
 @PropertySource( "classpath:config.properties" )
 public class LittleHotelierConfig {
+
+    @Value( "${lilhotelier.bedmatcher.classname}" )
+    private String lhBedMatcherClassName;
 
     @Bean( name = "reportsSQL" )
     public PropertiesFactoryBean getSqlReports() {
@@ -89,6 +94,12 @@ public class LittleHotelierConfig {
     public Gson getGsonSingleton() {
         // these are thread safe
         return new GsonBuilder().create();
+    }
+
+    @Bean
+    public RoomBedMatcher getRoomBedMatcher()
+            throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+        return RoomBedMatcher.class.cast( Class.forName( lhBedMatcherClassName ).newInstance() );
     }
 
 //    @Bean

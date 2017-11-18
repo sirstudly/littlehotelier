@@ -14,15 +14,10 @@ public class CastleRockRoomBedMatcher implements RoomBedMatcher {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
-    private String room;
-    private String bedName;
-
-    /**
-     * Default constructor.
-     * 
-     * @param roomLabel label of the room/bed in LH
-     */
-    public CastleRockRoomBedMatcher( String roomLabel ) {
+    @Override
+    public BedAssignment parse( String roomLabel ) {
+        String room = null;
+        String bedName = null;
         Pattern p = Pattern.compile( "([^\\-]*)-(.*)$" ); // anything but dash for room #, everything else for bed
         Matcher m = p.matcher( roomLabel );
         if ( m.find() == false ) {
@@ -33,16 +28,7 @@ public class CastleRockRoomBedMatcher implements RoomBedMatcher {
             room = m.group( 1 );
             bedName = m.group( 2 );
         }
-    }
-
-    @Override
-    public String getBedName() {
-        return bedName;
-    }
-
-    @Override
-    public String getRoom() {
-        return room;
+        return new BedAssignment( room, bedName );
     }
 
 }

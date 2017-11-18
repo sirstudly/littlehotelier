@@ -2,6 +2,7 @@ package com.macbackpackers.services;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -438,7 +439,7 @@ public class GmailService {
         // Load client secrets.
         InputStream in = getClass().getResourceAsStream( oauthClientIdFile );
         if( in == null ) {
-            throw new NullPointerException( "Unable to find OAuth client id file: " + oauthClientIdFile );
+            throw new FileNotFoundException( "Unable to find OAuth client id file: " + oauthClientIdFile );
         }
         GoogleClientSecrets clientSecrets = 
                 GoogleClientSecrets.load( JSON_FACTORY, new InputStreamReader( in ) );

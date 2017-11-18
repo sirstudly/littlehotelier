@@ -6,9 +6,6 @@ package com.macbackpackers.scrapers.matchers;
  */
 public class RMBRoomBedMatcher implements RoomBedMatcher {
 
-    private String room;
-    private String bedName;
-
     /**
      * These are the different room labels that LH has set up. The first bit of the room label must
      * start with one of these...
@@ -17,12 +14,11 @@ public class RMBRoomBedMatcher implements RoomBedMatcher {
             "LM", "T", "SW", "Fr", "GC", "HW"
     };
 
-    /**
-     * Default constructor.
-     * 
-     * @param roomLabel label for this bed/room in LH
-     */
-    public RMBRoomBedMatcher( String roomLabel ) {
+    @Override
+    public BedAssignment parse( String roomLabel ) {
+
+        String room = null;
+        String bedName = null;
 
         // we just see what the label starts with and split it
         for ( String roomName : ROOM_NAMES ) {
@@ -37,16 +33,7 @@ public class RMBRoomBedMatcher implements RoomBedMatcher {
         if ( room == null ) {
             room = roomLabel;
         }
-    }
-
-    @Override
-    public String getBedName() {
-        return bedName;
-    }
-
-    @Override
-    public String getRoom() {
-        return room;
+        return new BedAssignment( room, bedName );
     }
 
 }

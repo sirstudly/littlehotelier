@@ -46,7 +46,8 @@ import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
-import com.macbackpackers.scrapers.matchers.CastleRockRoomBedMatcher;
+import com.macbackpackers.scrapers.matchers.BedAssignment;
+import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 import com.macbackpackers.services.AuthenticationService;
 
 /**
@@ -74,6 +75,9 @@ public class BookingsPageScraper {
 
     @Autowired
     private ApplicationContext context;
+
+    @Autowired
+    private RoomBedMatcher roomBedMatcher;
 
     /**
      * Returns the base URL for a bookings search.
@@ -476,11 +480,10 @@ public class BookingsPageScraper {
                     if ( roomOption.isSelected() ) {
                         newAllocation.setRoomId( Integer.parseInt( roomOption.getValueAttribute() ) );
 
-                        // only supported for CRH
-                        CastleRockRoomBedMatcher roomMatcher = new CastleRockRoomBedMatcher( 
+                        BedAssignment bedAssignment = roomBedMatcher.parse( 
                                 StringUtils.trim( roomOption.getTextContent() ) );
-                        newAllocation.setRoom( roomMatcher.getRoom() );
-                        newAllocation.setBedName( roomMatcher.getBedName() );
+                        newAllocation.setRoom( bedAssignment.getRoom() );
+                        newAllocation.setBedName( bedAssignment.getBedName() );
 
                         LOGGER.debug( "  Room Id: " + newAllocation.getRoomId() );
                         LOGGER.debug( "  Room: " + newAllocation.getRoom() );
