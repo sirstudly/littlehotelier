@@ -46,7 +46,7 @@ public class ReservationPageScraperTest {
         HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, c.getTime(), bookingRef );
         HtmlPage reservationPage = reservationPageScraper.getReservationPage( webClient, bookingsPage, bookingRef );
 
-        reservationPageScraper.tickDeposit( reservationPage );
+        reservationPageScraper.tickDeposit( reservationPage, 0 );
     }
 
     @Test

@@ -26,6 +26,7 @@ public class CreateConfirmDepositAmountsJob extends AbstractJob {
             tickDepositJob.setStatus( JobStatus.submitted );
             tickDepositJob.setBookingRef( booking.getBookingRef() );
             tickDepositJob.setCheckinDate( booking.getCheckinDate() );
+            tickDepositJob.setReservationId( booking.getReservationId() );
             dao.insertJob( tickDepositJob );
         }
     }

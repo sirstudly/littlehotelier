@@ -1,0 +1,554 @@
+{
+    "id": 7590145,
+    "check_in_date": "2018-01-10",
+    "check_out_date": "2018-01-12",
+    "booking_reference_id": "HWL-552-340143838",
+    "guest_name": "Alice Muir",
+    "number_of_nights": 2,
+    "number_of_nights_description": "2 Nights",
+    "booking_source": "Hostelworld Group",
+    "payment_status": "unpaid",
+    "preserve_rates": true,
+    "check_in_string": "10 Jan 2018",
+    "check_out_string": "12 Jan 2018",
+    "reservation_room_types": 
+    [
+        {
+            "id": 9340664,
+            "room_type_id": 2935,
+            "rate_plan_id": 5920,
+            "room_id": 6684,
+            "number_adults": 1,
+            "number_children": 0,
+            "number_infants": 0,
+            "row_id": 69822987697680,
+            "room_type_name": "4 Bed Female Dormitory",
+            "rate_plan_name": "4 Bed Female Dormitory Standard",
+            "rate_plan": 
+            {
+                "occupants": 
+                {
+                    "included": 1,
+                    "maximum_adults": 1,
+                    "maximum_children": 0,
+                    "maximum_infants": 0,
+                    "maximum_occupants": 1
+                }
+            },
+
+            "room_name": "5A03PineappleT",
+            "pictures": 
+            [
+                
+            ],
+
+            "subtotal_amount": 26.4,
+            "extra_occupants_total": 0.0,
+            "discount_amount": 0.0,
+            "discount_percentage": 0.0,
+            "rate_plans": 
+            [
+                {
+                    "id": 5920,
+                    "name": "4 Bed Female Dormitory Standard"
+                }
+            ],
+
+            "rooms": 
+            [
+                {
+                    "id": 6682,
+                    "room_number": "5A01MushroomT"
+                },
+
+                {
+                    "id": 6683,
+                    "room_number": "5A02BlackOliveB"
+                },
+
+                {
+                    "id": 6684,
+                    "room_number": "5A03PineappleT"
+                },
+
+                {
+                    "id": 6685,
+                    "room_number": "5A04HamB"
+                }
+            ],
+
+            "reservation_room_dates": 
+            [
+                {
+                    "id": 24172392,
+                    "rate": "13.2",
+                    "display_date": "10 Jan 2018",
+                    "date": "2018-01-10",
+                    "discount_amount": "0.0",
+                    "discount_percentage": "0.0"
+                },
+
+                {
+                    "id": 24172393,
+                    "rate": "13.2",
+                    "display_date": "11 Jan 2018",
+                    "date": "2018-01-11",
+                    "discount_amount": "0.0",
+                    "discount_percentage": "0.0"
+                }
+            ]
+        },
+
+        {
+            "id": 9340665,
+            "room_type_id": 2935,
+            "rate_plan_id": 5920,
+            "room_id": 6685,
+            "number_adults": 1,
+            "number_children": 0,
+            "number_infants": 0,
+            "row_id": 69822987697520,
+            "room_type_name": "4 Bed Female Dormitory",
+            "rate_plan_name": "4 Bed Female Dormitory Standard",
+            "rate_plan": 
+            {
+                "occupants": 
+                {
+                    "included": 1,
+                    "maximum_adults": 1,
+                    "maximum_children": 0,
+                    "maximum_infants": 0,
+                    "maximum_occupants": 1
+                }
+            },
+
+            "room_name": "5A04HamB",
+            "pictures": 
+            [
+                
+            ],
+
+            "subtotal_amount": 26.4,
+            "extra_occupants_total": 0.0,
+            "discount_amount": 0.0,
+            "discount_percentage": 0.0,
+            "rate_plans": 
+            [
+                {
+                    "id": 5920,
+                    "name": "4 Bed Female Dormitory Standard"
+                }
+            ],
+
+            "rooms": 
+            [
+                {
+                    "id": 6682,
+                    "room_number": "5A01MushroomT"
+                },
+
+                {
+                    "id": 6683,
+                    "room_number": "5A02BlackOliveB"
+                },
+
+                {
+                    "id": 6684,
+                    "room_number": "5A03PineappleT"
+                },
+
+                {
+                    "id": 6685,
+                    "room_number": "5A04HamB"
+                }
+            ],
+
+            "reservation_room_dates": 
+            [
+                {
+                    "id": 24172394,
+                    "rate": "13.2",
+                    "display_date": "10 Jan 2018",
+                    "date": "2018-01-10",
+                    "discount_amount": "0.0",
+                    "discount_percentage": "0.0"
+                },
+
+                {
+                    "id": 24172395,
+                    "rate": "13.2",
+                    "display_date": "11 Jan 2018",
+                    "date": "2018-01-11",
+                    "discount_amount": "0.0",
+                    "discount_percentage": "0.0"
+                }
+            ]
+        }
+    ],
+
+    "guest_first_name": "Alice",
+    "guest_last_name": "Muir",
+    "guest_email": "alicemaeve@gmail.com",
+    "guest_phone_number": null,
+    "guest_organisation": null,
+    "guest_address": null,
+    "guest_address2": null,
+    "guest_city": null,
+    "guest_state": null,
+    "guest_post_code": null,
+    "guest_country": null,
+    "payment_card_number": null,
+    "payment_cc_disabled": null,
+    "payment_cvv_disabled": true,
+    "view_card_details": null,
+    "use_custom_text_field": false,
+    "display_referral_field": false,
+    "process_with_stripe": false,
+    "payment_card_name": null,
+    "payment_card_expiry_month": null,
+    "payment_card_expiry_year": null,
+    "arrival_time": "02:00 PM",
+    "guest_comments": "Hostel World Booking Ref: https://secure.hostelworld.com/inbox/bookings/bookingdetails.php?CustID=552-340143838\nBalance Due: 46.46 (GBP)\nNumber of males: 0\nNumber of females: 2",
+    "custom_property_text_field_label": "",
+    "custom_property_text_field": null,
+    "inclusions": 
+    [
+        
+    ],
+
+    "reservation_extras": 
+    [
+        
+    ],
+
+    "is_primary_contact_added": false,
+    "reservation_guests": 
+    [
+        {
+            "id": 7783648,
+            "reservation_room_type_id": null,
+            "guest_id": 8363943,
+            "primary_contact": false,
+            "row_id": 69822882916260,
+            "guest": 
+            {
+                "id": 8363943,
+                "property_id": 526,
+                "first_name": "Alice",
+                "last_name": "Muir",
+                "second_surname": null,
+                "email": "alicemaeve@gmail.com",
+                "phone_number": null,
+                "address": null,
+                "address2": null,
+                "city": null,
+                "state": null,
+                "country": null,
+                "post_code": null,
+                "organisation": null,
+                "gender": null,
+                "id_document_type": null,
+                "id_number": null,
+                "nationality": null,
+                "date_of_issue": "",
+                "date_of_birth": "",
+                "expiry_date": ""
+            }
+        }
+    ],
+
+    "pending_payments": 
+    [
+        {
+            "id": 4944262,
+            "payment_method": "Other",
+            "description": null,
+            "processed": false,
+            "paid_at": "2017-12-01T09:45:01.000+00:00",
+            "reservation_id": 7590145,
+            "humanize_card_type": null,
+            "amount": "£6.34",
+            "refundable_amount": 6.34,
+            "credit_card_surcharge_percentage": 0.0,
+            "credit_card_surcharge_amount": "£0",
+            "payment_total": "£6.34",
+            "is_deposit": true,
+            "is_card": false,
+            "is_processed": false,
+            "is_refund": false,
+            "is_recorded": true,
+            "is_fully_refunded": false,
+            "process_refund_enabled": false,
+            "payment_header_title": "\u003cstrong\u003eTo Be Taken\u003c/strong\u003e",
+            "paid_at_formatted": "01 Dec 2017",
+            "payment_type": "Deposit",
+            "refunds": 
+            [
+                
+            ]
+        }
+    ],
+
+    "payments": 
+    [
+        
+    ],
+
+    "notes": "",
+    "invoices": 
+    [
+        
+    ],
+
+    "taxes": 
+    {
+        "fixed": 
+        [
+            
+        ],
+
+        "percentage": 
+        [
+            {
+                "tax_id": 392,
+                "apply_tax": true,
+                "name": "VAT",
+                "percentage": 20.0,
+                "total": "£8.80"
+            }
+        ]
+    },
+
+    "totals": 
+    {
+        "room_total": "£52.80",
+        "extra_person_total": "£0",
+        "extras_total": "£0",
+        "discount_total": "£0",
+        "credit_card_surcharges": "£0",
+        "total_fixed_amount_taxes": "£0",
+        "total_percentage_taxes": "£8.80",
+        "service_charges": "£0",
+        "display_subtotal": false,
+        "subtotal": "£52.80",
+        "total": "£52.80",
+        "total_received": "£0",
+        "outstanding": "£52.80",
+        "payment_outstanding": "52.8",
+        "show_rates_including_fees": true,
+        "service_chargeable": false,
+        "service_charge_percentage": "0%"
+    },
+
+    "persisted": true,
+    "confirmed": true,
+    "status": "Confirmed",
+    "checked_in": false,
+    "checked_out": false,
+    "cancelled": false,
+    "card_on_file": false,
+    "timestamp": 1512121501,
+    "property": 
+    {
+        "id": 526,
+        "name": "High Street Hostel",
+        "service_chargeable": false,
+        "payment_gateway": "Payment Express Non-hosted",
+        "can_process_payment": false,
+        "prompt_user_to_connect": true,
+        "room_types": 
+        [
+            {
+                "id": 3038,
+                "name": "18 Bed Mixed Dormitory"
+            },
+
+            {
+                "id": 2935,
+                "name": "4 Bed Female Dormitory"
+            },
+
+            {
+                "id": 2934,
+                "name": "4 Bed Mixed Dormitory"
+            },
+
+            {
+                "id": 2936,
+                "name": "6 Bed Mixed Dormitory"
+            },
+
+            {
+                "id": 3037,
+                "name": "8-10 Bed Female Dormitory"
+            },
+
+            {
+                "id": 3036,
+                "name": "8-10 Bed Mixed Dormitory"
+            },
+
+            {
+                "id": 3035,
+                "name": "Double room"
+            },
+
+            {
+                "id": 2933,
+                "name": "Twin"
+            },
+
+            {
+                "id": 3039,
+                "name": "X-Rooms"
+            }
+        ],
+
+        "currency": 
+        {
+            "name": "United Kingdom Pounds",
+            "symbol": "GBP",
+            "unit": "£",
+            "delimiter": ","
+        },
+
+        "extras": 
+        [
+            {
+                "id": 2757,
+                "name": "breakfast",
+                "adult_price": "1.9",
+                "child_price": "1.9",
+                "allow_multiple": false,
+                "category": "Per Person Per Night",
+                "mandatory": false,
+                "applicable_from": null,
+                "applicable_to": null,
+                "tax_exempted": false
+            },
+
+            {
+                "id": 2759,
+                "name": "free breakfast",
+                "adult_price": "0.0",
+                "child_price": "0.0",
+                "allow_multiple": false,
+                "category": "Per Person Per Night",
+                "mandatory": false,
+                "applicable_from": null,
+                "applicable_to": null,
+                "tax_exempted": false
+            },
+
+            {
+                "id": 4189,
+                "name": "Hogmanay Street Party Pass",
+                "adult_price": "0.0",
+                "child_price": "0.0",
+                "allow_multiple": false,
+                "category": "Per Person Per Night",
+                "mandatory": true,
+                "applicable_from": "2015-12-31",
+                "applicable_to": "2015-12-31",
+                "tax_exempted": false
+            },
+
+            {
+                "id": 2758,
+                "name": "towel",
+                "adult_price": "0.2",
+                "child_price": "0.2",
+                "allow_multiple": true,
+                "category": "Per Person",
+                "mandatory": false,
+                "applicable_from": null,
+                "applicable_to": null,
+                "tax_exempted": false
+            }
+        ],
+
+        "credit_cards": 
+        [
+            {
+                "id": 7,
+                "name": "Maestro",
+                "description": "Maestro",
+                "position": 3
+            },
+
+            {
+                "id": 2,
+                "name": "MasterCard",
+                "description": "Mastercard",
+                "position": 5
+            },
+
+            {
+                "id": 1,
+                "name": "Visa",
+                "description": "Visa",
+                "position": 1
+            },
+
+            {
+                "id": 6,
+                "name": "VisaDebit",
+                "description": "Visa Debit",
+                "position": 2
+            }
+        ],
+
+        "payment_types": 
+        [
+            {
+                "label": "BACS",
+                "value": "BACS"
+            },
+
+            {
+                "label": "Card",
+                "value": "Card"
+            },
+
+            {
+                "label": "Cash",
+                "value": "Cash"
+            },
+
+            {
+                "label": "Cheque",
+                "value": "Cheque"
+            },
+
+            {
+                "label": "Gift Certificate",
+                "value": "Gift Certificate"
+            },
+
+            {
+                "label": "OTA Paid",
+                "value": "OTA Paid"
+            },
+
+            {
+                "label": "Other",
+                "value": "Other"
+            },
+
+            {
+                "label": "Voucher",
+                "value": "Voucher"
+            }
+        ]
+    },
+
+    "cards_on_file": 
+    [
+        
+    ],
+
+    "unit": "£",
+    "is_stripe": false,
+    "current_user_id": 597,
+    "url": "https://app.littlehotelier.com/api/v2/properties/526/reservations/7590145"
+}

@@ -40,13 +40,15 @@ import com.gargoylesoftware.htmlunit.html.HtmlSelect;
 import com.gargoylesoftware.htmlunit.html.HtmlTextArea;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.json.HWLDepositPaymentRequest;
 import com.macbackpackers.beans.json.RecordPaymentRequest;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.services.AuthenticationService;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.GmailService;
@@ -156,27 +158,43 @@ public class ReservationPageScraper {
     /**
      * Tick the "add payment" button for the automated deposit. Does nothing if already saved.
      * 
-     * @param reservationPage the individual reservation page we're looking at.
+     * @param bookingsPage the booking page; doesn't have to be this reservation, just need the CSRF
+     *            token
+     * @param reservationId the reservation to check
      * @throws IOException on comms error
      */
-    public void tickDeposit( HtmlPage reservationPage ) throws IOException {
+    public void tickDeposit( HtmlPage bookingsPage, int reservationId ) throws IOException {
 
-        HtmlButton addPayment = reservationPage.getFirstByXPath( "//div[@class='payments-panel']//button[text()='Confirm']" );
-        if ( addPayment != null ) {
-            LOGGER.info( "Clicking update button on reservation" );
-            HtmlPage currentPage = addPayment.click();
-            currentPage.getWebClient().waitForBackgroundJavaScript( 30000 );
-            // so many options! click on the one with the dialog that is opened
-            final String BASE_DIALOG = "//div[contains(@class,'payment-panel-container')]/div[contains(@class,'payment-panel') and contains(@class,'opened')]";
-            HtmlTextInput descriptionTxt = currentPage.getFirstByXPath( BASE_DIALOG + "//input[@id='description']" );
-            descriptionTxt.setValueAttribute( "HW automated deposit" );
-            HtmlButton paymentBtn = currentPage.getFirstByXPath( BASE_DIALOG + "//button[text()='Record']" );
-            currentPage = paymentBtn.click();
-            currentPage.getWebClient().waitForBackgroundJavaScript( 30000 );
+        // send a GET request for this reservation so we have the current details
+        URL reservationLoadURL = new URL( getReservationLoadURL( reservationId ) );
+        JsonObject reservationRoot = sendJsonRequest( bookingsPage.getWebClient(),
+                constructDefaultGetRequest( reservationLoadURL, bookingsPage ) );
+
+        JsonArray arr = reservationRoot.getAsJsonArray( "pending_payments" );
+        if ( arr.size() == 0 ) {
+            LOGGER.info( "No pending payments; nothing to do.." );
+            return;
         }
-        else {
-            LOGGER.info( "Payment button not found or already clicked " + reservationPage.getUrl() );
+        else if ( arr.size() > 1 ) {
+            LOGGER.error( arr.toString() );
+            throw new UnrecoverableFault( "WTF? There's more than one pending payment?" );
         }
+        JsonObject pendingPayment = arr.get( 0 ).getAsJsonObject();
+        LOGGER.info( "Pending payment found" );
+        LOGGER.debug( gson.toJson( pendingPayment ) );
+
+        // now construct a request to update the pending payment (deposit)
+        HWLDepositPaymentRequest depositReq = new HWLDepositPaymentRequest(
+                pendingPayment.get( "id" ).getAsInt(),
+                pendingPayment.get( "paid_at" ).getAsString(),
+                new BigDecimal( pendingPayment.get( "amount" ).getAsString().replaceAll( "£", "" ) ) );
+        String jsonRequest = gson.toJson( depositReq );
+
+        URL paymentsURL = new URL( getRecordPaymentsURL( reservationId ) );
+        LOGGER.info( "Attempting POST to " + paymentsURL + " for reservation " + reservationId );
+
+        sendJsonRequest( bookingsPage.getWebClient(),
+                constructDefaultRequest( HttpMethod.POST, paymentsURL, bookingsPage, jsonRequest ) );
     }
 
     /**
@@ -274,8 +292,6 @@ public class ReservationPageScraper {
         int reservationId = getReservationId( reservationPage );
         URL paymentsURL = new URL( getRecordPaymentsURL( reservationId ) );
         LOGGER.info( "Attempting POST to " + paymentsURL + " for reservation " + reservationId );
-
-        Gson gson = new GsonBuilder().setDateFormat( "yyyy-MM-dd'T'HH:mm:ss.SSS+00:00" ).create();
         String jsonRequest = gson.toJson( new RecordPaymentRequest( reservationId, cardType, amount, note, isDeposit ) );
 
         LOGGER.info( "Recording payment in LH" );
@@ -362,7 +378,7 @@ public class ReservationPageScraper {
         LOGGER.info( "Sending " + webRequest.getHttpMethod() + " request to " + webRequest.getUrl() );
         if ( webRequest.getHttpMethod() == HttpMethod.POST
                 || webRequest.getHttpMethod() == HttpMethod.PUT ) {
-            LOGGER.info( webRequest.getRequestBody() );
+            LOGGER.debug( webRequest.getRequestBody() );
         }
 
         Page redirectPage = webClient.getPage( webRequest );

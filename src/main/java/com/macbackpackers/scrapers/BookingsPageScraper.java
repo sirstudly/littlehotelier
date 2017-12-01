@@ -517,12 +517,14 @@ public class BookingsPageScraper {
             .forEach( r -> {
                 HtmlTableCell bookingRefCell = r.getFirstByXPath( "td[contains(@class,'booking-reference')]" );
                 HtmlTableCell checkinCell = r.getFirstByXPath( "td[contains(@class,'check_in')]" );
+                HtmlAnchor bookingLink = bookingRefCell.getFirstByXPath( "a" );
                 try {
-                    LOGGER.info( "Creating ConfirmDepositAmountsJob for " + bookingRefCell.getTextContent() );
+                    LOGGER.info( "Creating ConfirmDepositAmountsJob for " + StringUtils.trim( bookingRefCell.getTextContent() ) );
                     ConfirmDepositAmountsJob tickDepositJob = new ConfirmDepositAmountsJob();
                     tickDepositJob.setStatus( JobStatus.submitted );
                     tickDepositJob.setBookingRef( bookingRefCell.getTextContent() );
                     tickDepositJob.setCheckinDate( DATE_FORMAT_DD_MM_YY.parse( checkinCell.getTextContent() ) );
+                    tickDepositJob.setReservationId( Integer.parseInt( bookingLink.getAttribute( "data-reservation-id" ) ) );
                     wordPressDAO.insertJob( tickDepositJob );
                 }
                 catch ( ParseException ex ) {

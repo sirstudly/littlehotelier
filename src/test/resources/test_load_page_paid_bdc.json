@@ -1,0 +1,557 @@
+{
+    "id": 7187519,
+    "check_in_date": "2017-11-06",
+    "check_out_date": "2017-11-07",
+    "booking_reference_id": "BDC-1706665142",
+    "guest_name": "Huang Yan-Hao",
+    "number_of_nights": 1,
+    "number_of_nights_description": "1 Night",
+    "booking_source": "Booking.com",
+    "payment_status": "paid",
+    "preserve_rates": true,
+    "check_in_string": "06 Nov 2017",
+    "check_out_string": "07 Nov 2017",
+    "reservation_room_types": 
+    [
+        {
+            "id": 8833111,
+            "room_type_id": 3038,
+            "rate_plan_id": 6109,
+            "room_id": 7309,
+            "number_adults": 1,
+            "number_children": 0,
+            "number_infants": 0,
+            "subtotal_amount": 12.0,
+            "discount_amount": 0.0,
+            "discount_percentage": 0.0,
+            "row_id": 70081751662800,
+            "room_type_name": "18 Bed Mixed Dormitory",
+            "rate_plan_name": "18 Bed Mixed Dormitory Standard",
+            "rate_plan": 
+            {
+                "occupants": 
+                {
+                    "included": 1,
+                    "maximum_adults": 1,
+                    "maximum_children": 0,
+                    "maximum_infants": 0,
+                    "maximum_occupants": 1
+                }
+            },
+
+            "room_name": "602BosphorusB",
+            "pictures": 
+            [
+                
+            ],
+
+            "extra_occupants_total": 0.0,
+            "rate_plans": 
+            [
+                {
+                    "id": 6109,
+                    "name": "18 Bed Mixed Dormitory Standard"
+                }
+            ],
+
+            "rooms": 
+            [
+                {
+                    "id": 7308,
+                    "room_number": "601AmazonT"
+                },
+
+                {
+                    "id": 7309,
+                    "room_number": "602BosphorusB"
+                },
+
+                {
+                    "id": 7310,
+                    "room_number": "603ClydeT"
+                },
+
+                {
+                    "id": 7311,
+                    "room_number": "604DanubeB"
+                },
+
+                {
+                    "id": 7312,
+                    "room_number": "605ElbeT"
+                },
+
+                {
+                    "id": 7313,
+                    "room_number": "606FlooseyB"
+                },
+
+                {
+                    "id": 7314,
+                    "room_number": "607GangesT"
+                },
+
+                {
+                    "id": 7315,
+                    "room_number": "608HudsonB"
+                },
+
+                {
+                    "id": 7316,
+                    "room_number": "609IndusT"
+                },
+
+                {
+                    "id": 7317,
+                    "room_number": "610JordanB"
+                },
+
+                {
+                    "id": 7318,
+                    "room_number": "611KamaT"
+                },
+
+                {
+                    "id": 7319,
+                    "room_number": "612LoireB"
+                },
+
+                {
+                    "id": 7320,
+                    "room_number": "613MagpieT"
+                },
+
+                {
+                    "id": 7321,
+                    "room_number": "614NonniB"
+                },
+
+                {
+                    "id": 7322,
+                    "room_number": "615ObT"
+                },
+
+                {
+                    "id": 7323,
+                    "room_number": "616PittB"
+                },
+
+                {
+                    "id": 7324,
+                    "room_number": "617QueezyT"
+                },
+
+                {
+                    "id": 7325,
+                    "room_number": "618RangtikiB"
+                }
+            ],
+
+            "reservation_room_dates": 
+            [
+                {
+                    "id": 22814918,
+                    "rate": "12.0",
+                    "display_date": "06 Nov 2017",
+                    "date": "2017-11-06",
+                    "discount_amount": "0.0",
+                    "discount_percentage": "0.0"
+                }
+            ]
+        }
+    ],
+
+    "guest_first_name": "Huang",
+    "guest_last_name": "Yan-Hao",
+    "guest_email": null,
+    "guest_phone_number": null,
+    "guest_organisation": null,
+    "guest_address": null,
+    "guest_address2": null,
+    "guest_city": null,
+    "guest_state": null,
+    "guest_post_code": null,
+    "guest_country": null,
+    "payment_card_number": "XXXX-XXXX-XXXX-0890",
+    "payment_cc_disabled": true,
+    "payment_cvv_disabled": true,
+    "view_card_details": true,
+    "use_custom_text_field": false,
+    "display_referral_field": false,
+    "payment_card_type": "MasterCard",
+    "process_with_stripe": false,
+    "payment_card_name": "Bookingcom Agent",
+    "payment_card_expiry_month": 5,
+    "payment_card_expiry_year": 2018,
+    "arrival_time": null,
+    "guest_comments": "You have received a virtual credit card for this reservation.You may charge it as of 2017-11-06.\nApproximate time of arrival: between 14:00 and 15:00, booker_is_genius\nsmoking preference: Non-Smoking, The amount the guest prepaid to Booking.com is GBP 12.00",
+    "custom_property_text_field_label": "",
+    "custom_property_text_field": null,
+    "inclusions": 
+    [
+        
+    ],
+
+    "reservation_extras": 
+    [
+        
+    ],
+
+    "is_primary_contact_added": true,
+    "reservation_guests": 
+    [
+        {
+            "id": 7286847,
+            "reservation_room_type_id": 8833111,
+            "guest_id": 7955504,
+            "primary_contact": true,
+            "row_id": 70081794927700,
+            "guest": 
+            {
+                "id": 7955504,
+                "property_id": 526,
+                "first_name": "Huang",
+                "last_name": "Yan-Hao",
+                "second_surname": null,
+                "email": null,
+                "phone_number": null,
+                "address": null,
+                "address2": null,
+                "city": null,
+                "state": null,
+                "country": null,
+                "post_code": null,
+                "organisation": null,
+                "gender": null,
+                "id_document_type": null,
+                "id_number": null,
+                "nationality": null,
+                "date_of_issue": "",
+                "date_of_birth": "",
+                "expiry_date": ""
+            }
+        }
+    ],
+
+    "pending_payments": 
+    [
+        {
+            "id": 4642656,
+            "payment_method": "Other",
+            "description": null,
+            "processed": false,
+            "paid_at": "2017-10-16T23:03:11.000+01:00",
+            "reservation_id": 7187519,
+            "humanize_card_type": null,
+            "amount": "£12",
+            "refundable_amount": 12.0,
+            "credit_card_surcharge_percentage": 0.0,
+            "credit_card_surcharge_amount": "£0",
+            "payment_total": "£12",
+            "is_deposit": true,
+            "is_card": false,
+            "is_processed": false,
+            "is_refund": false,
+            "is_recorded": true,
+            "is_fully_refunded": false,
+            "process_refund_enabled": false,
+            "payment_header_title": "\u003cstrong\u003eTo Be Taken\u003c/strong\u003e",
+            "paid_at_formatted": "16 Oct 2017",
+            "payment_type": "Deposit",
+            "refunds": 
+            [
+                
+            ]
+        }
+    ],
+
+    "payments": 
+    [
+        {
+            "id": 4784016,
+            "payment_method": "MasterCard",
+            "description": "PxPost transaction 7718414 successful. DpsTxnRef: 0000000346b5b63a - 06/11/2017 00:48:40",
+            "processed": true,
+            "paid_at": "2017-11-06T00:48:45.000+00:00",
+            "reservation_id": 7187519,
+            "humanize_payment_method": "Card",
+            "humanize_card_type": "MasterCard",
+            "amount": "£12",
+            "refundable_amount": 12.0,
+            "credit_card_surcharge_percentage": 0.0,
+            "credit_card_surcharge_amount": "£0",
+            "payment_total": "£12",
+            "is_deposit": true,
+            "is_card": true,
+            "is_processed": true,
+            "is_refund": false,
+            "is_recorded": true,
+            "is_fully_refunded": false,
+            "process_refund_enabled": false,
+            "payment_header_title": "\u003cstrong\u003eRecorded Payment\u003c/strong\u003e (Card)",
+            "paid_at_formatted": "06 Nov 2017",
+            "payment_type": "Deposit",
+            "refunds": 
+            [
+                
+            ]
+        }
+    ],
+
+    "notes": "",
+    "invoices": 
+    [
+        
+    ],
+
+    "taxes": 
+    {
+        "fixed": 
+        [
+            
+        ],
+
+        "percentage": 
+        [
+            {
+                "tax_id": 392,
+                "apply_tax": true,
+                "name": "VAT",
+                "percentage": 20.0,
+                "total": "£2"
+            }
+        ]
+    },
+
+    "totals": 
+    {
+        "room_total": "£12",
+        "extra_person_total": "£0",
+        "extras_total": "£0",
+        "discount_total": "£0",
+        "credit_card_surcharges": "£0",
+        "total_fixed_amount_taxes": "£0",
+        "total_percentage_taxes": "£2",
+        "service_charges": "£0",
+        "display_subtotal": false,
+        "subtotal": "£12",
+        "total": "£12",
+        "total_received": "£12",
+        "outstanding": "£0",
+        "payment_outstanding": "0.0",
+        "show_rates_including_fees": true,
+        "service_chargeable": false,
+        "service_charge_percentage": "0%"
+    },
+
+    "persisted": true,
+    "confirmed": true,
+    "status": "Confirmed",
+    "checked_in": false,
+    "checked_out": false,
+    "cancelled": false,
+    "card_on_file": false,
+    "timestamp": 1509929325,
+    "property": 
+    {
+        "id": 526,
+        "name": "High Street Hostel",
+        "service_chargeable": false,
+        "payment_gateway": "Payment Express Non-hosted",
+        "can_process_payment": false,
+        "prompt_user_to_connect": true,
+        "room_types": 
+        [
+            {
+                "id": 3038,
+                "name": "18 Bed Mixed Dormitory"
+            },
+
+            {
+                "id": 2935,
+                "name": "4 Bed Female Dormitory"
+            },
+
+            {
+                "id": 2934,
+                "name": "4 Bed Mixed Dormitory"
+            },
+
+            {
+                "id": 2936,
+                "name": "6 Bed Mixed Dormitory"
+            },
+
+            {
+                "id": 3037,
+                "name": "8-10 Bed Female Dormitory"
+            },
+
+            {
+                "id": 3036,
+                "name": "8-10 Bed Mixed Dormitory"
+            },
+
+            {
+                "id": 3035,
+                "name": "Double room"
+            },
+
+            {
+                "id": 2933,
+                "name": "Twin"
+            },
+
+            {
+                "id": 3039,
+                "name": "X-Rooms"
+            }
+        ],
+
+        "currency": 
+        {
+            "name": "United Kingdom Pounds",
+            "symbol": "GBP",
+            "unit": "£",
+            "delimiter": ","
+        },
+
+        "extras": 
+        [
+            {
+                "id": 2757,
+                "name": "breakfast",
+                "adult_price": "1.9",
+                "child_price": "1.9",
+                "allow_multiple": false,
+                "category": "Per Person Per Night",
+                "mandatory": false,
+                "applicable_from": null,
+                "applicable_to": null,
+                "tax_exempted": false
+            },
+
+            {
+                "id": 2759,
+                "name": "free breakfast",
+                "adult_price": "0.0",
+                "child_price": "0.0",
+                "allow_multiple": false,
+                "category": "Per Person Per Night",
+                "mandatory": false,
+                "applicable_from": null,
+                "applicable_to": null,
+                "tax_exempted": false
+            },
+
+            {
+                "id": 4189,
+                "name": "Hogmanay Street Party Pass",
+                "adult_price": "0.0",
+                "child_price": "0.0",
+                "allow_multiple": false,
+                "category": "Per Person Per Night",
+                "mandatory": true,
+                "applicable_from": "2015-12-31",
+                "applicable_to": "2015-12-31",
+                "tax_exempted": false
+            },
+
+            {
+                "id": 2758,
+                "name": "towel",
+                "adult_price": "0.2",
+                "child_price": "0.2",
+                "allow_multiple": true,
+                "category": "Per Person",
+                "mandatory": false,
+                "applicable_from": null,
+                "applicable_to": null,
+                "tax_exempted": false
+            }
+        ],
+
+        "credit_cards": 
+        [
+            {
+                "id": 7,
+                "name": "Maestro",
+                "description": "Maestro",
+                "position": 3
+            },
+
+            {
+                "id": 2,
+                "name": "MasterCard",
+                "description": "Mastercard",
+                "position": 5
+            },
+
+            {
+                "id": 1,
+                "name": "Visa",
+                "description": "Visa",
+                "position": 1
+            },
+
+            {
+                "id": 6,
+                "name": "VisaDebit",
+                "description": "Visa Debit",
+                "position": 2
+            }
+        ],
+
+        "payment_types": 
+        [
+            {
+                "label": "BACS",
+                "value": "BACS"
+            },
+
+            {
+                "label": "Card",
+                "value": "Card"
+            },
+
+            {
+                "label": "Cash",
+                "value": "Cash"
+            },
+
+            {
+                "label": "Cheque",
+                "value": "Cheque"
+            },
+
+            {
+                "label": "Gift Certificate",
+                "value": "Gift Certificate"
+            },
+
+            {
+                "label": "OTA Paid",
+                "value": "OTA Paid"
+            },
+
+            {
+                "label": "Other",
+                "value": "Other"
+            },
+
+            {
+                "label": "Voucher",
+                "value": "Voucher"
+            }
+        ]
+    },
+
+    "cards_on_file": 
+    [
+        
+    ],
+
+    "unit": "£",
+    "current_user_id": 597,
+    "url": "https://app.littlehotelier.com/api/v2/properties/526/reservations/7187519"
+}

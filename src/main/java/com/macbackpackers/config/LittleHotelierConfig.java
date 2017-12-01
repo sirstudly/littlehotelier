@@ -93,7 +93,10 @@ public class LittleHotelierConfig {
     @Bean
     public Gson getGsonSingleton() {
         // these are thread safe
-        return new GsonBuilder().create();
+        return new GsonBuilder()
+                .setDateFormat( "yyyy-MM-dd'T'HH:mm:ss.SSS+00:00" )
+                .setPrettyPrinting()
+                .create();
     }
 
     @Bean

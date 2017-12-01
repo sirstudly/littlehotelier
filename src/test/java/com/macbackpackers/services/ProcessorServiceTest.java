@@ -116,9 +116,11 @@ public class ProcessorServiceTest {
     public void testConfirmDepositAmountsJob() throws Exception {
 
         // setup the job
-        Job j = new ConfirmDepositAmountsJob();
+        ConfirmDepositAmountsJob j = new ConfirmDepositAmountsJob();
         j.setStatus( JobStatus.submitted );
-        j.setParameter( "reservation_id", "1074445" );
+        j.setBookingRef( "HWL-551-340153819" );
+        j.setCheckinDate( new Date() );
+        j.setReservationId( 7591369 );
         int jobId = dao.insertJob( j );
 
         // this should now run the job

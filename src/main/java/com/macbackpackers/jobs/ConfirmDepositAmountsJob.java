@@ -43,8 +43,7 @@ public class ConfirmDepositAmountsJob extends AbstractJob {
     public void processJob() throws Exception {
         String bookingRef = getBookingRef();
         HtmlPage bookingsPage = bookingsScraper.goToBookingPageArrivedOn( webClient, getCheckinDate(), bookingRef );
-        HtmlPage reservationPage = reservationScraper.getReservationPage( webClient, bookingsPage, bookingRef );
-        reservationScraper.tickDeposit( reservationPage );
+        reservationScraper.tickDeposit( bookingsPage, getReservationId() );
     }
 
     @Override
@@ -59,7 +58,7 @@ public class ConfirmDepositAmountsJob extends AbstractJob {
     public void setBookingRef( String bookingRef ) {
         setParameter( "booking_reference", bookingRef );
     }
-    
+
     /**
      * Gets the checkin date to scrape the reservation.
      * 
@@ -77,6 +76,14 @@ public class ConfirmDepositAmountsJob extends AbstractJob {
      */
     public void setCheckinDate( Date checkinDate ) {
         setParameter( "checkin_date", AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ) );
+    }
+
+    public int getReservationId() {
+        return Integer.parseInt( getParameter( "reservation_id" ) );
+    }
+
+    public void setReservationId( int reservationId ) {
+        setParameter( "reservation_id", String.valueOf( reservationId ) );
     }
 
 }
