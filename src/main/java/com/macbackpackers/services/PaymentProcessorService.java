@@ -457,18 +457,24 @@ public class PaymentProcessorService {
                 throw new MissingUserDataException( "Amex not enabled. Charge manually using EFTPOS terminal." );
             }
 
-            LOGGER.info( "Retrieving card security code" );
-            CardDetails ccDetailsFromGmail = gmailService.fetchBdcCardDetailsFromBookingRef( bookingRef );
-
-            // AMEX cards not supported
-            if( "AX".equals( ccDetailsFromGmail.getCardType() ) ) {
-                throw new MissingUserDataException( "Amex not enabled. Charge manually using EFTPOS terminal." );
-            }
-
             LOGGER.info( "Retrieving customer card details" );
             CardDetails ccDetails = reservationPageScraper.getCardDetails( reservationPage, reservationId );
-            ccDetails.setExpiry( ccDetailsFromGmail.getExpiry() ); // copying over expiry
-            ccDetails.setCvv( ccDetailsFromGmail.getCvv() ); // copying over security code
+
+            try {
+                LOGGER.info( "Retrieving card security code" );
+                CardDetails ccDetailsFromGmail = gmailService.fetchBdcCardDetailsFromBookingRef( bookingRef );
+                ccDetails.setExpiry( ccDetailsFromGmail.getExpiry() ); // copying over expiry
+                ccDetails.setCvv( ccDetailsFromGmail.getCvv() ); // copying over security code
+                ccDetails.setCardType( ccDetailsFromGmail.getCardType() );
+            }
+            catch ( MissingUserDataException ex ) {
+                LOGGER.warn( "Unable to retrieve card security code. Proceeding without it...", ex );
+            }
+
+            // AMEX cards not supported
+            if ( "AX".equals( ccDetails.getCardType() ) ) {
+                throw new MissingUserDataException( "Amex not enabled. Charge manually using EFTPOS terminal." );
+            }
             return new Payment( getBdcDepositChargeAmount( reservationPage ), ccDetails );
         }
         // Expedia
