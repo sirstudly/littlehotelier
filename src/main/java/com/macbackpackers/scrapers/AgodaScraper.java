@@ -180,6 +180,7 @@ public class AgodaScraper {
         if ( webResponse.getContentType().equalsIgnoreCase( "application/json" ) ) {
             return parseCardDetails( redirectPage.getWebResponse().getContentAsString() );
         }
+        LOGGER.error( webResponse.getContentAsString() );
         throw new IOException( "Unexpected response type: " + webResponse.getContentType() );
     }
 
