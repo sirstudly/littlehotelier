@@ -18,6 +18,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlTableRow;
+import com.macbackpackers.beans.Payment;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.BookingsPageScraper;
@@ -76,9 +77,10 @@ public class PaymentProcessorServiceTest {
         // click on the only reservation on the page
         HtmlPage reservationPage = row.click();
         reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
-        
-        BigDecimal amountToCharge = paymentService.getBdcDepositChargeAmount( reservationPage );
-        LOGGER.info( "Amount to charge: " + amountToCharge );
+
+        Payment deposit = new Payment();
+        paymentService.updatePaymentWithBdcDepositChargeAmount( deposit, reservationPage );
+        LOGGER.info( "Amount to charge: " + deposit.getAmount() );
     }
 
     @Test

@@ -160,7 +160,7 @@ public class PaymentProcessorService {
             // if for some reason, we fucked up our calculation, this will throw an error!
             HtmlSpan outstandingTotalSpan = reservationPage.getFirstByXPath( "//span[contains(@class,'total_outstanding')]" );
             BigDecimal outstandingTotal = new BigDecimal( outstandingTotalSpan.getTextContent().replaceAll( POUND, "" ) );
-            if ( depositPayment.getAmount().compareTo( outstandingTotal ) > 0 ) {
+            if ( false == depositPayment.isVirtual() && depositPayment.getAmount().compareTo( outstandingTotal ) > 0 ) {
                 throw new UnrecoverableFault( "Calculated amount to charge " + depositPayment.getAmount() + " exceeds LH total outstanding (" + outstandingTotal + ")." );
             }
 
@@ -475,7 +475,10 @@ public class PaymentProcessorService {
             if ( "AX".equals( ccDetails.getCardType() ) ) {
                 throw new MissingUserDataException( "Amex not enabled. Charge manually using EFTPOS terminal." );
             }
-            return new Payment( getBdcDepositChargeAmount( reservationPage ), ccDetails );
+            Payment depositCharge = new Payment( ccDetails );
+            updatePaymentWithBdcDepositChargeAmount( depositCharge, reservationPage );
+            return depositCharge;
+            
         }
         // Expedia
         else if ( bookingRef.startsWith( "EXP-" ) ) {
@@ -576,48 +579,50 @@ public class PaymentProcessorService {
     }
 
     /**
-     * Retrieves the deposit amount to charge for the given BDC reservation.
+     * Retrieves the deposit amount to charge for the given BDC reservation
+     * and updates the amount on the given Payment object.
      * 
      * @param reservationPage the HtmlPage of the current reservation
      * @return deposit amount to charge reservation
      */
-    public BigDecimal getBdcDepositChargeAmount( HtmlPage reservationPage ) {
+    public void updatePaymentWithBdcDepositChargeAmount( Payment payment, HtmlPage reservationPage ) {
 
         // calculate how much we need to change
         HtmlSpan totalOutstanding = reservationPage.getFirstByXPath( "//span[contains(@class,'total_outstanding')]" );
         BigDecimal amountOutstanding = new BigDecimal( totalOutstanding.getTextContent().replaceAll( "£", "" ) );
         HtmlTextArea guestComments = reservationPage.getFirstByXPath( "//textarea[@id='guest_comments']" );
 
-        // either take first night, or a percentage amount
-        BigDecimal amountToPay;
-        if ( StringUtils.trimToEmpty( guestComments.getText() ).contains( 
+        // guest can pay for everything up-front; in which case we charge that amount
+        if ( StringUtils.trimToEmpty( guestComments.getText() ).contains(
                 "You have received a virtual credit card for this reservation" ) ) {
             Pattern p = Pattern.compile( "The amount the guest prepaid to Booking\\.com is GBP ([0-9]+\\.[0-9]{2})" );
             Matcher m = p.matcher( guestComments.getText() );
             if ( m.find() ) {
-                amountToPay = new BigDecimal( m.group( 1 ) );
+                // some weirdness where this may exceed the outstanding amount??
+                payment.setAmount( new BigDecimal( m.group( 1 ) ) );
+                payment.setVirtual( true );
             }
             else {
                 throw new MissingUserDataException( "Missing prepaid amount in guest comments when attempting to charge deposit." );
             }
         }
+        // either take first night, or a percentage amount
         else if ( "first_night".equals( bdcDepositStrategy ) ) {
-            amountToPay = reservationPageScraper.getAmountPayableForFirstNight( reservationPage );
+            payment.setAmount( reservationPageScraper.getAmountPayableForFirstNight( reservationPage ) );
         }
         else {
             BigDecimal percentToCharge = new BigDecimal( bdcDepositStrategy );
-            amountToPay = amountOutstanding.multiply( percentToCharge ).setScale( 2, RoundingMode.HALF_UP );
+            payment.setAmount( amountOutstanding.multiply( percentToCharge ).setScale( 2, RoundingMode.HALF_UP ) );
         }
 
         // extra sanity checks
-        if ( amountToPay.compareTo( BigDecimal.ZERO ) == 0 ) {
-            throw new IllegalStateException( "Amount payable is £0???" );
+        if ( payment.getAmount().compareTo( BigDecimal.ZERO ) <= 0 ) {
+            throw new IllegalStateException( "Amount payable is £" + payment.getAmount() + "???" );
         }
-        else if ( amountToPay.compareTo( amountOutstanding ) > 0 ) {
-            throw new IllegalStateException( "Amount to pay " + amountToPay +
+        else if ( false == payment.isVirtual() && payment.getAmount().compareTo( amountOutstanding ) > 0 ) {
+            throw new IllegalStateException( "Amount to pay " + payment.getAmount() +
                     " exceeds amount outstanding of " + amountOutstanding + "???" );
         }
-        return amountToPay;
     }
 
     /**

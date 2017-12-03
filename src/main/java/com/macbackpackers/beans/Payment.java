@@ -14,9 +14,16 @@ public class Payment {
 
     // full card details
     private CardDetails cardDetails;
-    
+
+    // whether this is against a "virtual" cc
+    private boolean virtual;
+
     public Payment() {
         // default constructor
+    }
+
+    public Payment( CardDetails cardDetails ) {
+        this.cardDetails = cardDetails;
     }
 
     public Payment( BigDecimal amount, CardDetails cardDetails ) {
@@ -38,6 +45,14 @@ public class Payment {
 
     public void setCardDetails( CardDetails cardDetails ) {
         this.cardDetails = cardDetails;
+    }
+
+    public boolean isVirtual() {
+        return virtual;
+    }
+
+    public void setVirtual( boolean virtual ) {
+        this.virtual = virtual;
     }
 
 }
