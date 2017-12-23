@@ -49,7 +49,9 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
 		   AND f.payment_total = f.payment_outstanding
 		   AND f.payment_total > 0
 		   AND f.booking_source IN ('Booking.com', 'Expedia')
-		   AND (c.comments IS NULL OR c.comments NOT LIKE 'You have received a virtual credit card for this reservation%')
+		   AND (c.comments IS NULL OR 
+		            (c.comments NOT LIKE 'You have received a virtual credit card for this reservation%'
+		         AND c.comments NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'))
 		 GROUP BY f.reservation_id, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn;
     </entry>
     <entry key="group.bookings">

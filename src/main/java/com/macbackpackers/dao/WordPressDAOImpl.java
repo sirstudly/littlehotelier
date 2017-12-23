@@ -642,7 +642,8 @@ public class WordPressDAOImpl implements WordPressDAO {
                     + "    ON c.reservationId = r.reservationId "
                     + " WHERE c.jobId = :allocationScraperJobId "
                     + "   AND c.paymentTotal = c.paymentOutstanding" // no deposit charged
-                    + "   AND r.comments LIKE 'You have received a virtual credit card for this reservation%'"
+                    + "   AND (r.comments LIKE 'You have received a virtual credit card for this reservation%' OR "
+                    + "        r.comments LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%') "
                     + "   AND c.bookingReference LIKE 'BDC-%'", BookingWithGuestComments.class )
                     .setParameter( "allocationScraperJobId", allocationScraperJobId )
                     .getResultList();

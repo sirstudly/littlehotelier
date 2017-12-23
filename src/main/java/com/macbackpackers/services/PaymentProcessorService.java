@@ -594,7 +594,9 @@ public class PaymentProcessorService {
 
         // guest can pay for everything up-front; in which case we charge that amount
         if ( StringUtils.trimToEmpty( guestComments.getText() ).contains(
-                "You have received a virtual credit card for this reservation" ) ) {
+                "You have received a virtual credit card for this reservation" ) ||
+             StringUtils.trimToEmpty( guestComments.getText() ).contains(
+                "THIS RESERVATION HAS BEEN PRE-PAID" ) ) {
             Pattern p = Pattern.compile( "The amount the guest prepaid to Booking\\.com is GBP ([0-9]+\\.[0-9]{2})" );
             Matcher m = p.matcher( guestComments.getText() );
             if ( m.find() ) {
