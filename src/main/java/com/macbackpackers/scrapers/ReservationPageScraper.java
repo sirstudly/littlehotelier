@@ -378,7 +378,7 @@ public class ReservationPageScraper {
         LOGGER.info( "Sending " + webRequest.getHttpMethod() + " request to " + webRequest.getUrl() );
         if ( webRequest.getHttpMethod() == HttpMethod.POST
                 || webRequest.getHttpMethod() == HttpMethod.PUT ) {
-            LOGGER.debug( webRequest.getRequestBody() );
+            LOGGER.debug( new LHJsonCardMask().applyCardMask( webRequest.getRequestBody() ) );
         }
 
         Page redirectPage = webClient.getPage( webRequest );
