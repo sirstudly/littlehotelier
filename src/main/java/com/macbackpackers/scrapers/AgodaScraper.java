@@ -18,6 +18,7 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.WebResponse;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
+import com.gargoylesoftware.htmlunit.html.HtmlDivision;
 import com.gargoylesoftware.htmlunit.html.HtmlInput;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
@@ -94,12 +95,17 @@ public class AgodaScraper {
         nextPage.getWebClient().waitForBackgroundJavaScript( 60000 ); // wait for page to load
 
         // if this is the first time logging in, retrieve and enter the passcode if requested
-        HtmlInput passcodeInput = HtmlInput.class.cast( nextPage.getElementById( "passcode" ) );
-        if ( passcodeInput != null ) {
+        HtmlDivision passcodeModalDiv = HtmlDivision.class.cast( nextPage.getElementById( "mfa-user-authentication-dialog" ) );
+        if ( passcodeModalDiv == null ) {
+            LOGGER.warn( "Modal dialog for passcode not present? Proceeding assuming we're logged in" );
+        }
+        else if ( "false".equals( passcodeModalDiv.getAttribute( "aria-hidden" ) ) ) {
             LOGGER.info( "Passcode requested. Retrieving from Gmail." );
             sleep( 50000 ); // it takes a few seconds for the email to arrive
+            LOGGER.debug( nextPage.asXml() );
             String passcode = gmailService.fetchAgodaPasscode();
             LOGGER.info( "Retrieved passcode " + passcode );
+            HtmlInput passcodeInput = HtmlInput.class.cast( nextPage.getElementById( "passcode" ) );
             passcodeInput.type( passcode );
             HtmlAnchor btnSubmitPasscode = HtmlAnchor.class.cast( nextPage.getElementById( "btnSubmitPasscode" ) );
             nextPage = btnSubmitPasscode.click();
