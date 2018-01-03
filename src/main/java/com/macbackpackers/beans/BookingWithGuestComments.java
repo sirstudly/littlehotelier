@@ -8,12 +8,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.time.FastDateFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A search result entity for retrieving bookings with their associated guest comments.
  *
  */
 public class BookingWithGuestComments {
+
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     private String bookingReference;
     private Date checkinDate; // the date of checkin
@@ -71,13 +75,14 @@ public class BookingWithGuestComments {
      * 
      * @return non-null chargeable date
      */
-    public Date getEarliestChargeDate(){
+    public Date getEarliestChargeDate() {
         try {
             Matcher m = MATCH_EARLIEST_CHARGE_DATE.matcher( getGuestComment() );
             if ( m.find() ) {
                 return DATE_FORMAT_YYYY_MM_DD.parse( m.group( 1 ) );
             }
-            throw new ParseException( "Missing charge date in comment for " + getBookingReference(), 0 );
+            LOGGER.info( getBookingReference() + ": no chargeable date found; defaulting to checkin date" );
+            return getCheckinDate();
         }
         catch ( ParseException e ) {
             // this shouldn't ever happen if we've setup the object correctly
