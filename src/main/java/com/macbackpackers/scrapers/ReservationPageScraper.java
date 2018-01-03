@@ -48,6 +48,7 @@ import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.json.HWLDepositPaymentRequest;
 import com.macbackpackers.beans.json.RecordPaymentRequest;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.PaymentCardNotAcceptedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.services.AuthenticationService;
 import com.macbackpackers.services.FileService;
@@ -372,8 +373,10 @@ public class ReservationPageScraper {
      * @param webRequest request to POST
      * @return non-null parsed response
      * @throws IOException on I/O error
+     * @throws IllegalStateException if we get any validation errors when sending the JSON request
+     * @throws PaymentCardNotAcceptedException if LH complains card details aren't correct
      */
-    private JsonObject sendJsonRequest( WebClient webClient, WebRequest webRequest ) throws IOException {
+    private JsonObject sendJsonRequest( WebClient webClient, WebRequest webRequest ) throws IOException, PaymentCardNotAcceptedException {
 
         LOGGER.info( "Sending " + webRequest.getHttpMethod() + " request to " + webRequest.getUrl() );
         if ( webRequest.getHttpMethod() == HttpMethod.POST
@@ -387,6 +390,12 @@ public class ReservationPageScraper {
             LOGGER.info( "Received application/json response" );
             JsonObject responseObj = gson.fromJson( logJsonWebResponse( webResponse ), JsonElement.class ).getAsJsonObject();
             if ( responseObj.get( "errors" ) != null && false == responseObj.get( "errors" ).getAsJsonObject().entrySet().isEmpty() ) {
+                
+                // bloody LH rejecting AMEX cards cause we don't have it enabled
+                if ( "card is not accepted".equals( responseObj.get( "errors" ).getAsJsonObject()
+                        .get( "payment_card_number" ).getAsJsonArray().get( 0 ).getAsString() ) ) {
+                    throw new PaymentCardNotAcceptedException();
+                }
                 throw new IllegalStateException( "One or more errors found in response." );
             }
             return responseObj;
@@ -488,9 +497,21 @@ public class ReservationPageScraper {
 
         // now send the update!
         URL reservationPostURL = new URL( getReservationPostURL( reservationId ) );
-        reservationRoot = sendJsonRequest( reservationPage.getWebClient(),
-                constructDefaultRequest( HttpMethod.PUT, reservationPostURL,
-                        reservationPage, gson.toJson( updateJson ) ) );
+        try {
+            sendJsonRequest( reservationPage.getWebClient(),
+                    constructDefaultRequest( HttpMethod.PUT, reservationPostURL,
+                            reservationPage, gson.toJson( updateJson ) ) );
+        }
+        catch ( PaymentCardNotAcceptedException ex ) {
+            // to bypass issue with saving a note when an Amex card is currently visible
+            // because we don't support Amex cards (but we may still get one from another channel)
+            // LH won't save card details if they're masked
+            LOGGER.info( "LH complaining with card validation error; trying again with masked card details" );
+            reservationRoot.getAsJsonObject().addProperty( "payment_card_number", "XXXX-XXXX-XXXX-XXXX" );
+            sendJsonRequest( reservationPage.getWebClient(),
+                    constructDefaultRequest( HttpMethod.PUT, reservationPostURL,
+                            reservationPage, gson.toJson( updateJson ) ) );
+        }
     }
 
     /**

@@ -142,5 +142,13 @@ public class JsonSerialisationTest {
                 new BigDecimal( pendingPayment.get( "amount" ).getAsString().replaceAll( "£", "" ) ) );
         LOGGER.info( gson.toJson( req ) );
     }
+    
+    @Test
+    public void testDeserialise() throws Exception {
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        JsonObject messageRoot = gson.fromJson(
+                "{\"message\":\"Validation failed: Payment card number card is not accepted\",\"errors\":{\"payment_card_number\":[\"card is not accepted\"],\"payment_card_type\":[],\"reservation_room_types\":[{}],\"reservation_extras\":[],\"reservation_guests\":{\"70044389994800\":{}}}}", JsonElement.class ).getAsJsonObject();
+        LOGGER.info( messageRoot.get( "errors" ).getAsJsonObject().get( "payment_card_number" ).getAsJsonArray().get( 0 ).getAsString() );
+    }
 
 }
