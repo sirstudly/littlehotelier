@@ -52,6 +52,19 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
 		   AND (c.comments IS NULL OR 
 		            (c.comments NOT LIKE 'You have received a virtual credit card for this reservation%'
 		         AND c.comments NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'))
+		 GROUP BY f.reservation_id, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn
+		 UNION ALL 
+		-- include Agoda bookings that have been checked-in but not yet paid 
+		SELECT f.job_id, GROUP_CONCAT( DISTINCT f.guest_name ) `guest_name`, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn, MAX(f.created_date) `created_date`
+		  FROM wp_lh_calendar f
+         WHERE f.job_id = :jobId
+		   AND ( ( f.payment_total = f.payment_outstanding AND f.lh_status = 'confirmed' ) -- nothing paid
+		      OR ( f.payment_outstanding > 0 AND f.lh_status IN ('checked-in', 'checked-out') ) ) -- amount still to pay
+		   AND f.payment_total > 0
+		   AND f.booking_source IN ('Agoda')
+		   -- agoda runs one day behind; all checkins from yesterday and before 
+		   -- should be -31 hours (for it to show after 7am the following day) but because clock on server is 7 hours behind
+		   AND f.checkin_date &lt; DATE_ADD( NOW(), INTERVAL -24 HOUR )
 		 GROUP BY f.reservation_id, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn;
     </entry>
     <entry key="group.bookings">
