@@ -666,7 +666,6 @@ INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (6,'com.macbackpackers.jobs.BedCountJob','0 20 4 * * ?','Y',NULL,NOW());
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (7,'com.macbackpackers.jobs.DiffBookingEnginesJob','0 9 1 * * ?','Y',NULL,NOW());
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (8,'com.macbackpackers.jobs.DbPurgeJob','0 31 4 * * ?','Y',NULL,NOW());
-INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (9,'com.macbackpackers.jobs.GuestCommentsReportJob','0 59 6 * * ?','Y',NULL,NOW());
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (10,'com.macbackpackers.jobs.CreateDepositChargeJob','0 00 22 * * ?','Y',NULL,NOW());
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (11,'com.macbackpackers.jobs.CreatePrepaidChargeJob','0 2 3 * * ?','Y',NULL,NOW());
 

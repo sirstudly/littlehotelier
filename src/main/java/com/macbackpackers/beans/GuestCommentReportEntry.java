@@ -31,6 +31,15 @@ public class GuestCommentReportEntry {
     @Column( name = "created_date" )
     private Timestamp createdDate;
 
+    public GuestCommentReportEntry() {
+        // default constructor
+    }
+
+    public GuestCommentReportEntry( int reservationId, String comments ) {
+        this.reservationId = reservationId;
+        this.comments = comments;
+    }
+
     public int getId() {
         return id;
     }

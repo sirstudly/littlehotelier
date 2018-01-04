@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -30,10 +31,10 @@ import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingWithGuestComments;
+import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
-import com.macbackpackers.beans.MissingGuestComment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
@@ -65,6 +66,25 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     public void insertAllocation( Allocation alloc ) {
         em.persist( alloc );
+    }
+
+    @Override
+    public void insertAllocations( AllocationList allocations ) {
+        if ( allocations.size() > 0 ) {
+            Query q = em.createNativeQuery( allocations.getBulkInsertStatement() );
+            for ( int i = 0 ; i < allocations.size() ; i++ ) {
+                Allocation a = allocations.get( i );
+                Object params[] = a.getAsParameters();
+                for ( int j = 0 ; j < params.length ; j++ ) {
+                    q.setParameter( i * params.length + j + 1, params[j] );
+                }
+            }
+            int rowsInserted = q.executeUpdate();
+            LOGGER.info( rowsInserted + " allocation rows inserted." );
+        }
+        else {
+            LOGGER.info( "Nothing to update." );
+        }
     }
 
     @Override
@@ -313,7 +333,6 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .getResultList();
     }
 
-    @SuppressWarnings( "unchecked" )
     @Override
     public List<BookingByCheckinDate> getHostelworldHostelBookersUnpaidDepositReservations( int allocationScraperJobId ) {
         LOGGER.info( "Querying unpaid reservations for allocation job : " + allocationScraperJobId );
@@ -704,40 +723,21 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    public List<MissingGuestComment> getAllocationsWithoutEntryInGuestCommentsReport( int allocationScraperJobId ) {
-        List<MissingGuestComment> allocations = em.createQuery(
-                        "SELECT DISTINCT new com.macbackpackers.beans.MissingGuestComment(c.reservationId, c.bookingReference, c.checkinDate)"
-                        + "  FROM Allocation c "
-                        + "  LEFT OUTER JOIN GuestCommentReportEntry r "
-                        + "    ON c.reservationId = r.reservationId "
-                        + " WHERE c.jobId = :allocationScraperJobId "
-                        + "   AND c.bookingReference IS NOT NULL " // could be NULL if BookingScraperJob failed to run
-                        + "   AND r.reservationId IS NULL "
-                        + "   AND c.reservationId > 0"
-                        + "   AND NOT EXISTS( "
-                        // if this job failed earlier, don't include entries where we 
-                        // have a pending job to update the guest comment table
-                        + "         SELECT 1 FROM GuestCommentSaveJob gcj"
-                        + "           JOIN JobParameter gcjp ON gcj.id = gcjp.job.id"
-                        + "          WHERE gcjp.name = 'reservation_id'"
-                        + "            AND gcjp.value = c.reservationId"
-                        + "            AND gcj.status IN ('submitted', 'processing'))", MissingGuestComment.class )
-                .setParameter( "allocationScraperJobId", allocationScraperJobId )
-                .getResultList();
-        return allocations;
-    }
-
-    @Override
-    public void updateGuestCommentsForReservation( int reservationId, String comment ) {
-        em.createNativeQuery( "INSERT INTO wp_lh_rpt_guest_comments ( reservation_id, comments ) "
-                        + " VALUES ( :reservationId, :comments ) "
-                        + " ON DUPLICATE KEY UPDATE "
-                        + " reservation_id = VALUES( reservation_id ), "
-                        + " comments = VALUES( comments )" )
-                .setParameter( "reservationId", reservationId )
-                .setParameter( "comments", comment )
-                .executeUpdate();
-        LOGGER.info( "Updating guest comments for reservation " + reservationId );
+    public void updateGuestCommentsForReservations( List<GuestCommentReportEntry> comments ) {
+        if ( comments.size() > 0 ) {
+            Query q = em.createNativeQuery( "INSERT INTO wp_lh_rpt_guest_comments ( reservation_id, comments ) "
+                    + " VALUES " + StringUtils.repeat( "( ?, ? )", ",", comments.size() )
+                    + " ON DUPLICATE KEY UPDATE "
+                    + " reservation_id = VALUES( reservation_id ), "
+                    + " comments = VALUES( comments )" );
+            for ( int i = 0 ; i < comments.size() ; i++ ) {
+                GuestCommentReportEntry entry = comments.get( i );
+                q.setParameter( 2 * i + 1, entry.getReservationId() );
+                q.setParameter( 2 * i + 2, entry.getComments() );
+            }
+            q.executeUpdate();
+            LOGGER.info( "Updated " + comments.size() + " guest comments." );
+        }
     }
 
     @Override

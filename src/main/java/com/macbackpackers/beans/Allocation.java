@@ -1,11 +1,14 @@
 
 package com.macbackpackers.beans;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.text.ParseException;
-import java.util.Calendar;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -14,12 +17,15 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.hibernate.annotations.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.macbackpackers.exceptions.UnrecoverableFault;
 
 @Entity
 @Table( name = "wp_lh_calendar" )
@@ -327,6 +333,69 @@ public class Allocation {
 
     public void setCreatedDate( Timestamp createdDate ) {
         this.createdDate = createdDate;
+    }
+
+    /**
+     * Retrieves the corresponding DB table name for this class based on its annotation.
+     * 
+     * @return table name
+     */
+    public static String getTableName() {
+        for ( Annotation ann : Allocation.class.getAnnotations() ) {
+            if ( ann instanceof Table ) {
+                Table tableAnnotation = (Table) ann;
+                return tableAnnotation.name();
+            }
+        }
+        throw new UnrecoverableFault( "Table annotation not found" );
+    }
+    
+    /**
+     * Returns a comma-delimited list of column names for this object from its annotations.
+     * 
+     * @return column names
+     */
+    public static String getColumnNames() {
+        ArrayList<String> columns = new ArrayList<>();
+        for ( Field field : Allocation.class.getDeclaredFields() ) {
+            for ( Annotation annotation : field.getDeclaredAnnotations() ) {
+                if ( annotation instanceof Column && field.getDeclaredAnnotation( Id.class ) == null ) {
+                    Column columnAnnotation = (Column) annotation;
+                    columns.add( columnAnnotation.name() );
+                }
+            }
+        }
+        return StringUtils.join( columns, "," );
+    }
+
+    /**
+     * Retrieves all fields on this object as a single array in the order specified by its
+     * persistence annotations.
+     * 
+     * @return non-null array
+     */
+    public Object[] getAsParameters() {
+        List<Object> params = new ArrayList<>();
+        for ( Field field : getClass().getDeclaredFields() ) {
+            for ( Annotation annotation : field.getDeclaredAnnotations() ) {
+                // include only those with column annotations which are not the Id
+                if ( annotation instanceof Column && field.getDeclaredAnnotation( Id.class ) == null ) {
+                    try {
+                        Type typeAnnotation = field.getDeclaredAnnotation( Type.class );
+                        if ( typeAnnotation != null && "yes_no".equals( typeAnnotation.type() ) ) {
+                            params.add( Boolean.TRUE.equals( field.get( this ) ) ? "Y" : "N" );
+                        }
+                        else {
+                            params.add( field.get( this ) );
+                        }
+                    }
+                    catch ( IllegalArgumentException | IllegalAccessException e ) {
+                        throw new UnrecoverableFault( e );
+                    }
+                }
+            }
+        }
+        return params.toArray();
     }
 
     @Override

@@ -3,6 +3,8 @@ package com.macbackpackers.dao;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -24,10 +26,11 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.macbackpackers.beans.Allocation;
+import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BookingByCheckinDate;
+import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
-import com.macbackpackers.beans.MissingGuestComment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.config.LittleHotelierConfig;
@@ -59,6 +62,30 @@ public class WordPressDAOTest {
     @Test
     public void testInsertAllocation() throws Exception {
 
+        Allocation alloc = createNewAllocation();
+
+        dao.insertAllocation( alloc );
+        Assert.assertTrue( "ID not assigned", alloc.getId() > 0 );
+
+        Allocation allocView = dao.fetchAllocation( alloc.getId() );
+        Assert.assertEquals( "ETA", alloc.getEta(), allocView.getEta() );
+        Assert.assertEquals( "viewed", alloc.isViewed(), allocView.isViewed() );
+    }
+
+    @Test
+    public void testInsertAllocationList() throws Exception {
+
+        AllocationList al = new AllocationList();
+        al.add( createNewAllocation() );
+        Allocation alloc = createNewAllocation();
+        alloc.setJobId( 2 );
+        alloc.setRoom( "new room2" );
+        al.add( alloc );
+        
+        dao.insertAllocations( al );
+    }
+
+    private Allocation createNewAllocation() throws ParseException {
         Allocation alloc = new Allocation();
         alloc.setJobId( 3 );
         alloc.setRoomId( 15 );
@@ -82,13 +109,7 @@ public class WordPressDAOTest {
         alloc.setNotes( "Multi-line\nnotes" );
         alloc.setViewed( true );
         alloc.setCreatedDate( new Timestamp( System.currentTimeMillis() ) );
-
-        dao.insertAllocation( alloc );
-        Assert.assertTrue( "ID not assigned", alloc.getId() > 0 );
-
-        Allocation allocView = dao.fetchAllocation( alloc.getId() );
-        Assert.assertEquals( "ETA", alloc.getEta(), allocView.getEta() );
-        Assert.assertEquals( "viewed", alloc.isViewed(), allocView.isViewed() );
+        return alloc;
     }
 
     @Test
@@ -111,6 +132,15 @@ public class WordPressDAOTest {
         Assert.assertEquals( "checkin date", "2014-04-26", DATE_FORMAT_YYYY_MM_DD.format( allocView.getCheckinDate() ) );
         Assert.assertEquals( "bed name", "Updated bed name", allocView.getBedName() );
         Assert.assertEquals( "notes", "Updated notes", allocView.getNotes() );
+    }
+
+    @Test
+    public void testUpdateGuestCommentsForReservations() throws Exception {
+        List<GuestCommentReportEntry> comments = new ArrayList<>();
+        comments.add( new GuestCommentReportEntry( 12345678, "Test Comment" ) );
+        comments.add( new GuestCommentReportEntry( 12345679, "Test Comment 2" ) );
+        comments.add( new GuestCommentReportEntry( 12345680, "Test Comment 3" ) );
+        dao.updateGuestCommentsForReservations( comments );
     }
 
     @Test
@@ -444,15 +474,6 @@ public class WordPressDAOTest {
     public void testGetOption() {
         Assert.assertEquals( "Just another WordPress site", dao.getOption( "blogdescription" ) );
         Assert.assertEquals( null, dao.getOption( "non.existent.key" ) );
-    }
-    
-    @Test
-    public void testGetAllocations() {
-        List<MissingGuestComment> allocations = dao.getAllocationsWithoutEntryInGuestCommentsReport( 472 );
-        for(MissingGuestComment a : allocations) {
-            LOGGER.info( "Reservation: " + a.getReservationId() );
-            LOGGER.info( "Booking Ref: " + a.getBookingReference() );
-        }
     }
     
     @Test

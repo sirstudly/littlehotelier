@@ -12,10 +12,10 @@ import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingWithGuestComments;
+import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
-import com.macbackpackers.beans.MissingGuestComment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
@@ -36,6 +36,13 @@ public interface WordPressDAO {
      * @param alloc the new allocation to insert
      */
     public void insertAllocation( Allocation alloc );
+    
+    /**
+     * Bulk insert a bunch of allocations.
+     * 
+     * @param allocations new allocations to create
+     */
+    public void insertAllocations( AllocationList allocations );
 
     /**
      * Updates attributes on an existing allocation.
@@ -328,21 +335,12 @@ public interface WordPressDAO {
     public List<String> findMissingHwBookingRefs( int jobId, Date checkinDate );
 
     /**
-     * Returns a list of Allocations which haven't been added to the guest comments report
-     * table.
+     * Inserts/updates the table for guest comments with a block of guest comments.
+     * {@code reservationId} and {@code comments} must be populated.
      * 
-     * @param allocationScraperJobId the scraper job ID which was run
-     * @return non-null list of bookings
+     * @param comments the guest comment (if applicable) for the reservation
      */
-    public List<MissingGuestComment> getAllocationsWithoutEntryInGuestCommentsReport( int allocationScraperJobId );
-
-    /**
-     * Inserts/updates the table for guest comments with the given guest comment.
-     * 
-     * @param reservationId ID of reservation to update
-     * @param comment the guest comment (if applicable) for the reservation
-     */
-    public void updateGuestCommentsForReservation( int reservationId, String comment );
+    public void updateGuestCommentsForReservations( List<GuestCommentReportEntry> comments );
 
     /**
      * Returns the wordpress option for the given property.

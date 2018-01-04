@@ -3,8 +3,10 @@ package com.macbackpackers.scrapers;
 
 import java.io.IOException;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
@@ -19,6 +21,8 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.macbackpackers.beans.Allocation;
+import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
@@ -118,6 +122,9 @@ public class AllocationsPageScraper {
         String currentBedName = null;
         String dataRoomId = null;
         String dataRoomTypeId = null;
+        AllocationList allocations = new AllocationList();
+        List<GuestCommentReportEntry> guestComments = new ArrayList<>();
+
         for ( DomElement div : calendarPage.getElementsByTagName( "div" ) ) {
             String dataDate = div.getAttribute( "data-date" );
 
@@ -160,15 +167,21 @@ public class AllocationsPageScraper {
                 // it could be one day off screen
                 for ( DomElement elem : div.getChildElements() ) {
                     if ( "span".equals( elem.getTagName() ) ) {
-                        insertAllocationFromSpan( jobId, Integer.parseInt( dataRoomTypeId ),
+                        collectAllocationsFromSpan( jobId, Integer.parseInt( dataRoomTypeId ),
                                 dataRoomId == null ? null : Integer.parseInt( dataRoomId ),
-                                currentBedName, dataDate, elem );
+                                currentBedName, dataDate, elem, allocations, guestComments );
                     }
                 }
                 if ( div.hasChildNodes() == false ) {
                     LOGGER.debug( "no records for " + dataDate );
                 }
             }
+        }
+
+        // batch update
+        if ( allocations.size() > 0 ) {
+            dao.insertAllocations( allocations );
+            dao.updateGuestCommentsForReservations( guestComments );
         }
     }
 
@@ -181,9 +194,12 @@ public class AllocationsPageScraper {
      * @param currentBedName the bed name for the allocation (required)
      * @param dataDate the data date for the record we are currently processing
      * @param span the span element containing the allocation details
+     * @param allocations container to add allocations to insert
+     * @param comments container to add guest comments to insert/update
      */
-    private void insertAllocationFromSpan( int jobId, int dataRoomTypeId,
-            Integer dataRoomId, String currentBedName, String dataDate, DomElement span ) {
+    private void collectAllocationsFromSpan( int jobId, int dataRoomTypeId,
+            Integer dataRoomId, String currentBedName, String dataDate, DomElement span, 
+            List<Allocation> allocations, List<GuestCommentReportEntry> comments ) {
 
         // should have 3 spans
         // 1) wrapper holding the following info
@@ -248,10 +264,11 @@ public class AllocationsPageScraper {
 
         LOGGER.info( "Done allocation " + alloc.getReservationId() + ": " + alloc.getGuestName() );
         LOGGER.debug( alloc.toString() );
-        dao.insertAllocation( alloc );
+        allocations.add( alloc );
 
-        String comments = StringUtils.trimToNull( span.getAttribute( "data-guest_comments" ) );
-        dao.updateGuestCommentsForReservation( alloc.getReservationId(), comments );
+        comments.add( new GuestCommentReportEntry(
+                alloc.getReservationId(),
+                StringUtils.trimToNull( span.getAttribute( "data-guest_comments" ) ) ) );
     }
 
     /**
