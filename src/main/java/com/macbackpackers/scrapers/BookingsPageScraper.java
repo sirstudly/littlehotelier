@@ -236,6 +236,7 @@ public class BookingsPageScraper {
             // existing record should already have the guest name(s)
             td = td.getNextElementSibling();
             LOGGER.debug( "  name: " + StringUtils.trim( td.getTextContent() ) );
+            boolean isUnread = StringUtils.trimToEmpty( td.getAttribute( "class" ) ).contains( "unread" );
 
             td = td.getNextElementSibling();
             DomElement bookingAnchor = td.getFirstElementChild();
@@ -286,6 +287,11 @@ public class BookingsPageScraper {
 
             td = td.getNextElementSibling();
             LOGGER.debug( "  Total Outstanding: " + StringUtils.trim( td.getTextContent() ) );
+
+            // only update if differs from default
+            if( isUnread ) {
+                allocList.setViewed( false );
+            }
 
             // write the updated attributes to datastore
             wordPressDAO.updateAllocationList( allocList );
