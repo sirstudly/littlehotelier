@@ -167,6 +167,12 @@ public class PaymentProcessorService {
             processPxPostTransaction( jobId, bookingRef, depositPayment, true, reservationPage );
         }
         catch ( MissingUserDataException ex ) {
+            if ( ex.getMessage().contains( "Amex not enabled" ) ) {
+                HtmlTextArea notes = reservationPage.getFirstByXPath( "//textarea[@id='notes']" );
+                if ( notes.getText().contains( "Amex not enabled" ) ) {
+                    return; // already in notes; ignore...
+                }
+            }
             reservationPageScraper.appendNote( reservationPage,
                     ex.getMessage() + " - " + DATETIME_FORMAT.format( new Date() ) + "\n" );
         }
@@ -404,10 +410,10 @@ public class PaymentProcessorService {
             }
             else {
                 LOGGER.info( "Previous transaction was *NOT* recorded in LH. Updating now." );
-            reservationPageScraper.addPayment( reservationPage, pxpost.getPaymentAmount(), "Other", isDeposit, 
-                    "PxPost transaction " + pxpost.getId() + " successful. - " 
-                    + DATETIME_FORMAT.format( new Date() ) );
-        }
+                reservationPageScraper.addPayment( reservationPage, pxpost.getPaymentAmount(), "Other", isDeposit,
+                        "PxPost transaction " + pxpost.getId() + " successful. - "
+                                + DATETIME_FORMAT.format( pxpost.getCreatedDate() ) );
+            }
         }
         else { // pxpost.isSuccessful() == null
             // not sure if the last payment went through...
