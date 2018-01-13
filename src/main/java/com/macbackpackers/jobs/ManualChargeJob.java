@@ -115,9 +115,4 @@ public class ManualChargeJob extends AbstractJob {
         setParameter( "use_lh_card_details", String.valueOf( overrideCardDetails ) );
     }
 
-    @Override
-    public int getRetryCount() {
-        return 1; // only attempt to charge card once!
-    }
-
 }
