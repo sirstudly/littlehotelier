@@ -50,6 +50,7 @@ import com.macbackpackers.beans.json.RecordPaymentRequest;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentCardNotAcceptedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.exceptions.WebResponseException;
 import com.macbackpackers.services.AuthenticationService;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.GmailService;
@@ -384,6 +385,28 @@ public class ReservationPageScraper {
             LOGGER.debug( new LHJsonCardMask().applyCardMask( webRequest.getRequestBody() ) );
         }
 
+        try {
+            // sometimes we get a blank page on POST from LH with nothing updated
+            // try it again once more if this happens
+            return doSendJsonRequest( webClient, webRequest );
+        }
+        catch( WebResponseException e ) {
+            LOGGER.error( e.getMessage() + ": " + e.getWebResponse().getContentAsString() );
+            LOGGER.error( "Reattempting one more time..." );
+            return doSendJsonRequest( webClient, webRequest );
+        }
+    }
+
+    /**
+     * Sends the JSON request.
+     * 
+     * @param webClient the web client
+     * @param webRequest request to POST
+     * @return non-null parsed response
+     * @throws WebResponseException if we don't get a proper JSON response
+     * @throws IOException on comms error
+     */
+    private JsonObject doSendJsonRequest( WebClient webClient, WebRequest webRequest ) throws WebResponseException, IOException {
         Page redirectPage = webClient.getPage( webRequest );
         WebResponse webResponse = redirectPage.getWebResponse();
         if ( webResponse.getContentType().equalsIgnoreCase( "application/json" ) ) {
@@ -400,10 +423,8 @@ public class ReservationPageScraper {
             }
             return responseObj;
         }
-        else {
-            LOGGER.error( webResponse.getContentAsString() );
-            throw new IOException( "Unexpected response type: " + webResponse.getContentType() );
-        }
+        throw new WebResponseException( "Unexpected response type: " +
+                webResponse.getContentType(), webResponse );
     }
 
     /**
