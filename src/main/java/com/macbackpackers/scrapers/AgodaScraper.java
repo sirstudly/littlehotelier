@@ -89,17 +89,18 @@ public class AgodaScraper {
         // Change the value of the text fields
         usernameField.setValueAttribute( username );
         passwordField.setValueAttribute( password );
+        loginPage.getWebClient().waitForBackgroundJavaScript( 5000 ); // wait for page to load
         HtmlAnchor loginLink = loginPage.getFirstByXPath( "//a[@type='submit' and @title='Login']" );
 
         HtmlPage nextPage = loginLink.click();
-        nextPage.getWebClient().waitForBackgroundJavaScript( 60000 ); // wait for page to load
+        nextPage.getWebClient().waitForBackgroundJavaScript( 20000 ); // wait for page to load
 
         // if this is the first time logging in, retrieve and enter the passcode if requested
         HtmlDivision passcodeModalDiv = HtmlDivision.class.cast( nextPage.getElementById( "mfa-user-authentication-dialog" ) );
         if ( passcodeModalDiv == null ) {
             LOGGER.warn( "Modal dialog for passcode not present? Proceeding assuming we're logged in" );
         }
-        else if ( "false".equals( passcodeModalDiv.getAttribute( "aria-hidden" ) ) ) {
+        else if ( passcodeModalDiv.isDisplayed() ) {
             LOGGER.info( "Passcode requested. Retrieving from Gmail." );
             sleep( 50000 ); // it takes a few seconds for the email to arrive
             LOGGER.debug( nextPage.asXml() );
