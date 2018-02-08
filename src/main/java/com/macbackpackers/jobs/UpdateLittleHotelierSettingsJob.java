@@ -35,10 +35,11 @@ public class UpdateLittleHotelierSettingsJob extends AbstractJob {
         // using the parameters specified by the job
         // *disabled for now - not working*
 //        authService.doLogin( webClient, getParameter( "username" ), getParameter( "password" ) );
-        dao.setOption( "hbo_lilho_username", getParameter( "username" ));
-        dao.setOption( "hbo_lilho_password", getParameter( "password" ));
+//        dao.setOption( "hbo_lilho_username", getParameter( "username" ));
+//        dao.setOption( "hbo_lilho_password", getParameter( "password" ));
 
         // update the session cookie and write it to disk
+        fileService.loadCookiesFromFile( webClient );
         fileService.addLittleHotelierSessionCookie( webClient, dao.getOption( "hbo_lilho_session" ) );
         fileService.writeCookiesToFile( webClient );
     }
