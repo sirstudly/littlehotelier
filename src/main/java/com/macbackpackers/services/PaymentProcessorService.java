@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.collections.ListUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
@@ -403,7 +404,9 @@ public class PaymentProcessorService {
         else if ( Boolean.TRUE.equals( pxpost.getSuccessful() ) ) {
 
             LOGGER.info( "Last transaction was successful; checking if payment was logged in LH" );
-            List<?> paymentDivs = reservationPage.getByXPath( "//div[@class='payment-row']/div[@class='row']/div" );
+            List<?> paymentDivs = ListUtils.union(
+                    reservationPage.getByXPath( "//div[@class='payment-row']/div[@class='row']/div" ),
+                    reservationPage.getByXPath( "//div[@class='payment-label-bottom']" ) );
             if ( paymentDivs.stream().anyMatch( p -> HtmlDivision.class.cast( p ).getTextContent()
                     .contains( "PxPost transaction " + pxpost.getId() + " successful" ) ) ) {
                 LOGGER.info( "Previous transaction was recorded in LH. Ok to continue." );
@@ -483,6 +486,12 @@ public class PaymentProcessorService {
             }
             Payment depositCharge = new Payment( ccDetails );
             updatePaymentWithBdcDepositChargeAmount( depositCharge, reservationPage );
+
+            // on occasion, this is not the correct CVC for virtual payments
+            if ( depositCharge.isVirtual() && "000".equals( depositCharge.getCardDetails().getCvv() ) ) {
+                LOGGER.warn( "CVC of 000 found. This is probably a fuck-up on BDC. Blanking out CVC." );
+                depositCharge.getCardDetails().setCvv( null );
+            }
             return depositCharge;
             
         }
