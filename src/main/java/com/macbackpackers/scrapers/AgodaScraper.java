@@ -57,6 +57,7 @@ public class AgodaScraper {
     private static final Pattern CARD_EXPIRY_PATTERN = Pattern.compile( "(\\d{2})/\\d{2}(\\d{2})" );
     
     public static final String NO_CHARGE_NOTE = "AGODA BOOKING DO NOT CHARGE GUEST - RONBOT";
+    public static final String CHARGE_NOTE = "PROPERTY COLLECT. CHARGE GUEST IN FULL. - RONBOT";
 
     /**
      * Logs into Agoda providing the necessary credentials.

@@ -114,17 +114,6 @@ public class ReservationPageScraper {
     }
 
     /**
-     * Returns the card lookup URL for the given ID.
-     * 
-     * @param reservationId ID of reservation to lookup
-     * @return URL of individual reservation
-     */
-    private String getCardLookupURL( int reservationId ) {
-        return String.format( "https://app.littlehotelier.com/extranet/properties/%s/reservations/%d/display_card_number",
-                lhPropertyId, reservationId );
-    }
-
-    /**
      * Returns the payments recoring URL for the given ID.
      * 
      * @param reservationId ID of reservation to lookup
@@ -536,6 +525,66 @@ public class ReservationPageScraper {
     }
 
     /**
+     * Appends a message to the guest comments/notes section of the current reservation page.
+     * 
+     * @param reservationPage the currently loaded reservation page.
+     * @param comments guest comments to be prepended (optional)
+     * @param note the note to be prepended (optional)
+     * @throws IOException on I/O error
+     */
+    public void replaceCommentsAndNote( HtmlPage reservationPage, String comments, String note ) throws IOException {
+        
+        if ( note != null ) {
+            LOGGER.info( "Replacing note on reservation: " + note );
+        }
+        if ( comments != null ) {
+            LOGGER.info( "Replacing guest-comments on reservation: " + note );
+        }
+        if( note == null && comments == null ) {
+            LOGGER.info( "Nothing to do..." );
+            return;
+        }
+
+        // send a GET request for this reservation so we have a starting point
+        int reservationId = getReservationId( reservationPage );
+        URL reservationLoadURL = new URL( getReservationLoadURL( reservationId ) );
+        JsonObject reservationRoot = sendJsonRequest( reservationPage.getWebClient(),
+                constructDefaultGetRequest( reservationLoadURL, reservationPage ) );
+
+        // this is now a new JSON object we can manipulate
+        JsonObject updateJson = transformReservationToUpdate( reservationRoot );
+        reservationRoot = updateJson.get( "reservation" ).getAsJsonObject();
+
+        // replace "notes" property
+        if ( note != null ) {
+            reservationRoot.getAsJsonObject().addProperty( "notes", note );
+        }
+
+        // replace "guest_comments" property
+        if ( comments != null ) {
+            reservationRoot.getAsJsonObject().addProperty( "guest_comments", comments );
+        }
+
+        // now send the update!
+        URL reservationPostURL = new URL( getReservationPostURL( reservationId ) );
+        try {
+            sendJsonRequest( reservationPage.getWebClient(),
+                    constructDefaultRequest( HttpMethod.PUT, reservationPostURL,
+                            reservationPage, gson.toJson( updateJson ) ) );
+        }
+        catch ( PaymentCardNotAcceptedException ex ) {
+            // to bypass issue with saving a note when an Amex card is currently visible
+            // because we don't support Amex cards (but we may still get one from another channel)
+            // LH won't save card details if they're masked
+            LOGGER.info( "LH complaining with card validation error; trying again with masked card details" );
+            reservationRoot.getAsJsonObject().addProperty( "payment_card_number", "XXXX-XXXX-XXXX-XXXX" );
+            sendJsonRequest( reservationPage.getWebClient(),
+                    constructDefaultRequest( HttpMethod.PUT, reservationPostURL,
+                            reservationPage, gson.toJson( updateJson ) ) );
+        }
+    }
+
+    /**
      * Returns the card details from the reservation page. Expiry is only populated if available.
      * 
      * @param reservationPage the currently open reservation page
@@ -739,15 +788,52 @@ public class ReservationPageScraper {
         HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageBookedOn( webClient, bookedDate, bookingRef );
         HtmlPage reservationPage = getReservationPage( webClient, bookingsPage, bookingRef );
         HtmlTextArea guestComments = reservationPage.getFirstByXPath( "//textarea[@id='guest_comments']" );
+        HtmlTextArea reservationNotes = reservationPage.getFirstByXPath( "//textarea[@id='notes']" );
 
         String newComment = null;
         String newNote = null;
-        if ( false == guestComments.getTextContent().contains( AgodaScraper.NO_CHARGE_NOTE ) ) {
+        if ( guestComments.getTextContent().contains( AgodaScraper.NO_CHARGE_NOTE ) ) {
+            // Remove no-charge note for all bookings where we collect here
+            if ( guestComments.getTextContent().contains( "Property Collect" ) ) {
+                LOGGER.info( "Removing no-charge note in comments, replacing with charge note." );
+                replaceCommentsAndNote( reservationPage,
+                        AgodaScraper.CHARGE_NOTE + "\n" + guestComments.getTextContent().replaceAll( AgodaScraper.NO_CHARGE_NOTE, "" ),
+                        AgodaScraper.CHARGE_NOTE + "\n" + reservationNotes.getTextContent().replaceAll( AgodaScraper.NO_CHARGE_NOTE, "" ) );
+                return;
+            }
+            LOGGER.info( "No-charge note already present. Skipping update to guest comments." );
+        }
+        else if ( guestComments.getTextContent().contains( AgodaScraper.CHARGE_NOTE ) ) {
+            LOGGER.info( "Charge note already present. Skipping" );
+        }
+        else if ( guestComments.getTextContent().contains( "Property Collect" ) ) {
+            LOGGER.info( "Adding charge note to comments." );
+            newComment = AgodaScraper.CHARGE_NOTE;
+        }
+        else {
+            LOGGER.info( "Adding no charge note to comments." );
             newComment = AgodaScraper.NO_CHARGE_NOTE;
         }
 
-        HtmlTextArea reservationNotes = reservationPage.getFirstByXPath( "//textarea[@id='notes']" );
-        if ( false == reservationNotes.getTextContent().contains( AgodaScraper.NO_CHARGE_NOTE ) ) {
+        if ( reservationNotes.getTextContent().contains( AgodaScraper.NO_CHARGE_NOTE ) ) {
+            // Remove no-charge note for all bookings where we collect here
+            if( guestComments.getTextContent().contains( "Property Collect" ) ) {
+                LOGGER.info( "Removing no-charge note, replacing with charge note." );
+                replaceCommentsAndNote( reservationPage, null,
+                        AgodaScraper.CHARGE_NOTE + "\n" + reservationNotes.getTextContent().replaceAll( AgodaScraper.NO_CHARGE_NOTE, "" ) );
+                return;
+            }
+            LOGGER.info( "No-charge note already present. Skipping update to notes." );
+        }
+        else if ( reservationNotes.getTextContent().contains( AgodaScraper.CHARGE_NOTE ) ) {
+            LOGGER.info( "Charge note already present. Skipping" );
+        }
+        else if ( guestComments.getTextContent().contains( "Property Collect" ) ) {
+            LOGGER.info( "Adding charge note to notes." );
+            newNote = AgodaScraper.CHARGE_NOTE;
+        }
+        else {
+            LOGGER.info( "Adding no charge note to notes." );
             newNote = AgodaScraper.NO_CHARGE_NOTE;
         }
 
