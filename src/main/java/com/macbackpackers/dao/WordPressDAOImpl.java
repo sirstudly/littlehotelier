@@ -62,6 +62,9 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Value( "${processor.id}" )
     private String processorId;
 
+    @Value( "${wordpress.db.prefix}" )
+    private String wordpressPrefix;
+
     @Override
     public void insertAllocation( Allocation alloc ) {
         em.persist( alloc );
@@ -745,7 +748,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     public String getOption( String property ) {
         List<String> sqlResult = em.createNativeQuery(
                 "          SELECT option_value"
-                        + "  FROM wp_options"
+                        + "  FROM " + wordpressPrefix + "options"
                         + " WHERE option_name = :optionName " )
                 .setParameter( "optionName", property )
                 .getResultList();
@@ -766,7 +769,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     public void setOption( String property, String value ) {
         em.createNativeQuery(
-                "   INSERT INTO wp_options(option_name, option_value) "
+                "   INSERT INTO " + wordpressPrefix + "options(option_name, option_value) "
                 + " VALUES (:name, :value) "
                 + " ON DUPLICATE KEY "
                 + " UPDATE option_name = :name, option_value = :value")
