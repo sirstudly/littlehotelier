@@ -21,6 +21,7 @@ import com.macbackpackers.services.PaymentProcessorService;
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.AgodaChargeJob" )
+@Deprecated // doesn't seem to be working
 public class AgodaChargeJob extends AbstractJob {
 
     @Autowired

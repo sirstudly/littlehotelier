@@ -60,11 +60,13 @@ public class CreateAgodaChargeJob extends AbstractJob {
             if ( (Arrays.asList( "checked-in", "checked-out" ).contains( status ) && paymentOutstanding.compareTo( BigDecimal.ZERO ) > 0)
                     || ("confirmed".equals( status ) && checkinDate.before( toDate ) && paymentReceived.equals( BigDecimal.ZERO )) ) {
 
-                LOGGER.info( "Creating a AgodaChargeJob for booking " + bookingRef );
-                AgodaChargeJob agodaChargeJob = new AgodaChargeJob();
+                LOGGER.info( "Creating a ManualChargeJob for booking " + bookingRef );
+                ManualChargeJob agodaChargeJob = new ManualChargeJob();
                 agodaChargeJob.setStatus( JobStatus.submitted );
                 agodaChargeJob.setBookingRef( bookingRef );
-                agodaChargeJob.setCheckinDate( checkinDate );
+                agodaChargeJob.setAmount( paymentOutstanding );
+                agodaChargeJob.setMessage( "Automated charge attempt. -ronbot" );
+                agodaChargeJob.setCardDetailsOverrideEnabled( true );
                 dao.insertJob( agodaChargeJob );
             }
         }
