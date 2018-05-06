@@ -34,6 +34,7 @@ import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
+import com.macbackpackers.beans.JobScheduler;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.ScheduledJob;
@@ -373,6 +374,30 @@ public class WordPressDAOImpl implements WordPressDAO {
             throw new EmptyResultDataAccessException( 1 );
         }
         job.setLastScheduledDate( new Timestamp( System.currentTimeMillis() ) );
+    }
+
+    @Override
+    public List<JobScheduler> fetchActiveJobSchedules() {
+        return em.createQuery(
+                "FROM JobScheduler WHERE active = true", JobScheduler.class )
+                .getResultList();
+    }
+
+    @Override
+    public void updateJobScheduler( JobScheduler schedule ) {
+        em.merge( schedule );
+    }
+    
+    @Override
+    public boolean isJobCurrentlyPending( String classname ) {
+        return em.createQuery( "SELECT COUNT(1) FROM AbstractJob "
+                + "     WHERE classname = :classname "
+                + "     AND status IN (:submittedStatus, :processingStatus)",
+                Long.class )
+                .setParameter( "classname", classname )
+                .setParameter( "submittedStatus", JobStatus.submitted )
+                .setParameter( "processingStatus", JobStatus.processing )
+                .getSingleResult() > 0;
     }
 
     @Override

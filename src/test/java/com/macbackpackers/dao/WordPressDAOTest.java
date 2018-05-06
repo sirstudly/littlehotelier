@@ -597,4 +597,26 @@ public class WordPressDAOTest {
                 } );
         LOGGER.info( "Found " + counter + " records" );
     }
+    
+    @Test
+    public void testFetchActiveJobSchedules() {
+        dao.fetchActiveJobSchedules()
+                .stream()
+                .forEach( s -> {
+                    LOGGER.info( ToStringBuilder.reflectionToString( s ) );
+                    LOGGER.info( "is overdue? " + s.isOverdue() );
+                    try {
+                        int jobId = dao.insertJob( s.createNewJob() );
+                        LOGGER.info( "Created job " + jobId );
+                    }
+                    catch ( ReflectiveOperationException e ) {
+                        LOGGER.error( "whoops!", e );
+                    }
+                } );
+    }
+    
+    @Test
+    public void testIsJobCurrentlyPending() {
+        LOGGER.info( "pending: " + dao.isJobCurrentlyPending( "com.macbackpackers.jobs.ConfirmDepositAmountsJob" ) );        
+    }
 }

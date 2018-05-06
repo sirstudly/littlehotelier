@@ -80,6 +80,27 @@ CREATE TABLE `wp_lh_scheduled_job_param` (
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 
+CREATE TABLE `job_scheduler` (
+  `job_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `classname` varchar(255) NOT NULL,
+  `repeat_time_minutes` int(10) unsigned DEFAULT NULL,
+  `repeat_daily_at` varchar(8) NULL DEFAULT NULL, -- 24 hour clock e.g. 23:00:00 
+  `active_yn` char(1) DEFAULT NULL,
+  `last_run_date` timestamp NULL DEFAULT NULL,
+  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_updated_date` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`job_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+CREATE TABLE `job_scheduler_param` (
+  `job_param_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `job_id` bigint(20) unsigned NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `value` varchar(255) NOT NULL,
+  PRIMARY KEY (`job_param_id`)
+--  FOREIGN KEY (`job_id`) REFERENCES `job_scheduler`(`job_id`) -- removed cause of hibernate
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
 CREATE TABLE `wp_lh_job_dependency` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `job_id` bigint(20) unsigned NOT NULL,
@@ -656,6 +677,34 @@ INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`roo
 
 *************** END RMB ***************/
  
+/***  START FORT WILLIAM *********
+
+INSERT INTO wp_lh_rooms(id, room_type_id, room, bed_name)
+SELECT DISTINCT room_id, room_type_id, room, bed_name
+  FROM wp_lh_calendar
+  WHERE room_id IS NOT NULL;
+
+UPDATE wp_lh_rooms
+   SET capacity = 6, room_type = 'M', active_yn = 'Y' WHERE room IN ( '6' );
+   
+UPDATE wp_lh_rooms
+   SET capacity = 6, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '4' );
+
+UPDATE wp_lh_rooms
+   SET capacity = 8, room_type = 'F', active_yn = 'Y' WHERE room IN ( '5' );
+
+UPDATE wp_lh_rooms
+   SET capacity = 8, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '1', '2' );
+
+UPDATE wp_lh_rooms
+   SET capacity = 2, room_type = 'TWIN', active_yn = 'Y' WHERE room IN ( 'Room 03' );
+
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`)
+SELECT DISTINCT 100000 + room_type_id `id`, 'Unallocated' `room`, null `bed_name`, capacity, room_type_id, room_type, 'N' `active_yn` FROM wp_lh_rooms
+ WHERE room IN ('1','2','4','5','6','Room 03');
+
+*************** END FORT WILLIAM ***************/
+
 -- scheduled jobs
 /*
 INSERT INTO `wp_lh_scheduled_jobs` (`job_id`,`classname`,`cron_schedule`,`active_yn`,`last_scheduled_date`,`last_updated_date`) VALUES (1,'com.macbackpackers.jobs.ScrapeReservationsBookedOnJob','0 31 * * * ?','Y',NULL,NOW());

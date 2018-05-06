@@ -15,6 +15,7 @@ import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
+import com.macbackpackers.beans.JobScheduler;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.ScheduledJob;
@@ -194,6 +195,29 @@ public interface WordPressDAO {
      * @throws EmptyResultDataAccessException if jobId doesn't exist
      */
     public void updateScheduledJob( int jobId ) throws EmptyResultDataAccessException;
+
+    /**
+     * Returns the list of active job schedules.
+     * 
+     * @return non-null list of job schedules
+     */
+    public List<JobScheduler> fetchActiveJobSchedules();
+    
+    /**
+     * Updates an existing JobScheduler.
+     * 
+     * @param schedule job scheduler to save
+     */
+    public void updateJobScheduler( JobScheduler schedule );
+
+    /**
+     * Checks whether the given job is at {@link JobStatus#processing} or
+     * {@link JobStatus#submitted}.
+     * 
+     * @param classname fully qualified name of job class
+     * @return true if job is currently running or submitted
+     */
+    public boolean isJobCurrentlyPending( String classname );
 
     /**
      * Returns the most recent job of the given type.

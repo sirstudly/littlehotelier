@@ -100,6 +100,7 @@ public class RunProcessor
     public void runInStandardMode() throws IOException, ShutdownException, SchedulerException {
         acquireLock();
 //        dao.resetAllProcessingJobsToFailed();
+        processorService.createOverdueScheduledJobs();
         processorService.processJobs();
     }
 

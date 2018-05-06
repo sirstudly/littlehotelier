@@ -2,6 +2,7 @@
 package com.macbackpackers.services;
 
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -83,6 +84,30 @@ public class ProcessorService {
         catch ( InterruptedException e ) {
             // ignored
         }
+    }
+
+    /**
+     * Runs through all scheduled jobs and creates any that need to be run.
+     */
+    public void createOverdueScheduledJobs() {
+        dao.fetchActiveJobSchedules()
+                .stream()
+                .filter( s -> s.isOverdue() && s.isActive() )
+                .forEach( s -> {
+                    try {
+                        s.setLastRunDate( new Timestamp( System.currentTimeMillis() ) );
+                        dao.updateJobScheduler( s );
+
+                        // only need to create job if it's not already queued
+                        if( false == dao.isJobCurrentlyPending( s.getClassname() ) ) {
+                            LOGGER.info( "Creating new job " + s.getClassname() );
+                            dao.insertJob( s.createNewJob() );
+                        }
+                    }
+                    catch ( ReflectiveOperationException e ) {
+                        LOGGER.error( "Whoops! Something went wrong here!", e );
+                    }
+                } );
     }
 
     /**
