@@ -2,6 +2,7 @@
 package com.macbackpackers.beans.json;
 
 import java.math.BigDecimal;
+import java.util.Calendar;
 import java.util.Date;
 
 /**
@@ -39,7 +40,12 @@ public class RecordPaymentRequest {
             this.total_amount = amount;
             this.description = description;
             this.payment_type = isDeposit;
-            this.paid_at = new Date();
+
+            // validation error may occur: "paid_at":["can't be in the future"]
+            // rollback a few minutes in case of any sync/daylight savings weirdness
+            Calendar c = Calendar.getInstance();
+            c.add( Calendar.MINUTE, -70 );
+            this.paid_at = c.getTime();
         }
     }
 
