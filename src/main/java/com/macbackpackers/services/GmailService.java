@@ -79,7 +79,7 @@ public class GmailService {
     private final String AGODA_PASSCODE_TEMPLATE = "subject:\"One-time passcode for YCS login\"";
     
     /** String for matching emails for LH security access */
-    private final String LH_SECURITY_ACCESS = "subject:\"LittleHotelier - Security access required\" from:noreply@littlehotelier.com in:inbox"; 
+    private final String LH_SECURITY_ACCESS = "subject:\"LittleHotelier - Security access required\" from:noreply@app.littlehotelier.com in:inbox"; 
 
     /** Global instance of the JSON factory. */
     private static final JsonFactory JSON_FACTORY =
