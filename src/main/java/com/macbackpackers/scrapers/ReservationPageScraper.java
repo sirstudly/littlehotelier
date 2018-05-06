@@ -408,6 +408,10 @@ public class ReservationPageScraper {
                         .get( "payment_card_number" ).getAsJsonArray().get( 0 ).getAsString() ) ) {
                     throw new PaymentCardNotAcceptedException();
                 }
+                else if ( "is not a valid DiscoverCard card".equals( responseObj.get( "errors" ).getAsJsonObject()
+                        .get( "payment_card_number" ).getAsJsonArray().get( 0 ).getAsString() ) ) {
+                    throw new PaymentCardNotAcceptedException();
+                }
                 throw new IllegalStateException( "One or more errors found in response." );
             }
             return responseObj;
