@@ -168,7 +168,7 @@ public class AgodaScraper {
         String referrerUrl = "https://ycs.agoda.com/en-us/HotelBookings/Index/" + agodaPropertyId + "?";
         gotoPage( webClient, referrerUrl );
 
-        URL bookingDetailsUrl = new URL( "https://ycs.agoda.com/en-us/HotelBookings/GetDetails/" + agodaPropertyId );
+        URL bookingDetailsUrl = new URL( "https://ycs.agoda.com/en-us/HotelBookings/GetDetailsV2/" + agodaPropertyId );
         LOGGER.info( "Attempting POST to " + bookingDetailsUrl );
         WebRequest requestSettings = new WebRequest( bookingDetailsUrl, HttpMethod.POST );
         requestSettings.setAdditionalHeader( "Accept", "application/json, text/javascript, */*; q=0.01" );
@@ -181,7 +181,7 @@ public class AgodaScraper {
         requestSettings.setAdditionalHeader( "Pragma", "no-cache" );
         requestSettings.setAdditionalHeader( "Origin", "https://ycs.agoda.com" );
 
-        requestSettings.setRequestBody( "bookingIds=" + bookingRef );
+        requestSettings.setRequestBody( "[{\"BookingId\":\"" + bookingRef + "\",\"EmailType\":\"0\"}]" );
 
         Page redirectPage = webClient.getPage( requestSettings );
         WebResponse webResponse = redirectPage.getWebResponse();
@@ -205,7 +205,17 @@ public class AgodaScraper {
         JsonArray jarray = jobject.getAsJsonArray( "ResponseData" );
         jobject = jarray.get( 0 ).getAsJsonObject();
         jobject = jobject.getAsJsonObject( "ApiData" );
-        jobject = jobject.getAsJsonObject( "HotelPayment" );
+        jelement = jobject.get( "HotelPayment" );
+        if ( jelement.isJsonNull() ) {
+            throw new MissingUserDataException( "No payment data available on Agoda." );
+        }
+        else if ( jelement.isJsonObject() ) {
+            jobject = jobject.getAsJsonObject( "HotelPayment" );
+        }
+        else {
+            LOGGER.error( "Unsupported JSON type?! " + jelement );
+            throw new MissingUserDataException( "Unable to read payment data on Agoda." );
+        }
         String cardExpiry = jobject.get( "CardExpiryDate" ).getAsString(); // MM/YYYY
 
         Matcher m = CARD_EXPIRY_PATTERN.matcher( cardExpiry );
