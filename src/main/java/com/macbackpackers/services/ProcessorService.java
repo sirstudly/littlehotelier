@@ -1,6 +1,7 @@
 
 package com.macbackpackers.services;
 
+import java.io.File;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.concurrent.CyclicBarrier;
@@ -216,10 +217,18 @@ public class ProcessorService {
         // only allow one copy job to take place at a time system-wide
         synchronized ( CLASS_LEVEL_LOCK ) {
             if ( false == SystemUtils.IS_OS_WINDOWS && StringUtils.isNotBlank( destinationLogLocation ) ) {
-                String cmd = "scp " + localLogDirectory + "/job-" + jobId + ".log " + destinationLogLocation;
-                LOGGER.info( "Copying log file" );
-                Process p = Runtime.getRuntime().exec( cmd );
+                LOGGER.info( "Compressing log file" );
+                ProcessBuilder pb = new ProcessBuilder( "gzip" );
+                pb.redirectInput( new File( localLogDirectory + "/job-" + jobId + ".log" ) );
+                pb.redirectOutput( new File( localLogDirectory + "/job-" + jobId + ".gz" ) );
+                Process p = pb.start();
                 int exitVal = p.waitFor();
+                LOGGER.info( "GZipped file completed with exit code(" + exitVal + ")" );
+
+                pb = new ProcessBuilder( "scp", localLogDirectory + "/job-" + jobId + ".gz", destinationLogLocation );
+                LOGGER.info( "Copying log file" );
+                p = pb.start();
+                exitVal = p.waitFor();
                 LOGGER.info( "Log file copy completed with exit code(" + exitVal + ")" );
             }
         }
