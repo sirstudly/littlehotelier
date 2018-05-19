@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
@@ -90,11 +91,20 @@ public class LittleHotelierConfig {
         return webClient;
     }
 
-    @Bean
-    public Gson getGsonSingleton() {
+    @Bean( name = "gsonForLH" )
+    public Gson getGsonForLittleHotelier() {
         // these are thread safe
         return new GsonBuilder()
                 .setDateFormat( "yyyy-MM-dd'T'HH:mm:ss.SSS+00:00" )
+                .setPrettyPrinting()
+                .create();
+    }
+
+    @Bean( name = "gsonForCloudbeds" )
+    public Gson getGsonForCloudbeds() {
+        // these are thread safe
+        return new GsonBuilder()
+                .setFieldNamingPolicy( FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES )
                 .setPrettyPrinting()
                 .create();
     }

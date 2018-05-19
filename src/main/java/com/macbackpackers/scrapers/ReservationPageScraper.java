@@ -16,6 +16,7 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
@@ -79,6 +80,7 @@ public class ReservationPageScraper {
     private BookingsPageScraper bookingsPageScraper;
 
     @Autowired
+    @Qualifier( "gsonForLH" )
     private Gson gson;
 
     @Value( "${lilhotelier.propertyid}" )
