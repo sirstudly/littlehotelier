@@ -29,7 +29,7 @@ public class CloudbedsJsonRequestFactory {
     @Value( "${cloudbeds.property.id}" )
     protected String PROPERTY_ID;
     
-    private static final String VERSION = "https://static1.cloudbeds.com/myfrontdesk-front/initial-10.1/app.js.gz";
+    private static final String VERSION = "https://static1.cloudbeds.com/myfrontdesk-front/initial-11.0/app.js.gz";
 
     protected WebRequest createBaseJsonRequest( String url ) throws IOException {
         WebRequest requestSettings = new WebRequest( new URL( url ), HttpMethod.POST );
@@ -45,6 +45,41 @@ public class CloudbedsJsonRequestFactory {
         return requestSettings;
     }
 
+    /**
+     * Returns a payment methods request for this property.
+     * 
+     * @return PaymentRequest for this property
+     * @throws IOException invalid URL
+     */
+    public WebRequest createGetPaymentMethods() throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/associations/loader/paymentMethods" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "billing_portal_id", "0" ),
+                new NameValuePair( "is_bp_setup_completed", "0" ),
+                new NameValuePair( "propertyIds[]", PROPERTY_ID ),
+                new NameValuePair( "property_id", PROPERTY_ID ),
+                new NameValuePair( "group_id", PROPERTY_ID ),
+                new NameValuePair( "version", VERSION ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Ping responds with pong. Doesn't require a login.
+     * 
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createPingRequest() throws IOException {
+        return createBaseJsonRequest( "https://hotels.cloudbeds.com/error/ping" );
+    }
+
+    /**
+     * Returns a single reservation request.
+     * 
+     * @param reservationId unique ID of reservation
+     * @return web request
+     * @throws IOException on i/o error
+     */
     public WebRequest createGetReservationRequest( String reservationId ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservation" );
         webRequest.setRequestParameters( Arrays.asList(
@@ -58,6 +93,13 @@ public class CloudbedsJsonRequestFactory {
         return webRequest;
     }
 
+    /**
+     * Get info on all customers checking in on the given date range.
+     * @param checkinDateStart checkin date (inclusive)
+     * @param checkinDateEnd checkin date (inclusive)
+     * @return web request
+     * @throws IOException on i/o error
+     */
     public WebRequest createGetCustomersRequest( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/get_customers" );
         webRequest.setRequestParameters( Arrays.asList(
@@ -96,6 +138,13 @@ public class CloudbedsJsonRequestFactory {
         return webRequest;
     }
 
+    /**
+     * Retrieves all reservations within the given checkin date range.
+     * @param checkinDateStart checkin date (inclusive)
+     * @param checkinDateEnd checkin date (inclusive)
+     * @return web request
+     * @throws IOException on i/o error
+     */
     public WebRequest createGetReservationsRequest( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         webRequest.setRequestParameters( Arrays.asList(
@@ -156,6 +205,7 @@ public class CloudbedsJsonRequestFactory {
 
     /**
      * Records a new payment onto the existing reservation.
+     * 
      * @param reservationId ID of reservation (as it appears in the URL)
      * @param bookingRoomId (which "room" we're booking the payment to)
      * @param cardType one of "mastercard", "visa". Anything else will blank the field.

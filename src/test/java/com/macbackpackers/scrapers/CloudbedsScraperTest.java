@@ -4,10 +4,10 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.time.LocalDate;
-import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -17,14 +17,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.config.LittleHotelierConfig;
+import com.macbackpackers.dao.WordPressDAO;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = LittleHotelierConfig.class)
@@ -35,13 +32,16 @@ public class CloudbedsScraperTest {
     @Autowired
     CloudbedsScraper cloudbedsService;
     
+    @Autowired
+    WordPressDAO dao;
+    
     @Autowired 
     @Qualifier( "gsonForCloudbeds" )
     private Gson gson;
 
     @Test
     public void testDoLogin() throws Exception {
-        HtmlPage htmlPage = cloudbedsService.login( "daniele.barco+10@cloudbeds.com", "Cloudb3ds!" );
+        cloudbedsService.login( "test@cloudbeds.com", "testpassword" );
     }
     
     @Test
@@ -51,7 +51,8 @@ public class CloudbedsScraperTest {
 
     @Test
     public void testLoadBooking() throws Exception {
-        cloudbedsService.getReservation( "9813914" );
+        Reservation r = cloudbedsService.getReservation( "9813914" );
+        LOGGER.info( ToStringBuilder.reflectionToString( r ) );
     }
 
     @Test
@@ -64,18 +65,30 @@ public class CloudbedsScraperTest {
     @Test
     public void testGetReservations() throws Exception {
         List<Customer> results = cloudbedsService.getReservations( 
-                LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 5 ) );
+                LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 30 ) );
         results.stream().forEach( t -> LOGGER.info( t.toString() ) );
     }
     
     @Test
     public void testAddPayment() throws Exception {
-        cloudbedsService.addPayment( "9814194", "visa", new BigDecimal( "0.14" ), "Test payment XYZ" );
+        cloudbedsService.addPayment( "9814194", "visa", new BigDecimal( "0.15" ), "Test payment XYZ" );
     }
     
     @Test
     public void testAddNote() throws Exception {
         cloudbedsService.addNote( "9897593", "Test Note& with <> Special characters\n\t ?" );
+    }
+    
+    @Test
+    public void testPing() throws Exception {
+        cloudbedsService.ping();
+    }
+    
+    @Test
+    public void testDumpAllocations() throws Exception {
+        dao.deleteAllocations( 9042 );
+        cloudbedsService.dumpAllocationsFrom( 9042, 
+                LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 30 ) );;
     }
     
     @Test

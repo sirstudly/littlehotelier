@@ -27,6 +27,20 @@ import com.macbackpackers.jobs.AbstractJob;
 public interface WordPressDAO {
 
     /**
+     * Returns whether the property manager is Cloudbeds.
+     * 
+     * @return true if cloudbeds, false if not.
+     */
+    public boolean isCloudbeds();
+
+    /**
+     * Returns whether the property manager is Little Hotelier.
+     * 
+     * @return true if lilho, false if not.
+     */
+    public boolean isLittleHotelier();
+
+    /**
      * Format for use when parsing whole dates (e.g. checkin/checkout dates, etc.)
      */
     public static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd 00:00:00" );

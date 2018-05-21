@@ -7,6 +7,8 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.text.ParseException;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -185,6 +187,10 @@ public class Allocation {
     public void setCheckinDate( java.util.Date checkinDate ) {
         setCheckinDate( new Date( checkinDate.getTime() ) );
     }
+    
+    public void setCheckinDate( LocalDate checkinDate ) {
+        setCheckinDate( Date.from( checkinDate.atStartOfDay( ZoneId.systemDefault() ).toInstant() ) );
+    }
 
     public Date getCheckoutDate() {
         return checkoutDate;
@@ -196,6 +202,10 @@ public class Allocation {
 
     public void setCheckoutDate( java.util.Date checkoutDate ) {
         setCheckoutDate( new Date( checkoutDate.getTime() ) );
+    }
+    
+    public void setCheckoutDate( LocalDate checkoutDate ) {
+        setCheckoutDate( Date.from( checkoutDate.atStartOfDay( ZoneId.systemDefault() ).toInstant() ) );
     }
 
     public BigDecimal getPaymentTotal() {

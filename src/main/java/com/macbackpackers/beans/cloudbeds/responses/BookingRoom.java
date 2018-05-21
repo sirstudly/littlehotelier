@@ -8,7 +8,7 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
  * these.
  *
  */
-public class BookingRoom {
+public class BookingRoom extends CloudbedsJsonResponse {
 
     private String id;
     private String bookingId;
@@ -18,6 +18,7 @@ public class BookingRoom {
     private String roomTypeName;
     private String roomTypeNameShort;
     private String roomTypeId;
+    private String roomNumber;
 
     public String getId() {
         return id;
@@ -81,6 +82,14 @@ public class BookingRoom {
 
     public void setRoomTypeId( String roomTypeId ) {
         this.roomTypeId = roomTypeId;
+    }
+
+    public String getRoomNumber() {
+        return roomNumber;
+    }
+
+    public void setRoomNumber( String roomNumber ) {
+        this.roomNumber = roomNumber;
     }
 
     @Override

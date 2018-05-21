@@ -2,6 +2,7 @@
 package com.macbackpackers.jobs;
 
 import java.text.ParseException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -28,8 +29,7 @@ public class AllocationScraperJob extends AbstractJob {
     @Transactional // no re-run on this job; all must go thru or nothing
     public void processJob() throws Exception {
         // dump calendar page(s)
-        List<AllocationScraperWorkerJob> allocationScraperJobs = insertAllocationScraperWorkerJobs();
-        insertCreateReportsJob( allocationScraperJobs );
+        insertCreateReportsJob( dao.isCloudbeds() ? insertCloudbedsAllocationScraperWorkerJobs() : insertAllocationScraperWorkerJobs() );
     }
 
     /**
@@ -51,6 +51,29 @@ public class AllocationScraperJob extends AbstractJob {
             int jobId = dao.insertJob( workerJob );
             jobs.add( AllocationScraperWorkerJob.class.cast( dao.fetchJobById( jobId ) ) );
             currentDate.add( Calendar.DATE, 14 ); // calendar page shows 2 weeks at a time
+        }
+        return jobs;
+    }
+
+    /**
+     * Create jobs to scrape the calendar page(s) from start date to end date.
+     * 
+     * @return List of created AllocationScraperWorkerJob
+     * @throws ParseException on date parse error from parameters
+     */
+    private List<CloudbedsAllocationScraperWorkerJob> insertCloudbedsAllocationScraperWorkerJobs() throws ParseException {
+        List<CloudbedsAllocationScraperWorkerJob> jobs = new ArrayList<CloudbedsAllocationScraperWorkerJob>();
+
+        LocalDate currentDate = LocalDate.now();
+        while ( currentDate.isBefore( getEndLocalDate() ) ) {
+            CloudbedsAllocationScraperWorkerJob workerJob = new CloudbedsAllocationScraperWorkerJob();
+            workerJob.setStatus( JobStatus.submitted );
+            workerJob.setAllocationScraperJobId( getId() );
+            workerJob.setStartDate( currentDate );
+            workerJob.setEndDate( currentDate.plusDays( 13 ) );
+            int jobId = dao.insertJob( workerJob );
+            jobs.add( CloudbedsAllocationScraperWorkerJob.class.cast( dao.fetchJobById( jobId ) ) );
+            currentDate = currentDate.plusDays( 14 ); // calendar page shows 2 weeks at a time
         }
         return jobs;
     }
@@ -119,6 +142,15 @@ public class AllocationScraperJob extends AbstractJob {
         Calendar cal = Calendar.getInstance();
         cal.add( Calendar.DATE, getDaysAhead() );
         return cal.getTime();
+    }
+
+    /**
+     * Gets the date to stop scraping the allocation data (inclusive).
+     * 
+     * @return non-null local date parameter
+     */
+    public LocalDate getEndLocalDate() {
+        return LocalDate.now().plusDays( getDaysAhead() );
     }
 
 }

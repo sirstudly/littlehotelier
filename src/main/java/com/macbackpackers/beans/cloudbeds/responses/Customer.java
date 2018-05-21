@@ -6,7 +6,7 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
 /**
  * Also known as a reservation. Depending on the response type, some fields may not be used.
  */
-public class Customer {
+public class Customer extends CloudbedsJsonResponse {
 
     private String firstName;
     private String lastName;

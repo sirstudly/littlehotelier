@@ -5,7 +5,7 @@ import java.util.List;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
-public class Reservation {
+public class Reservation extends CloudbedsJsonResponse {
 
     private String reservationId;
     private String status;
@@ -20,6 +20,12 @@ public class Reservation {
     private String checkinDate;
     private String checkoutDate;
     private String sourceName;
+    private String identifier;
+    private String thirdPartyIdentifier;
+    private String bookingDateHotelTime;
+    private Integer kidsNumber;
+    private Integer adultsNumber;
+    private String paidValue;
     private List<BookingRoom> bookingRooms;
 
     public String getReservationId() {
@@ -124,6 +130,54 @@ public class Reservation {
 
     public void setSourceName( String sourceName ) {
         this.sourceName = sourceName;
+    }
+
+    public String getIdentifier() {
+        return identifier;
+    }
+
+    public void setIdentifier( String identifier ) {
+        this.identifier = identifier;
+    }
+
+    public String getThirdPartyIdentifier() {
+        return thirdPartyIdentifier;
+    }
+
+    public void setThirdPartyIdentifier( String thirdPartyIdentifier ) {
+        this.thirdPartyIdentifier = thirdPartyIdentifier;
+    }
+
+    public String getBookingDateHotelTime() {
+        return bookingDateHotelTime;
+    }
+
+    public void setBookingDateHotelTime( String bookingDateHotelTime ) {
+        this.bookingDateHotelTime = bookingDateHotelTime;
+    }
+
+    public Integer getKidsNumber() {
+        return kidsNumber;
+    }
+
+    public void setKidsNumber( Integer kidsNumber ) {
+        this.kidsNumber = kidsNumber;
+    }
+
+    public Integer getAdultsNumber() {
+        return adultsNumber;
+    }
+
+    public void setAdultsNumber( Integer adultsNumber ) {
+        this.adultsNumber = adultsNumber;
+    }
+
+    public String getPaidValue() {
+        return paidValue;
+    }
+
+    public void setPaidValue( String paidValue ) {
+        this.paidValue = paidValue;
     }
 
     public List<BookingRoom> getBookingRooms() {

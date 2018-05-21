@@ -52,18 +52,22 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
      */
     private List<BookingScraperJob> insertBookingsScraperJobs() {
 
-        // create a separate job for each checkin_date for the given allocation records
-        // this will make it easier to re-run if any date fails
-        List<BookingScraperJob> jobs = new ArrayList<BookingScraperJob>();
-        for ( Date checkinDate : dao.getCheckinDatesForAllocationScraperJobId( getAllocationScraperJobId() ) ) {
-            BookingScraperJob bookingScraperJob = new BookingScraperJob();
-            bookingScraperJob.setStatus( JobStatus.submitted );
-            bookingScraperJob.setAllocationScraperJobId( getAllocationScraperJobId() );
-            bookingScraperJob.setCheckinDate( checkinDate );
-            int jobId = dao.insertJob( bookingScraperJob );
-            jobs.add( BookingScraperJob.class.cast( dao.fetchJobById( jobId ) ) );
+        // only applicable for Little Hotelier
+        if( dao.isLittleHotelier() ) {
+            // create a separate job for each checkin_date for the given allocation records
+            // this will make it easier to re-run if any date fails
+            List<BookingScraperJob> jobs = new ArrayList<BookingScraperJob>();
+            for ( Date checkinDate : dao.getCheckinDatesForAllocationScraperJobId( getAllocationScraperJobId() ) ) {
+                BookingScraperJob bookingScraperJob = new BookingScraperJob();
+                bookingScraperJob.setStatus( JobStatus.submitted );
+                bookingScraperJob.setAllocationScraperJobId( getAllocationScraperJobId() );
+                bookingScraperJob.setCheckinDate( checkinDate );
+                int jobId = dao.insertJob( bookingScraperJob );
+                jobs.add( BookingScraperJob.class.cast( dao.fetchJobById( jobId ) ) );
+            }
+            return jobs;
         }
-        return jobs;
+        return new ArrayList<>();
     }
 
     /**

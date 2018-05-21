@@ -66,6 +66,19 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Value( "${wordpress.db.prefix}" )
     private String wordpressPrefix;
 
+    @Value( "${property.manager:lilho}" )
+    private String propertyManager;
+
+    @Override
+    public boolean isCloudbeds() {
+        return "cloudbeds".equalsIgnoreCase( propertyManager );
+    }
+
+    @Override
+    public boolean isLittleHotelier() {
+        return false == isCloudbeds();
+    }
+
     @Override
     public void insertAllocation( Allocation alloc ) {
         em.persist( alloc );
