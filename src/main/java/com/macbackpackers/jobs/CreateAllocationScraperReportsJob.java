@@ -28,7 +28,8 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         // first we consolidate results from all AllocationScraperWorkerJobs
         for ( Job dependentJob : getDependentJobs() ) {
             // remap the worker id to the parent AllocationScraperJob id (for consolidating results)
-            if ( dependentJob instanceof AllocationScraperWorkerJob ) {
+            if ( dependentJob instanceof AllocationScraperWorkerJob ||
+                    dependentJob instanceof CloudbedsAllocationScraperWorkerJob ) {
                 dao.updateAllocationJobId( dependentJob.getId(), getAllocationScraperJobId() );
             }
         }

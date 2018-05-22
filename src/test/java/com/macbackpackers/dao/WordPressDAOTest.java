@@ -88,7 +88,7 @@ public class WordPressDAOTest {
     private Allocation createNewAllocation() throws ParseException {
         Allocation alloc = new Allocation();
         alloc.setJobId( 3 );
-        alloc.setRoomId( 15 );
+        alloc.setRoomId( "15" );
         alloc.setRoom( "the room" );
         alloc.setBedName( "the bed" );
         alloc.setReservationId( 92415 );
@@ -434,7 +434,7 @@ public class WordPressDAOTest {
     private Allocation createTestAllocation( int jobId, Date checkinDate, String bookingSource ) throws Exception {
         Allocation alloc = new Allocation();
         alloc.setJobId( jobId );
-        alloc.setRoomId( 15 );
+        alloc.setRoomId( "15" );
         alloc.setRoom( "the room" );
         alloc.setBedName( "the bed" );
         alloc.setReservationId( 4 );

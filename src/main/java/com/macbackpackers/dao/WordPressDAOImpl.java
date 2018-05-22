@@ -66,12 +66,9 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Value( "${wordpress.db.prefix}" )
     private String wordpressPrefix;
 
-    @Value( "${property.manager:lilho}" )
-    private String propertyManager;
-
     @Override
     public boolean isCloudbeds() {
-        return "cloudbeds".equalsIgnoreCase( propertyManager );
+        return "cloudbeds".equalsIgnoreCase( getOption( "hbo_property_manager" ) );
     }
 
     @Override

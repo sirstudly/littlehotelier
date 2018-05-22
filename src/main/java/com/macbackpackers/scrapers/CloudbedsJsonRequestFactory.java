@@ -26,7 +26,7 @@ public class CloudbedsJsonRequestFactory {
     private static final DateTimeFormatter DD_MM_YYYY = DateTimeFormatter.ofPattern( "dd/MM/yyyy" );
     private static final DecimalFormat CURRENCY_FORMAT = new DecimalFormat("###0.00");
 
-    @Value( "${cloudbeds.property.id}" )
+    @Value( "${cloudbeds.property.id:0}" )
     protected String PROPERTY_ID;
     
     private static final String VERSION = "https://static1.cloudbeds.com/myfrontdesk-front/initial-11.0/app.js.gz";
@@ -107,7 +107,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "iColumns", "3" ),
                 new NameValuePair( "sColumns", ",," ),
                 new NameValuePair( "iDisplayStart", "0" ),
-                new NameValuePair( "iDisplayLength", "100" ),
+                new NameValuePair( "iDisplayLength", "1000" ),
                 new NameValuePair( "mDataProp_0", "first_name" ),
                 new NameValuePair( "bRegex_0", "false" ),
                 new NameValuePair( "bSearchable_0", "true" ),
@@ -145,14 +145,14 @@ public class CloudbedsJsonRequestFactory {
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetReservationsRequest( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
+    public WebRequest createGetReservationsRequestByCheckinDate( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "sEcho", "2" ),
                 new NameValuePair( "iColumns", "8" ),
                 new NameValuePair( "sColumns", ",,,,,,," ),
                 new NameValuePair( "iDisplayStart", "0" ),
-                new NameValuePair( "iDisplayLength", "100" ),
+                new NameValuePair( "iDisplayLength", "1000" ),
                 new NameValuePair( "mDataProp_0", "id" ),
                 new NameValuePair( "bRegex_0", "false" ),
                 new NameValuePair( "bSearchable_0", "true" ),
@@ -192,6 +192,73 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "date_start[1]", checkinDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_end[0]", "" ),
                 new NameValuePair( "date_end[1]", "" ),
+                new NameValuePair( "booking_date[0]", "" ),
+                new NameValuePair( "booking_date[1]", "" ),
+                new NameValuePair( "status", "all" ),
+                new NameValuePair( "billing_portal_id", "0" ),
+                new NameValuePair( "is_bp_setup_completed", "0" ),
+                new NameValuePair( "property_id", PROPERTY_ID ),
+                new NameValuePair( "group_id", PROPERTY_ID ),
+                new NameValuePair( "version", VERSION ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Retrieves all reservations staying within the given date range.
+     * @param stayDateStart checkin date (inclusive)
+     * @param stayDateEnd checkin date (inclusive)
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createGetReservationsRequestByStayDate( LocalDate stayDateStart, LocalDate stayDateEnd ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "sEcho", "2" ),
+                new NameValuePair( "iColumns", "8" ),
+                new NameValuePair( "sColumns", ",,,,,,," ),
+                new NameValuePair( "iDisplayStart", "0" ),
+                new NameValuePair( "iDisplayLength", "1000" ),
+                new NameValuePair( "mDataProp_0", "id" ),
+                new NameValuePair( "bRegex_0", "false" ),
+                new NameValuePair( "bSearchable_0", "true" ),
+                new NameValuePair( "bSortable_0", "false" ),
+                new NameValuePair( "mDataProp_1", "identifier" ),
+                new NameValuePair( "bRegex_1", "false" ),
+                new NameValuePair( "bSearchable_1", "true" ),
+                new NameValuePair( "bSortable_1", "true" ),
+                new NameValuePair( "mDataProp_2", "first_name" ),
+                new NameValuePair( "bRegex_2", "false" ),
+                new NameValuePair( "bSearchable_2", "true" ),
+                new NameValuePair( "bSortable_2", "true" ),
+                new NameValuePair( "mDataProp_3", "last_name" ),
+                new NameValuePair( "bRegex_3", "false" ),
+                new NameValuePair( "bSearchable_3", "true" ),
+                new NameValuePair( "bSortable_3", "true" ),
+                new NameValuePair( "mDataProp_4", "booking_date" ),
+                new NameValuePair( "bRegex_4", "false" ),
+                new NameValuePair( "bSearchable_4", "true" ),
+                new NameValuePair( "bSortable_4", "true" ),
+                new NameValuePair( "mDataProp_5", "checkin_date" ),
+                new NameValuePair( "bRegex_5", "false" ),
+                new NameValuePair( "bSearchable_5", "true" ),
+                new NameValuePair( "bSortable_5", "true" ),
+                new NameValuePair( "mDataProp_6", "checkout_date" ),
+                new NameValuePair( "bRegex_6", "false" ),
+                new NameValuePair( "bSearchable_6", "true" ),
+                new NameValuePair( "bSortable_6", "true" ),
+                new NameValuePair( "mDataProp_7", "grand_total" ),
+                new NameValuePair( "bRegex_7", "false" ),
+                new NameValuePair( "bSearchable_7", "true" ),
+                new NameValuePair( "bSortable_7", "true" ),
+                new NameValuePair( "iSortCol_0", "3" ),
+                new NameValuePair( "sSortDir_0", "asc" ),
+                new NameValuePair( "iSortingCols", "1" ),
+                new NameValuePair( "date_start[0]", "" ),
+                new NameValuePair( "date_start[1]", "" ),
+                new NameValuePair( "date_end[0]", "" ),
+                new NameValuePair( "date_end[1]", "" ),
+                new NameValuePair( "date_stay[0]", stayDateStart.format( YYYY_MM_DD ) ),
+                new NameValuePair( "date_stay[1]", stayDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "booking_date[0]", "" ),
                 new NameValuePair( "booking_date[1]", "" ),
                 new NameValuePair( "status", "all" ),

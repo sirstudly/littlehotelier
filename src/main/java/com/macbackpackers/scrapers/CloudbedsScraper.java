@@ -30,6 +30,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
@@ -37,6 +38,8 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.scrapers.matchers.BedAssignment;
+import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 import com.macbackpackers.services.FileService;
 
 @Component
@@ -44,6 +47,9 @@ import com.macbackpackers.services.FileService;
 public class CloudbedsScraper {
     
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+    
+    // a class-level lock
+    private static final Object CLASS_LOCK = new Object();
 
     @Autowired
     @Qualifier( "webClient" )
@@ -62,37 +68,55 @@ public class CloudbedsScraper {
     @Autowired
     private CloudbedsJsonRequestFactory jsonRequestFactory;
 
-    @Value( "${cloudbeds.property.id}" )
+    @Autowired
+    private RoomBedMatcher roomBedMatcher;
+    
+    @Value( "${cloudbeds.property.id:0}" )
     private String PROPERTY_ID;
 
     @Value( "${process.jobs.retries:3}" )
     private int MAX_RETRY;
+    
+    // once we've verified we're logged in, we'll assume be logged-in for the duration of this object
+    private boolean loggedIn;
 
     /**
      * Verifies that we're logged in (or otherwise log us in if not).
      * 
      * @throws IOException on connection error
      */
-    private synchronized void validateLoggedIn() throws IOException {
+    private void validateLoggedIn() throws IOException {
 
-        fileService.loadCookiesFromFile( webClient );
-
-        // we'll just send a sample request; we just want to make sure we get a valid response back
-        WebRequest requestSettings = jsonRequestFactory.createGetPaymentMethods();
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
-        Optional<CloudbedsJsonResponse> response = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(),
-                CloudbedsJsonResponse.class ) );
-        if ( false == response.isPresent() || false == response.get().isSuccess() ) {
-            LOGGER.info( "I don't think we're logged in, doing it now." );
-            if ( response.isPresent() ) {
-                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-            }
-            login();
+        // should only need to do this once for the lifetime of this object
+        if( loggedIn ) {
+            return;
         }
-        else {
-            LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        // don't allow multiple threads writing to the same cookie file at the same time
+        synchronized( CLASS_LOCK ) {
+            fileService.loadCookiesFromFile( webClient );
+    
+            // we'll just send a sample request; we just want to make sure we get a valid response back
+            WebRequest requestSettings = jsonRequestFactory.createGetPaymentMethods();
+    
+            Page redirectPage = webClient.getPage( requestSettings );
+            LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+            Optional<CloudbedsJsonResponse> response = Optional.fromNullable( 
+                    gson.fromJson( redirectPage.getWebResponse().getContentAsString(),
+                    CloudbedsJsonResponse.class ) );
+            if ( false == response.isPresent() || false == response.get().isSuccess() ) {
+                LOGGER.info( "I don't think we're logged in, doing it now." );
+                if ( response.isPresent() ) {
+                    LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+                }
+                login();
+            }
+            else {
+                LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+            }
+
+            // if we make it to this point, we're probably logged in
+            loggedIn = true;
         }
     }
 
@@ -213,9 +237,10 @@ public class CloudbedsScraper {
         // we create one record for each "booking room"
         return r.getBookingRooms().stream()
             .map( br -> { 
+                BedAssignment bed = roomBedMatcher.parse( br.getRoomNumber() );
                 Allocation a = new Allocation();
-                //a.setBedName( ?? );
-                a.setBookedDate( r.getBookingDateHotelTime() );
+                a.setBedName( bed.getBedName() );
+                a.setBookedDate( LocalDate.parse( r.getBookingDateHotelTime().substring( 0, 10 ) ) );
                 a.setBookingReference( 
                         StringUtils.defaultIfBlank( r.getThirdPartyIdentifier(), r.getIdentifier() ) );
                 a.setBookingSource( r.getSourceName() );
@@ -226,18 +251,17 @@ public class CloudbedsScraper {
                 a.setJobId( jobId );
                 a.setNumberGuests( r.getAdultsNumber() + r.getKidsNumber() );
                 a.setPaymentOutstanding( r.getBalanceDue() );
-                //a.setPaymentStatus( paymentStatus );
                 a.setPaymentTotal( r.getPaidValue() );
-                //a.setRatePlanName( ratePlanName );
                 a.setReservationId( Integer.parseInt( r.getReservationId() ) );
-                a.setRoom( br.getRoomNumber() );
-                a.setRoomId( Integer.parseInt( br.getId() ) );
+                a.setRoom( bed.getRoom() );
+                a.setRoomId( br.getRoomId() );
                 a.setRoomTypeId( Integer.parseInt( br.getRoomTypeId() ) );
                 a.setStatus( r.getStatus() );
                 a.setViewed( true );
+                a.setNotes( r.getNotesAsString() );
                 return a;
             } )
-            .collect(Collectors.toList());
+            .collect( Collectors.toList() );
     }
 
     /**
@@ -269,19 +293,20 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Get all reservations between the given checkin date range.
+     * Get all reservations staying between the given checkin date range.
      * 
-     * @param checkinDateStart checkin date (inclusive)
-     * @param checkinDateEnd checkin date (inclusive)
+     * @param stayDateStart stay date (inclusive)
+     * @param stayDateEnd stay date (exclusive)
      * @return non-null list of customer reservations
      * @throws IOException
      */
-    public List<Customer> getReservations( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
+    public List<Customer> getReservations( LocalDate stayDateStart, LocalDate stayDateEnd ) throws IOException {
         
         validateLoggedIn();
-        WebRequest requestSettings = jsonRequestFactory.createGetReservationsRequest( checkinDateStart, checkinDateEnd );
+        WebRequest requestSettings = jsonRequestFactory.createGetReservationsRequestByStayDate(
+                stayDateStart, stayDateEnd );
 
-        Page redirectPage = webClient.getPage(requestSettings);
+        Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
         
@@ -388,18 +413,28 @@ public class CloudbedsScraper {
      * Dumps the allocations starting on the given date (inclusive).
      * 
      * @param jobId the job ID to associate with this dump
-     * @param startDate the start checkin date to check allocations for (inclusive)
-     * @param endDate the end checkin date to check allocations for (inclusive)
+     * @param startDate the start date to check allocations for (inclusive)
+     * @param endDate the end date to check allocations for (exclusive)
      * @throws IOException on read/write error
      */
 //    @Transactional
     public void dumpAllocationsFrom( int jobId, LocalDate startDate, LocalDate endDate ) throws IOException {
         AllocationList allocations = new AllocationList();
-        getReservations( startDate, endDate )
-            .parallelStream()
-            .map( c -> getReservationRetry( c.getId() ) )
-            .map( r -> reservationToAllocation( jobId, r ) )
-            .forEach( a -> allocations.addAll( a ) );
+        List<Reservation> reservations = getReservations( startDate, endDate ).stream()
+                .map( c -> getReservationRetry( c.getId() ) )
+                .collect( Collectors.toList() );
+        reservations.stream()
+                .map( r -> reservationToAllocation( jobId, r ) )
+                .forEach( a -> allocations.addAll( a ) );
         dao.insertAllocations( allocations );
-   }
+
+        // now update the comments
+        List<GuestCommentReportEntry> guestComments = reservations.stream()
+                .filter( r -> StringUtils.isNotBlank( r.getSpecialRequests() ) )
+                .map( r -> new GuestCommentReportEntry(
+                        Integer.parseInt( r.getReservationId() ),
+                        r.getSpecialRequests() ) )
+                .collect( Collectors.toList() );
+        dao.updateGuestCommentsForReservations( guestComments );
+    }
 }

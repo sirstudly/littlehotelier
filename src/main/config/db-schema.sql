@@ -2,7 +2,7 @@
 CREATE TABLE `wp_lh_calendar` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `job_id` bigint(20) unsigned DEFAULT NULL,
-  `room_id` int(10) unsigned DEFAULT NULL,
+  `room_id` varchar(255) DEFAULT NULL,
   `room_type_id` int(10) unsigned DEFAULT NULL,
   `room` varchar(50) NOT NULL,
   `bed_name` varchar(50) DEFAULT NULL,
@@ -253,7 +253,7 @@ CREATE TABLE `wp_lh_send_email` (
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 CREATE TABLE `wp_lh_rooms` (
-  `id` bigint(20) unsigned NOT NULL,
+  `id` varchar(255) NOT NULL,
   `room` varchar(50) DEFAULT NULL,
   `bed_name` varchar(50) DEFAULT NULL,
   `capacity` smallint(6) DEFAULT NULL,
@@ -618,12 +618,17 @@ UPDATE wp_lh_rooms
  
  /***  START HSH *********
  
+INSERT INTO wp_lh_rooms(id, room_type_id, room, bed_name)
+SELECT DISTINCT room_id, room_type_id, room, bed_name
+  AND room_id IS NOT NULL
+  FROM wp_lh_calendar;
+
 UPDATE wp_lh_rooms
    SET capacity = 2, room_type = 'TWIN', active_yn = 'Y' WHERE room IN ( 'TA', 'TB' );
 UPDATE wp_lh_rooms
    SET capacity = 2, room_type = 'DBL', active_yn = 'Y' WHERE room IN ( 'TC' );
 UPDATE wp_lh_rooms
-   SET capacity = 18, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '6' );
+   SET capacity = 18, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '6R' );
 UPDATE wp_lh_rooms
    SET capacity = 4, room_type = 'F', active_yn = 'Y' WHERE room IN ( '5A' );
 UPDATE wp_lh_rooms
@@ -635,13 +640,43 @@ UPDATE wp_lh_rooms
 UPDATE wp_lh_rooms
    SET capacity = 10, room_type = 'F', active_yn = 'Y' WHERE room IN ( '3D' );
 UPDATE wp_lh_rooms
-   SET capacity = 8, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '5D', '5E' );
+   SET capacity = 8, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '5B', '5D', '5E' );
 UPDATE wp_lh_rooms
    SET capacity = 10, room_type = 'MX', active_yn = 'Y' WHERE room IN ( '3B', '3C', '5G' );
 UPDATE wp_lh_rooms
    SET capacity = 8, room_type = 'LT_FEMALE', active_yn = 'Y' WHERE room IN ( '5B', 'F&V' );
 UPDATE wp_lh_rooms
    SET capacity = 16, room_type = 'LT_MALE', active_yn = 'Y' WHERE room IN ( 'Zoo' );
+
+-- insert 'Unallocated' rows with room_type_id as PK
+INSERT INTO wp_lh_rooms(id, room_type_id, room, bed_name)
+SELECT DISTINCT room_type_id, room_type_id, room, bed_name
+  AND room_id IS NULL
+  FROM wp_lh_calendar;
+
+-- find out which room types correspond to each "Unallocated" row
+-- select * from wp_lh_rooms order by room_type_id, room;
+UPDATE wp_lh_rooms
+   SET capacity = 2, room_type = 'TWIN', active_yn = 'N' WHERE id = '111743';
+UPDATE wp_lh_rooms
+   SET capacity = 2, room_type = 'DBL', active_yn = 'N' WHERE id = '111744';
+UPDATE wp_lh_rooms
+   SET capacity = 4, room_type = 'F', active_yn = 'N' WHERE id = '111745';
+UPDATE wp_lh_rooms
+   SET capacity = 4, room_type = 'MX', active_yn = 'N' WHERE id = '111746';
+UPDATE wp_lh_rooms
+   SET capacity = 6, room_type = 'MX', active_yn = 'N' WHERE id = '111747';
+UPDATE wp_lh_rooms
+   SET capacity = 8, room_type = 'F', active_yn = 'N' WHERE id = '111748';
+UPDATE wp_lh_rooms
+   SET capacity = 10, room_type = 'F', active_yn = 'N' WHERE id = '111752';
+UPDATE wp_lh_rooms
+   SET capacity = 8, room_type = 'MX', active_yn = 'N' WHERE id = '111754';
+UPDATE wp_lh_rooms
+   SET capacity = 10, room_type = 'MX', active_yn = 'N' WHERE id = '111755';
+UPDATE wp_lh_rooms
+   SET capacity = 18, room_type = 'MX', active_yn = 'N' WHERE id = '111756';
+
 
 -- SELECT DISTINCT 'Unallocated' `room`, null `bed_name`, capacity, room_type_id, room_type, 'N' `active_yn` FROM wp_lh_rooms;
 INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES (1,'Unallocated',NULL,2,2933,'TWIN','N');

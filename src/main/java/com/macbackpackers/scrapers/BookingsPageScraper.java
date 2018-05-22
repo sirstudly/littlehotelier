@@ -484,7 +484,7 @@ public class BookingsPageScraper {
             else {
                 for ( HtmlOption roomOption : roomSelect.getOptions() ) {
                     if ( roomOption.isSelected() ) {
-                        newAllocation.setRoomId( Integer.parseInt( roomOption.getValueAttribute() ) );
+                        newAllocation.setRoomId( roomOption.getValueAttribute() );
 
                         BedAssignment bedAssignment = roomBedMatcher.parse( 
                                 StringUtils.trim( roomOption.getTextContent() ) );

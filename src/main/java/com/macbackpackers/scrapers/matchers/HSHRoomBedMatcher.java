@@ -1,8 +1,7 @@
 
 package com.macbackpackers.scrapers.matchers;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.macbackpackers.exceptions.MissingUserDataException;
 
 /**
  * Matches rooms/bed labels in LH for High Street Hostel.
@@ -10,44 +9,101 @@ import java.util.regex.Pattern;
 public class HSHRoomBedMatcher implements RoomBedMatcher {
 
     /**
-     * These are the different room labels that LH has set up. The first bit of the room label must
+     * These are the different room labels that has been set up. The first bit of the room label must
      * start with one of these...
      */
-    private static final String ROOM_NAMES[] = {
-            "3A", "3B", "3C", "3D", "3E",
-            "5A", "5B", "5C", "5D", "5E", "5F", "5G", "6P",
-            "TA", "TB", "TC",
-            "LOTR", "T3M", "TMNT", "F&V", "Zoo"
-    };
+    enum ROOM_NAMES {
+        THREE_A ("3A", "3A"), 
+        THREE_B ("3B", "3B"),
+        THREE_C ("3C", "3C"),
+        THREE_D ("3D", "3D"),
+        THREE_E ("3E", "3E"),
+        FIVE_A ("5A", "5A"),
+        FIVE_B ("5B", "5B"),
+        FIVE_C ("5C", "5C"),
+        FIVE_D ("5D", "5D"),
+        FIVE_E ("5E", "5E"),
+        FIVE_F ("5F", "5F"),
+        FIVE_G ("5G", "5G"),
+        SIX_P ("6P", "6P"),
+        SIX_R ("6R", "6R"),
+        WILL_KATE ("7Will", "TA", 1),
+        BATMAN_ROBIN ("7Batman", "TB", 1),
+        LADY_TRAMP ("7Lady", "TC", 1),
+        LOTR ("7LOTR", "LOTR"),
+        T3M ("7T3M", "T3M"),
+        TMNT ("7TMNT", "TMNT"),
+        FRUIT_VEG ("4FV", "F&V"),
+        ZOO ("4Z", "Zoo"),
+        UNALLOCATED ("N/A", "Unallocated");
 
-    @Override
-    public BedAssignment parse( String roomLabel ) {
+        final String room;
+        final String mappedRoom;
+        final int substringLength;
 
-        String room = null;
-        String bedName = null;
-
-        // for room 6, we setup a specific match
-        Pattern p = Pattern.compile( "6([0-9]{2}.*)$" );
-        Matcher m = p.matcher( roomLabel );
-        if ( m.find() ) {
-            room = "6";
-            bedName = m.group( 1 );
+        private ROOM_NAMES( String room, String mappedRoom ) {
+            this.room = room;
+            this.mappedRoom = mappedRoom;
+            this.substringLength = room.length();
         }
-        else {
-            // otherwise, we just see what the label starts with and split it
-            for ( String roomName : ROOM_NAMES ) {
-                if ( roomLabel.startsWith( roomName ) ) {
-                    room = roomName;
-                    bedName = roomLabel.substring( roomName.length() );
-                    break;
-                }
+
+        private ROOM_NAMES( String room, String mappedRoom, int substringLength ) {
+            this.room = room;
+            this.mappedRoom = mappedRoom;
+            this.substringLength = substringLength;
+        }
+
+        public String getRoom() {
+            return room;
+        }
+
+        public String getMappedRoom() {
+            return mappedRoom;
+        }
+
+        public int getSubstringLength() {
+            return substringLength;
+        }
+    }
+
+    /**
+     * Returns the room given the room number.
+     * 
+     * @param roomNumber "room number"
+     * @return non-null room name.
+     */
+    private static String getRoomFromRoomNumber( String roomNumber ) {
+        if ( roomNumber == null ) {
+            return "Unallocated";
+        }
+        for ( ROOM_NAMES room : ROOM_NAMES.values() ) {
+            if ( roomNumber.startsWith( room.getRoom() ) ) {
+                return room.getMappedRoom();
             }
         }
+        throw new MissingUserDataException( "Missing room mapping for " + roomNumber );
+    }
 
-        // if we haven't matched anything, just use the room label as the room (no bed name)
-        if ( room == null ) {
-            room = roomLabel;
+    /**
+     * Returns the bedname given the room number.
+     * 
+     * @param roomNumber "room number"
+     * @return non-null room name.
+     */
+    private static String getBedNameFromRoomNumber( String roomNumber ) {
+        if ( roomNumber == null || "N/A".equals( roomNumber ) ) {
+            return null;
         }
-        return new BedAssignment( room, bedName );
+        for ( ROOM_NAMES room : ROOM_NAMES.values() ) {
+            if ( roomNumber.startsWith( room.getRoom() ) ) {
+                return roomNumber.substring( room.getSubstringLength() );
+            }
+        }
+        throw new MissingUserDataException( "Missing room mapping for " + roomNumber );
+    }
+
+    @Override
+    public BedAssignment parse( String roomNumber ) {
+        return new BedAssignment( getRoomFromRoomNumber( roomNumber ), getBedNameFromRoomNumber( roomNumber ) );
     }
 }

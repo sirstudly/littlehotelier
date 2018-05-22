@@ -8,10 +8,11 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
  * these.
  *
  */
-public class BookingRoom extends CloudbedsJsonResponse {
+public class BookingRoom {
 
     private String id;
     private String bookingId;
+    private String roomId;
     private String roomIdentifier;
     private String startDate;
     private String endDate;
@@ -34,6 +35,14 @@ public class BookingRoom extends CloudbedsJsonResponse {
 
     public void setBookingId( String bookingId ) {
         this.bookingId = bookingId;
+    }
+
+    public String getRoomId() {
+        return roomId;
+    }
+
+    public void setRoomId( String roomId ) {
+        this.roomId = roomId;
     }
 
     public String getRoomIdentifier() {

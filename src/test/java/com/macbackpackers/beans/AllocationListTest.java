@@ -17,7 +17,7 @@ public class AllocationListTest {
     public void testGetBulkInsertStatement() throws Exception {
         Allocation alloc = new Allocation();
         alloc.setJobId( 2 );
-        alloc.setRoomId( 15 );
+        alloc.setRoomId( "15" );
         alloc.setRoomTypeId( 8 );
         alloc.setRoom( "the room" );
         alloc.setBedName( "the bed" );

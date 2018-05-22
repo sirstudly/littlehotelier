@@ -70,7 +70,7 @@ public class AllocationScraperJob extends AbstractJob {
             workerJob.setStatus( JobStatus.submitted );
             workerJob.setAllocationScraperJobId( getId() );
             workerJob.setStartDate( currentDate );
-            workerJob.setEndDate( currentDate.plusDays( 13 ) );
+            workerJob.setEndDate( currentDate.plusDays( 14 ) );
             int jobId = dao.insertJob( workerJob );
             jobs.add( CloudbedsAllocationScraperWorkerJob.class.cast( dao.fetchJobById( jobId ) ) );
             currentDate = currentDate.plusDays( 14 ); // calendar page shows 2 weeks at a time

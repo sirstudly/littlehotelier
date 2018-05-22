@@ -46,7 +46,7 @@ public class Allocation {
     private int jobId;
 
     @Column( name = "room_id" )
-    private Integer roomId;
+    private String roomId;
 
     @Column( name = "room_type_id", nullable = false )
     private int roomTypeId;
@@ -136,11 +136,11 @@ public class Allocation {
         this.reservationId = reservationId;
     }
 
-    public Integer getRoomId() {
+    public String getRoomId() {
         return roomId;
     }
 
-    public void setRoomId( Integer roomId ) {
+    public void setRoomId( String roomId ) {
         this.roomId = roomId;
     }
 
@@ -296,6 +296,10 @@ public class Allocation {
 
     public void setBookedDate( java.util.Date bookedDate ) {
         this.bookedDate = bookedDate;
+    }
+
+    public void setBookedDate( LocalDate bookedDate ) {
+        this.bookedDate = Date.from( bookedDate.atStartOfDay( ZoneId.systemDefault() ).toInstant() );
     }
 
     /**

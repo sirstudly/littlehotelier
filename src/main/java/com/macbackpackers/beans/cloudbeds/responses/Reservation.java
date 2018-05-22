@@ -21,12 +21,14 @@ public class Reservation extends CloudbedsJsonResponse {
     private String checkoutDate;
     private String sourceName;
     private String identifier;
+    private String specialRequests;
     private String thirdPartyIdentifier;
     private String bookingDateHotelTime;
     private Integer kidsNumber;
     private Integer adultsNumber;
     private String paidValue;
     private List<BookingRoom> bookingRooms;
+    private List<BookingNote> notes;
 
     public String getReservationId() {
         return reservationId;
@@ -148,6 +150,14 @@ public class Reservation extends CloudbedsJsonResponse {
         this.thirdPartyIdentifier = thirdPartyIdentifier;
     }
 
+    public String getSpecialRequests() {
+        return specialRequests;
+    }
+
+    public void setSpecialRequests( String specialRequests ) {
+        this.specialRequests = specialRequests;
+    }
+
     public String getBookingDateHotelTime() {
         return bookingDateHotelTime;
     }
@@ -186,6 +196,30 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setBookingRooms( List<BookingRoom> bookingRooms ) {
         this.bookingRooms = bookingRooms;
+    }
+
+    public List<BookingNote> getNotes() {
+        return notes;
+    }
+
+    public void setNotes( List<BookingNote> notes ) {
+        this.notes = notes;
+    }
+
+    /**
+     * Returns concatenated list of notes.
+     * 
+     * @return notes (or null if none found)
+     */
+    public String getNotesAsString() {
+        if ( getNotes() == null || getNotes().isEmpty() ) {
+            return null; // nothing to show
+        }
+        StringBuffer result = new StringBuffer();
+        for ( BookingNote note : getNotes() ) {
+            result.append( note.toString() ).append( "\n" );
+        }
+        return result.toString();
     }
 
     @Override
