@@ -742,6 +742,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         em.createNativeQuery( sql.getProperty( "group.bookings" ) )
             .setParameter( "jobId", allocationScraperJobId )
             .setParameter( "groupSize", getGroupBookingSize() )
+            .setParameter( "propertyManager", StringUtils.defaultIfBlank( getOption( "hbo_property_manager" ), "n/a" ) )
             .executeUpdate();
     }
 

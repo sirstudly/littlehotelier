@@ -226,7 +226,7 @@ public class AllocationsPageScraper {
 
         Allocation alloc = new Allocation();
         alloc.setJobId( jobId );
-        alloc.setRoomId( String.valueOf( dataRoomId ) );
+        alloc.setRoomId( dataRoomId == null ? null : String.valueOf( dataRoomId ) );
         alloc.setRoomTypeId( dataRoomTypeId );
         BedAssignment bedAssignment = roomBedMatcher.parse( currentBedName );
         alloc.setRoom( bedAssignment.getRoom() );

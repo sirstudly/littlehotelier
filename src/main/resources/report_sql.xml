@@ -56,7 +56,7 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
     </entry>
     <entry key="group.bookings">
 	    INSERT INTO `wp_lh_group_bookings` (job_id, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn)
-        SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, SUM(num_guests) `num_guests`, notes, viewed_yn
+        SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, CASE WHEN :propertyManager = 'cloudbeds' THEN num_guests ELSE SUM(num_guests) END `num_guests`, notes, viewed_yn
           FROM ( -- some duplicates may occur; remove them first
                 SELECT job_id, room, bed_name, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn 
                   FROM wp_lh_calendar
@@ -66,7 +66,7 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
                 ) t
          WHERE reservation_id > 0 -- ignore room closures
       GROUP BY reservation_id, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, notes, viewed_yn
-        HAVING SUM(num_guests) >= :groupSize
+        HAVING CASE WHEN :propertyManager = 'cloudbeds' THEN num_guests ELSE SUM(num_guests) END >= :groupSize
      UNION
         -- also include bookings for 5 guests into 6 bed dorms
         SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, SUM(num_guests) `num_guests`, notes, viewed_yn
@@ -83,6 +83,6 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
                 ) t
          WHERE reservation_id > 0 -- ignore room closures
       GROUP BY reservation_id, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, notes, viewed_yn
-      HAVING SUM(num_guests) = 5
+      HAVING CASE WHEN :propertyManager = 'cloudbeds' THEN num_guests ELSE SUM(num_guests) END = 5
     </entry>
 </properties>

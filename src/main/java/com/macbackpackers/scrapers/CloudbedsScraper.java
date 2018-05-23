@@ -199,7 +199,7 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createGetReservationRequest( reservationId );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.info( "Pulling data for " + reservationId + " from: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         Optional<Reservation> r = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class ) );
@@ -251,7 +251,7 @@ public class CloudbedsScraper {
                 a.setJobId( jobId );
                 a.setNumberGuests( r.getAdultsNumber() + r.getKidsNumber() );
                 a.setPaymentOutstanding( r.getBalanceDue() );
-                a.setPaymentTotal( r.getPaidValue() );
+                a.setPaymentTotal( r.getGrandTotal() );
                 a.setReservationId( Integer.parseInt( r.getReservationId() ) );
                 a.setRoom( bed.getRoom() );
                 a.setRoomId( br.getRoomId() );
