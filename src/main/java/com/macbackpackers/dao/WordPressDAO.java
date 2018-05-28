@@ -5,6 +5,8 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 
+import javax.persistence.NoResultException;
+
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.springframework.dao.EmptyResultDataAccessException;
 
@@ -81,6 +83,15 @@ public interface WordPressDAO {
      * @throws EmptyResultDataAccessException if allocation does not exist
      */
     public Allocation fetchAllocation( int id ) throws EmptyResultDataAccessException;
+
+    /**
+     * Returns all allocations with the given checkin date for the AllocationScraperJob.
+     * 
+     * @param allocationScraperJobId job id
+     * @param checkinDate checkin date
+     * @return non-null allocation list
+     */
+    public List<Allocation> fetchAllocationsByCheckinDate( int allocationScraperJobId, Date checkinDate );
 
     /**
      * Deletes all Allocations for the given jobId.
@@ -294,6 +305,15 @@ public interface WordPressDAO {
      * @return non-null list
      */
     public List<BookingWithGuestComments> fetchAgodaBookingsMissingNoChargeNote();
+
+    /**
+     * Returns a single guest comment by reservation ID.
+     * 
+     * @param reservationId ID of reservation
+     * @return non-null guest comment report entry
+     * @throws NoResultException if no results found
+     */
+    public GuestCommentReportEntry fetchGuestComments( int reservationId ) throws NoResultException;
 
     /**
      * Creates a report with all bookings with more than 5 guests.

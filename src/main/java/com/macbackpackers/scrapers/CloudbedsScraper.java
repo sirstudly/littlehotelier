@@ -6,6 +6,8 @@ import java.net.URL;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -30,12 +32,14 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.PaymentCardNotAcceptedException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
@@ -50,10 +54,6 @@ public class CloudbedsScraper {
     
     // a class-level lock
     private static final Object CLASS_LOCK = new Object();
-
-    @Autowired
-    @Qualifier( "webClient" )
-    private WebClient webClient;
 
     @Autowired
     @Qualifier( "gsonForCloudbeds" )
@@ -83,9 +83,10 @@ public class CloudbedsScraper {
     /**
      * Verifies that we're logged in (or otherwise log us in if not).
      * 
+     * @param webClient web client instance to use
      * @throws IOException on connection error
      */
-    private void validateLoggedIn() throws IOException {
+    private void validateLoggedIn( WebClient webClient ) throws IOException {
 
         // should only need to do this once for the lifetime of this object
         if( loggedIn ) {
@@ -109,7 +110,7 @@ public class CloudbedsScraper {
                 if ( response.isPresent() ) {
                     LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
                 }
-                login();
+                login( webClient );
             }
             else {
                 LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
@@ -122,21 +123,25 @@ public class CloudbedsScraper {
 
     /**
      * Logs in with the saved credentials.
+     * 
+     * @param webClient web client instance to use
      * @return logged in page
      * @throws IOException on page load failure
      */
-    public HtmlPage login() throws IOException {
-        return login( dao.getOption( "hbo_cloudbeds_username" ), dao.getOption( "hbo_cloudbeds_password" ) );
+    public HtmlPage login( WebClient webClient ) throws IOException {
+        return login( webClient, dao.getOption( "hbo_cloudbeds_username" ), dao.getOption( "hbo_cloudbeds_password" ) );
     }
 
     /**
      * Logs in with the given credentials.
+     * 
+     * @param webClient web client instance to use
      * @param username username/email
      * @param password password
      * @return logged in page
      * @throws IOException on page load failure.
      */
-    public HtmlPage login( String username, String password ) throws IOException {
+    public HtmlPage login( WebClient webClient, String username, String password ) throws IOException {
 
         if ( StringUtils.isBlank( username ) || StringUtils.isBlank( password ) ) {
             throw new UnrecoverableFault( "Missing login details for Cloudbeds." );
@@ -172,30 +177,34 @@ public class CloudbedsScraper {
 
     /**
      * Goes to the Cloudbeds dashboard. Will login if required.
+     * 
+     * @param webClient web client instance to use
      * @return dashboard page
      * @throws IOException on navigation failure
      */
-    public HtmlPage loadDashboard() throws IOException {
+    public HtmlPage loadDashboard( WebClient webClient ) throws IOException {
         HtmlPage loadedPage = webClient.getPage( "https://hotels.cloudbeds.com/connect/" + PROPERTY_ID );
         LOGGER.info( "Loading Dashboard." );
         if ( loadedPage.getUrl().getPath().contains( "/login" ) ) {
             fileService.loadCookiesFromFile( webClient );
             LOGGER.info( "Oops, we're not logged in. Logging in now." );
-            login( dao.getOption( "hbo_cloudbeds_username" ), dao.getOption( "hbo_cloudbeds_password" ) );
+            login( webClient, dao.getOption( "hbo_cloudbeds_username" ), dao.getOption( "hbo_cloudbeds_password" ) );
         }
         return loadedPage;
     }
 
     /**
      * Loads the given reservation by ID.
+     * 
+     * @param webClient web client instance to use
      * @param reservationId unique cloudbeds reservation ID
      * @return the loaded reservation (not-null)
      * @throws IOException on load failure
      * @throws MissingUserDataException if reservation not found
      */
-    public Reservation getReservation( String reservationId ) throws IOException {
+    public Reservation getReservation( WebClient webClient, String reservationId ) throws IOException {
 
-        validateLoggedIn();
+        validateLoggedIn( webClient );
         WebRequest requestSettings = jsonRequestFactory.createGetReservationRequest( reservationId );
 
         Page redirectPage = webClient.getPage( requestSettings );
@@ -209,13 +218,27 @@ public class CloudbedsScraper {
             }
             throw new MissingUserDataException( "Reservation not found." );
         }
+
+        // need to parse the credit_cards object manually to check for presence
+        JsonObject rootElem = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class );
+        JsonElement creditCardsElem = rootElem.get( "credit_cards" );
+        if ( creditCardsElem.isJsonObject() && creditCardsElem.getAsJsonObject().entrySet().size() > 0 ) {
+            r.get().setCardDetailsPresent( true );
+        }
         return r.get();
     }
 
-    private Reservation getReservationRetry( String reservationId ) {
+    /**
+     * Gets reservation but retries {@code MAX_RETRY} number of times before failing.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId the reservation to query
+     * @return non-null reservation
+     */
+    private Reservation getReservationRetry( WebClient webClient, String reservationId ) {
         for ( int i = 0 ; i < MAX_RETRY ; i++ ) {
             try {
-                return getReservation( reservationId );
+                return getReservation( webClient, reservationId );
             }
             catch ( IOException ex ) {
                 LOGGER.error( "Failed to retrieve reservation " + reservationId, ex );
@@ -228,6 +251,7 @@ public class CloudbedsScraper {
      * Converts a Reservation object (which contains multiple bed assignments) into a List of
      * Allocation.
      * 
+     * @param lhWebClient web client instance to use
      * @param jobId job ID to populate allocation
      * @param r reservation to be converted
      * @return non-null list of allocation
@@ -266,46 +290,55 @@ public class CloudbedsScraper {
 
     /**
      * Retrieve all customers between the given checkin dates (inclusive).
+     * 
+     * @param webClient web client instance to use
      * @param checkinDateStart checkin date start
      * @param checkinDateEnd checkin date end (inclusive)
      * @return non-null customer list
      * @throws IOException on page load failure
      */
-    public List<Customer> getCustomers( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
-        
-        validateLoggedIn();
-        WebRequest requestSettings = jsonRequestFactory.createGetCustomersRequest( checkinDateStart, checkinDateEnd );
-
-        Page redirectPage = webClient.getPage(requestSettings);
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-        
-        Optional<JsonElement> jelement = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ) );
-        if( false == jelement.isPresent() ) {
-            throw new MissingUserDataException( "Failed to retrieve customers." );
-        }
-        JsonObject jobject = jelement.get().getAsJsonObject();
-        Optional<JsonArray> jarray = Optional.fromNullable( jobject.getAsJsonArray( "aaData" ) );
-        if( false == jarray.isPresent() ) {
-            throw new MissingUserDataException( "Failed to retrieve customers." );
-        }
-        return Arrays.asList( gson.fromJson( jarray.get(), Customer[].class ) );
+    public List<Customer> getCustomers( WebClient webClient, LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
+        return getCustomers( webClient, jsonRequestFactory.createGetCustomersRequest(
+                checkinDateStart, checkinDateEnd ) );
     }
 
     /**
      * Get all reservations staying between the given checkin date range.
      * 
+     * @param webClient web client instance to use
      * @param stayDateStart stay date (inclusive)
      * @param stayDateEnd stay date (exclusive)
      * @return non-null list of customer reservations
      * @throws IOException
      */
-    public List<Customer> getReservations( LocalDate stayDateStart, LocalDate stayDateEnd ) throws IOException {
-        
-        validateLoggedIn();
-        WebRequest requestSettings = jsonRequestFactory.createGetReservationsRequestByStayDate(
-                stayDateStart, stayDateEnd );
+    public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd ) throws IOException {
+        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByStayDate(
+                stayDateStart, stayDateEnd ) );
+    }
 
+    /**
+     * Get all reservations matching the given query.
+     * 
+     * @param webClient web client instance to use
+     * @param query the query string
+     * @return non-null list of customer reservations
+     * @throws IOException
+     */
+    public List<Customer> getReservations( WebClient webClient, String query ) throws IOException {
+        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( query ) );
+    }
+
+    /**
+     * Get all customers/reservations using the given request.
+     * 
+     * @param webClient web client instance to use
+     * @param requestSettings request details
+     * @return non-null list of customer reservations
+     * @throws IOException
+     */
+    private List<Customer> getCustomers( WebClient webClient, WebRequest requestSettings ) throws IOException {
+        
+        validateLoggedIn( webClient );
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
@@ -330,6 +363,7 @@ public class CloudbedsScraper {
     /**
      * Add a payment record to the given reservation.
      * 
+     * @param webClient web client instance to use
      * @param reservationId unique reservation ID
      * @param cardType one of "mastercard", "visa". Anything else will blank the field.
      * @param amount amount to add
@@ -337,12 +371,12 @@ public class CloudbedsScraper {
      * @throws IOException on page load failure
      * @throws RecordPaymentFailedException payment record failure
      */
-    public void addPayment( String reservationId, String cardType, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
+    public void addPayment( WebClient webClient, String reservationId, String cardType, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
 
         // first we need to find a "room" we're booking to
         // it doesn't actually map to a room, just an assigned guest
         // it doesn't even have to be an allocated room
-        Reservation reservation = getReservation( reservationId );
+        Reservation reservation = getReservation( webClient, reservationId );
         if ( reservation.getBookingRooms() == null || reservation.getBookingRooms().isEmpty() ) {
             throw new MissingUserDataException( "Unable to find allocation to assign payment to!" );
         }
@@ -355,53 +389,85 @@ public class CloudbedsScraper {
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        // throw a wobbly if response not successful
-        Optional<JsonElement> jelement = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ) );
-        if ( false == jelement.isPresent() ) {
+        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
+        LOGGER.debug( jsonResponse );
+        
+        if( StringUtils.isBlank( jsonResponse ) ) {
             throw new MissingUserDataException( "Missing response from add payment request?" );
         }
+        CloudbedsJsonResponse response = gson.fromJson( jsonResponse, CloudbedsJsonResponse.class );
 
-        JsonObject jobject = jelement.get().getAsJsonObject();
-        if ( false == jobject.get( "success" ).getAsBoolean() ) {
-            throw new RecordPaymentFailedException( jobject.get( "message" ).getAsString() );
+        // throw a wobbly if response not successful
+        if ( response.isFailure() ) {
+            throw new RecordPaymentFailedException( response.getMessage() );
         }
     }
 
     /**
      * Adds a note to an existing reservation.
+     * 
+     * @param webClient web client instance to use
      * @param reservationId unique reservation ID
      * @param note note description to add
      * @throws IOException on page load failure
      */
-    public void addNote( String reservationId, String note ) throws IOException {
+    public void addNote( WebClient webClient, String reservationId, String note ) throws IOException {
 
-        validateLoggedIn();
+        validateLoggedIn( webClient );
         WebRequest requestSettings = jsonRequestFactory.createAddNoteRequest( reservationId, note );
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "POST: " + redirectPage.getUrl().getPath() );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
+        LOGGER.debug( jsonResponse );
 
-        // throw a wobbly if response not successful
-        Optional<JsonElement> jelement = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ) );
-        if ( false == jelement.isPresent() ) {
+        if ( StringUtils.isBlank( jsonResponse ) ) {
             throw new MissingUserDataException( "Missing response from add note request?" );
         }
+        CloudbedsJsonResponse response = gson.fromJson( jsonResponse, CloudbedsJsonResponse.class );
 
-        JsonObject jobject = jelement.get().getAsJsonObject();
-        if ( false == jobject.get( "success" ).getAsBoolean() ) {
-            throw new IOException( jobject.get( "message" ).getAsString() );
+        // throw a wobbly if response not successful
+        if ( response.isFailure() ) {
+            throw new IOException( response.getMessage() );
+        }
+    }
+
+    /**
+     * Adds a payment card to an existing reservation.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId unique reservation ID
+     * @param cardDetails card to add
+     * @throws IOException on page load failure
+     */
+    public void addCardDetails( WebClient webClient, String reservationId, CardDetails cardDetails ) throws IOException {
+
+        validateLoggedIn( webClient );
+        WebRequest requestSettings = jsonRequestFactory.createAddCreditCardRequest( reservationId, cardDetails );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "POST: " + redirectPage.getUrl().getPath() );
+        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
+        LOGGER.debug( jsonResponse );
+
+        if ( StringUtils.isBlank( jsonResponse ) ) {
+            throw new MissingUserDataException( "Missing response from add card details request?" );
+        }
+        CloudbedsJsonResponse response = gson.fromJson( jsonResponse, CloudbedsJsonResponse.class );
+
+        // throw a wobbly if response not successful
+        if ( response.isFailure() ) {
+            throw new PaymentCardNotAcceptedException( response.getMessage() );
         }
     }
 
     /**
      * Sends a ping request to the server.
      * 
+     * @param webClient web client instance to use
      * @throws IOException
      */
-    public void ping() throws IOException {
+    public void ping( WebClient webClient ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createPingRequest();
 
         Page redirectPage = webClient.getPage( requestSettings );
@@ -412,16 +478,16 @@ public class CloudbedsScraper {
     /**
      * Dumps the allocations starting on the given date (inclusive).
      * 
+     * @param webClient web client instance to use
      * @param jobId the job ID to associate with this dump
      * @param startDate the start date to check allocations for (inclusive)
      * @param endDate the end date to check allocations for (exclusive)
      * @throws IOException on read/write error
      */
-//    @Transactional
-    public void dumpAllocationsFrom( int jobId, LocalDate startDate, LocalDate endDate ) throws IOException {
+    public void dumpAllocationsFrom( WebClient webClient, int jobId, LocalDate startDate, LocalDate endDate ) throws IOException {
         AllocationList allocations = new AllocationList();
-        List<Reservation> reservations = getReservations( startDate, endDate ).stream()
-                .map( c -> getReservationRetry( c.getId() ) )
+        List<Reservation> reservations = getReservations( webClient, startDate, endDate ).stream()
+                .map( c -> getReservationRetry( webClient, c.getId() ) )
                 .collect( Collectors.toList() );
         reservations.stream()
                 .map( r -> reservationToAllocation( jobId, r ) )
@@ -436,5 +502,61 @@ public class CloudbedsScraper {
                         r.getSpecialRequests() ) )
                 .collect( Collectors.toList() );
         dao.updateGuestCommentsForReservations( guestComments );
+    }
+
+    /**
+     * Goes to the given page.
+     * 
+     * @param webClient web client instance to use
+     * @param pageURL URL
+     * @return non-null page
+     * @throws IOException on i/o error
+     */
+    public HtmlPage navigateToPage( WebClient webClient, String pageURL ) throws IOException {
+        // attempt to go the page directly using the current credentials
+        LOGGER.info( "Loading page: " + pageURL );
+        validateLoggedIn( webClient );
+        HtmlPage nextPage = webClient.getPage( pageURL );
+        LOGGER.debug( "Now on " + nextPage.getUrl() );
+        if ( nextPage.getUrl().getPath().endsWith( "/login" ) ) {
+            throw new UnrecoverableFault( "Login to Cloudbeds failed. Has the password changed?" );
+        }
+        return nextPage;
+    }
+
+    /**
+     * Attempts to find the CB booking based on either the bookingRef or guest name. Throws
+     * UnrecoverableFault if booking could not be resolved.
+     * 
+     * @param webClient web client instance to use
+     * @param bookingRef LH booking reference
+     * @param guestName name of guest
+     * @return non-null reservation
+     * @throws IOException on i/o error
+     */
+    public Reservation findBookingByLHBookingRef( WebClient webClient, String bookingRef, String guestName ) throws IOException {
+
+        // first try to search by booking ref
+        Pattern p = Pattern.compile( "^\\D*(\\d+)$" );
+        Matcher m = p.matcher( bookingRef );
+        if ( m.find() ) {
+            List<Customer> reservations = getReservations( webClient, m.group( 1 ) );
+            if ( reservations.size() > 1 ) {
+                throw new UnrecoverableFault( "More than one CB booking found for " + bookingRef );
+            }
+            else if ( reservations.size() == 1 ) {
+                return getReservationRetry( webClient, reservations.get( 0 ).getId() );
+            }
+        }
+
+        // could not find booking by booking ref; try with guest name
+        List<Customer> reservations = getReservations( webClient, guestName );
+        if ( reservations.size() > 1 ) {
+            throw new UnrecoverableFault( "More than one CB booking found for " + bookingRef + ": " + guestName );
+        }
+        else if ( reservations.size() == 1 ) {
+            return getReservationRetry( webClient, reservations.get( 0 ).getId() );
+        }
+        throw new UnrecoverableFault( "No CB bookings found for " + bookingRef + ": " + guestName );
     }
 }

@@ -597,7 +597,7 @@ public class ReservationPageScraper {
      * @return non-null card number
      * @throws IOException
      */
-    public CardDetails getCardDetails( HtmlPage reservationPage, int reservationId ) throws IOException {
+    public CardDetails getCardDetails( HtmlPage reservationPage ) throws IOException {
         CardDetails cardDetails = new CardDetails();
 
         // we should already have secure access so should be able to see the card details directly

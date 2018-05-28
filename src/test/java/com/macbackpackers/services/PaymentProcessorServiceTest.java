@@ -34,7 +34,11 @@ public class PaymentProcessorServiceTest {
 
     @Autowired
     @Qualifier( "webClient" )
-    WebClient webClient;
+    WebClient lhWebClient;
+
+    @Autowired
+    @Qualifier( "webClient" )
+    WebClient cbWebClient;
 
     @Autowired
     WordPressDAO dao;
@@ -48,7 +52,7 @@ public class PaymentProcessorServiceTest {
         c.set( Calendar.YEAR, 2017 );
         c.set( Calendar.MONTH, Calendar.OCTOBER );
         c.set( Calendar.DATE, 26 );
-        paymentService.processDepositPayment( webClient, 0, "BDC-1264569063", c.getTime() );
+        paymentService.processDepositPayment( lhWebClient, 0, "BDC-1264569063", c.getTime() );
         LOGGER.info( "done" );
     }
     
@@ -62,7 +66,7 @@ public class PaymentProcessorServiceTest {
         c.set( Calendar.DATE, 7 );
         
         LOGGER.info( "Processing payment for booking " + bookingRef );
-        HtmlPage bookingsPage = bookingScraper.goToBookingPageBookedOn( webClient, c.getTime(), bookingRef );
+        HtmlPage bookingsPage = bookingScraper.goToBookingPageBookedOn( lhWebClient, c.getTime(), bookingRef );
         
         List<?> rows = bookingsPage.getByXPath( 
                 "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr[@class!='group_header']" );
@@ -93,7 +97,7 @@ public class PaymentProcessorServiceTest {
         c.set( Calendar.MONTH, Calendar.OCTOBER );
         c.set( Calendar.DATE, 13 );
 
-        HtmlPage bookingsPage = bookingScraper.goToBookingPageBookedOn( webClient, c.getTime(), bookingRef );
+        HtmlPage bookingsPage = bookingScraper.goToBookingPageBookedOn( lhWebClient, c.getTime(), bookingRef );
 
         List<?> rows = bookingsPage.getByXPath(
                 "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr/td[@class='booking_reference' and text()='" + bookingRef + "']/.." );
@@ -113,7 +117,15 @@ public class PaymentProcessorServiceTest {
 
     @Test
     public void testProcessManualPayment() throws Exception {
-        paymentService.processManualPayment( webClient, 0,
+        paymentService.processManualPayment( lhWebClient, 0,
                 "HWL-551-336647714", new BigDecimal( "0.01" ), "Testing -rc", true );
     }
+    
+    @Test
+    public void testCopyCardDetailsFromLHtoCB() throws Exception {
+        Calendar c = Calendar.getInstance();
+        c.set( Calendar.DATE, 26 );
+        paymentService.copyCardDetailsFromLHtoCB( lhWebClient, cbWebClient, "LH1804028813910", c.getTime() );
+    }
+
 }

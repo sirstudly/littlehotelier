@@ -53,7 +53,7 @@ public class AuthenticationService {
         LOGGER.info( "Loading page: " + pageURL );
         HtmlPage nextPage = webClient.getPage( pageURL );
 
-        if ( "/login".equals( nextPage.getUrl().getPath() ) ) {
+        if ( nextPage.getUrl().getPath().contains( "/login" ) ) {
             LOGGER.warn( "Current credentials not valid?" );
             LOGGER.debug( nextPage.asXml() );
             throw new UnrecoverableFault( "Unable to login using existing credentials. Has the password changed?" );
@@ -107,6 +107,18 @@ public class AuthenticationService {
         doLogin( webClient,
                 wordpressDAO.getOption( "hbo_lilho_username" ),
                 wordpressDAO.getOption( "hbo_lilho_password" ) );
+    }
+
+    /**
+     * Updates the current cookie file with the given LH session key.
+     * 
+     * @param webClient active web client
+     * @throws IOException on i/o error
+     */
+    public void updateLittleHotelierSessionKey( WebClient webClient ) throws IOException {
+        fileService.loadCookiesFromFile( webClient );
+        fileService.addLittleHotelierSessionCookie( webClient, wordpressDAO.getOption( "hbo_lilho_session" ) );
+        fileService.writeCookiesToFile( webClient );
     }
 
     /**

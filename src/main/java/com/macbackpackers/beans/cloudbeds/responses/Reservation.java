@@ -29,6 +29,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String paidValue;
     private List<BookingRoom> bookingRooms;
     private List<BookingNote> notes;
+    private boolean cardDetailsPresent;
 
     public String getReservationId() {
         return reservationId;
@@ -220,6 +221,14 @@ public class Reservation extends CloudbedsJsonResponse {
             result.append( note.toString() ).append( "\n" );
         }
         return result.toString();
+    }
+
+    public boolean isCardDetailsPresent() {
+        return cardDetailsPresent;
+    }
+
+    public void setCardDetailsPresent( boolean cardDetailsPresent ) {
+        this.cardDetailsPresent = cardDetailsPresent;
     }
 
     @Override

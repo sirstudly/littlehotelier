@@ -25,6 +25,15 @@ public class CloudbedsJsonResponse {
         return false == Boolean.FALSE.equals( getSuccess() );
     }
 
+    /**
+     * Return true iff success is present and true.
+     * 
+     * @return true only if success = true
+     */
+    public boolean isFailure() {
+        return !isSuccess();
+    }
+
     public String getMessage() {
         return message;
     }

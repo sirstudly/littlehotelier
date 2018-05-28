@@ -514,6 +514,11 @@ public class WordPressDAOTest {
     }
     
     @Test
+    public void testFetchGuestComments() throws Exception {
+        LOGGER.info( ToStringBuilder.reflectionToString( dao.fetchGuestComments( 10372722 ) ) );   
+    }
+
+    @Test
     public void testRunGroupBookingsReport() {
         dao.runGroupBookingsReport( 137652 );   
     }

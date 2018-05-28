@@ -6,10 +6,14 @@ package com.macbackpackers.exceptions;
  */
 public class PaymentCardNotAcceptedException extends RuntimeException {
 
-    private static final long serialVersionUID = 6405059383301826469L;
+    private static final long serialVersionUID = -829476788823018044L;
 
     public PaymentCardNotAcceptedException() {
         super();
+    }
+
+    public PaymentCardNotAcceptedException( String message ) {
+        super( message );
     }
 
 }

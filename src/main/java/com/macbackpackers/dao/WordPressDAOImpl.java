@@ -12,6 +12,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.persistence.EntityManager;
+import javax.persistence.NoResultException;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Query;
 
@@ -107,6 +108,16 @@ public class WordPressDAOImpl implements WordPressDAO {
             throw new EmptyResultDataAccessException( 1 );
         }
         return alloc;
+    }
+
+    @Override
+    public List<Allocation> fetchAllocationsByCheckinDate( int allocationScraperJobId, Date checkinDate ) {
+        return em.createQuery( "FROM Allocation WHERE jobId = :jobId AND reservationId > 0 "
+                + "AND status IN ('checked-in', 'confirmed') AND paymentStatus = 'unpaid' "
+                + "AND checkinDate = :checkinDate", Allocation.class )
+                .setParameter( "jobId", allocationScraperJobId )
+                .setParameter( "checkinDate", checkinDate )
+                .getResultList();
     }
 
     @Override
@@ -429,24 +440,25 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( "specifiedDate", specifiedDate )
                 .executeUpdate();
         LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from wp_lh_jobs" );
-        
-        rowsDeleted = em
-                // doesn't take into the date; just deletes all guest comments that
-                // are no longer present when running the allocation scraper job
-                .createNativeQuery( 
-                        "  DELETE m FROM wp_lh_rpt_guest_comments m "
-                        + "  LEFT OUTER JOIN wp_lh_calendar c "
-                        + "    ON m.reservation_id = c.reservation_id "
-                        // match up with the allocation scraper job that completed last by
-                        // finding the last completed SplitRoomReservationReportJob
-                        + "   AND c.job_id = (SELECT CAST(p.value AS UNSIGNED) FROM wp_lh_job_param p "
-                        + "                    WHERE p.job_id IN (SELECT MAX(j.job_id) FROM wp_lh_jobs j "
-                        + "                                        WHERE j.classname = 'com.macbackpackers.jobs.SplitRoomReservationReportJob' "
-                        + "                                          AND j.status = 'completed') "
-                        + "                    AND p.name = 'allocation_scraper_job_id') " +
-                        " WHERE c.reservation_id IS NULL" )
-                .executeUpdate();
-        LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from wp_lh_rpt_guest_comments" );
+
+// need to keep old records from migration
+//        rowsDeleted = em
+//                // doesn't take into the date; just deletes all guest comments that
+//                // are no longer present when running the allocation scraper job
+//                .createNativeQuery( 
+//                        "  DELETE m FROM wp_lh_rpt_guest_comments m "
+//                        + "  LEFT OUTER JOIN wp_lh_calendar c "
+//                        + "    ON m.reservation_id = c.reservation_id "
+//                        // match up with the allocation scraper job that completed last by
+//                        // finding the last completed SplitRoomReservationReportJob
+//                        + "   AND c.job_id = (SELECT CAST(p.value AS UNSIGNED) FROM wp_lh_job_param p "
+//                        + "                    WHERE p.job_id IN (SELECT MAX(j.job_id) FROM wp_lh_jobs j "
+//                        + "                                        WHERE j.classname = 'com.macbackpackers.jobs.SplitRoomReservationReportJob' "
+//                        + "                                          AND j.status = 'completed') "
+//                        + "                    AND p.name = 'allocation_scraper_job_id') " +
+//                        " WHERE c.reservation_id IS NULL" )
+//                .executeUpdate();
+//        LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from wp_lh_rpt_guest_comments" );
     }
 
     /**
@@ -726,6 +738,13 @@ public class WordPressDAOImpl implements WordPressDAO {
                     .getResultList();
         }
         return Collections.emptyList();
+    }
+
+    @Override
+    public GuestCommentReportEntry fetchGuestComments( int reservationId ) throws NoResultException {
+        return em.createQuery( "FROM GuestCommentReportEntry WHERE reservationId = :reservationId", GuestCommentReportEntry.class )
+                .setParameter( "reservationId", reservationId )
+                .getSingleResult();
     }
 
     @Override

@@ -52,7 +52,7 @@ public class BedCountJob extends AbstractJob {
     public void processJob() throws Exception {
         if ( dao.isCloudbeds() ) {
             LocalDate selectedDate = getSelectedLocalDate();
-            cloudbedsScraper.dumpAllocationsFrom(
+            cloudbedsScraper.dumpAllocationsFrom( webClient,
                     getId(), selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
         }
         else {

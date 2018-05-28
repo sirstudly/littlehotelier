@@ -29,6 +29,26 @@ public class CardDetails {
         return cardType;
     }
 
+    /**
+     * Returns the card type string (used for Cloudbeds) based on the card number BIN.
+     * See also {@link https://www.bincodes.com/bin-list/}
+     * 
+     * @return one of visa, master, maestro
+     * @throws IllegalArgumentException if card not supported
+     */
+    public String getCloudbedsCardTypeFromBinRange() throws IllegalArgumentException {
+        if ( cardNumber.matches( "^4\\d+" ) ) {
+            return "visa";
+        }
+        if ( cardNumber.matches( "^((5[0,6-8])|6)\\d+" ) ) {
+            return "maestro";
+        }
+        if ( cardNumber.matches( "^((2[2-7])|(5[1-5]))\\d+" ) ) {
+            return "master";
+        }
+        throw new IllegalArgumentException( "Unsupported card found. BIN: " + cardNumber.substring( 0, 6 ) );
+    }
+
     public void setCardType( String cardType ) {
         this.cardType = cardType;
     }

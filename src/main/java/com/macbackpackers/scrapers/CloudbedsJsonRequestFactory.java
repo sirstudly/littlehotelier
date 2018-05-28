@@ -7,14 +7,18 @@ import java.net.URL;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.HttpMethod;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.util.NameValuePair;
+import com.macbackpackers.beans.CardDetails;
 
 /**
  * Convenience class for creating JSON requests for Cloudbeds.
@@ -27,9 +31,11 @@ public class CloudbedsJsonRequestFactory {
     private static final DecimalFormat CURRENCY_FORMAT = new DecimalFormat("###0.00");
 
     @Value( "${cloudbeds.property.id:0}" )
-    protected String PROPERTY_ID;
+    private String PROPERTY_ID;
+
+    private String BILLING_PORTAL_ID = "37077"; // ??? is this going to change
     
-    private static final String VERSION = "https://static1.cloudbeds.com/myfrontdesk-front/initial-11.0/app.js.gz";
+    private static final String VERSION = "https://static1.cloudbeds.com/myfrontdesk-front/initial-12.0/app.js.gz";
 
     protected WebRequest createBaseJsonRequest( String url ) throws IOException {
         WebRequest requestSettings = new WebRequest( new URL( url ), HttpMethod.POST );
@@ -54,8 +60,8 @@ public class CloudbedsJsonRequestFactory {
     public WebRequest createGetPaymentMethods() throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/associations/loader/paymentMethods" );
         webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "billing_portal_id", "0" ),
-                new NameValuePair( "is_bp_setup_completed", "0" ),
+                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "propertyIds[]", PROPERTY_ID ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
@@ -84,9 +90,9 @@ public class CloudbedsJsonRequestFactory {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservation" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "id", reservationId ),
-                new NameValuePair( "billing_portal_id", "0" ),
+                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ),
                 new NameValuePair( "is_identifier", "0" ),
-                new NameValuePair( "is_bp_setup_completed", "0" ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
                 new NameValuePair( "version", VERSION ) ) );
@@ -130,8 +136,8 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "repeating_and_new_guests", "all" ),
                 new NameValuePair( "country_code", "all" ),
                 new NameValuePair( "guest_status", "all" ),
-                new NameValuePair( "billing_portal_id", "0" ),
-                new NameValuePair( "is_bp_setup_completed", "0" ),
+                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
                 new NameValuePair( "version", VERSION ) ) );
@@ -139,7 +145,28 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Get info on all customers by searching on a generic term.
+     * 
+     * @param query whatever you want to search by
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createGetReservationsRequest( String query ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
+        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+                new NameValuePair( "date_start[0]", "" ),
+                new NameValuePair( "date_start[1]", "" ),
+                new NameValuePair( "date_end[0]", "" ),
+                new NameValuePair( "date_end[1]", "" ),
+                new NameValuePair( "booking_date[0]", "" ),
+                new NameValuePair( "booking_date[1]", "" ),
+                new NameValuePair( "query", query ) ) );
+        return webRequest;
+    }
+
+    /**
      * Retrieves all reservations within the given checkin date range.
+     * 
      * @param checkinDateStart checkin date (inclusive)
      * @param checkinDateEnd checkin date (inclusive)
      * @return web request
@@ -147,64 +174,19 @@ public class CloudbedsJsonRequestFactory {
      */
     public WebRequest createGetReservationsRequestByCheckinDate( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "sEcho", "2" ),
-                new NameValuePair( "iColumns", "8" ),
-                new NameValuePair( "sColumns", ",,,,,,," ),
-                new NameValuePair( "iDisplayStart", "0" ),
-                new NameValuePair( "iDisplayLength", "1000" ),
-                new NameValuePair( "mDataProp_0", "id" ),
-                new NameValuePair( "bRegex_0", "false" ),
-                new NameValuePair( "bSearchable_0", "true" ),
-                new NameValuePair( "bSortable_0", "false" ),
-                new NameValuePair( "mDataProp_1", "identifier" ),
-                new NameValuePair( "bRegex_1", "false" ),
-                new NameValuePair( "bSearchable_1", "true" ),
-                new NameValuePair( "bSortable_1", "true" ),
-                new NameValuePair( "mDataProp_2", "first_name" ),
-                new NameValuePair( "bRegex_2", "false" ),
-                new NameValuePair( "bSearchable_2", "true" ),
-                new NameValuePair( "bSortable_2", "true" ),
-                new NameValuePair( "mDataProp_3", "last_name" ),
-                new NameValuePair( "bRegex_3", "false" ),
-                new NameValuePair( "bSearchable_3", "true" ),
-                new NameValuePair( "bSortable_3", "true" ),
-                new NameValuePair( "mDataProp_4", "booking_date" ),
-                new NameValuePair( "bRegex_4", "false" ),
-                new NameValuePair( "bSearchable_4", "true" ),
-                new NameValuePair( "bSortable_4", "true" ),
-                new NameValuePair( "mDataProp_5", "checkin_date" ),
-                new NameValuePair( "bRegex_5", "false" ),
-                new NameValuePair( "bSearchable_5", "true" ),
-                new NameValuePair( "bSortable_5", "true" ),
-                new NameValuePair( "mDataProp_6", "checkout_date" ),
-                new NameValuePair( "bRegex_6", "false" ),
-                new NameValuePair( "bSearchable_6", "true" ),
-                new NameValuePair( "bSortable_6", "true" ),
-                new NameValuePair( "mDataProp_7", "grand_total" ),
-                new NameValuePair( "bRegex_7", "false" ),
-                new NameValuePair( "bSearchable_7", "true" ),
-                new NameValuePair( "bSortable_7", "true" ),
-                new NameValuePair( "iSortCol_0", "3" ),
-                new NameValuePair( "sSortDir_0", "asc" ),
-                new NameValuePair( "iSortingCols", "1" ),
+        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
                 new NameValuePair( "date_start[0]", checkinDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_start[1]", checkinDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_end[0]", "" ),
                 new NameValuePair( "date_end[1]", "" ),
                 new NameValuePair( "booking_date[0]", "" ),
-                new NameValuePair( "booking_date[1]", "" ),
-                new NameValuePair( "status", "all" ),
-                new NameValuePair( "billing_portal_id", "0" ),
-                new NameValuePair( "is_bp_setup_completed", "0" ),
-                new NameValuePair( "property_id", PROPERTY_ID ),
-                new NameValuePair( "group_id", PROPERTY_ID ),
-                new NameValuePair( "version", VERSION ) ) );
+                new NameValuePair( "booking_date[1]", "" ) ) );
         return webRequest;
     }
 
     /**
      * Retrieves all reservations staying within the given date range.
+     * 
      * @param stayDateStart checkin date (inclusive)
      * @param stayDateEnd checkin date (inclusive)
      * @return web request
@@ -212,7 +194,26 @@ public class CloudbedsJsonRequestFactory {
      */
     public WebRequest createGetReservationsRequestByStayDate( LocalDate stayDateStart, LocalDate stayDateEnd ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        webRequest.setRequestParameters( Arrays.asList(
+        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+                new NameValuePair( "date_start[0]", "" ),
+                new NameValuePair( "date_start[1]", "" ),
+                new NameValuePair( "date_end[0]", "" ),
+                new NameValuePair( "date_end[1]", "" ),
+                new NameValuePair( "date_stay[0]", stayDateStart.format( YYYY_MM_DD ) ),
+                new NameValuePair( "date_stay[1]", stayDateEnd.format( YYYY_MM_DD ) ),
+                new NameValuePair( "booking_date[0]", "" ),
+                new NameValuePair( "booking_date[1]", "" ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Returns a new modifiable list of common parameters to the {@code get_reservations} request.
+     * 
+     * @param additionalParams additional parameters to add to return list
+     * @return new non-null modifiable list
+     */
+    private List<NameValuePair> getCommonReservationsQueryParameters( NameValuePair... additionalParams ) {
+        List<NameValuePair> params = new ArrayList<NameValuePair>( Arrays.asList(
                 new NameValuePair( "sEcho", "2" ),
                 new NameValuePair( "iColumns", "8" ),
                 new NameValuePair( "sColumns", ",,,,,,," ),
@@ -253,21 +254,14 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "iSortCol_0", "3" ),
                 new NameValuePair( "sSortDir_0", "asc" ),
                 new NameValuePair( "iSortingCols", "1" ),
-                new NameValuePair( "date_start[0]", "" ),
-                new NameValuePair( "date_start[1]", "" ),
-                new NameValuePair( "date_end[0]", "" ),
-                new NameValuePair( "date_end[1]", "" ),
-                new NameValuePair( "date_stay[0]", stayDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_stay[1]", stayDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "booking_date[0]", "" ),
-                new NameValuePair( "booking_date[1]", "" ),
-                new NameValuePair( "status", "all" ),
-                new NameValuePair( "billing_portal_id", "0" ),
-                new NameValuePair( "is_bp_setup_completed", "0" ),
+                new NameValuePair( "status", "confirmed,not_confirmed,checked_in,checked_out,no_show" ),
+                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
                 new NameValuePair( "version", VERSION ) ) );
-        return webRequest;
+        params.addAll( Arrays.asList( additionalParams ) );
+        return params;
     }
 
     /**
@@ -298,8 +292,8 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "auth_payment", "0" ),
                 new NameValuePair( "keep_credit_card_info", "0" ),
                 new NameValuePair( "booking_id", reservationId ),
-                new NameValuePair( "billing_portal_id", "0" ),
-                new NameValuePair( "is_bp_setup_completed", "0" ),
+                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
                 new NameValuePair( "version", VERSION ) ) );
@@ -318,11 +312,43 @@ public class CloudbedsJsonRequestFactory {
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "reservation_id", reservationId ),
                 new NameValuePair( "notes", note ),
-                new NameValuePair( "billing_portal_id", "0" ),
-                new NameValuePair( "is_bp_setup_completed", "0" ),
+                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
                 new NameValuePair( "version", VERSION ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Records a new credit card onto the existing reservation.
+     * @param reservationId ID of reservation (as it appears in the URL)
+     * @param cardDetails card details to be added
+     * @return web request
+     * @throws IOException on creation failure
+     */
+    public WebRequest createAddCreditCardRequest( String reservationId, CardDetails cardDetails ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/save_credit_card" );
+        List<NameValuePair> params = new ArrayList<>( Arrays.asList(
+                new NameValuePair( "booking_id", reservationId ),
+                new NameValuePair( "card_type", cardDetails.getCloudbedsCardTypeFromBinRange() ),
+                new NameValuePair( "card_number", cardDetails.getCardNumber() ),
+                new NameValuePair( "card_name", cardDetails.getName().toUpperCase() ),
+                new NameValuePair( "year_expir", "20" + cardDetails.getExpiry().substring( 2 ) ),
+                new NameValuePair( "mon_expir", cardDetails.getExpiry().substring( 0, 2 ) ),
+                new NameValuePair( "announcementsLast", "" ),
+                new NameValuePair( "is_active", "1" ),
+                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ), 
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "property_id", PROPERTY_ID ),
+                new NameValuePair( "group_id", PROPERTY_ID ),
+                new NameValuePair( "version", VERSION ) ) );
+
+        // CVV optional
+        if( StringUtils.isNotBlank( cardDetails.getCvv() ) ) {
+            params.add( new NameValuePair( "cvv", cardDetails.getCvv() ) );
+        }
+        webRequest.setRequestParameters( params );
         return webRequest;
     }
 }

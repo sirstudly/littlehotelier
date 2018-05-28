@@ -20,6 +20,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
@@ -29,6 +30,7 @@ import com.macbackpackers.jobs.AgodaChargeJob;
 import com.macbackpackers.jobs.AgodaNoChargeNoteJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
+import com.macbackpackers.jobs.CopyCardDetailsFromLHJob;
 import com.macbackpackers.jobs.CreateAgodaNoChargeNoteJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CreateDepositChargeJob;
@@ -426,5 +428,16 @@ public class ProcessorServiceTest {
         CreateAgodaNoChargeNoteJob j = new CreateAgodaNoChargeNoteJob();
         j.setStatus( JobStatus.submitted );
         dao.insertJob( j );
+    }
+
+    @Test
+    public void testCreateCopyCardDetailsFromLHtoCBJobs() throws Exception {
+        for ( Allocation a : dao.fetchAllocationsByCheckinDate( 1, Calendar.getInstance().getTime() ) ) {
+            CopyCardDetailsFromLHJob j = new CopyCardDetailsFromLHJob();
+            j.setBookingRef( a.getBookingReference() );
+            j.setCheckinDate( a.getCheckinDate() );
+            j.setStatus( JobStatus.submitted );
+            dao.insertJob( j );
+        }
     }
 }

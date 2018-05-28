@@ -8,6 +8,8 @@ import java.util.List;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.hamcrest.Matchers;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -17,7 +19,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.google.gson.Gson;
+import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.config.LittleHotelierConfig;
@@ -31,69 +36,116 @@ public class CloudbedsScraperTest {
 
     @Autowired
     CloudbedsScraper cloudbedsService;
-    
+
     @Autowired
     WordPressDAO dao;
-    
+
+    @Autowired
+    @Qualifier( "webClient" )
+    WebClient webClient;
+
     @Autowired 
     @Qualifier( "gsonForCloudbeds" )
     private Gson gson;
 
     @Test
     public void testDoLogin() throws Exception {
-        cloudbedsService.login( "test@cloudbeds.com", "testpassword" );
+        cloudbedsService.login( webClient, "daniele.barco+10@cloudbeds.com", "Cloudb3ds!" );
     }
     
     @Test
     public void testLoadDashboard() throws Exception {
-        cloudbedsService.loadDashboard();
+        cloudbedsService.loadDashboard( webClient );
     }
 
     @Test
     public void testLoadBooking() throws Exception {
-        Reservation r = cloudbedsService.getReservation( "9813914" );
+        Reservation r = cloudbedsService.getReservation( webClient, "10384646" );
         LOGGER.info( ToStringBuilder.reflectionToString( r ) );
     }
 
     @Test
     public void testGetCustomers() throws Exception {
-        List<Customer> results = cloudbedsService.getCustomers( 
+        List<Customer> results = cloudbedsService.getCustomers( webClient, 
                 LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 2 ) );
         results.stream().forEach( t -> LOGGER.info( t.toString() ) );
     }
 
     @Test
     public void testGetReservations() throws Exception {
-        List<Customer> results = cloudbedsService.getReservations( 
+        List<Customer> results = cloudbedsService.getReservations( webClient, 
                 LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 30 ) );
         results.stream().forEach( t -> LOGGER.info( t.toString() ) );
+        LOGGER.info( "Found " + results.size() + " entries" );
     }
     
     @Test
     public void testAddPayment() throws Exception {
-        cloudbedsService.addPayment( "9814194", "visa", new BigDecimal( "0.15" ), "Test payment XYZ" );
+        cloudbedsService.addPayment( webClient, "9814194", "visa", new BigDecimal( "0.15" ), "Test payment XYZ" );
     }
     
     @Test
     public void testAddNote() throws Exception {
-        cloudbedsService.addNote( "9897593", "Test Note& with <> Special characters\n\t ?" );
+        cloudbedsService.addNote( webClient, "9897593", "Test Note& with <> Special characters\n\t ?" );
+    }
+    
+    @Test
+    public void testAddCreditCard() throws Exception {
+        CardDetails cd = new CardDetails();
+        cd.setCardNumber( "4917300000000008" );
+        cd.setName( "scrooge mcduck" );
+        //cd.setCvv( "987" );
+        cd.setExpiry( "0829" );
+        cloudbedsService.addCardDetails( webClient, "10384646", cd );
     }
     
     @Test
     public void testPing() throws Exception {
-        cloudbedsService.ping();
+        cloudbedsService.ping( webClient );
     }
     
     @Test
     public void testDumpAllocations() throws Exception {
         dao.deleteAllocations( 9042 );
-        cloudbedsService.dumpAllocationsFrom( 9042, 
+        cloudbedsService.dumpAllocationsFrom( webClient, 9042, 
                 LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 30 ) );;
     }
     
     @Test
+    public void testCopyNotes() throws Exception {
+        addNoteToCloudbedsReservation( "BDC-2041863340", 9238060 );
+    }
+
+    /**
+     * Adds a note to the reservation held in Cloudbeds using the comments on the given LH reservation ID.
+     * 
+     * @param bookingReference the reference to query for on cloudbeds
+     * @param lhReservationId the LH reservation ID we want to copy the comment from
+     */
+    private void addNoteToCloudbedsReservation( String bookingReference, int lhReservationId ) throws Exception {
+        LOGGER.info( "Processing booking " + bookingReference );
+        // first find the reservation on CB using the BDC reference
+        List<Customer> c = cloudbedsService.getReservations( webClient, 
+                bookingReference.startsWith( "BDC-" ) ? bookingReference.substring( 4 ) : bookingReference );
+        Assert.assertThat( "Only 1 reservation expected", c.size(), Matchers.is( 1 ) );
+        Reservation r = cloudbedsService.getReservation( webClient, c.get( 0 ).getId() );
+        
+        // now get the comment we want to copy using the OLD reservation ID
+        String comment = dao.fetchGuestComments( lhReservationId ).getComments();
+        Assert.assertThat( comment, Matchers.notNullValue() );
+        cloudbedsService.addNote( webClient, r.getReservationId(), "Booking.com agent to be charged at check-in. Do NOT charge guest! \n" + comment );
+    }
+
+    @Test
     public void testDeserialise() throws Exception {
         Reservation reservation = gson.fromJson( FileUtils.readFileToString( new File( "test.json" ), Charset.defaultCharset() ), Reservation.class );
         LOGGER.info( reservation.toString() );
+    }
+    
+    @Test
+    public void testNav() throws Exception {
+        HtmlPage page = cloudbedsService.navigateToPage( webClient, "https://hotels.cloudbeds.com/connect/17959#/calendar" );
+        page.getWebClient().waitForBackgroundJavaScript( 60000 ); // wait for page to load
+        LOGGER.info( page.asXml() );
     }
 }

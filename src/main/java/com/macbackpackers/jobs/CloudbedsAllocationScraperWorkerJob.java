@@ -9,7 +9,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 
 /**
@@ -24,14 +26,24 @@ public class CloudbedsAllocationScraperWorkerJob extends AbstractJob {
     @Transient
     private CloudbedsScraper cloudbedsScraper;
 
+    @Autowired
+    @Transient
+    @Qualifier( "webClient" )
+    private WebClient webClient;
+
     @Override
     public void resetJob() throws Exception {
         dao.deleteAllocations( getId() );
     }
 
     @Override
+    public void finalizeJob() {
+        webClient.close(); // cleans up JS threads
+    }
+
+    @Override
     public void processJob() throws Exception {
-        cloudbedsScraper.dumpAllocationsFrom( getId(), getStartDate(), getEndDate() );
+        cloudbedsScraper.dumpAllocationsFrom( webClient, getId(), getStartDate(), getEndDate() );
     }
 
     /**
