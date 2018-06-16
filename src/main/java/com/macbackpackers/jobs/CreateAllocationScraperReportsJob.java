@@ -131,10 +131,12 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
      *            being created
      */
     private void insertCreateAgodaNoChargeNoteJob( List<? extends Job> dependentJobs ) {
-        CreateAgodaNoChargeNoteJob j = new CreateAgodaNoChargeNoteJob();
-        j.getDependentJobs().addAll( dependentJobs );
-        j.setStatus( JobStatus.submitted );
-        dao.insertJob( j );
+        if( dao.isLittleHotelier() ) {
+            CreateAgodaNoChargeNoteJob j = new CreateAgodaNoChargeNoteJob();
+            j.getDependentJobs().addAll( dependentJobs );
+            j.setStatus( JobStatus.submitted );
+            dao.insertJob( j );
+        }
     }
 
     public int getAllocationScraperJobId() {

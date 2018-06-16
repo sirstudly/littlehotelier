@@ -48,7 +48,7 @@
 	<logger name="org.hibernate" level="INFO" />
     <logger name="org.quartz" level="INFO" />
 
-    <logger name="com.macbackpackers" level="DEBUG" additivity="false">
+    <logger name="com.macbackpackers" level="INFO" additivity="false">
         <appender-ref ref="BY-JOB" />
         <appender-ref ref="STDOUT" />
     </logger>

@@ -4,6 +4,8 @@ package com.macbackpackers.services;
 import java.io.File;
 
 import org.apache.commons.io.FileUtils;
+import org.hamcrest.Matchers;
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,5 +59,12 @@ public class RegexMatchTest {
         ExpediaCardMask cm = new ExpediaCardMask();
         LOGGER.info( cm.applyCardSecurityCodeMask( cm.applyCardMask(
                 FileUtils.readFileToString( new File( "expedia_response_ex.xml" ), "UTF-8" ) ) ) );
+    }
+
+    @Test
+    public void testBasicCardMask() throws Exception {
+        BasicCardMask cm = new BasicCardMask();
+        Assert.assertThat( cm.applyCardMask( "1234567890123456" ), Matchers.is( "123456........56" ) );
+        Assert.assertThat( cm.applyCardSecurityCodeMask( "123" ), Matchers.is( "..." ) );
     }
 }

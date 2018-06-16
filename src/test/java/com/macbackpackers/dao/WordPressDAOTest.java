@@ -260,6 +260,12 @@ public class WordPressDAOTest {
     }
 
     @Test
+    public void testGetNextJobToProcess2() throws Exception {
+        Job nextJob = dao.getNextJobToProcess();
+        LOGGER.info( ToStringBuilder.reflectionToString( nextJob ) );
+    }
+
+    @Test
     public void testUpdateJobStatus() throws Exception {
         HousekeepingJob j = new HousekeepingJob();
         j.setStatus( JobStatus.submitted );

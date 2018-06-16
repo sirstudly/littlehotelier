@@ -11,7 +11,7 @@ public class RMBRoomBedMatcher implements RoomBedMatcher {
      * start with one of these...
      */
     private static final String ROOM_NAMES[] = {
-            "LM", "T", "SW", "Fr", "GC", "HW"
+            "LM", "T", "ME", "*", "GC", "HW"
     };
 
     @Override
@@ -22,9 +22,15 @@ public class RMBRoomBedMatcher implements RoomBedMatcher {
 
         // we just see what the label starts with and split it
         for ( String roomName : ROOM_NAMES ) {
-            if ( roomLabel.startsWith( roomName ) ) {
+            // remapped staff room
+            if ( roomLabel.startsWith( "*" ) ) {
+                room = "SW";
+                bedName = roomLabel.substring( roomName.length() ).trim();
+                break;
+            }
+            else if ( roomLabel.startsWith( roomName ) ) {
                 room = roomName;
-                bedName = roomLabel.substring( roomName.length() );
+                bedName = roomLabel.substring( roomName.length() ).trim();
                 break;
             }
         }

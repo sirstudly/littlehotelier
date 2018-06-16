@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.google.gson.Gson;
@@ -56,6 +57,9 @@ public class CloudbedsScraperTest {
     @Test
     public void testLoadDashboard() throws Exception {
         cloudbedsService.loadDashboard( webClient );
+        webClient.waitForBackgroundJavaScript( 360000 );
+        Page dashboard = webClient.getCurrentWindow().getEnclosedPage();
+        LOGGER.info( dashboard.getWebResponse().getContentAsString() );
     }
 
     @Test
@@ -113,6 +117,7 @@ public class CloudbedsScraperTest {
     
     @Test
     public void testCopyNotes() throws Exception {
+        // find all bookings with "virtual cc details"
         addNoteToCloudbedsReservation( "BDC-2041863340", 9238060 );
     }
 

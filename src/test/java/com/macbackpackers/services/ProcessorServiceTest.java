@@ -3,6 +3,8 @@ package com.macbackpackers.services;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -48,6 +50,7 @@ import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.jobs.SendAllUnsentEmailJob;
 import com.macbackpackers.jobs.SplitRoomReservationReportJob;
 import com.macbackpackers.jobs.UnpaidDepositReportJob;
+import com.macbackpackers.jobs.UpdateLittleHotelierSettingsJob;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 
 @RunWith( SpringJUnit4ClassRunner.class )
@@ -431,13 +434,46 @@ public class ProcessorServiceTest {
     }
 
     @Test
+    public void testCreateCopyCardDetailsFromLHtoCBJob() throws Exception {
+        createCopyCardDetailsFromLHtoCBJob( "HWL-552-365677363", LocalDate.parse( "2018-06-12" ));
+    }
+
+    private void createCopyCardDetailsFromLHtoCBJob( String bookingRef, LocalDate checkinDate ) {
+        CopyCardDetailsFromLHJob j = new CopyCardDetailsFromLHJob();
+        j.setBookingRef( bookingRef );
+        j.setCheckinDate( Date.from( checkinDate.atStartOfDay( ZoneId.systemDefault() ).toInstant() ) );
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+    }
+
+    @Test
     public void testCreateCopyCardDetailsFromLHtoCBJobs() throws Exception {
-        for ( Allocation a : dao.fetchAllocationsByCheckinDate( 1, Calendar.getInstance().getTime() ) ) {
-            CopyCardDetailsFromLHJob j = new CopyCardDetailsFromLHJob();
-            j.setBookingRef( a.getBookingReference() );
-            j.setCheckinDate( a.getCheckinDate() );
-            j.setStatus( JobStatus.submitted );
-            dao.insertJob( j );
+        Calendar c = Calendar.getInstance();
+        c.set( Calendar.MONTH, Calendar.MAY );
+        c.set( Calendar.DATE, 25 );
+        createCopyCardDetailsFromLHtoCBJobs( c.getTime(), 135 );
+    }
+    
+    @Test
+    public void testCreateUpdateLittleHotelierSettingsJob() throws Exception {
+        UpdateLittleHotelierSettingsJob j = new UpdateLittleHotelierSettingsJob();
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+    }
+    
+    private void createCopyCardDetailsFromLHtoCBJobs( Date startDate, int daysAhead ) {
+        Calendar c = Calendar.getInstance();
+        c.setTime( startDate );
+        for( int i = 0; i < daysAhead; i++ ) {
+            for ( String br : dao.fetchDistinctBookingsByCheckinDate( 1, c.getTime() ) ) {
+                LOGGER.info( "Creating job for " + br );
+                CopyCardDetailsFromLHJob j = new CopyCardDetailsFromLHJob();
+                j.setBookingRef( br );
+                j.setCheckinDate( c.getTime() );
+                j.setStatus( JobStatus.aborted );
+                dao.insertJob( j );
+            }
+            c.add( Calendar.DATE, 1 );
         }
     }
 }

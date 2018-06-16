@@ -352,7 +352,9 @@ public class HostelworldScraper {
     }
 
     /**
-     * Retrieve the cardholder details from the given booking.
+     * Retrieve the cardholder details from the given booking. Not sure if it needs to be
+     * synchronized but had a few issues with not pulling back card details even when they were
+     * present when running multiple jobs?
      * 
      * @param webClient web client
      * @param bookingRef e.g. HWL-555-1234567
@@ -360,7 +362,7 @@ public class HostelworldScraper {
      * @throws ParseException
      * @throws IOException
      */
-    public CardDetails getCardDetails( WebClient webClient, String bookingRef ) throws ParseException, IOException {
+    public synchronized CardDetails getCardDetails( WebClient webClient, String bookingRef ) throws ParseException, IOException {
         Pattern p = Pattern.compile( "HWL-" + hostelNumber + "-([\\d]+)" );
         Matcher m = p.matcher( bookingRef );
         if ( false == m.find() ) {

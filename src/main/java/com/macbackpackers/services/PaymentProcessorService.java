@@ -336,9 +336,10 @@ public class PaymentProcessorService {
             String firstName = nameField.getValueAttribute();
             nameField = reservationPage.getFirstByXPath( "//input[@id='guest_last_name']" );
             String lastName = nameField.getValueAttribute();
+            LOGGER.info( "Processing booking " + bookingRef + " for " + firstName + " " + lastName );
 
             // check if payment exists in CB
-            Reservation cbReservation = cloudbedsScraper.findBookingByLHBookingRef( cbWebClient, bookingRef, firstName + " " + lastName );
+            Reservation cbReservation = cloudbedsScraper.findBookingByLHBookingRef( cbWebClient, bookingRef, checkinDate, firstName + " " + lastName );
             if ( cbReservation.isCardDetailsPresent() ) {
                 LOGGER.info( "Card details found for reservation " + cbReservation.getReservationId() + "; skipping copy" );
                 return;
@@ -379,8 +380,9 @@ public class PaymentProcessorService {
                 ccDetails = retrieveAgodaCardDetails( reservationPage, bookingRef );
             }
             else if ( isCardDetailsBlank ) {
-                throw new MissingUserDataException( "No card details found for " + bookingRef
-                        + " checking in on " + AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ) );
+                LOGGER.info( "No card details found for " + bookingRef + " checking in on " 
+                        + AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ) );
+                return;
             }
             else {
                 int reservationId = reservationPageScraper.getReservationId( reservationPage );
@@ -389,13 +391,19 @@ public class PaymentProcessorService {
                 if ( viewCcDetails != null ) {
                     LOGGER.info( "Card details currently hidden; requesting security access" );
                     reservationPageScraper.enableSecurityAccess( reservationPage, reservationId );
-
-                    // this method call is now a free-for-all to any and all threads
-                    isCardDetailsVisible = true;
                 }
+                // this method call is now a free-for-all to any and all threads
+                isCardDetailsVisible = true;
+
                 // get the full card details
                 ccDetails = reservationPageScraper.getCardDetails( reservationPage );
-                LOGGER.info( "CC details so far: " + ccDetails.getCardNumber().substring( 11 ) );
+            }
+            LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( ccDetails.getCardNumber() )
+                    + " for " + firstName + " " + lastName );
+
+            // if we're missing the cardholder name; just use the guest name
+            if ( StringUtils.isBlank( ccDetails.getName() ) ) {
+                ccDetails.setName( firstName + " " + lastName );
             }
             cloudbedsScraper.addCardDetails( cbWebClient, cbReservation.getReservationId(), ccDetails );
         }

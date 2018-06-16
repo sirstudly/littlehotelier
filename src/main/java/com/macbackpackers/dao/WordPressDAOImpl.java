@@ -111,10 +111,10 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    public List<Allocation> fetchAllocationsByCheckinDate( int allocationScraperJobId, Date checkinDate ) {
-        return em.createQuery( "FROM Allocation WHERE jobId = :jobId AND reservationId > 0 "
-                + "AND status IN ('checked-in', 'confirmed') AND paymentStatus = 'unpaid' "
-                + "AND checkinDate = :checkinDate", Allocation.class )
+    public List<String> fetchDistinctBookingsByCheckinDate( int allocationScraperJobId, Date checkinDate ) {
+        return em.createQuery( "SELECT DISTINCT bookingReference FROM Allocation "
+                + "WHERE jobId = :jobId AND reservationId > 0 "
+                + "AND checkinDate = :checkinDate", String.class )
                 .setParameter( "jobId", allocationScraperJobId )
                 .setParameter( "checkinDate", checkinDate )
                 .getResultList();
@@ -277,6 +277,9 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( "processedBy", thisProcessorId )
                 .getResultList();
         
+//        if ( jobs.size() > 0 ) {
+//            AbstractJob job = jobs.get( 0 );
+//            job = fetchJobById( job.getId() ); // fetch by primary key
         forAllJobs: for ( AbstractJob job : jobs ) {
             // first check that all dependent jobs have completed successfully
             for ( Job dependentJob : job.getDependentJobs() ) {
@@ -293,7 +296,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                         // ok; just check remaining dependent jobs
                 }
             }
-            
+
             LOGGER.debug( "Attempting to lock job " + job.getId() );
             Timestamp now = new Timestamp( System.currentTimeMillis() );
             job.setStatus( JobStatus.processing );
@@ -303,7 +306,6 @@ public class WordPressDAOImpl implements WordPressDAO {
             job.setLastUpdatedDate( now );
             return job; // all dependent jobs are completed; this is the one 
         }
-
         LOGGER.info( "No more jobs to process..." );
         return null; // we couldn't find a job to process
     }

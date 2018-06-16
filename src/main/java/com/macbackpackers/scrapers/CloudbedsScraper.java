@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.net.URL;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -77,9 +78,6 @@ public class CloudbedsScraper {
     @Value( "${process.jobs.retries:3}" )
     private int MAX_RETRY;
     
-    // once we've verified we're logged in, we'll assume be logged-in for the duration of this object
-    private boolean loggedIn;
-
     /**
      * Verifies that we're logged in (or otherwise log us in if not).
      * 
@@ -87,11 +85,6 @@ public class CloudbedsScraper {
      * @throws IOException on connection error
      */
     private void validateLoggedIn( WebClient webClient ) throws IOException {
-
-        // should only need to do this once for the lifetime of this object
-        if( loggedIn ) {
-            return;
-        }
 
         // don't allow multiple threads writing to the same cookie file at the same time
         synchronized( CLASS_LOCK ) {
@@ -115,9 +108,6 @@ public class CloudbedsScraper {
             else {
                 LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
             }
-
-            // if we make it to this point, we're probably logged in
-            loggedIn = true;
         }
     }
 
@@ -208,7 +198,7 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createGetReservationRequest( reservationId );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Pulling data for " + reservationId + " from: " + redirectPage.getUrl().getPath() );
+        LOGGER.info( "Pulling reservation data for #" + reservationId + " from: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         Optional<Reservation> r = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class ) );
@@ -446,7 +436,7 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createAddCreditCardRequest( reservationId, cardDetails );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "POST: " + redirectPage.getUrl().getPath() );
+        LOGGER.info( "POST for reservation " + reservationId + " to: " + redirectPage.getUrl().getPath() );
         String jsonResponse = redirectPage.getWebResponse().getContentAsString();
         LOGGER.debug( jsonResponse );
 
@@ -534,10 +524,10 @@ public class CloudbedsScraper {
      * @return non-null reservation
      * @throws IOException on i/o error
      */
-    public Reservation findBookingByLHBookingRef( WebClient webClient, String bookingRef, String guestName ) throws IOException {
+    public Reservation findBookingByLHBookingRef( WebClient webClient, String bookingRef, Date checkinDate, String guestName ) throws IOException {
 
         // first try to search by booking ref
-        Pattern p = Pattern.compile( "^\\D*(\\d+)$" );
+        Pattern p = Pattern.compile( "\\D*(\\d+)$" );
         Matcher m = p.matcher( bookingRef );
         if ( m.find() ) {
             List<Customer> reservations = getReservations( webClient, m.group( 1 ) );
@@ -550,7 +540,11 @@ public class CloudbedsScraper {
         }
 
         // could not find booking by booking ref; try with guest name
-        List<Customer> reservations = getReservations( webClient, guestName );
+        List<Customer> reservations = getReservations( webClient, guestName ).stream()
+                .peek( c -> LOGGER.info( "Matched reservation " + c.getId() + " for "
+                        + c.getFirstName() + " " + c.getLastName() + " with checkin date " + c.getCheckinDate() ) )
+                .filter( c -> AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ).equals( c.getCheckinDate() ) )
+                .collect( Collectors.toList() );
         if ( reservations.size() > 1 ) {
             throw new UnrecoverableFault( "More than one CB booking found for " + bookingRef + ": " + guestName );
         }

@@ -85,13 +85,13 @@ public interface WordPressDAO {
     public Allocation fetchAllocation( int id ) throws EmptyResultDataAccessException;
 
     /**
-     * Returns all allocations with the given checkin date for the AllocationScraperJob.
+     * Returns all booking references with the given checkin date for the AllocationScraperJob.
      * 
      * @param allocationScraperJobId job id
      * @param checkinDate checkin date
-     * @return non-null allocation list
+     * @return non-null booking reference list
      */
-    public List<Allocation> fetchAllocationsByCheckinDate( int allocationScraperJobId, Date checkinDate );
+    public List<String> fetchDistinctBookingsByCheckinDate( int allocationScraperJobId, Date checkinDate );
 
     /**
      * Deletes all Allocations for the given jobId.

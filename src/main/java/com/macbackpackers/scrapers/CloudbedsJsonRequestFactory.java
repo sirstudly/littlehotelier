@@ -9,7 +9,10 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,7 +38,7 @@ public class CloudbedsJsonRequestFactory {
 
     private String BILLING_PORTAL_ID = "37077"; // ??? is this going to change
     
-    private static final String VERSION = "https://static1.cloudbeds.com/myfrontdesk-front/initial-12.0/app.js.gz";
+    private static final String VERSION = "https://static1.cloudbeds.com/myfrontdesk-front/pie-1.1/app.js.gz";
 
     protected WebRequest createBaseJsonRequest( String url ) throws IOException {
         WebRequest requestSettings = new WebRequest( new URL( url ), HttpMethod.POST );
@@ -145,7 +148,7 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
-     * Get info on all customers by searching on a generic term.
+     * Get info on all customers including cancelled bookings by searching on a generic term.
      * 
      * @param query whatever you want to search by
      * @return web request
@@ -160,6 +163,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "date_end[1]", "" ),
                 new NameValuePair( "booking_date[0]", "" ),
                 new NameValuePair( "booking_date[1]", "" ),
+                new NameValuePair( "status", "all" ),
                 new NameValuePair( "query", query ) ) );
         return webRequest;
     }
@@ -213,7 +217,7 @@ public class CloudbedsJsonRequestFactory {
      * @return new non-null modifiable list
      */
     private List<NameValuePair> getCommonReservationsQueryParameters( NameValuePair... additionalParams ) {
-        List<NameValuePair> params = new ArrayList<NameValuePair>( Arrays.asList(
+        List<NameValuePair> params = Arrays.asList(
                 new NameValuePair( "sEcho", "2" ),
                 new NameValuePair( "iColumns", "8" ),
                 new NameValuePair( "sColumns", ",,,,,,," ),
@@ -259,9 +263,23 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
-                new NameValuePair( "version", VERSION ) ) );
-        params.addAll( Arrays.asList( additionalParams ) );
-        return params;
+                new NameValuePair( "version", VERSION ) );
+
+        // copy above into a map so we can remove the ones we are replacing
+        Map<String, NameValuePair> paramMap = new HashMap<>();
+        for ( NameValuePair nvp : params ) {
+            paramMap.put( nvp.getName(), nvp );
+        }
+
+        // remove, re-add any custom keys
+        for ( NameValuePair nvp : additionalParams ) {
+            paramMap.remove( nvp.getName() );
+            paramMap.put( nvp.getName(), nvp );
+        }
+
+        return paramMap.entrySet().stream()
+                .map( es -> es.getValue() )
+                .collect( Collectors.toList() );
     }
 
     /**
