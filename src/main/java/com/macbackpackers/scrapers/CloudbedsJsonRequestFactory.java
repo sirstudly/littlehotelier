@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,7 @@ import com.gargoylesoftware.htmlunit.HttpMethod;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.dao.WordPressDAO;
 
 /**
  * Convenience class for creating JSON requests for Cloudbeds.
@@ -36,9 +38,39 @@ public class CloudbedsJsonRequestFactory {
     @Value( "${cloudbeds.property.id:0}" )
     private String PROPERTY_ID;
 
+    @Autowired
+    private WordPressDAO dao;
+    
     private String BILLING_PORTAL_ID = "37077"; // ??? is this going to change
     
-    private static final String VERSION = "https://static1.cloudbeds.com/myfrontdesk-front/pie-1.1/app.js.gz";
+    // a default version which we'll probably get prompted to update
+    private static final String DEFAULT_VERSION = "https://static1.cloudbeds.com/myfrontdesk-front/initial-12.0/app.js.gz";
+    
+    // the current cloudbeds version we're using
+    private String version;
+
+    /**
+     * Returns the current cloudbeds version we're requesting against.
+     * 
+     * @return non-null version
+     */
+    public synchronized String getVersion() {
+        if ( version == null ) {
+            String currentVersion = dao.getOption( "hbo_cloudbeds_version" );
+            version = StringUtils.isNotBlank( currentVersion ) ? currentVersion : DEFAULT_VERSION;
+        }
+        return version;
+    }
+
+    /**
+     * Sets the cloudbeds version to use for all future requests.
+     * 
+     * @param newVersion non-null version
+     */
+    public synchronized void setVersion( String newVersion ) {
+        dao.setOption( "hbo_cloudbeds_version", newVersion );
+        version = newVersion;
+    }
 
     protected WebRequest createBaseJsonRequest( String url ) throws IOException {
         WebRequest requestSettings = new WebRequest( new URL( url ), HttpMethod.POST );
@@ -55,20 +87,17 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
-     * Returns a payment methods request for this property.
+     * Returns a user has CC view permissions request for this property.
      * 
      * @return PaymentRequest for this property
      * @throws IOException invalid URL
      */
-    public WebRequest createGetPaymentMethods() throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/associations/loader/paymentMethods" );
+    public WebRequest createGetUserHasViewCCPermisions() throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/cc_passwords/user_have_ccp_view_permission" );
         webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ),
-                new NameValuePair( "is_bp_setup_completed", "1" ),
-                new NameValuePair( "propertyIds[]", PROPERTY_ID ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
-                new NameValuePair( "version", VERSION ) ) );
+                new NameValuePair( "version", getVersion() ) ) );
         return webRequest;
     }
 
@@ -98,7 +127,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
-                new NameValuePair( "version", VERSION ) ) );
+                new NameValuePair( "version", getVersion() ) ) );
         return webRequest;
     }
 
@@ -143,7 +172,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
-                new NameValuePair( "version", VERSION ) ) );
+                new NameValuePair( "version", getVersion() ) ) );
         return webRequest;
     }
 
@@ -263,7 +292,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
-                new NameValuePair( "version", VERSION ) );
+                new NameValuePair( "version", getVersion() ) );
 
         // copy above into a map so we can remove the ones we are replacing
         Map<String, NameValuePair> paramMap = new HashMap<>();
@@ -314,7 +343,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
-                new NameValuePair( "version", VERSION ) ) );
+                new NameValuePair( "version", getVersion() ) ) );
         return webRequest;
     }
 
@@ -334,7 +363,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
-                new NameValuePair( "version", VERSION ) ) );
+                new NameValuePair( "version", getVersion() ) ) );
         return webRequest;
     }
 
@@ -360,7 +389,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
-                new NameValuePair( "version", VERSION ) ) );
+                new NameValuePair( "version", getVersion() ) ) );
 
         // CVV optional
         if( StringUtils.isNotBlank( cardDetails.getCvv() ) ) {

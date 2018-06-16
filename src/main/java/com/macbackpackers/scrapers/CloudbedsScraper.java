@@ -87,28 +87,77 @@ public class CloudbedsScraper {
     private void validateLoggedIn( WebClient webClient ) throws IOException {
 
         // don't allow multiple threads writing to the same cookie file at the same time
-        synchronized( CLASS_LOCK ) {
+        synchronized ( CLASS_LOCK ) {
             fileService.loadCookiesFromFile( webClient );
-    
-            // we'll just send a sample request; we just want to make sure we get a valid response back
-            WebRequest requestSettings = jsonRequestFactory.createGetPaymentMethods();
-    
-            Page redirectPage = webClient.getPage( requestSettings );
-            LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
-            Optional<CloudbedsJsonResponse> response = Optional.fromNullable( 
-                    gson.fromJson( redirectPage.getWebResponse().getContentAsString(),
-                    CloudbedsJsonResponse.class ) );
-            if ( false == response.isPresent() || false == response.get().isSuccess() ) {
+
+            // simple request to see if we're logged in
+            Optional<CloudbedsJsonResponse> response = doGetUserPermissionRequest( webClient );
+
+            // if user not logged in, then response is blank
+            if ( false == response.isPresent() ) {
                 LOGGER.info( "I don't think we're logged in, doing it now." );
-                if ( response.isPresent() ) {
-                    LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-                }
                 login( webClient );
+
+                // retry request
+                response = doGetUserPermissionRequest( webClient );
+                if ( false == response.isPresent() ) {
+                    throw new UnrecoverableFault( "Unable to login? Incorrect username/password?" );
+                }
             }
-            else {
-                LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+            // if user is logged in and correct version, response is one of either {"access": true} or {"access": false}
+            // if user is logged in but using an obsolete version, then response is not-blank and {success: false}
+            if ( false == response.get().isSuccess() ) {
+
+                // we may have updated our version; try to validate again
+                response = doGetUserPermissionRequest( webClient );
+
+                // if still nothing, then we fail here
+                if ( false == response.isPresent() || false == response.get().isSuccess() ) {
+                    throw new UnrecoverableFault( "Unable to login? Incorrect username/password?" );
+                }
             }
         }
+    }
+
+    /**
+     * Attempts a simple request to see if current user has access to view CC details functionality.
+     * Response should either be access: false, or access: true. Or if they aren't logged in, then
+     * an empty response is expected.
+     * 
+     * @param webClient current web client
+     * @return a possibly empty response
+     * @throws IOException on network error
+     */
+    private Optional<CloudbedsJsonResponse> doGetUserPermissionRequest( WebClient webClient ) throws IOException {
+        // we'll just send a sample request; we just want to make sure we get a valid response back
+        WebRequest requestSettings = jsonRequestFactory.createGetUserHasViewCCPermisions();
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        Optional<CloudbedsJsonResponse> response = Optional.fromNullable(
+                gson.fromJson( redirectPage.getWebResponse().getContentAsString(),
+                        CloudbedsJsonResponse.class ) );
+
+        // We get a response back and it's unsuccessful
+        LOGGER.info( "Response status[{}]: {}",
+                redirectPage.getWebResponse().getStatusCode(),
+                redirectPage.getWebResponse().getStatusMessage() );
+        if ( response.isPresent() && false == response.get().isSuccess() ) {
+            LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+
+            // check if we're using an outdated version
+            if ( StringUtils.isNotBlank( response.get().getVersion() ) ) {
+                LOGGER.info( "Looks like we're using an outdated version. Updating our records." );
+                if ( false == jsonRequestFactory.getVersion().equals( response.get().getVersion() ) ) {
+                    jsonRequestFactory.setVersion( response.get().getVersion() );
+                }
+            }
+        }
+        else {
+            LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+        }
+        return response;
     }
 
     /**

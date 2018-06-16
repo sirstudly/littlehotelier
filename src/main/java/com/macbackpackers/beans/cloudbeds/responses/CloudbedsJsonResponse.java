@@ -8,6 +8,7 @@ public class CloudbedsJsonResponse {
 
     private Boolean success;
     private String message;
+    private String version;
 
     public Boolean getSuccess() {
         return success;
@@ -40,6 +41,14 @@ public class CloudbedsJsonResponse {
 
     public void setMessage( String message ) {
         this.message = message;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion( String version ) {
+        this.version = version;
     }
 
 }
