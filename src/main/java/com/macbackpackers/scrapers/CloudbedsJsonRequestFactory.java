@@ -240,6 +240,30 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Retrieves all reservations staying within the given date range.
+     * 
+     * @param dateStart checkin date (inclusive)
+     * @param dateEnd checkin date (inclusive)
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createGetRoomAssignmentsReport( LocalDate dateStart, LocalDate dateEnd ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reports/get_room_assignments_report" );
+        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+                new NameValuePair( "booking_date[0]", dateStart.format( YYYY_MM_DD ) ),
+                new NameValuePair( "booking_date[1]", dateEnd.format( YYYY_MM_DD ) ),
+                new NameValuePair( "room_types", dao.getAllRoomTypeIds().stream()
+                        .map( rt -> rt.toString() )
+                        .collect( Collectors.joining( "," ) ) ),
+                new NameValuePair( "show_assigned_unassigned", "show_assigned_rooms,show_unassigned_rooms" ),
+                new NameValuePair( "view", "room_assignments_report" ),
+                new NameValuePair( "property_id", PROPERTY_ID ),
+                new NameValuePair( "group_id", PROPERTY_ID ),
+                new NameValuePair( "version", getVersion() ) ) );
+        return webRequest;
+    }
+
+    /**
      * Returns a new modifiable list of common parameters to the {@code get_reservations} request.
      * 
      * @param additionalParams additional parameters to add to return list

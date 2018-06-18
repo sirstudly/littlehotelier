@@ -10,6 +10,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -32,6 +33,8 @@ import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.PxPostTransaction;
+import com.macbackpackers.beans.RoomBed;
+import com.macbackpackers.beans.RoomBedLookup;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.jobs.AllocationScraperJob;
@@ -263,6 +266,14 @@ public class WordPressDAOTest {
     public void testGetNextJobToProcess2() throws Exception {
         Job nextJob = dao.getNextJobToProcess();
         LOGGER.info( ToStringBuilder.reflectionToString( nextJob ) );
+    }
+    
+    @Test
+    public void testFetchAllRoomBeds() throws Exception {
+        Map<RoomBedLookup, RoomBed> roomBeds = dao.fetchAllRoomBeds();
+        roomBeds.forEach( (x, y) ->  
+            LOGGER.info( x + " -> " + y.getRoom() + ": " + y.getBedName() ) );
+        LOGGER.info( "Listed " + roomBeds.size() + " entries." );
     }
 
     @Test

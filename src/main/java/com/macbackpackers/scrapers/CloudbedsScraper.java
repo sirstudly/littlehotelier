@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -31,10 +32,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.macbackpackers.beans.Allocation;
-import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.CardDetails;
-import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
@@ -43,7 +41,6 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentCardNotAcceptedException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
-import com.macbackpackers.scrapers.matchers.BedAssignment;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 import com.macbackpackers.services.FileService;
 
@@ -55,6 +52,7 @@ public class CloudbedsScraper {
     
     // a class-level lock
     private static final Object CLASS_LOCK = new Object();
+    private static final DateTimeFormatter YYYY_MM_DD = DateTimeFormatter.ofPattern( "yyyy-MM-dd" );
 
     @Autowired
     @Qualifier( "gsonForCloudbeds" )
@@ -140,7 +138,7 @@ public class CloudbedsScraper {
                         CloudbedsJsonResponse.class ) );
 
         // We get a response back and it's unsuccessful
-        LOGGER.info( "Response status[{}]: {}",
+        LOGGER.debug( "Response status {}: {}",
                 redirectPage.getWebResponse().getStatusCode(),
                 redirectPage.getWebResponse().getStatusMessage() );
         if ( response.isPresent() && false == response.get().isSuccess() ) {
@@ -154,7 +152,7 @@ public class CloudbedsScraper {
                 }
             }
         }
-        else {
+        else if ( response.isPresent() ) {
             LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
         }
         return response;
@@ -274,7 +272,7 @@ public class CloudbedsScraper {
      * @param reservationId the reservation to query
      * @return non-null reservation
      */
-    private Reservation getReservationRetry( WebClient webClient, String reservationId ) {
+    public Reservation getReservationRetry( WebClient webClient, String reservationId ) {
         for ( int i = 0 ; i < MAX_RETRY ; i++ ) {
             try {
                 return getReservation( webClient, reservationId );
@@ -284,47 +282,6 @@ public class CloudbedsScraper {
             }
         }
         throw new UnrecoverableFault( "Max attempts made to retrieve reservation " + reservationId );
-    }
-
-    /**
-     * Converts a Reservation object (which contains multiple bed assignments) into a List of
-     * Allocation.
-     * 
-     * @param lhWebClient web client instance to use
-     * @param jobId job ID to populate allocation
-     * @param r reservation to be converted
-     * @return non-null list of allocation
-     */
-    private List<Allocation> reservationToAllocation( int jobId, Reservation r ) {
-        
-        // we create one record for each "booking room"
-        return r.getBookingRooms().stream()
-            .map( br -> { 
-                BedAssignment bed = roomBedMatcher.parse( br.getRoomNumber() );
-                Allocation a = new Allocation();
-                a.setBedName( bed.getBedName() );
-                a.setBookedDate( LocalDate.parse( r.getBookingDateHotelTime().substring( 0, 10 ) ) );
-                a.setBookingReference( 
-                        StringUtils.defaultIfBlank( r.getThirdPartyIdentifier(), r.getIdentifier() ) );
-                a.setBookingSource( r.getSourceName() );
-                a.setCheckinDate( LocalDate.parse( br.getStartDate() ) );
-                a.setCheckoutDate( LocalDate.parse( br.getEndDate() ) );
-                a.setDataHref( "/connect/" + PROPERTY_ID + "#/reservations/" + r.getReservationId());
-                a.setGuestName( r.getFirstName() + " " + r.getLastName() );
-                a.setJobId( jobId );
-                a.setNumberGuests( r.getAdultsNumber() + r.getKidsNumber() );
-                a.setPaymentOutstanding( r.getBalanceDue() );
-                a.setPaymentTotal( r.getGrandTotal() );
-                a.setReservationId( Integer.parseInt( r.getReservationId() ) );
-                a.setRoom( bed.getRoom() );
-                a.setRoomId( br.getRoomId() );
-                a.setRoomTypeId( Integer.parseInt( br.getRoomTypeId() ) );
-                a.setStatus( r.getStatus() );
-                a.setViewed( true );
-                a.setNotes( r.getNotesAsString() );
-                return a;
-            } )
-            .collect( Collectors.toList() );
     }
 
     /**
@@ -397,6 +354,39 @@ public class CloudbedsScraper {
             throw new MissingUserDataException( "Failed to retrieve reservations." );
         }
         return Arrays.asList( gson.fromJson( jarray.get(), Customer[].class ) );
+    }
+
+    /**
+     * Finds all staff allocations for the given date (and the day after):
+     * <ul>
+     * <li>If stayDate is staff bed, stayDate + 1 is staff bed -&gt; allocation for 2 days
+     * <li>If stayDate is staff bed, stayDate + 1 is not staff bed -&gt; allocation for 1st day
+     * <li>If stayDate is not staff bed, stayDate +1 is staff bed -&gt; allocation for 2nd day
+     * </ul>
+     * 
+     * @param webClient web client instance to use
+     * @param stayDate the date we're searching on
+     * @return non-null raw JSON object holding all bed assignments
+     * @throws IOException on failure
+     */
+    public JsonObject getAllStaffAllocations( WebClient webClient, LocalDate stayDate ) throws IOException {
+
+        validateLoggedIn( webClient );
+        WebRequest requestSettings = jsonRequestFactory.createGetRoomAssignmentsReport( stayDate, stayDate.plusDays( 1 ) );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Fetching staff allocations for " + stayDate.format( YYYY_MM_DD ) + " from: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        Optional<JsonObject> rpt = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
+        if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
+            if ( rpt.isPresent() ) {
+                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+            }
+            throw new MissingUserDataException( "Failed response." );
+        }
+
+        return rpt.get();
     }
 
     /**
@@ -512,35 +502,6 @@ public class CloudbedsScraper {
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-    }
-
-    /**
-     * Dumps the allocations starting on the given date (inclusive).
-     * 
-     * @param webClient web client instance to use
-     * @param jobId the job ID to associate with this dump
-     * @param startDate the start date to check allocations for (inclusive)
-     * @param endDate the end date to check allocations for (exclusive)
-     * @throws IOException on read/write error
-     */
-    public void dumpAllocationsFrom( WebClient webClient, int jobId, LocalDate startDate, LocalDate endDate ) throws IOException {
-        AllocationList allocations = new AllocationList();
-        List<Reservation> reservations = getReservations( webClient, startDate, endDate ).stream()
-                .map( c -> getReservationRetry( webClient, c.getId() ) )
-                .collect( Collectors.toList() );
-        reservations.stream()
-                .map( r -> reservationToAllocation( jobId, r ) )
-                .forEach( a -> allocations.addAll( a ) );
-        dao.insertAllocations( allocations );
-
-        // now update the comments
-        List<GuestCommentReportEntry> guestComments = reservations.stream()
-                .filter( r -> StringUtils.isNotBlank( r.getSpecialRequests() ) )
-                .map( r -> new GuestCommentReportEntry(
-                        Integer.parseInt( r.getReservationId() ),
-                        r.getSpecialRequests() ) )
-                .collect( Collectors.toList() );
-        dao.updateGuestCommentsForReservations( guestComments );
     }
 
     /**

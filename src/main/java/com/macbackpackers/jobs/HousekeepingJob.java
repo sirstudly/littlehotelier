@@ -15,7 +15,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
-import com.macbackpackers.scrapers.CloudbedsScraper;
+import com.macbackpackers.services.CloudbedsService;
 
 /**
  * Job that updates the housekeeping tables for the given date
@@ -31,7 +31,7 @@ public class HousekeepingJob extends AbstractJob {
 
     @Autowired
     @Transient
-    private CloudbedsScraper cloudbedsScraper;
+    private CloudbedsService cloudbedsService;
 
     @Autowired
     @Transient
@@ -47,7 +47,7 @@ public class HousekeepingJob extends AbstractJob {
     public void processJob() throws Exception {
         if ( dao.isCloudbeds() ) {
             LocalDate selectedDate = getSelectedLocalDate();
-            cloudbedsScraper.dumpAllocationsFrom( webClient,
+            cloudbedsService.dumpAllocationsFrom( webClient,
                     getId(), selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
         }
         else {

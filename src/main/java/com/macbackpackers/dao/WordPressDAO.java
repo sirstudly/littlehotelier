@@ -4,6 +4,7 @@ package com.macbackpackers.dao;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import javax.persistence.NoResultException;
 
@@ -20,6 +21,8 @@ import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobScheduler;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.PxPostTransaction;
+import com.macbackpackers.beans.RoomBed;
+import com.macbackpackers.beans.RoomBedLookup;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
@@ -374,6 +377,20 @@ public interface WordPressDAO {
      * @return room type ID (or null if cannot be determined)
      */
     public Integer getRoomTypeIdForHostelworldLabel( String roomTypeLabel );
+
+    /**
+     * Returns all room type IDs available.
+     * 
+     * @return non-null list of room types
+     */
+    public List<Integer> getAllRoomTypeIds();
+
+    /**
+     * Returns a map of all RoomBeds.
+     * 
+     * @return non-null map
+     */
+    public Map<RoomBedLookup, RoomBed> fetchAllRoomBeds();
 
     /**
      * Returns the ID of the last completed allocation scraper job.

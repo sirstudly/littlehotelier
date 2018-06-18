@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import com.gargoylesoftware.htmlunit.WebClient;
-import com.macbackpackers.scrapers.CloudbedsScraper;
+import com.macbackpackers.services.CloudbedsService;
 
 /**
  * Worker job that scrapes the allocation data for a particular date range.
@@ -24,7 +24,7 @@ public class CloudbedsAllocationScraperWorkerJob extends AbstractJob {
 
     @Autowired
     @Transient
-    private CloudbedsScraper cloudbedsScraper;
+    private CloudbedsService cloudbedsService;
 
     @Autowired
     @Transient
@@ -43,7 +43,7 @@ public class CloudbedsAllocationScraperWorkerJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        cloudbedsScraper.dumpAllocationsFrom( webClient, getId(), getStartDate(), getEndDate() );
+        cloudbedsService.dumpAllocationsFrom( webClient, getId(), getStartDate(), getEndDate() );
     }
 
     /**

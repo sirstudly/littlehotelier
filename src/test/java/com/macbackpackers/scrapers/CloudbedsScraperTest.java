@@ -23,6 +23,7 @@ import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
@@ -109,16 +110,15 @@ public class CloudbedsScraperTest {
     }
     
     @Test
-    public void testDumpAllocations() throws Exception {
-        dao.deleteAllocations( 9042 );
-        cloudbedsService.dumpAllocationsFrom( webClient, 9042, 
-                LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 30 ) );;
-    }
-    
-    @Test
     public void testCopyNotes() throws Exception {
         // find all bookings with "virtual cc details"
         addNoteToCloudbedsReservation( "BDC-2041863340", 9238060 );
+    }
+
+    @Test
+    public void testGetAllStaffAllocations() throws Exception {
+        JsonObject rpt = cloudbedsService.getAllStaffAllocations( webClient, LocalDate.now() );
+        LOGGER.info( rpt.toString() );
     }
 
     /**

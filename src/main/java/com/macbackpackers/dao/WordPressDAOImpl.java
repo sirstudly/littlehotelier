@@ -6,7 +6,9 @@ import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -16,6 +18,7 @@ import javax.persistence.NoResultException;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Query;
 
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +41,8 @@ import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobScheduler;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.PxPostTransaction;
+import com.macbackpackers.beans.RoomBed;
+import com.macbackpackers.beans.RoomBedLookup;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
@@ -654,6 +659,28 @@ public class WordPressDAOImpl implements WordPressDAO {
             throw new IncorrectResultSetColumnCountException( "Unable to determine room type id for " + roomTypeLabel, 1, roomTypeIds.size() );
         }
         return roomTypeIds.get( 0 );
+    }
+
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public List<Integer> getAllRoomTypeIds() {
+        return em.createNativeQuery( "SELECT DISTINCT room_type_id FROM wp_lh_rooms" ).getResultList();
+    }
+
+    @Override
+    public Map<RoomBedLookup, RoomBed> fetchAllRoomBeds() {
+        List<RoomBed> roomBeds = em.createQuery( "FROM RoomBed WHERE room != 'Unallocated'", RoomBed.class )
+                .getResultList();
+
+        // key/value will be the same
+        // lookup will be done using RoomBed.equals()
+        HashMap<RoomBedLookup, RoomBed> roomBedMap = new HashMap<>();
+        roomBeds.stream()
+                .forEach( rb -> {
+                    rb.setBedName( StringEscapeUtils.unescapeHtml4( rb.getBedName() ) );
+                    roomBedMap.put( new RoomBedLookup( rb.getRoom(), rb.getBedName() ), rb );
+                });
+        return roomBedMap;
     }
 
     /////////////////////////////////////////////////////////////////////
