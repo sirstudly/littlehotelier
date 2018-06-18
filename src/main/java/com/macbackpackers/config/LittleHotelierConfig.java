@@ -1,6 +1,9 @@
 
 package com.macbackpackers.config;
 
+import java.io.IOException;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +21,7 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 
 @Configuration
@@ -29,6 +33,9 @@ public class LittleHotelierConfig {
 
     @Value( "${lilhotelier.bedmatcher.classname}" )
     private String lhBedMatcherClassName;
+    
+    @Autowired
+    private CloudbedsScraper cloudbedsScraper;
 
     @Bean( name = "reportsSQL" )
     public PropertiesFactoryBean getSqlReports() {
@@ -88,6 +95,22 @@ public class LittleHotelierConfig {
         webClient.getOptions().setThrowExceptionOnScriptError( false );
         webClient.getOptions().setCssEnabled( false );
         webClient.getOptions().setUseInsecureSSL( true );
+        return webClient;
+    }
+
+    @Bean( name = "webClientForCloudbeds" )
+    @Scope( "prototype" )
+    public WebClient getCloudbedsWebClient() throws IOException {
+        // javascript disabled
+        WebClient webClient = new WebClient( BrowserVersion.CHROME );
+        webClient.getOptions().setTimeout( 120000 );
+        webClient.getOptions().setRedirectEnabled( true );
+        webClient.getOptions().setJavaScriptEnabled( false );
+        webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
+        webClient.getOptions().setThrowExceptionOnScriptError( false );
+        webClient.getOptions().setCssEnabled( false );
+        webClient.getOptions().setUseInsecureSSL( true );
+        cloudbedsScraper.validateLoggedIn( webClient );
         return webClient;
     }
 

@@ -27,7 +27,7 @@ public class CloudbedsServiceTest {
     CloudbedsService cloudbedsService;
 
     @Autowired
-    @Qualifier( "webClientScriptingDisabled" )
+    @Qualifier( "webClientForCloudbeds" )
     WebClient webClient;
 
     @Test

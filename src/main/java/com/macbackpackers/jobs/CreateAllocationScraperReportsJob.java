@@ -118,10 +118,12 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
      * 
      */
     private void insertHostelworldHostelBookersConfirmDepositJob() {
-        CreateConfirmDepositAmountsJob j = new CreateConfirmDepositAmountsJob();
-        j.setStatus( JobStatus.submitted );
-        j.setAllocationScraperJobId( getAllocationScraperJobId() );
-        dao.insertJob( j );
+        if ( dao.isLittleHotelier() ) {
+            CreateConfirmDepositAmountsJob j = new CreateConfirmDepositAmountsJob();
+            j.setStatus( JobStatus.submitted );
+            j.setAllocationScraperJobId( getAllocationScraperJobId() );
+            dao.insertJob( j );
+        }
     }
 
     /**

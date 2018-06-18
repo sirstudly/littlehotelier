@@ -11,7 +11,7 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationContext;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
@@ -35,7 +35,9 @@ public class HousekeepingJob extends AbstractJob {
 
     @Autowired
     @Transient
-    @Qualifier( "webClientScriptingDisabled" )
+    private ApplicationContext ctx;
+
+    @Transient
     private WebClient webClient;
 
     @Override
@@ -47,7 +49,7 @@ public class HousekeepingJob extends AbstractJob {
     public void processJob() throws Exception {
         if ( dao.isCloudbeds() ) {
             LocalDate selectedDate = getSelectedLocalDate();
-            cloudbedsService.dumpAllocationsFrom( webClient,
+            cloudbedsService.dumpAllocationsFrom( getWebClient(),
                     getId(), selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
         }
         else {
@@ -57,7 +59,7 @@ public class HousekeepingJob extends AbstractJob {
             Calendar dayBefore = Calendar.getInstance();
             dayBefore.setTime( selectedDate );
             dayBefore.add( Calendar.DATE, -1 );
-            allocationScraper.dumpAllocationsFrom( webClient, getId(), dayBefore.getTime() );
+            allocationScraper.dumpAllocationsFrom( getWebClient(), getId(), dayBefore.getTime() );
         }
     }
 
@@ -84,6 +86,14 @@ public class HousekeepingJob extends AbstractJob {
      */
     private LocalDate getSelectedLocalDate() {
         return LocalDate.parse( getParameter( "selected_date" ).substring( 0, 10 ) );
+    }
+
+    private WebClient getWebClient() {
+        if ( webClient == null ) {
+            webClient = ctx.getBean( dao.isCloudbeds() ? "webClientForCloudbeds" : "webClientScriptingDisabled",
+                    WebClient.class );
+        }
+        return webClient;
     }
 
 }

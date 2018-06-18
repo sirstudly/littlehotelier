@@ -43,7 +43,7 @@ public class CloudbedsScraperTest {
     WordPressDAO dao;
 
     @Autowired
-    @Qualifier( "webClient" )
+    @Qualifier( "webClientForCloudbeds" )
     WebClient webClient;
 
     @Autowired 

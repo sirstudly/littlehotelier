@@ -28,7 +28,7 @@ public class CloudbedsAllocationScraperWorkerJob extends AbstractJob {
 
     @Autowired
     @Transient
-    @Qualifier( "webClient" )
+    @Qualifier( "webClientForCloudbeds" )
     private WebClient webClient;
 
     @Override

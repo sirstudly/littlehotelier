@@ -82,7 +82,7 @@ public class CloudbedsScraper {
      * @param webClient web client instance to use
      * @throws IOException on connection error
      */
-    private void validateLoggedIn( WebClient webClient ) throws IOException {
+    public void validateLoggedIn( WebClient webClient ) throws IOException {
 
         // don't allow multiple threads writing to the same cookie file at the same time
         synchronized ( CLASS_LOCK ) {
@@ -241,11 +241,10 @@ public class CloudbedsScraper {
      */
     public Reservation getReservation( WebClient webClient, String reservationId ) throws IOException {
 
-        validateLoggedIn( webClient );
         WebRequest requestSettings = jsonRequestFactory.createGetReservationRequest( reservationId );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Pulling reservation data for #" + reservationId + " from: " + redirectPage.getUrl().getPath() );
+        LOGGER.info( "Pulling reservation data for #" + reservationId );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         Optional<Reservation> r = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class ) );
@@ -334,7 +333,6 @@ public class CloudbedsScraper {
      */
     private List<Customer> getCustomers( WebClient webClient, WebRequest requestSettings ) throws IOException {
         
-        validateLoggedIn( webClient );
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
@@ -371,7 +369,6 @@ public class CloudbedsScraper {
      */
     public JsonObject getAllStaffAllocations( WebClient webClient, LocalDate stayDate ) throws IOException {
 
-        validateLoggedIn( webClient );
         WebRequest requestSettings = jsonRequestFactory.createGetRoomAssignmentsReport( stayDate, stayDate.plusDays( 1 ) );
 
         Page redirectPage = webClient.getPage( requestSettings );
@@ -442,7 +439,6 @@ public class CloudbedsScraper {
      */
     public void addNote( WebClient webClient, String reservationId, String note ) throws IOException {
 
-        validateLoggedIn( webClient );
         WebRequest requestSettings = jsonRequestFactory.createAddNoteRequest( reservationId, note );
 
         Page redirectPage = webClient.getPage( requestSettings );
@@ -471,7 +467,6 @@ public class CloudbedsScraper {
      */
     public void addCardDetails( WebClient webClient, String reservationId, CardDetails cardDetails ) throws IOException {
 
-        validateLoggedIn( webClient );
         WebRequest requestSettings = jsonRequestFactory.createAddCreditCardRequest( reservationId, cardDetails );
 
         Page redirectPage = webClient.getPage( requestSettings );
@@ -515,7 +510,6 @@ public class CloudbedsScraper {
     public HtmlPage navigateToPage( WebClient webClient, String pageURL ) throws IOException {
         // attempt to go the page directly using the current credentials
         LOGGER.info( "Loading page: " + pageURL );
-        validateLoggedIn( webClient );
         HtmlPage nextPage = webClient.getPage( pageURL );
         LOGGER.debug( "Now on " + nextPage.getUrl() );
         if ( nextPage.getUrl().getPath().endsWith( "/login" ) ) {

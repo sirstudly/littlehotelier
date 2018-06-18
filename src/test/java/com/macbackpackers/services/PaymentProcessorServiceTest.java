@@ -37,7 +37,7 @@ public class PaymentProcessorServiceTest {
     WebClient lhWebClient;
 
     @Autowired
-    @Qualifier( "webClient" )
+    @Qualifier( "webClientForCloudbeds" )
     WebClient cbWebClient;
 
     @Autowired

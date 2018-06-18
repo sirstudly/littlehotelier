@@ -21,7 +21,7 @@ public class CastleRockRoomBedMatcher implements RoomBedMatcher {
         Pattern p = Pattern.compile( "([^\\-]*)-(.*)$" ); // anything but dash for room #, everything else for bed
         Matcher m = p.matcher( roomLabel );
         if ( m.find() == false ) {
-            LOGGER.info( "Couldn't determine bed name from '" + roomLabel + "'. Is it a private?" );
+            LOGGER.debug( "Couldn't determine bed name from '" + roomLabel + "'. Is it a private?" );
             room = roomLabel;
         }
         else {
