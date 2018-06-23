@@ -3,6 +3,8 @@ package com.macbackpackers.config;
 
 import java.io.IOException;
 
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.openqa.selenium.WebDriver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.PropertiesFactoryBean;
@@ -33,7 +35,7 @@ public class LittleHotelierConfig {
 
     @Value( "${lilhotelier.bedmatcher.classname}" )
     private String lhBedMatcherClassName;
-    
+
     @Autowired
     private CloudbedsScraper cloudbedsScraper;
 
@@ -138,9 +140,12 @@ public class LittleHotelierConfig {
         return RoomBedMatcher.class.cast( Class.forName( lhBedMatcherClassName ).newInstance() );
     }
 
-//    @Bean
-//    public Scheduler getScheduler() throws SchedulerException {
-//        return StdSchedulerFactory.getDefaultScheduler();
-//    }
+    @Bean
+    public GenericObjectPool<WebDriver> getWebDriverPool( LittleHotelierWebDriverFactory driverFactory ) {
+        GenericObjectPool<WebDriver> objectPool = new GenericObjectPool<WebDriver>( driverFactory );
+        objectPool.setBlockWhenExhausted( true );
+        objectPool.setMaxTotal( 1 ); // only keep one around for now
+        return objectPool;
+    }
 
 }

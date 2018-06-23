@@ -12,7 +12,6 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,15 +28,14 @@ import org.springframework.stereotype.Service;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlDivision;
-import com.gargoylesoftware.htmlunit.html.HtmlHiddenInput;
 import com.gargoylesoftware.htmlunit.html.HtmlInput;
 import com.gargoylesoftware.htmlunit.html.HtmlItalic;
 import com.gargoylesoftware.htmlunit.html.HtmlLabel;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlSpan;
 import com.gargoylesoftware.htmlunit.html.HtmlTextArea;
-import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.GuestDetails;
 import com.macbackpackers.beans.Payment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
@@ -48,6 +46,7 @@ import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.AgodaScraper;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
+import com.macbackpackers.scrapers.ChromeScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.HostelworldScraper;
 import com.macbackpackers.scrapers.ReservationPageScraper;
@@ -98,6 +97,9 @@ public class PaymentProcessorService {
     
     @Autowired
     private CloudbedsScraper cloudbedsScraper;
+    
+    @Autowired
+    private ChromeScraper chromeScraper;
 
     /**
      * Attempt to charge the deposit payment for the given reservation. This method
@@ -301,117 +303,68 @@ public class PaymentProcessorService {
         }
     }
 
-    private final ReentrantLock CARD_LOCK = new ReentrantLock();
-    private boolean isCardDetailsVisible = false; // for efficiency, we only need the CARD_LOCK if this is false
-
     /**
      * Copies the card details from LH (or HWL/AGO/EXP) to CB if it doesn't already exist.
      * 
-     * @param lhWebClient web client for lil hotelier
      * @param cbWebClient web client for cloudbeds
      * @param bookingRef the booking ref to copy
      * @param checkinDate checkin date of this booking
      * @throws IOException on i/o error
      * @throws ParseException on bonehead error
+     * @throws Exception on web page load error
      */
-    public void copyCardDetailsFromLHtoCB( WebClient lhWebClient, WebClient cbWebClient, String bookingRef, Date checkinDate ) throws IOException, ParseException {
-
+    public void copyCardDetailsFromLHtoCB( WebClient cbWebClient, String bookingRef, Date checkinDate ) throws IOException, ParseException, Exception {
         LOGGER.info( "Processing " + bookingRef + " checking in on " + AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ) );
 
-        // before we start, we latch this method so we only have to enable security access once
-        // even if we have a bunch of jobs that hit this method at the same time
-        CARD_LOCK.lock();
+        // lookup guest in LH
+        GuestDetails guest = chromeScraper.retrieveGuestDetailsFromLH( bookingRef, checkinDate );
 
-        // if we can already see card details, we don't need the lock anymore
-        // anyone can come in here....
-        if ( isCardDetailsVisible ) {
-            CARD_LOCK.unlock();
+        // check if payment exists in CB
+        Reservation cbReservation = cloudbedsScraper.findBookingByLHBookingRef(
+                cbWebClient, bookingRef, checkinDate, guest.getFullName() );
+        if ( cbReservation.isCardDetailsPresent() ) {
+            LOGGER.info( "Card details found for reservation " + cbReservation.getReservationId() + "; skipping copy" );
+            return;
         }
 
-        try {
-            HtmlPage bookingsPage = bookingsPageScraper.goToBookingPageArrivedOn( lhWebClient, checkinDate, bookingRef );
-            HtmlPage reservationPage = reservationPageScraper.getReservationPage( lhWebClient, bookingsPage, bookingRef );
-            
-            HtmlTextInput nameField = reservationPage.getFirstByXPath( "//input[@id='guest_first_name']" );
-            String firstName = nameField.getValueAttribute();
-            nameField = reservationPage.getFirstByXPath( "//input[@id='guest_last_name']" );
-            String lastName = nameField.getValueAttribute();
-            LOGGER.info( "Processing booking " + bookingRef + " for " + firstName + " " + lastName );
-
-            // check if payment exists in CB
-            Reservation cbReservation = cloudbedsScraper.findBookingByLHBookingRef( cbWebClient, bookingRef, checkinDate, firstName + " " + lastName );
-            if ( cbReservation.isCardDetailsPresent() ) {
-                LOGGER.info( "Card details found for reservation " + cbReservation.getReservationId() + "; skipping copy" );
-                return;
-            }
-            // extra sanity check that we have the correct booking
-            if ( false == firstName.equalsIgnoreCase( cbReservation.getFirstName() )
-                    || false == lastName.equalsIgnoreCase( cbReservation.getLastName() ) ) {
-                throw new UnrecoverableFault( "Mismatch on booking name! Found "
-                        + cbReservation.getFirstName() + " " + cbReservation.getLastName()
-                        + " when expected " + firstName + " " + lastName );
-            }
-
-            // extra sanity check on the correct date
-            HtmlHiddenInput checkinDateInput = reservationPage.getFirstByXPath( "//input[@id='check_in_date']" );
-            if ( false == cbReservation.getCheckinDate().equals( checkinDateInput.getValueAttribute() ) ) {
-                throw new UnrecoverableFault( "Mismatch on checkin date. Found "
-                        + cbReservation.getCheckinDate() + " but expected "
-                        + checkinDateInput.getValueAttribute() );
-            }
-
-            // get the full card details
-            CardDetails ccDetails = null;
-            HtmlTextInput paymentCardField = reservationPage.getFirstByXPath( "//input[@id='payment_card_number']" );
-            boolean isCardDetailsBlank = StringUtils.isBlank( paymentCardField.getValueAttribute() );
-
-            // only look up on HWL portal if we don't have it available in LH
-            if ( bookingRef.startsWith( "HWL-" ) && isCardDetailsBlank ) {
-                LOGGER.info( "Retrieving HWL customer card details" );
-                ccDetails = retrieveHWCardDetails( bookingRef );
-            }
-            else if ( bookingRef.startsWith( "EXP-" ) && isCardDetailsBlank ) {
-                LOGGER.info( "Retrieving EXP customer card details" );
-                ccDetails = expediaService.returnCardDetailsForBooking( bookingRef ).getCardDetails();
-            }
-            else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
-                LOGGER.info( "Retrieving AGO customer card details" );
-                // I don't think this actually works anymore but give it a go anyways
-                ccDetails = retrieveAgodaCardDetails( reservationPage, bookingRef );
-            }
-            else if ( isCardDetailsBlank ) {
-                LOGGER.info( "No card details found for " + bookingRef + " checking in on " 
-                        + AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ) );
-                return;
-            }
-            else {
-                int reservationId = reservationPageScraper.getReservationId( reservationPage );
-                HtmlAnchor viewCcDetails = reservationPage.getFirstByXPath( "//a[@class='view-card-details']" );
-                // if the "view card details" link is available; we don't yet have secure access yet
-                if ( viewCcDetails != null ) {
-                    LOGGER.info( "Card details currently hidden; requesting security access" );
-                    reservationPageScraper.enableSecurityAccess( reservationPage, reservationId );
-                }
-                // this method call is now a free-for-all to any and all threads
-                isCardDetailsVisible = true;
-
-                // get the full card details
-                ccDetails = reservationPageScraper.getCardDetails( reservationPage );
-            }
-            LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( ccDetails.getCardNumber() )
-                    + " for " + firstName + " " + lastName );
-
-            // if we're missing the cardholder name; just use the guest name
-            if ( StringUtils.isBlank( ccDetails.getName() ) ) {
-                ccDetails.setName( firstName + " " + lastName );
-            }
-            cloudbedsScraper.addCardDetails( cbWebClient, cbReservation.getReservationId(), ccDetails );
+        // extra sanity check that we have the correct booking
+        if ( false == guest.getFirstName().equalsIgnoreCase( cbReservation.getFirstName() )
+                || false == guest.getLastName().equalsIgnoreCase( cbReservation.getLastName() ) ) {
+            throw new UnrecoverableFault( "Mismatch on booking name! Found "
+                    + cbReservation.getFirstName() + " " + cbReservation.getLastName()
+                    + " when expected " + guest.getFullName() );
         }
-        finally {
-            if ( CARD_LOCK.isHeldByCurrentThread() ) {
-                CARD_LOCK.unlock();
-            }
+
+        CardDetails ccDetails = guest.getCardDetails();
+        boolean isCardDetailsBlank = ccDetails == null;
+
+        // only look up on HWL portal if we don't have it available in LH
+        if ( bookingRef.startsWith( "HWL-" ) && isCardDetailsBlank ) {
+            LOGGER.info( "Retrieving HWL customer card details" );
+            ccDetails = retrieveHWCardDetails( bookingRef );
         }
+        else if ( bookingRef.startsWith( "EXP-" ) && isCardDetailsBlank ) {
+            LOGGER.info( "Retrieving EXP customer card details" );
+            ccDetails = expediaService.returnCardDetailsForBooking( bookingRef ).getCardDetails();
+        }
+//        else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
+//            LOGGER.info( "Retrieving AGO customer card details" );
+//            // I don't think this actually works anymore but give it a go anyways
+//            ccDetails = retrieveAgodaCardDetails( reservationPage, bookingRef );
+//        }
+        else if ( isCardDetailsBlank ) {
+            LOGGER.info( "No card details found for " + bookingRef + " checking in on "
+                    + AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ) );
+            return;
+        }
+        LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( ccDetails.getCardNumber() )
+                + " for " + guest.getFullName() );
+
+        // if we're missing the cardholder name; just use the guest name
+        if ( StringUtils.isBlank( ccDetails.getName() ) ) {
+            ccDetails.setName( guest.getFullName() );
+        }
+        cloudbedsScraper.addCardDetails( cbWebClient, cbReservation.getReservationId(), ccDetails );
     }
 
     /**

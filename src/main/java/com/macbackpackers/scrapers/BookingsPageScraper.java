@@ -188,7 +188,7 @@ public class BookingsPageScraper {
      * @param status status of reservation (optional)
      * @return URL of bookings arriving on this date
      */
-    private String getBookingsURLForArrivalsByDate( Date fromDate, Date toDate, String bookingRef, String status ) {
+    public String getBookingsURLForArrivalsByDate( Date fromDate, Date toDate, String bookingRef, String status ) {
         return getBookingURL()
                 .replaceAll( "__DATE_FROM__", DATE_FORMAT_BOOKING_URL.format( fromDate ) )
                 .replaceAll( "__DATE_TO__", DATE_FORMAT_BOOKING_URL.format( toDate ) )

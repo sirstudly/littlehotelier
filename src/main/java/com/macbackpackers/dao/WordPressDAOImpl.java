@@ -18,8 +18,8 @@ import javax.persistence.NoResultException;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Query;
 
-import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -268,12 +268,12 @@ public class WordPressDAOImpl implements WordPressDAO {
         // (since there should only ever be 1 unique one; we'll be re-running these jobs)
         String thisProcessorId = getUniqueProcessorId();
         LOGGER.info( "Getting next job for " + thisProcessorId );
-        List<AbstractJob> jobs = em
-                .createQuery( "FROM AbstractJob "
+        List<Integer> jobs = em
+                .createQuery( "SELECT id FROM AbstractJob "
                         + "     WHERE status = :submittedStatus "
                         + "        OR (status = :processingStatus AND processedBy = :processedBy)"
                         + "     ORDER BY CASE WHEN classname = 'com.macbackpackers.jobs.ShutdownJob' THEN 0 ELSE 1 END, job_id",
-                        AbstractJob.class )
+                        Integer.class )
                 .setParameter( "submittedStatus", JobStatus.submitted )
                 .setParameter( "processingStatus", JobStatus.processing )
                 // processedBy includes name of current thread
@@ -282,13 +282,11 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( "processedBy", thisProcessorId )
                 .getResultList();
         
-//        if ( jobs.size() > 0 ) {
-//            AbstractJob job = jobs.get( 0 );
-//            job = fetchJobById( job.getId() ); // fetch by primary key
-        forAllJobs: for ( AbstractJob job : jobs ) {
+        forAllJobs: for ( int jobId : jobs ) {
+            AbstractJob job = fetchJobById( jobId ); // fetch by primary key
             // first check that all dependent jobs have completed successfully
             for ( Job dependentJob : job.getDependentJobs() ) {
-                switch( dependentJob.getStatus()) {
+                switch ( dependentJob.getStatus() ) {
                     case submitted:
                     case processing:
                         continue forAllJobs; // need to wait until parent job finishes

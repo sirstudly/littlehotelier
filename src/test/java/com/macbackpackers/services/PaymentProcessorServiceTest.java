@@ -42,7 +42,7 @@ public class PaymentProcessorServiceTest {
 
     @Autowired
     WordPressDAO dao;
-    
+
     @Autowired
     BookingsPageScraper bookingScraper;
 
@@ -55,7 +55,7 @@ public class PaymentProcessorServiceTest {
         paymentService.processDepositPayment( lhWebClient, 0, "BDC-1264569063", c.getTime() );
         LOGGER.info( "done" );
     }
-    
+
     @Test
     public void testDepositChargeAmount() throws Exception {
         String bookingRef = "BDC-1192773406";
@@ -64,20 +64,20 @@ public class PaymentProcessorServiceTest {
         c.set( Calendar.YEAR, 2017 );
         c.set( Calendar.MONTH, 5 ); // 0-based
         c.set( Calendar.DATE, 7 );
-        
+
         LOGGER.info( "Processing payment for booking " + bookingRef );
         HtmlPage bookingsPage = bookingScraper.goToBookingPageBookedOn( lhWebClient, c.getTime(), bookingRef );
-        
-        List<?> rows = bookingsPage.getByXPath( 
+
+        List<?> rows = bookingsPage.getByXPath(
                 "//div[@id='content']/div[@class='reservations']/div[@class='data']/table/tbody/tr[@class!='group_header']" );
-        if(rows.size() != 1) {
-            throw new IncorrectResultSizeDataAccessException("Unable to find unique booking " + bookingRef, 1);
+        if ( rows.size() != 1 ) {
+            throw new IncorrectResultSizeDataAccessException( "Unable to find unique booking " + bookingRef, 1 );
         }
         // need the LH reservation ID before clicking on the row
         HtmlTableRow row = HtmlTableRow.class.cast( rows.get( 0 ) );
         int reservationId = Integer.parseInt( row.getAttribute( "data-id" ) );
         LOGGER.info( "Reservation ID: " + reservationId );
-        
+
         // click on the only reservation on the page
         HtmlPage reservationPage = row.click();
         reservationPage.getWebClient().waitForBackgroundJavaScript( 30000 ); // wait for page to load
@@ -120,12 +120,13 @@ public class PaymentProcessorServiceTest {
         paymentService.processManualPayment( lhWebClient, 0,
                 "HWL-551-336647714", new BigDecimal( "0.01" ), "Testing -rc", true );
     }
-    
+
     @Test
     public void testCopyCardDetailsFromLHtoCB() throws Exception {
         Calendar c = Calendar.getInstance();
-        c.set( Calendar.DATE, 26 );
-        paymentService.copyCardDetailsFromLHtoCB( lhWebClient, cbWebClient, "LH1804028813910", c.getTime() );
+        c.set( Calendar.DATE, 28 );
+        c.set( Calendar.MONTH, Calendar.AUGUST );
+        paymentService.copyCardDetailsFromLHtoCB( cbWebClient, "LH1802108246113", c.getTime() );
     }
 
 }

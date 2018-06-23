@@ -466,12 +466,14 @@ public class ProcessorServiceTest {
         c.setTime( startDate );
         for( int i = 0; i < daysAhead; i++ ) {
             for ( String br : dao.fetchDistinctBookingsByCheckinDate( 1, c.getTime() ) ) {
-                LOGGER.info( "Creating job for " + br );
-                CopyCardDetailsFromLHJob j = new CopyCardDetailsFromLHJob();
-                j.setBookingRef( br );
-                j.setCheckinDate( c.getTime() );
-                j.setStatus( JobStatus.aborted );
-                dao.insertJob( j );
+                if ( br.startsWith( "LH" ) ) {
+                    LOGGER.info( "Creating job for " + br );
+                    CopyCardDetailsFromLHJob j = new CopyCardDetailsFromLHJob();
+                    j.setBookingRef( br );
+                    j.setCheckinDate( c.getTime() );
+                    j.setStatus( JobStatus.aborted );
+                    dao.insertJob( j );
+                }
             }
             c.add( Calendar.DATE, 1 );
         }

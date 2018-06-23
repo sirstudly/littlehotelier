@@ -111,7 +111,7 @@ public class ReservationPageScraper {
      * @return URL of individual reservation
      */
     private String getReservationURL( int reservationId ) {
-        return String.format( "https://app.littlehotelier.com/extranet/properties/%s/reservations/%d/edit",
+        return String.format( "https://app.littlehotelier.com/extranet/properties/%s/reservations/%d/edit?reservation_filter[booking_reference_id]=9999999",
                 lhPropertyId, reservationId );
     }
 

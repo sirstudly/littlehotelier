@@ -4,6 +4,7 @@ package com.macbackpackers.scrapers;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -83,6 +84,7 @@ public class CloudbedsJsonRequestFactory {
         requestSettings.setAdditionalHeader( "Cache-Control", "max-age=0" );
         requestSettings.setAdditionalHeader( "Origin", "https://hotels.cloudbeds.com" );
         requestSettings.setAdditionalHeader( "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36" );
+        requestSettings.setCharset( StandardCharsets.UTF_8 );
         return requestSettings;
     }
 

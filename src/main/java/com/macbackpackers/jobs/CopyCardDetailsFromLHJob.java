@@ -1,3 +1,4 @@
+
 package com.macbackpackers.jobs;
 
 import java.text.ParseException;
@@ -20,26 +21,20 @@ public class CopyCardDetailsFromLHJob extends AbstractJob {
 
     @Autowired
     @Transient
-    @Qualifier( "webClient" )
-    private WebClient lhWebClient;
-    
-    @Autowired
-    @Transient
     @Qualifier( "webClientForCloudbeds" )
     private WebClient cbWebClient;
-    
+
     @Autowired
     @Transient
     private PaymentProcessorService paymentProcessor;
 
     @Override
     public void processJob() throws Exception {
-        paymentProcessor.copyCardDetailsFromLHtoCB( lhWebClient, cbWebClient, getBookingRef(), getCheckinDate() );
+        paymentProcessor.copyCardDetailsFromLHtoCB( cbWebClient, getBookingRef(), getCheckinDate() );
     }
 
     @Override
     public void finalizeJob() {
-        lhWebClient.close(); // cleans up JS threads
         cbWebClient.close(); // cleans up JS threads
     }
 
