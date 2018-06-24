@@ -129,4 +129,9 @@ public class PaymentProcessorServiceTest {
         paymentService.copyCardDetailsFromLHtoCB( cbWebClient, "LH1802108246113", c.getTime() );
     }
 
+    @Test
+    public void testCopyCardDetailsToCloudbeds() throws Exception {
+        paymentService.copyCardDetailsToCloudbeds( cbWebClient, "11109575" );
+    }
+
 }

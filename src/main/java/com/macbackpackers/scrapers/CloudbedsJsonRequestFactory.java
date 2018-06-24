@@ -242,6 +242,30 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Get all reservations matching the given booking source(s) and booked dates.
+     * 
+     * @param bookedDateStart booked date (inclusive)
+     * @param bookedDateEnd booked date (inclusive)
+     * @param bookingSourceIds comma-delimited list of booking source Id(s)
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createGetReservationsRequestByBookingSource( LocalDate bookedDateStart, 
+            LocalDate bookedDateEnd, String bookingSourceIds ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
+        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+                new NameValuePair( "date_start[0]", "" ),
+                new NameValuePair( "date_start[1]", "" ),
+                new NameValuePair( "date_end[0]", "" ),
+                new NameValuePair( "date_end[1]", "" ),
+                new NameValuePair( "booking_date[0]", bookedDateStart.format( YYYY_MM_DD ) ),
+                new NameValuePair( "booking_date[1]", bookedDateEnd.format( YYYY_MM_DD ) ),
+                new NameValuePair( "status", "all" ),
+                new NameValuePair( "source", bookingSourceIds ) ) );
+        return webRequest;
+    }
+
+    /**
      * Retrieves all reservations staying within the given date range.
      * 
      * @param dateStart checkin date (inclusive)
@@ -424,4 +448,22 @@ public class CloudbedsJsonRequestFactory {
         webRequest.setRequestParameters( params );
         return webRequest;
     }
+
+    /**
+     * Returns the source id for the given source name (used for searching).
+     * 
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createReservationSourceLookupRequest() throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/associations/loader/sources" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "property_id", PROPERTY_ID ),
+                new NameValuePair( "group_id", PROPERTY_ID ),
+                new NameValuePair( "version", getVersion() ) ) );
+        return webRequest;
+    }
+
 }

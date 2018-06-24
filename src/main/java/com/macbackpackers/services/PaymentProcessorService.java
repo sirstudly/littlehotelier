@@ -368,6 +368,55 @@ public class PaymentProcessorService {
     }
 
     /**
+     * Copies the card details (for HWL/AGO/EXP) to CB if it doesn't already exist.
+     * 
+     * @param cbWebClient web client for cloudbeds
+     * @param reservationId the unique cloudbeds reservation ID
+     * @throws IOException on i/o error
+     * @throws ParseException on bonehead error
+     * @return the loaded reservation
+     */
+    public Reservation copyCardDetailsToCloudbeds( WebClient webClient, String reservationId ) throws IOException, ParseException {
+        LOGGER.info( "Processing reservation " + reservationId );
+
+        // check if payment exists in CB
+        Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+        if ( cbReservation.isCardDetailsPresent() ) {
+            LOGGER.info( "Card details found for reservation " + cbReservation.getReservationId() + "; skipping copy" );
+            return cbReservation;
+        }
+
+        CardDetails ccDetails = null;
+        if ( cbReservation.getSourceName().startsWith( "Hostelworld" ) ) {
+            String hwlRef = "HWL-" + cbReservation.getThirdPartyIdentifier();
+            LOGGER.info( "Retrieving HWL customer card details for " + hwlRef );
+            ccDetails = retrieveHWCardDetails( hwlRef );
+        }
+        else if ( cbReservation.getSourceName().startsWith( "Expedia" ) ) {
+            LOGGER.info( "Retrieving EXP customer card details" );
+            ccDetails = expediaService.returnCardDetailsForBooking(
+                    cbReservation.getThirdPartyIdentifier() ).getCardDetails();
+        }
+//        else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
+//            LOGGER.info( "Retrieving AGO customer card details" );
+//            // I don't think this actually works anymore but give it a go anyways
+//            ccDetails = retrieveAgodaCardDetails( reservationPage, bookingRef );
+//        }
+        else {
+            throw new UnsupportedOperationException( "Unsupported source " + cbReservation.getSourceName() );
+        }
+        LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( ccDetails.getCardNumber() )
+                + " for " + ccDetails.getName() );
+
+        // if we're missing the cardholder name; just use the guest name
+        if ( StringUtils.isBlank( ccDetails.getName() ) ) {
+            ccDetails.setName( cbReservation.getFirstName() + cbReservation.getLastName() );
+        }
+        cloudbedsScraper.addCardDetails( webClient, cbReservation.getReservationId(), ccDetails );
+        return cbReservation;
+    }
+
+    /**
      * Does the nitty-gritty of posting the transaction, or recovering if we've already attempted to
      * do a post, updates the payment details in LH or leaves a note on the booking if the
      * transaction was not approved. If we've already successfully charged this {@code bookingRef}, 

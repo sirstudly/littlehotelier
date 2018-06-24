@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -18,7 +19,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.HttpMethod;
@@ -41,17 +41,13 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentCardNotAcceptedException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
-import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 import com.macbackpackers.services.FileService;
 
 @Component
-@Scope( "prototype" )
 public class CloudbedsScraper {
     
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
     
-    // a class-level lock
-    private static final Object CLASS_LOCK = new Object();
     private static final DateTimeFormatter YYYY_MM_DD = DateTimeFormatter.ofPattern( "yyyy-MM-dd" );
 
     @Autowired
@@ -67,9 +63,6 @@ public class CloudbedsScraper {
     @Autowired
     private CloudbedsJsonRequestFactory jsonRequestFactory;
 
-    @Autowired
-    private RoomBedMatcher roomBedMatcher;
-    
     @Value( "${cloudbeds.property.id:0}" )
     private String PROPERTY_ID;
 
@@ -82,38 +75,36 @@ public class CloudbedsScraper {
      * @param webClient web client instance to use
      * @throws IOException on connection error
      */
-    public void validateLoggedIn( WebClient webClient ) throws IOException {
+    public synchronized void validateLoggedIn( WebClient webClient ) throws IOException {
 
         // don't allow multiple threads writing to the same cookie file at the same time
-        synchronized ( CLASS_LOCK ) {
-            fileService.loadCookiesFromFile( webClient );
+        fileService.loadCookiesFromFile( webClient );
 
-            // simple request to see if we're logged in
-            Optional<CloudbedsJsonResponse> response = doGetUserPermissionRequest( webClient );
+        // simple request to see if we're logged in
+        Optional<CloudbedsJsonResponse> response = doGetUserPermissionRequest( webClient );
 
-            // if user not logged in, then response is blank
+        // if user not logged in, then response is blank
+        if ( false == response.isPresent() ) {
+            LOGGER.info( "I don't think we're logged in, doing it now." );
+            login( webClient );
+
+            // retry request
+            response = doGetUserPermissionRequest( webClient );
             if ( false == response.isPresent() ) {
-                LOGGER.info( "I don't think we're logged in, doing it now." );
-                login( webClient );
-
-                // retry request
-                response = doGetUserPermissionRequest( webClient );
-                if ( false == response.isPresent() ) {
-                    throw new UnrecoverableFault( "Unable to login? Incorrect username/password?" );
-                }
+                throw new UnrecoverableFault( "Unable to login? Incorrect username/password?" );
             }
+        }
 
-            // if user is logged in and correct version, response is one of either {"access": true} or {"access": false}
-            // if user is logged in but using an obsolete version, then response is not-blank and {success: false}
-            if ( false == response.get().isSuccess() ) {
+        // if user is logged in and correct version, response is one of either {"access": true} or {"access": false}
+        // if user is logged in but using an obsolete version, then response is not-blank and {success: false}
+        if ( false == response.get().isSuccess() ) {
 
-                // we may have updated our version; try to validate again
-                response = doGetUserPermissionRequest( webClient );
+            // we may have updated our version; try to validate again
+            response = doGetUserPermissionRequest( webClient );
 
-                // if still nothing, then we fail here
-                if ( false == response.isPresent() || false == response.get().isSuccess() ) {
-                    throw new UnrecoverableFault( "Unable to login? Incorrect username/password?" );
-                }
+            // if still nothing, then we fail here
+            if ( false == response.isPresent() || false == response.get().isSuccess() ) {
+                throw new UnrecoverableFault( "Unable to login? Incorrect username/password?" );
             }
         }
     }
@@ -483,6 +474,56 @@ public class CloudbedsScraper {
         if ( response.isFailure() ) {
             throw new PaymentCardNotAcceptedException( response.getMessage() );
         }
+    }
+
+    /**
+     * Sends a source lookup request to the server.
+     * 
+     * @param webClient web client instance to use
+     * @param sourceName name of booking source to search for
+     * @return comma-delimited list of matching source ids
+     * @throws IOException
+     */
+    public String lookupBookingSourceIds( WebClient webClient, String... sourceNames ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createReservationSourceLookupRequest();
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            throw new MissingUserDataException( "Failed to retrieve source lookup." );
+        }
+        
+        // drill down to each of the 3rd party OTAs matching the given source(s)
+        return StreamSupport.stream( jelement.getAsJsonObject()
+                .get( "result" ).getAsJsonArray().spliterator(), false )
+                .filter( o -> "OTA".equals( o.getAsJsonObject().get( "text" ).getAsString() ) )
+                .flatMap( o -> StreamSupport.stream(
+                        o.getAsJsonObject().get( "children" ).getAsJsonArray().spliterator(), false ) )
+                .filter( p -> Arrays.asList( sourceNames ).contains( p.getAsJsonObject().get( "text" ).getAsString() ) )
+                .map( o -> o.getAsJsonObject().get( "li_attr" ).getAsJsonObject().get( "data-source-id" ).getAsString() )
+                .collect( Collectors.joining( "," ) );
+    }
+    
+    /**
+     * Get all reservations with the given booking sources.
+     * 
+     * @param webClient web client instance to use
+     * @param bookedDateStart booked date (inclusive)
+     * @param bookedDateEnd booked date (inclusive)
+     * @param bookingSources comma-delimited list of booking source(s)
+     * @return non-null list of reservations
+     * @throws IOException
+     */
+    public List<Reservation> getReservationsForBookingSources( WebClient webClient,
+            LocalDate bookedDateStart, LocalDate bookedDateEnd, String ... sourceNames ) throws IOException {
+        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByBookingSource(
+                bookedDateStart, bookedDateEnd, lookupBookingSourceIds( webClient, sourceNames ) ) )
+                        .stream()
+                        .map( c -> getReservationRetry( webClient, c.getId() ) )
+                        .collect( Collectors.toList() );
     }
 
     /**

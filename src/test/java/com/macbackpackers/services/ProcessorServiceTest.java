@@ -35,6 +35,7 @@ import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CopyCardDetailsFromLHJob;
 import com.macbackpackers.jobs.CreateAgodaNoChargeNoteJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
+import com.macbackpackers.jobs.CreateCopyCardDetailsToCloudbedsJob;
 import com.macbackpackers.jobs.CreateDepositChargeJob;
 import com.macbackpackers.jobs.CreatePrepaidChargeJob;
 import com.macbackpackers.jobs.CreateScrapeCancelledBookingsJob;
@@ -478,4 +479,14 @@ public class ProcessorServiceTest {
             c.add( Calendar.DATE, 1 );
         }
     }
+
+    @Test
+    public void testCreateCopyCardDetailsToCloudbedsJob() throws Exception {
+        CreateCopyCardDetailsToCloudbedsJob j = new CreateCopyCardDetailsToCloudbedsJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingDate( LocalDate.now().withMonth( 6 ).withDayOfMonth( 3 ) );
+        j.setDaysAhead( 4 );
+        dao.insertJob( j );
+    }
+
 }
