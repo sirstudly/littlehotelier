@@ -370,7 +370,7 @@ public class PaymentProcessorService {
     /**
      * Copies the card details (for HWL/AGO/EXP) to CB if it doesn't already exist.
      * 
-     * @param cbWebClient web client for cloudbeds
+     * @param webClient web client for cloudbeds
      * @param reservationId the unique cloudbeds reservation ID
      * @throws IOException on i/o error
      * @throws ParseException on bonehead error
@@ -379,7 +379,7 @@ public class PaymentProcessorService {
     public Reservation copyCardDetailsToCloudbeds( WebClient webClient, String reservationId ) throws IOException, ParseException {
         LOGGER.info( "Processing reservation " + reservationId );
 
-        // check if payment exists in CB
+        // check if card details exist in CB
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
         if ( cbReservation.isCardDetailsPresent() ) {
             LOGGER.info( "Card details found for reservation " + cbReservation.getReservationId() + "; skipping copy" );
@@ -414,6 +414,64 @@ public class PaymentProcessorService {
         }
         cloudbedsScraper.addCardDetails( webClient, cbReservation.getReservationId(), ccDetails );
         return cbReservation;
+    }
+
+    /**
+     * Does a AUTHORIZE/CAPTURE on the card details on the booking for the balance remaining 
+     * if the Rate Plan is "Non-refundable".
+     * 
+     * @param webClient web client for cloudbeds
+     * @param reservationId the unique cloudbeds reservation ID
+     * @throws IOException on i/o error
+     * @throws ParseException on bonehead error
+     */
+    public void chargeNonRefundableBooking( WebClient webClient, String reservationId ) throws IOException, ParseException {
+        LOGGER.info( "Processing charge of non-refundable booking: " + reservationId );
+        Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+
+        LOGGER.info( cbReservation.getThirdPartyIdentifier() + ": "
+                + cbReservation.getFirstName() + " " + cbReservation.getLastName() );
+        LOGGER.info( "Status: " + cbReservation.getStatus() );
+        LOGGER.info( "Checkin: " + cbReservation.getCheckinDate() );
+        LOGGER.info( "Checkout: " + cbReservation.getCheckoutDate() );
+        LOGGER.info( "Grand Total: " + cbReservation.getGrandTotal() );
+        LOGGER.info( "Balance Due: " + cbReservation.getBalanceDue() );
+
+        // check if we have anything to pay
+        if ( cbReservation.isPaid() ) {
+            LOGGER.info( "Booking is paid. Nothing to do." );
+            return;
+        }
+
+        if ( false == "Non-refundable".equalsIgnoreCase( cbReservation.getUsedRoomTypes() ) ) {
+            throw new UnrecoverableFault( "ABORT! Attempting to charge a non non-refundable booking!" );
+        }
+
+        // check if card details exist in CB; copy over if req'd
+        if ( false == cbReservation.isCardDetailsPresent() ) {
+            LOGGER.info( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Attempting to copy if available." );
+            copyCardDetailsToCloudbeds( webClient, reservationId );
+
+            // requery; if still not available, something has gone wrong somewhere
+            cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+            if ( false == cbReservation.isCardDetailsPresent() ) {
+                throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
+            }
+        }
+
+        // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
+        cloudbedsScraper.chargeNonRefundableBooking( webClient, reservationId,
+                cbReservation.getCreditCardId(), cbReservation.getBalanceDueAsDecimal() );
+
+        // mark booking as fully paid in Hostelworld
+        if ( "Hostelworld & Hostelbookers".equals( cbReservation.getSourceName() ) ) {
+            try (WebClient hwlWebClient = context.getBean( "webClientForHostelworld", WebClient.class )) {
+                hostelworldScraper.acknowledgeFullPaymentTaken( hwlWebClient, cbReservation.getThirdPartyIdentifier() );
+            }
+            catch ( Exception ex ) {
+                LOGGER.error( "Failed to acknowedge payment in HWL. Meh...", ex );
+            }
+        }
     }
 
     /**
@@ -631,7 +689,6 @@ public class PaymentProcessorService {
     /**
      * Retrieve card details for the given HW booking.
      * 
-     * @param lhWebClient web client for hostelworld
      * @param bookingRef e.g. HWL-555-123485758 
      * @return full card details (not-null); amount is null
      * @throws IOException on page load error

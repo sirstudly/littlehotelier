@@ -5,12 +5,15 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -19,15 +22,20 @@ import java.util.stream.StreamSupport;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.StreamUtils;
 
+import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 
 public class SimpleTest {
 
@@ -35,7 +43,10 @@ public class SimpleTest {
     public static final FastDateFormat DATE_FORMAT_BOOKED_DATE = FastDateFormat.getInstance( "d MMM yy HH:mm:ss" );
     public static final SimpleDateFormat DATE_FORMAT_SIMPLE = new SimpleDateFormat( "d'th' MMM 'x''o'yy HH:mm:ss" );
 
-    private Gson gson = new Gson();
+    private Gson gson = new GsonBuilder()
+            .setFieldNamingPolicy( FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES )
+            .setPrettyPrinting()
+            .create();
 
     @Test
     public void testReplace() throws Exception {
@@ -112,8 +123,7 @@ public class SimpleTest {
 
     @Test
     public void testCompare() {
-        LOGGER.info( "Compare" + new BigDecimal( "2" ).compareTo( BigDecimal.ZERO ) );
-        LOGGER.info( StringEscapeUtils.unescapeHtml4( "02- Tall &amp; Short" ) );
+        LOGGER.info( "Compare: " + new BigDecimal( "2" ).compareTo( BigDecimal.ZERO ) );
     }
 
     @Test
@@ -142,6 +152,28 @@ public class SimpleTest {
                 .map( e -> e.getKey() )
                 .collect( Collectors.toList() );
         LOGGER.info( StringUtils.join( staffBeds, "," ) );
+    }
+
+    @Test
+    public void testLoadReservation() throws Exception {
+
+        String json = StreamUtils.copyToString( getClass().getClassLoader().getResourceAsStream(
+                "get_reservation_cloudbeds.json" ), StandardCharsets.UTF_8 );
+        Reservation r = gson.fromJson( json, Reservation.class );
+
+        Assert.assertEquals( "First name matched", "John", r.getFirstName() );
+
+        // need to parse the credit_cards object manually to check for presence
+        JsonObject rootElem = gson.fromJson( json, JsonObject.class );
+        JsonElement creditCardsElem = rootElem.get( "credit_cards" );
+        Assert.assertEquals( "Credit card object exists", 3, creditCardsElem.getAsJsonObject().entrySet().size() );
+        
+        String cardId = null;
+        for ( Iterator<Entry<String, JsonElement>> it = creditCardsElem.getAsJsonObject().entrySet().iterator() ; it.hasNext() ; ) {
+            cardId = it.next().getKey();
+        }
+        Assert.assertEquals( "Card ID should be the last one", "5819432", cardId );
+
     }
 
 }

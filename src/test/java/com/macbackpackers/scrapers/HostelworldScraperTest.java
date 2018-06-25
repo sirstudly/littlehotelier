@@ -49,4 +49,9 @@ public class HostelworldScraperTest {
     public void testGetCardDetails() throws Exception {
         scraper.getCardDetails( webClient, "HWL-551-306023597" );
     }
+
+    @Test
+    public void testAcknowledgeFullPaymentTaken() throws Exception {
+        scraper.acknowledgeFullPaymentTaken( webClient, "551-380044923" );
+    }
 }

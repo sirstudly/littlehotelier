@@ -7,7 +7,9 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -250,7 +252,12 @@ public class CloudbedsScraper {
         JsonObject rootElem = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class );
         JsonElement creditCardsElem = rootElem.get( "credit_cards" );
         if ( creditCardsElem.isJsonObject() && creditCardsElem.getAsJsonObject().entrySet().size() > 0 ) {
-            r.get().setCardDetailsPresent( true );
+            String cardId = null;
+            for ( Iterator<Entry<String, JsonElement>> it = creditCardsElem.getAsJsonObject().entrySet().iterator() ; it.hasNext() ; ) {
+                cardId = it.next().getKey();
+            }
+            // save the last one on the list (if more than one)
+            r.get().setCreditCardId( cardId );
         }
         return r.get();
     }
@@ -524,6 +531,52 @@ public class CloudbedsScraper {
                         .stream()
                         .map( c -> getReservationRetry( webClient, c.getId() ) )
                         .collect( Collectors.toList() );
+    }
+
+    /**
+     * Does an AUTHORIZE/CAPTURE for the given booking for the amount given.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId unique CB reservation
+     * @param cardId the card id to charge against
+     * @param amount how much
+     * @throws IOException
+     */
+    public void chargeNonRefundableBooking( WebClient webClient, String reservationId, String cardId, BigDecimal amount ) throws IOException {
+
+        // AUTHORIZE
+        LOGGER.info( "Begin AUTHORIZE for reservation " + reservationId + " for " + amount );
+        WebRequest requestSettings = jsonRequestFactory.createAuthorizeCreditCardRequest(
+                reservationId, cardId, amount );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
+            addNote( webClient, reservationId, "Failed to AUTHORIZE booking: " +
+                    jelement.getAsJsonObject().get( "message" ).getAsString() );
+            throw new MissingUserDataException( "Failed to AUTHORIZE booking." );
+        }
+
+        // CAPTURE
+        LOGGER.info( "Begin CAPTURE for reservation " + reservationId  + " for " + amount );
+        requestSettings = jsonRequestFactory.createCaptureCreditCardRequest(
+                reservationId, cardId, amount );
+
+        redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
+            addNote( webClient, reservationId, "Failed to AUTHORIZE booking: " +
+                    jelement.getAsJsonObject().get( "message" ).getAsString() );
+            throw new MissingUserDataException( "Failed to CAPTURE booking." );
+        }
     }
 
     /**

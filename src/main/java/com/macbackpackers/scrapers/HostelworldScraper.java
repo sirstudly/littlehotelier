@@ -3,7 +3,10 @@ package com.macbackpackers.scrapers;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Iterator;
@@ -18,11 +21,15 @@ import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
+import com.gargoylesoftware.htmlunit.HttpMethod;
+import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.html.HtmlForm;
 import com.gargoylesoftware.htmlunit.html.HtmlListItem;
@@ -32,12 +39,16 @@ import com.gargoylesoftware.htmlunit.html.HtmlSubmitInput;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.gargoylesoftware.htmlunit.html.HtmlUnorderedList;
 import com.gargoylesoftware.htmlunit.util.Cookie;
+import com.gargoylesoftware.htmlunit.util.NameValuePair;
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.HostelworldBookingDate;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.exceptions.WebResponseException;
 import com.macbackpackers.services.FileService;
 
 @Component
@@ -71,6 +82,10 @@ public class HostelworldScraper {
 
     @Value( "${hostelworld.url.bookings}" )
     private String bookingsUrl;
+
+    @Autowired
+    @Qualifier( "gsonForHostelworld" )
+    private Gson gson;
 
     /**
      * Logs into Hostelworld providing the necessary credentials.
@@ -406,6 +421,43 @@ public class HostelworldScraper {
     }
 
     /**
+     * Acknowledge that we've taken full payment for the booking.
+     * 
+     * @param webClient the logged-in web client
+     * @param bookingRef HWL reservation id (property ID not required)
+     * @throws IOException
+     */
+    public synchronized void acknowledgeFullPaymentTaken( WebClient webClient, String bookingRef ) throws IOException {
+
+        LOGGER.info( "Acknowledging full payment taken for HWL-" + bookingRef );
+
+        // strip property id if provided
+        String hwlBookingId = bookingRef;
+        Pattern p = Pattern.compile( hostelNumber + "-([\\d]+)" );
+        Matcher m = p.matcher( bookingRef );
+        if ( m.find() ) {
+            hwlBookingId = m.group( 1 );
+        }
+
+        gotoPage( webClient, "https://inbox.hostelworld.com/booking/view/" + hwlBookingId );
+
+        WebRequest webRequest = createBasePostRequest( "https://inbox.hostelworld.com/booking/payment/confirm" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "custId", hwlBookingId ),
+                new NameValuePair( "bookingPaymentAck", "1" ) ) );
+        Page redirectPage = webClient.getPage( webRequest );
+
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || jelement.getAsJsonObject().get( "success" ) == null ) {
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
+            throw new WebResponseException( "Acknowledgement probably failed...", redirectPage.getWebResponse() );
+        }
+    }
+
+    /**
      * Moves the iterator over 2 elements and returns the text content of the 2nd element. Throws
      * assertion error if iterator runs out of elements.
      * 
@@ -476,5 +528,24 @@ public class HostelworldScraper {
     private String getBookingsURLForBookedByDate( Date date ) {
         return bookingsUrl.replaceAll( "__DATE__", DATE_FORMAT_YYYY_MM_DD.format( date ) )
                 .replaceAll( "__DATE_TYPE__", "bookeddate" );
+    }
+
+    /**
+     * Creates a standard POST request.
+     * 
+     * @param url the page to POST to
+     * @return request options
+     */
+    private WebRequest createBasePostRequest( String url ) throws IOException {
+        WebRequest requestSettings = new WebRequest( new URL( url ), HttpMethod.POST );
+        requestSettings.setAdditionalHeader( "Accept", "*/*" );
+        requestSettings.setAdditionalHeader( "Content-Type", "application/x-www-form-urlencoded; charset=UTF-8" );
+        requestSettings.setAdditionalHeader( "Referer", "https://inbox.hostelworld.com/" );
+        requestSettings.setAdditionalHeader( "Accept-Language", "en-GB,en-US;q=0.9,en;q=0.8" );
+        requestSettings.setAdditionalHeader( "Accept-Encoding", "gzip, deflate, br" );
+        requestSettings.setAdditionalHeader( "Origin", "https://inbox.hostelworld.com" );
+        requestSettings.setAdditionalHeader( "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36" );
+        requestSettings.setCharset( StandardCharsets.UTF_8 );
+        return requestSettings;
     }
 }

@@ -134,4 +134,8 @@ public class PaymentProcessorServiceTest {
         paymentService.copyCardDetailsToCloudbeds( cbWebClient, "11109575" );
     }
 
+    @Test
+    public void testChargeNonRefundableBooking() throws Exception {
+        paymentService.chargeNonRefundableBooking( cbWebClient, "11068108" );
+    }
 }

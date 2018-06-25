@@ -1,6 +1,7 @@
 
 package com.macbackpackers.beans.cloudbeds.responses;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -24,12 +25,13 @@ public class Reservation extends CloudbedsJsonResponse {
     private String specialRequests;
     private String thirdPartyIdentifier;
     private String bookingDateHotelTime;
+    private String usedRoomTypes;
     private Integer kidsNumber;
     private Integer adultsNumber;
     private String paidValue;
     private List<BookingRoom> bookingRooms;
     private List<BookingNote> notes;
-    private boolean cardDetailsPresent;
+    private String creditCardId;
 
     public String getReservationId() {
         return reservationId;
@@ -97,6 +99,19 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public String getBalanceDue() {
         return balanceDue;
+    }
+
+    public BigDecimal getBalanceDueAsDecimal() {
+        return new BigDecimal( getBalanceDue() );
+    }
+
+    /**
+     * Returns true iff balance due is 0 (or negative)
+     * 
+     * @return if anything is still left to be paid on booking
+     */
+    public boolean isPaid() {
+        return getBalanceDueAsDecimal().compareTo( BigDecimal.ZERO ) <= 0;
     }
 
     public void setBalanceDue( String balanceDue ) {
@@ -167,6 +182,14 @@ public class Reservation extends CloudbedsJsonResponse {
         this.bookingDateHotelTime = bookingDateHotelTime;
     }
 
+    public String getUsedRoomTypes() {
+        return usedRoomTypes;
+    }
+
+    public void setUsedRoomTypes( String usedRoomTypes ) {
+        this.usedRoomTypes = usedRoomTypes;
+    }
+
     public Integer getKidsNumber() {
         return kidsNumber;
     }
@@ -224,11 +247,15 @@ public class Reservation extends CloudbedsJsonResponse {
     }
 
     public boolean isCardDetailsPresent() {
-        return cardDetailsPresent;
+        return creditCardId != null;
     }
 
-    public void setCardDetailsPresent( boolean cardDetailsPresent ) {
-        this.cardDetailsPresent = cardDetailsPresent;
+    public String getCreditCardId() {
+        return creditCardId;
+    }
+
+    public void setCreditCardId( String creditCardId ) {
+        this.creditCardId = creditCardId;
     }
 
     @Override

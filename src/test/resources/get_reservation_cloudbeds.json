@@ -1,0 +1,750 @@
+{
+    "reservation_id": "11038074",
+    "identifier": "5572996299",
+    "third_party_identifier": "551-380044923",
+    "name": "John Doe",
+    "document_number": "",
+    "booking_date_server_time": "2018-06-19 16:49:47",
+    "status": "confirmed",
+    "lang": null,
+    "street": "",
+    "number": "",
+    "complement": "",
+    "neighborhood": "",
+    "city": "",
+    "first_name": "John",
+    "last_name": "Doe",
+    "zip": "",
+    "special_requests": "",
+    "email": "johndoe@yahoo.com",
+    "phone": "7777776791",
+    "bdate": null,
+    "customer_id": "10789271",
+    "gender": "N\/A",
+    "passport": "",
+    "cpf": "",
+    "rg": null,
+    "issue_date": null,
+    "state": "",
+    "issuer": null,
+    "issuer_state": null,
+    "country": "IN",
+    "address1": "",
+    "address2": "",
+    "guest_status_id": "0",
+    "guest_status_name": "",
+    "is_custom": true,
+    "property_id": "17363",
+    "taxes_value": 15.5033,
+    "grand_total": 93.02,
+    "third_party": true,
+    "source": "75117",
+    "is_root_source": "0",
+    "is_hotel_collect_booking": "1",
+    "cancellation_numb": null,
+    "cell_phone": "",
+    "additional_charges": 0,
+    "booking_payment": 
+    {
+        "payment_method": "pay_at_location",
+        "payment_method_name": "Credit Card"
+    },
+
+    "booking_deposit": "0.00",
+    "booking_total": "93.0200",
+    "booking_via": false,
+    "association_id": "0",
+    "association_name": null,
+    "channel_name": "Hostelworld & Hostelbookers",
+    "prolongation_day": false,
+    "channel_price_listed": "106.92",
+    "channel_commission": "13.90",
+    "channel_balance": "93.02",
+    "currency_from": "GBP",
+    "currency_to": "GBP",
+    "currency_rate": "1.0000000000",
+    "checkin_date": "2018-07-19",
+    "checkout_date": "2018-07-22",
+    "booking_estimated_arrival_time": "12:00",
+    "channel_payment_type": null,
+    "nights": "3",
+    "paid_value": 93.02,
+    "room_rate_total_adjustment": "0.0000",
+    "last_change": "2018-06-24 07:08:20",
+    "room_revenue_total": "0.0000",
+    "room_revenue_total_adjustment": "0.0000",
+    "receipt_identifier": null,
+    "receipt_integration": null,
+    "folio_config_id": null,
+    "group_profile_id": null,
+    "group_profile_name": null,
+    "allotment_block_id": null,
+    "allotment_block_name": null,
+    "receipt_amount": null,
+    "receipt_date": null,
+    "adults_number": "2",
+    "kids_number": "0",
+    "deleted": "0",
+    "channel": "hw2",
+    "booking_date_hotel_time": "2018-06-19 17:49:47",
+    "rooms_total": 77.5167,
+    "balance_due": 0,
+    "sub_total": 77.5167,
+    "booking_rooms": 
+    [
+        {
+            "id": "16312574",
+            "booking_id": "11038074",
+            "room_identifier": "5572996299",
+            "room_group": "1",
+            "in_house": "-1",
+            "parent_id": null,
+            "room_id": "112014-15",
+            "event_id": "152943919077703963",
+            "adults": "1",
+            "kids": "0",
+            "start_date": "2018-07-19",
+            "end_date": "2018-07-22",
+            "room_type_id": "112014",
+            "room_total": "46.51",
+            "room_type_name": "10 Bed Mixed Dormitory",
+            "min_room_rate": "13.79",
+            "max_room_rate": "16.36",
+            "total": "46.51",
+            "detailed_rates": "[{\"date\":\"2018-07-19\",\"rate\":13.79,\"adults\":0,\"kids\":0,\"rate_description\":\"Non-refundable\"},{\"date\":\"2018-07-20\",\"rate\":16.36,\"adults\":0,\"kids\":0,\"rate_description\":\"Non-refundable\"},{\"date\":\"2018-07-21\",\"rate\":16.36,\"adults\":0,\"kids\":0,\"rate_description\":\"Non-refundable\"}]",
+            "adults_inBasePrice": "1",
+            "children_inBasePrice": "0",
+            "charge_additional_adult": "[]",
+            "charge_additional_child": "[]",
+            "add_adult_rate_first_night": "0.00",
+            "add_adult_total": "0.00",
+            "add_kid_rate_first_night": "0.00",
+            "add_kids_total": "0.00",
+            "package": "0",
+            "guest_id": "10789271",
+            "guest_first_name": "John",
+            "guest_last_name": "Doe",
+            "rate_id": "199406",
+            "nights": "3",
+            "package_name": null,
+            "room_type_name_short": "10x",
+            "room_number": "22-06- Rock"
+        },
+
+        {
+            "id": "16312575",
+            "booking_id": "11038074",
+            "room_identifier": "5572996299-2",
+            "room_group": "2",
+            "in_house": "-1",
+            "parent_id": null,
+            "room_id": "112014-16",
+            "event_id": "152943919451906571",
+            "adults": "1",
+            "kids": "0",
+            "start_date": "2018-07-19",
+            "end_date": "2018-07-22",
+            "room_type_id": "112014",
+            "room_total": "46.51",
+            "room_type_name": "10 Bed Mixed Dormitory",
+            "min_room_rate": "13.79",
+            "max_room_rate": "16.36",
+            "total": "46.51",
+            "detailed_rates": "[{\"date\":\"2018-07-19\",\"rate\":13.79,\"adults\":0,\"kids\":0,\"rate_description\":\"Non-refundable\"},{\"date\":\"2018-07-20\",\"rate\":16.36,\"adults\":0,\"kids\":0,\"rate_description\":\"Non-refundable\"},{\"date\":\"2018-07-21\",\"rate\":16.36,\"adults\":0,\"kids\":0,\"rate_description\":\"Non-refundable\"}]",
+            "adults_inBasePrice": "1",
+            "children_inBasePrice": "0",
+            "charge_additional_adult": "[]",
+            "charge_additional_child": "[]",
+            "add_adult_rate_first_night": "0.00",
+            "add_adult_total": "0.00",
+            "add_kid_rate_first_night": "0.00",
+            "add_kids_total": "0.00",
+            "package": "0",
+            "guest_id": "10789271",
+            "guest_first_name": "John",
+            "guest_last_name": "Doe",
+            "rate_id": "199406",
+            "nights": "3",
+            "package_name": null,
+            "room_type_name_short": "10x",
+            "room_number": "22-07- Eilean Donan"
+        }
+    ],
+
+    "used_room_types": "Non-refundable",
+    "selected_source": 
+    {
+        "id": "75117",
+        "sub_source": "Hostelworld & Hostelbookers",
+        "credit_card": "0",
+        "debit_card": "0",
+        "ebanking": "0",
+        "other_payment_forms": "0",
+        "pay_at_location": "0",
+        "third_party_payment": "0",
+        "property_id": "17363",
+        "parent_source": "7",
+        "deleted": "0",
+        "is_active": "1",
+        "ota_source_id": "25",
+        "commission": "13",
+        "original_id": "75117"
+    },
+
+    "source_name": "Hostelworld & Hostelbookers",
+    "code_booking_via": "myallocator",
+    "country_name": "India",
+    "adjustment_rate": 0,
+    "adjustment_product": 0,
+    "adjustment_roomRevenue": 0,
+    "assigned_guests": 
+    [
+        {
+            "id": "18922893",
+            "property_id": "17363",
+            "customer_id": "10789271",
+            "booking_id": "11038074",
+            "booking_rooms_id": "16312574",
+            "police_report_status": "new"
+        },
+
+        {
+            "id": "18922894",
+            "property_id": "17363",
+            "customer_id": "10789271",
+            "booking_id": "11038074",
+            "booking_rooms_id": "16312575",
+            "police_report_status": "new"
+        }
+    ],
+
+    "additional_guests": 
+    [
+        {
+            "photo_id": null,
+            "original_name": null,
+            "path": null,
+            "crop_param": null,
+            "cropped_image": null,
+            "id": "10789271",
+            "property_id": "17363",
+            "first_name": "John",
+            "last_name": "Doe",
+            "count_reservations": "1",
+            "is_repeat_guest": "0",
+            "email": "johndoe@yahoo.com",
+            "birthday": null,
+            "cpf": "",
+            "phone": "7777776791",
+            "gender": "N\/A",
+            "cell_phone": "",
+            "street": "",
+            "number": "",
+            "complement": "",
+            "neighborhood": "",
+            "city": "",
+            "state": "",
+            "zip": "",
+            "country": "IN",
+            "rg": null,
+            "issue_date": null,
+            "issuer": null,
+            "issuer_state": null,
+            "user_id": null,
+            "address1": "",
+            "address2": "",
+            "id_photo": "0",
+            "deleted": "0",
+            "status_id": "0",
+            "status_name": "",
+            "document_type": "na",
+            "document_number": "",
+            "document_issue_date": null,
+            "document_issuing_country": "",
+            "document_expiration_date": null,
+            "last_change": "2018-06-19 20:13:14",
+            "is_opt_in": "0",
+            "opt_in_hash": "",
+            "email_hash": "",
+            "is_anonymized": "0",
+            "customer_id": "10789271",
+            "is_main_customer": true,
+            "booking_id": "11038074",
+            "custom_fields": 
+            [
+                
+            ],
+
+            "country_name": "India",
+            "document_type_name": "-"
+        }
+    ],
+
+    "notes": 
+    [
+        
+    ],
+
+    "notes_customers": 
+    [
+        
+    ],
+
+    "folios": 
+    [
+        
+    ],
+
+    "filters": 
+    {
+        "user": 
+        [
+            {
+                "user_name": "SYSTEM",
+                "user_id": 0,
+                "active": 1
+            },
+
+            {
+                "user_name": "Jamie Porten",
+                "user_id": "41312",
+                "active": 1
+            },
+
+            {
+                "user_name": "Andy Greiff",
+                "user_id": "43797",
+                "active": 1
+            },
+
+            {
+                "user_name": "RON BOT",
+                "user_id": "47855",
+                "active": 1
+            },
+
+            {
+                "user_name": "Birgit Nathan",
+                "user_id": "43795",
+                "active": 1
+            },
+
+            {
+                "user_name": "Janette Wilson",
+                "user_id": "43899",
+                "active": 1
+            },
+
+            {
+                "user_name": "CRH Reception",
+                "user_id": "48190",
+                "active": 1
+            },
+
+            {
+                "user_name": "Hayden Barnes",
+                "user_id": "43796",
+                "active": 1
+            },
+
+            {
+                "user_name": "ron chan",
+                "user_id": "47854",
+                "active": 1
+            },
+
+            {
+                "user_name": "Jamie Porten",
+                "user_id": "43668",
+                "active": 1
+            }
+        ],
+
+        "taxes": 
+        [
+            {
+                "text": "VAT",
+                "id": "tax_28619"
+            }
+        ],
+
+        "fees": 
+        [
+            
+        ],
+
+        "description": 
+        [
+            {
+                "text": "Room Revenue",
+                "children": 
+                [
+                    {
+                        "text": "Room Rate",
+                        "id": "rate"
+                    },
+
+                    {
+                        "text": "Cancellation",
+                        "id": "roomRevenue_cancellation"
+                    },
+
+                    {
+                        "text": "No Show",
+                        "id": "roomRevenue_no_show"
+                    },
+
+                    {
+                        "text": "Manual",
+                        "id": "roomRevenue_manual"
+                    }
+                ],
+
+                "id": "temp_100"
+            },
+
+            {
+                "text": "Items and Services",
+                "children": 
+                [
+                    
+                ],
+
+                "id": "temp_101"
+            },
+
+            {
+                "text": "Taxes",
+                "children": 
+                [
+                    {
+                        "text": "VAT",
+                        "id": "tax_28619"
+                    }
+                ],
+
+                "id": "temp_taxes"
+            }
+        ]
+    },
+
+    "another_currency_text": "",
+    "sub_fees_grouped_by_date": 
+    [
+        
+    ],
+
+    "sub_taxes_grouped_by_date": 
+    {
+        "2018-07-19": 
+        {
+            "28619": 
+            {
+                "id": "28619",
+                "credit": 4.5966666666667,
+                "name": "VAT"
+            }
+        },
+
+        "2018-07-20": 
+        {
+            "28619": 
+            {
+                "id": "28619",
+                "credit": 5.4533333333333,
+                "name": "VAT"
+            }
+        },
+
+        "2018-07-21": 
+        {
+            "28619": 
+            {
+                "id": "28619",
+                "credit": 5.4533333333333,
+                "name": "VAT"
+            }
+        }
+    },
+
+    "fees_on_res_grouped_by_name": 
+    [
+        
+    ],
+
+    "taxes_on_res_grouped_by_name": 
+    [
+        
+    ],
+
+    "taxes_on_fees_res_grouped_by_name": 
+    [
+        
+    ],
+
+    "linked_taxes": 
+    [
+        {
+            "id": "28619",
+            "fee_id": null,
+            "type": "inclusive",
+            "name": "VAT",
+            "code": "",
+            "amount": "20.00000",
+            "amount_type": "percentage",
+            "set_on": null,
+            "expired_on": null,
+            "reservation_id": "11038074",
+            "child_id": null
+        }
+    ],
+
+    "linked_fees": 
+    [
+        
+    ],
+
+    "custom_item_sub_fees_array": 
+    [
+        
+    ],
+
+    "custom_item_sub_taxes_array": 
+    [
+        
+    ],
+
+    "product_sub_fees_array": 
+    [
+        
+    ],
+
+    "product_sub_taxes_array": 
+    [
+        
+    ],
+
+    "addon_sub_fees_array": 
+    [
+        
+    ],
+
+    "addon_sub_taxes_array": 
+    [
+        
+    ],
+
+    "adjustments_fees_array": 
+    [
+        
+    ],
+
+    "adjustments_taxes_array": 
+    [
+        
+    ],
+
+    "rates_fees_array": 
+    [
+        
+    ],
+
+    "rates_taxes_array": 
+    {
+        "VAT": 
+        {
+            "id": "28619",
+            "credit": 15.503333333333,
+            "name": "VAT"
+        }
+    },
+
+    "rates_sub_taxes_array": 
+    [
+        
+    ],
+
+    "rates_sub_fees_array": 
+    [
+        
+    ],
+
+    "room_revenue_sub_fees_array": 
+    [
+        
+    ],
+
+    "room_revenue_sub_taxes_array": 
+    [
+        
+    ],
+
+    "credit_cards": 
+    {
+        "4819433": 
+        {
+            "id": "4819433",
+            "card_type_short": "vi",
+            "card_type": "visa",
+            "card_number": "5252",
+            "is_active": true,
+            "token_data": "928b2b2e-29ae-4cce-b16b-2d28016b6d55",
+            "is_token": "1",
+            "is_cc_data_purged": "0"
+        },
+        "6869212": 
+        {
+            "id": "6869212",
+            "card_type_short": "vi",
+            "card_type": "visa",
+            "card_number": "5253",
+            "is_active": true,
+            "token_data": "ddddddd-29ae-4cce-b16b-2d28016b6d55",
+            "is_token": "1",
+            "is_cc_data_purged": "0"
+        },
+        "5819432": 
+        {
+            "id": "5819432",
+            "card_type_short": "vi",
+            "card_type": "visa",
+            "card_number": "5253",
+            "is_active": true,
+            "token_data": "fffffff-29ae-4cce-b16b-2d28016b6d55",
+            "is_token": "1",
+            "is_cc_data_purged": "0"
+        }
+    },
+
+    "success": true,
+    "adjustments_sources": 
+    [
+        
+    ],
+
+    "custom_fields": 
+    [
+        
+    ],
+
+    "additional_charges_with_adj": 0,
+    "files": 
+    [
+        
+    ],
+
+    "invoice": 
+    {
+        "count": "1"
+    },
+
+    "setup_invoice": 
+    {
+        "id": "17568",
+        "property_id": "17363",
+        "title": 
+        {
+            "en": "Castle Rock Hostel Invoice",
+            "pt-br": "",
+            "es": "",
+            "ru": "",
+            "ua": "",
+            "it": "",
+            "de": "",
+            "fr": "",
+            "et": "",
+            "pl": "",
+            "nl": "",
+            "fi": "",
+            "el": "",
+            "ja": "",
+            "th": "",
+            "cn": "",
+            "he": "",
+            "ko": "",
+            "sv": "",
+            "no": "",
+            "lt": "",
+            "vn": "",
+            "hu": "",
+            "sk": "",
+            "cs": "",
+            "mk": "",
+            "ro": ""
+        },
+
+        "prefix": "",
+        "suffix": "",
+        "start_number": null,
+        "tax_id1": "",
+        "tax_id2": "",
+        "cpf": "",
+        "due_date": null,
+        "arr_dep_date": "0",
+        "charge_breakdown": "0",
+        "custom_text": 
+        {
+            "en": "<b>TERMS &amp; CONDITIONS<br><br><\/b><br>Please note *** ALL GUESTS MUST BE AGED 18 YEARS OR OVER.<br><br>***SPECIAL CANCELLATION POLICY FOR AUGUST\/HOGMANAY: All August bookings must \nbe cancelled more than 7 days prior to 2pm on the arrival date, to \nreceive a 90% refund. If it is less than 7 days in advance, no refund \nwill be given. No shows will be charged the full amount of the booking. ALL GUESTS BOOKED \nIN WITH US OVER HOGMANAY RECEIVE A FREE STREET PARTY TICKET UPON \nARRIVAL.\n\n<span><br><br><br>CHECK IN\/OUT PROCEDURES:<br>&nbsp;<\/span><span><br>-Check in is from 2.30pm. Early arrivals are welcome to store their luggage and use the hostel facilities and common areas.\n<br>-All guests are required to sign in and have valid photo \nidentification for check in. Acceptable forms of identification are \npassport, national ID, or a drivers license. \n<br>-Check out is until 10.30am \u2013 the room must be vacated and keys returned by this time.<\/span>\n\n<span><br><br>GROUP BOOKINGS:<br>&nbsp;<br>-For bookings of 5 or more people, you must contact the hostel directly at <a target=\"\" rel=\"\">emailme@myproperty.com<\/a> . If you make a group booking online, your booking may be cancelled. \n<br>-We do not accept stag and hen parties. <br><br><\/span><span>ACCOMMODATION\n<br>-Accommodation is in bunk style dormitory rooms ranging from 4 \u2013 16 \nbeds in each room unless a double, triple or quad room has been booked. \n All bunks are individually named and will be allocated upon check in at\n the hostel.  Please ensure that you use the specific bunk allocated to \nyou.\n<br>-Each bunk is provided with a locker and safe for valuables.  A \nrefundable deposit of \u00a310 or a valid passport or driving licence will be\n required for the locker\/dorm room keys.<\/span>\n\n<span><br><br>GUEST INFORMATION:<br>&nbsp;<br>-All guests must be aged 18 or over. \n<br>-The hostel reserves the right to refuse entry to anyone who behaves \nin an unacceptable manner or is in an unsuitable condition eg. drunk and\n disorderly. In such circumstance no refund of deposit will be offered.\n<br>-Our hostel operates a strict no smoking policy.  Anyone found \nsmoking within the premises will be asked to leave, with no refund \noffered and may be charged a fee.\n<br>-Although the hostel is not licensed to sell alcohol, guests may \nconsume alcohol on the premises but within reason.  Anyone heavily under\n the influence and causing a disturbance in the hostel will be asked to \nleave immediately.\n<\/span>\n<br><br>PAYMENT POLICY:\n\n<br><br>-The amount equal to the first will be charged at the time of booking. <br>-The outstanding balance is payable at check in on your arrival date either by cash or card (unless you are an accepted group in which you need to follow our group payment policy). \n<br><br>CANCELLATION POLICIES:\n<br><br>**Special cancellation policy for August\/Hogmany: All August bookings must \nbe cancelled more than 7 days prior to 2pm on the arrival date, to \nreceive a 90% refund. If it is less than 7 days in advance, no refund \nwill be given. No shows will be charged the full amount of the booking.<br><br><span>Regular Cancellation Policy:\n<br>Cancellations up to 48 hours prior to 2.00pm on the day of check-in receive a 90% refund. \n<br>If it is less than 48 hours in advance, then you will be charged the amount equal to the first night of your stay. \n<br>No-shows may be charged the entire amount of their stay.<br><br><br><b>HOW TO FIND US<\/b><br><br><\/span><br><span>DIRECTIONS FROM BUS STATION\n<br>When you are at the bus station take the exit on to St Andrews \nSquare and turn left down to Princes Street. When you reach Princes St, \nturn right onto Princes Street. You will come to the National Gallery (a\n big building with sandstone columns), just after it turn left up a \nstreet called The Mound.  At the top of the mound there are some traffic\n lights, keep walking straight through them on to North Bank Street and \nyou will come to another set of traffic lights with a pub on the corner \ncalled Deacon Brodies. Turn right here and just after this there will be\n a big building called The Hub, the street on the left is Johnston Terrace, \nand we are just along there on the left hand side.<\/span>\n\n<br><br><span>DIRECTIONS FROM TRAIN STATION\n<br>From the railway station take the Market Street exit, turn right \nonto Market Street and walk up the hill and at the top there will be a \nset of traffic lights. At these take a sharp left onto North Bank \nStreet.  At the top you will come to another set of traffic lights with a\n pub on the corner called Deacon Brodies. Turn right here and just after\n this there will be a big building called The Hub, the street on the \nleft is Johnston Terrace, and we are just along there on the left hand side.<\/span>\n\n<span><br><br>DIRECTIONS FROM AIRPORT\n<br>From the airport take the Airlink bus number 100 (costs \u00a34.50) into the\n city centre and get off at Waverley Bridge (the last stop). When you \nwalk off the bus, turn left and walk to the roundabout and then turn \nright onto Market St. Walk up the hill and at the top there will be a \nset of traffic lights, at these take a sharp left onto North Bank \nStreet.  At the top you will come to another set of traffic lights with a\n pub on the corner called Deacon Brodies. Turn right here and just after\n this there will be a big building called The Hub, the street on the \nleft is Johnston Terrace, and we are just along there on the left hand side.<\/span><br><br><br>",
+            "pt-br": "",
+            "es": "",
+            "ru": "",
+            "ua": "",
+            "it": "",
+            "de": "",
+            "fr": "",
+            "et": "",
+            "pl": "",
+            "nl": "",
+            "fi": "",
+            "el": "",
+            "ja": "",
+            "th": "",
+            "cn": "",
+            "he": "",
+            "ko": "",
+            "sv": "",
+            "no": "",
+            "lt": "",
+            "vn": "",
+            "hu": "",
+            "sk": "",
+            "cs": "",
+            "mk": "",
+            "ro": ""
+        },
+
+        "generate_at_once": "1",
+        "set_on": "2018-04-24 12:15:15",
+        "expired_on": null,
+        "logo_id": "0",
+        "guest_lang": "1",
+        "invoice_lang": "en",
+        "room_number": "1",
+        "id_setup": "17568"
+    },
+
+    "maxRoomIdentifier": 2,
+    "minTransDate": "2018-06-24 08:08:16",
+    "check_role": false,
+    "check_via": true,
+    "allotment_block_code": null,
+    "trialLeft": null,
+    "accountStatus": 
+    {
+        "billing": 
+        {
+            "billing_portal_id": "36165",
+            "is_bp_setup_completed": "1",
+            "billing_offers": 
+            [
+                
+            ]
+        },
+
+        "hide_overdue_notice": false
+    },
+
+    "isAcceptedTosAgreement": true,
+    "announcementsNew": null,
+    "pie_new_sys_events_num": 0
+}

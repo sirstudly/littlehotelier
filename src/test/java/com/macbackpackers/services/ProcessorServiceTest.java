@@ -22,7 +22,6 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
@@ -31,9 +30,11 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AgodaChargeJob;
 import com.macbackpackers.jobs.AgodaNoChargeNoteJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
+import com.macbackpackers.jobs.ChargeNonRefundableBookingJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CopyCardDetailsFromLHJob;
 import com.macbackpackers.jobs.CreateAgodaNoChargeNoteJob;
+import com.macbackpackers.jobs.CreateChargeNonRefundableBookingJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CreateCopyCardDetailsToCloudbedsJob;
 import com.macbackpackers.jobs.CreateDepositChargeJob;
@@ -482,10 +483,28 @@ public class ProcessorServiceTest {
 
     @Test
     public void testCreateCopyCardDetailsToCloudbedsJob() throws Exception {
-        CreateCopyCardDetailsToCloudbedsJob j = new CreateCopyCardDetailsToCloudbedsJob();
+        for( int i = 1; i < 24; i++) {
+            CreateCopyCardDetailsToCloudbedsJob j = new CreateCopyCardDetailsToCloudbedsJob();
+            j.setStatus( JobStatus.submitted );
+            j.setBookingDate( LocalDate.now().withMonth( 6 ).withDayOfMonth( i ) );
+            dao.insertJob( j );
+        }
+    }
+
+    @Test
+    public void testChargeNonRefundableBookingJob() throws Exception {
+        ChargeNonRefundableBookingJob j = new ChargeNonRefundableBookingJob();
         j.setStatus( JobStatus.submitted );
-        j.setBookingDate( LocalDate.now().withMonth( 6 ).withDayOfMonth( 3 ) );
-        j.setDaysAhead( 4 );
+        j.setReservationId( "380317840" );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void testCreateChargeNonRefundableBookingJob() throws Exception {
+        CreateChargeNonRefundableBookingJob j = new CreateChargeNonRefundableBookingJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingDate( LocalDate.now().withMonth( 6 ).withDayOfMonth( 9 ) );
+        j.setDaysAhead( 15 );
         dao.insertJob( j );
     }
 

@@ -220,6 +220,7 @@
                     <excludes>
                         <!-- manually place this in classpath -->
                         <exclude>**/chromedriver*</exclude>
+                        <exclude>**/config*.properties</exclude>
                     </excludes>
                 </configuration>
             </plugin>

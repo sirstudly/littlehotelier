@@ -31,22 +31,22 @@ import com.macbackpackers.dao.WordPressDAO;
  */
 @Component
 public class CloudbedsJsonRequestFactory {
-    
+
     private static final DateTimeFormatter YYYY_MM_DD = DateTimeFormatter.ofPattern( "yyyy-MM-dd" );
     private static final DateTimeFormatter DD_MM_YYYY = DateTimeFormatter.ofPattern( "dd/MM/yyyy" );
-    private static final DecimalFormat CURRENCY_FORMAT = new DecimalFormat("###0.00");
+    private static final DecimalFormat CURRENCY_FORMAT = new DecimalFormat( "###0.00" );
 
     @Value( "${cloudbeds.property.id:0}" )
     private String PROPERTY_ID;
 
     @Autowired
     private WordPressDAO dao;
-    
+
     private String BILLING_PORTAL_ID = "37077"; // ??? is this going to change
-    
+
     // a default version which we'll probably get prompted to update
     private static final String DEFAULT_VERSION = "https://static1.cloudbeds.com/myfrontdesk-front/initial-12.0/app.js.gz";
-    
+
     // the current cloudbeds version we're using
     private String version;
 
@@ -135,6 +135,7 @@ public class CloudbedsJsonRequestFactory {
 
     /**
      * Get info on all customers checking in on the given date range.
+     * 
      * @param checkinDateStart checkin date (inclusive)
      * @param checkinDateEnd checkin date (inclusive)
      * @return web request
@@ -250,7 +251,7 @@ public class CloudbedsJsonRequestFactory {
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetReservationsRequestByBookingSource( LocalDate bookedDateStart, 
+    public WebRequest createGetReservationsRequestByBookingSource( LocalDate bookedDateStart,
             LocalDate bookedDateEnd, String bookingSourceIds ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         webRequest.setRequestParameters( getCommonReservationsQueryParameters(
@@ -295,7 +296,7 @@ public class CloudbedsJsonRequestFactory {
      * @param additionalParams additional parameters to add to return list
      * @return new non-null modifiable list
      */
-    private List<NameValuePair> getCommonReservationsQueryParameters( NameValuePair... additionalParams ) {
+    private List<NameValuePair> getCommonReservationsQueryParameters( NameValuePair ... additionalParams ) {
         List<NameValuePair> params = Arrays.asList(
                 new NameValuePair( "sEcho", "2" ),
                 new NameValuePair( "iColumns", "8" ),
@@ -377,8 +378,7 @@ public class CloudbedsJsonRequestFactory {
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "payment_type", "cards" ),
                 new NameValuePair( "choose_card",
-                        cardType.equalsIgnoreCase( "mastercard" ) ? "master" : 
-                        cardType.equalsIgnoreCase( "visa" ) ? "visa" : "" ),
+                        cardType.equalsIgnoreCase( "mastercard" ) ? "master" : cardType.equalsIgnoreCase( "visa" ) ? "visa" : "" ),
                 new NameValuePair( "assign_to", bookingRoomId ),
                 new NameValuePair( "paid", CURRENCY_FORMAT.format( amount ) ),
                 new NameValuePair( "payment_date", LocalDate.now().format( DD_MM_YYYY ) ),
@@ -399,6 +399,7 @@ public class CloudbedsJsonRequestFactory {
 
     /**
      * Records a new note onto the existing reservation.
+     * 
      * @param reservationId ID of reservation (as it appears in the URL)
      * @param note note to be added
      * @return web request
@@ -419,6 +420,7 @@ public class CloudbedsJsonRequestFactory {
 
     /**
      * Records a new credit card onto the existing reservation.
+     * 
      * @param reservationId ID of reservation (as it appears in the URL)
      * @param cardDetails card details to be added
      * @return web request
@@ -435,14 +437,14 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "mon_expir", cardDetails.getExpiry().substring( 0, 2 ) ),
                 new NameValuePair( "announcementsLast", "" ),
                 new NameValuePair( "is_active", "1" ),
-                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ), 
+                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ),
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
                 new NameValuePair( "version", getVersion() ) ) );
 
         // CVV optional
-        if( StringUtils.isNotBlank( cardDetails.getCvv() ) ) {
+        if ( StringUtils.isNotBlank( cardDetails.getCvv() ) ) {
             params.add( new NameValuePair( "cvv", cardDetails.getCvv() ) );
         }
         webRequest.setRequestParameters( params );
@@ -458,6 +460,58 @@ public class CloudbedsJsonRequestFactory {
     public WebRequest createReservationSourceLookupRequest() throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/associations/loader/sources" );
         webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "property_id", PROPERTY_ID ),
+                new NameValuePair( "group_id", PROPERTY_ID ),
+                new NameValuePair( "version", getVersion() ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Authorises a guest credit card.
+     * 
+     * @param reservationId the unique CB reservation id
+     * @param cardId the card to charge
+     * @param amount amount to charge
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createAuthorizeCreditCardRequest( String reservationId, String cardId, BigDecimal amount ) throws IOException {
+        return createAuthorizeCreditCardRequest( "authorize", reservationId, cardId, amount );
+    }
+
+    /**
+     * Captures a previous AUTHORIZE on a guest credit card.
+     * 
+     * @param reservationId the unique CB reservation id
+     * @param cardId the card to charge
+     * @param amount amount to charge
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createCaptureCreditCardRequest( String reservationId, String cardId, BigDecimal amount ) throws IOException {
+        return createAuthorizeCreditCardRequest( "capture", reservationId, cardId, amount );
+    }
+
+    /**
+     * Authorises a guest credit card.
+     * 
+     * @param transactionType (one of "authorize" or "capture")
+     * @param reservationId the unique CB reservation id
+     * @param cardId the card to charge
+     * @param amount amount to charge
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    private WebRequest createAuthorizeCreditCardRequest( String transactionType, String reservationId, String cardId, BigDecimal amount ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/authorize_credit_card" );
+        final DecimalFormat CURRENCY_FORMAT = new DecimalFormat( "###0.00" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "authorize_amount", CURRENCY_FORMAT.format( amount ) ),
+                new NameValuePair( "booking_id", reservationId ),
+                new NameValuePair( "card_id", cardId ),
+                new NameValuePair( "transaction_type", transactionType ),
                 new NameValuePair( "billing_portal_id", BILLING_PORTAL_ID ),
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
