@@ -41,6 +41,7 @@ import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentCardNotAcceptedException;
+import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.services.FileService;
@@ -331,8 +332,8 @@ public class CloudbedsScraper {
      */
     private List<Customer> getCustomers( WebClient webClient, WebRequest requestSettings ) throws IOException {
         
+        LOGGER.info( "Going to: " + requestSettings.getUrl().getPath() );
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
         
         Optional<JsonElement> jelement = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ) );
@@ -558,7 +559,7 @@ public class CloudbedsScraper {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             addNote( webClient, reservationId, "Failed to AUTHORIZE booking: " +
                     jelement.getAsJsonObject().get( "message" ).getAsString() );
-            throw new MissingUserDataException( "Failed to AUTHORIZE booking." );
+            throw new PaymentNotAuthorizedException( "Failed to AUTHORIZE booking.", redirectPage.getWebResponse() );
         }
 
         // CAPTURE
@@ -573,9 +574,9 @@ public class CloudbedsScraper {
         jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
-            addNote( webClient, reservationId, "Failed to AUTHORIZE booking: " +
+            addNote( webClient, reservationId, "Failed to CAPTURE booking: " +
                     jelement.getAsJsonObject().get( "message" ).getAsString() );
-            throw new MissingUserDataException( "Failed to CAPTURE booking." );
+            throw new PaymentNotAuthorizedException( "Failed to CAPTURE booking.", redirectPage.getWebResponse() );
         }
     }
 
