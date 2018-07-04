@@ -12,7 +12,7 @@ CREATE TABLE `wp_lh_calendar` (
   `checkout_date` datetime NOT NULL,
   `payment_total` decimal(10,2) DEFAULT NULL,
   `payment_outstanding` decimal(10,2) DEFAULT NULL,
-  `rate_plan_name` varchar(50) DEFAULT NULL,
+  `rate_plan_name` varchar(255) DEFAULT NULL,
   `payment_status` varchar(50) DEFAULT NULL,
   `num_guests` int(10) unsigned DEFAULT NULL,
   `data_href` varchar(255) DEFAULT NULL,

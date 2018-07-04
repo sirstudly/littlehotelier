@@ -224,6 +224,7 @@ public class CloudbedsService {
                 a.setStatus( r.getStatus() );
                 a.setViewed( true );
                 a.setNotes( r.getNotesAsString() );
+                a.setRatePlanName( r.getUsedRoomTypes() );
                 return a;
             } )
             .collect( Collectors.toList() );
