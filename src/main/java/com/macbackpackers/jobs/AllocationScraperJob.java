@@ -140,6 +140,7 @@ public class AllocationScraperJob extends AbstractJob {
      */
     public Date getEndDate() throws ParseException {
         Calendar cal = Calendar.getInstance();
+        cal.setTime( getStartDate() );
         cal.add( Calendar.DATE, getDaysAhead() );
         return cal.getTime();
     }
