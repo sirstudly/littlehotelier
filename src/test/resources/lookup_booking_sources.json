@@ -1,0 +1,392 @@
+{
+    "success": true,
+    "result": 
+    [
+        {
+            "id": "select_all_channels",
+            "text": "Select All Sources",
+            "li_attr": 
+            {
+                "class": "first-level"
+            },
+
+            "state": 
+            {
+                "selected": true
+            }
+        },
+
+        {
+            "id": "select_association",
+            "text": "Association \/ Group",
+            "children": 
+            [
+                {
+                    "id": "association_id18266",
+                    "text": "MacBackpackers Ltd",
+                    "li_attr": 
+                    {
+                        "data-source-id": "assoc-18266"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                }
+            ],
+
+            "li_attr": 
+            {
+                "class": "first-level",
+                "data-source-id": "assoc-0"
+            },
+
+            "a_attr": 
+            {
+                "class": ""
+            },
+
+            "state": 
+            {
+                "selected": true
+            }
+        },
+
+        {
+            "id": "select_direct",
+            "text": "Direct",
+            "li_attr": 
+            {
+                "class": "first-level",
+                "data-source-id": "dir-0"
+            },
+
+            "children": 
+            [
+                {
+                    "id": "sources_dir1",
+                    "text": "Website",
+                    "li_attr": 
+                    {
+                        "class": "",
+                        "data-source-id": "dir-1"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                },
+
+                {
+                    "id": "sources_dir2",
+                    "text": "Walk-In",
+                    "li_attr": 
+                    {
+                        "class": "",
+                        "data-source-id": "dir-2"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                },
+
+                {
+                    "id": "sources_dir3",
+                    "text": "Phone",
+                    "li_attr": 
+                    {
+                        "class": "",
+                        "data-source-id": "dir-3"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                },
+
+                {
+                    "id": "sources_dir5",
+                    "text": "Email",
+                    "li_attr": 
+                    {
+                        "class": "",
+                        "data-source-id": "dir-5"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                }
+            ],
+
+            "a_attr": 
+            {
+                "class": ""
+            },
+
+            "state": 
+            {
+                "selected": true
+            }
+        },
+
+        {
+            "id": "primary_third_party_source_6",
+            "li_atr": "primary_third_party_source_6",
+            "text": "Wholesaler",
+            "li_attr": 
+            {
+                "class": "first-level  trd-party-source-disabled",
+                "data-source-id": "6-0"
+            },
+
+            "children": 
+            [
+                
+            ],
+
+            "state": 
+            {
+                "selected": true
+            }
+        },
+
+        {
+            "id": "primary_third_party_source_7",
+            "li_atr": "primary_third_party_source_7",
+            "text": "OTA",
+            "li_attr": 
+            {
+                "class": "first-level ",
+                "data-source-id": "7-0"
+            },
+
+            "children": 
+            [
+                {
+                    "id": "sub_source_0_75119",
+                    "text": "Expedia (Channel Collect Booking)",
+                    "li_attr": 
+                    {
+                        "class": "sub-source",
+                        "data-source-id": "7-75119-0",
+                        "data-parent-source-id": "7",
+                        "data-sub_source-id": "75119"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                },
+
+                {
+                    "id": "sub_source_1_75119",
+                    "text": "Expedia (Hotel Collect Booking)",
+                    "li_attr": 
+                    {
+                        "class": "sub-source",
+                        "data-source-id": "7-75119-1",
+                        "data-parent-source-id": "7",
+                        "data-sub_source-id": "75119"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                },
+
+                {
+                    "id": "sub_source_0_75120",
+                    "text": "Booking.com (Channel Collect Booking)",
+                    "li_attr": 
+                    {
+                        "class": "sub-source",
+                        "data-source-id": "7-75120-0",
+                        "data-parent-source-id": "7",
+                        "data-sub_source-id": "75120"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                },
+
+                {
+                    "id": "sub_source_1_75120",
+                    "text": "Booking.com (Hotel Collect Booking)",
+                    "li_attr": 
+                    {
+                        "class": "sub-source",
+                        "data-source-id": "7-75120-1",
+                        "data-parent-source-id": "7",
+                        "data-sub_source-id": "75120"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                },
+
+                {
+                    "id": "sub_source_1_80174",
+                    "text": "Hostelsclub",
+                    "li_attr": 
+                    {
+                        "class": "sub-source",
+                        "data-source-id": "7-80174-1",
+                        "data-parent-source-id": "7",
+                        "data-sub_source-id": "80174"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                },
+
+                {
+                    "id": "sub_source_1_75117",
+                    "text": "Hostelworld & Hostelbookers",
+                    "li_attr": 
+                    {
+                        "class": "sub-source",
+                        "data-source-id": "7-75117-1",
+                        "data-parent-source-id": "7",
+                        "data-sub_source-id": "75117"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                },
+
+                {
+                    "id": "sub_source_0_75121",
+                    "text": "Agoda (Channel Collect Booking)",
+                    "li_attr": 
+                    {
+                        "class": "sub-source",
+                        "data-source-id": "7-75121-0",
+                        "data-parent-source-id": "7",
+                        "data-sub_source-id": "75121"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                },
+
+                {
+                    "id": "sub_source_1_75121",
+                    "text": "Agoda (Hotel Collect Booking)",
+                    "li_attr": 
+                    {
+                        "class": "sub-source",
+                        "data-source-id": "7-75121-1",
+                        "data-parent-source-id": "7",
+                        "data-sub_source-id": "75121"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                }
+            ],
+
+            "state": 
+            {
+                "selected": true
+            }
+        },
+
+        {
+            "id": "primary_third_party_source_8",
+            "li_atr": "primary_third_party_source_8",
+            "text": "Corporate Client",
+            "li_attr": 
+            {
+                "class": "first-level  trd-party-source-disabled",
+                "data-source-id": "8-0"
+            },
+
+            "children": 
+            [
+                
+            ],
+
+            "state": 
+            {
+                "selected": true
+            }
+        },
+
+        {
+            "id": "primary_third_party_source_9",
+            "li_atr": "primary_third_party_source_9",
+            "text": "Travel Agent",
+            "li_attr": 
+            {
+                "class": "first-level ",
+                "data-source-id": "9-0"
+            },
+
+            "children": 
+            [
+                {
+                    "id": "sub_source_1_80045",
+                    "text": "Reception",
+                    "li_attr": 
+                    {
+                        "class": "sub-source",
+                        "data-source-id": "9-80045-1",
+                        "data-parent-source-id": "9",
+                        "data-sub_source-id": "80045"
+                    },
+
+                    "state": 
+                    {
+                        "selected": true
+                    }
+                }
+            ],
+
+            "state": 
+            {
+                "selected": true
+            }
+        }
+    ],
+
+    "trialLeft": null,
+    "accountStatus": 
+    {
+        "billing": 
+        {
+            "billing_portal_id": "36165",
+            "is_bp_setup_completed": "1",
+            "billing_offers": 
+            [
+                
+            ]
+        },
+
+        "hide_overdue_notice": false
+    },
+
+    "isAcceptedTosAgreement": true,
+    "announcementsNew": null,
+    "pie_new_sys_events_num": 0
+}

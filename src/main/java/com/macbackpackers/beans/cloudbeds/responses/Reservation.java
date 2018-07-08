@@ -2,6 +2,7 @@
 package com.macbackpackers.beans.cloudbeds.responses;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -28,6 +29,8 @@ public class Reservation extends CloudbedsJsonResponse {
     private String usedRoomTypes;
     private Integer kidsNumber;
     private Integer adultsNumber;
+    private String channelPaymentType;
+    private String isHotelCollectBooking;
     private String paidValue;
     private List<BookingRoom> bookingRooms;
     private List<BookingNote> notes;
@@ -142,6 +145,10 @@ public class Reservation extends CloudbedsJsonResponse {
         this.checkoutDate = checkoutDate;
     }
 
+    public boolean isCheckinDateTodayOrInPast() {
+        return LocalDate.parse( getCheckinDate() ).compareTo( LocalDate.now() ) <= 0;
+    }
+
     public String getSourceName() {
         return sourceName;
     }
@@ -204,6 +211,30 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setAdultsNumber( Integer adultsNumber ) {
         this.adultsNumber = adultsNumber;
+    }
+
+    public String getChannelPaymentType() {
+        return channelPaymentType;
+    }
+
+    public void setChannelPaymentType( String channelPaymentType ) {
+        this.channelPaymentType = channelPaymentType;
+    }
+
+    public String getIsHotelCollectBooking() {
+        return isHotelCollectBooking;
+    }
+
+    public void setIsHotelCollectBooking( String isHotelCollectBooking ) {
+        this.isHotelCollectBooking = isHotelCollectBooking;
+    }
+
+    public boolean isHotelCollectBooking() {
+        return "1".equals( getIsHotelCollectBooking() );
+    }
+
+    public boolean isChannelCollectBooking() {
+        return "Channel".equals( getChannelPaymentType() ) && false == isHotelCollectBooking();
     }
 
     public String getPaidValue() {

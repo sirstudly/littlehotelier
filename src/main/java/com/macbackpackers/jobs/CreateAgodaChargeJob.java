@@ -4,6 +4,7 @@ package com.macbackpackers.jobs;
 import static com.macbackpackers.scrapers.AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -14,14 +15,15 @@ import javax.persistence.Transient;
 
 import org.apache.commons.csv.CSVRecord;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationContext;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.scrapers.BookingsPageScraper;
+import com.macbackpackers.scrapers.CloudbedsScraper;
 
 /**
- * Job that creates {@link AgodaChargeJob}s for the past X days.
+ * Job that creates Agoda charge jobs for the past X days.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.CreateAgodaChargeJob" )
@@ -33,11 +35,48 @@ public class CreateAgodaChargeJob extends AbstractJob {
 
     @Autowired
     @Transient
-    @Qualifier( "webClient" )
-    private WebClient webClient;
+    private ApplicationContext appContext;
+
+    @Autowired
+    @Transient
+    private CloudbedsScraper cbScraper;
 
     @Override
     public void processJob() throws Exception {
+
+        if ( dao.isCloudbeds() ) {
+            try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+                processJobForCloudbeds( webClient );
+            }
+        }
+        else {
+            try (WebClient webClient = appContext.getBean( "webClient", WebClient.class )) {
+                processJobForLittleHotelier( webClient );
+            }
+        }
+    }
+
+    private void processJobForCloudbeds( WebClient webClient ) throws Exception {
+        cbScraper.getReservationsForBookingSources( webClient,
+                LocalDate.now().minusDays( getDaysBack() ), LocalDate.now(), "Agoda (Channel Collect Booking)" )
+                .stream()
+                .filter( p -> false == p.isPaid() )
+                .filter( p -> "Agoda".equals( p.getSourceName() ) ) // sure to be sure
+                .filter( p -> p.isChannelCollectBooking() )
+                .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
+                .filter( p -> p.isCheckinDateTodayOrInPast() )
+                .forEach( p -> {
+                    LOGGER.info( "Creating a DepositChargeJob for booking "
+                            + p.getThirdPartyIdentifier() + " (" + p.getStatus() + ")" );
+                    LOGGER.info( p.getFirstName() + " " + p.getLastName() );
+                    DepositChargeJob chargeJob = new DepositChargeJob();
+                    chargeJob.setStatus( JobStatus.submitted );
+                    chargeJob.setReservationId( Integer.parseInt( p.getReservationId() ) );
+                    dao.insertJob( chargeJob );
+                } );
+    }
+
+    private void processJobForLittleHotelier( WebClient webClient ) throws Exception {
         Calendar c = Calendar.getInstance();
         c.add( Calendar.DATE, -1 );
         Date toDate = c.getTime(); // yesterday
@@ -70,11 +109,6 @@ public class CreateAgodaChargeJob extends AbstractJob {
                 dao.insertJob( agodaChargeJob );
             }
         }
-    }
-
-    @Override
-    public void finalizeJob() {
-        webClient.close(); // cleans up JS threads
     }
 
     /**
