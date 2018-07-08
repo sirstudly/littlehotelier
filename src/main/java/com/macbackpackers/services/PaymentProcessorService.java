@@ -460,7 +460,7 @@ public class PaymentProcessorService {
         }
 
         // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
-        cloudbedsScraper.chargeNonRefundableBooking( webClient, reservationId,
+        cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
                 cbReservation.getCreditCardId(), cbReservation.getBalanceDueAsDecimal() );
 
         // mark booking as fully paid in Hostelworld
@@ -472,6 +472,42 @@ public class PaymentProcessorService {
                 LOGGER.error( "Failed to acknowedge payment in HWL. Meh...", ex );
             }
         }
+    }
+
+    /**
+     * Does a AUTHORIZE/CAPTURE on the card details on the booking for the balance remaining.
+     * 
+     * @param webClient web client for cloudbeds
+     * @param reservationId the unique cloudbeds reservation ID
+     * @throws IOException on i/o error
+     * @throws ParseException on bonehead error
+     */
+    public void processCardPaymentForRemainingBalance( WebClient webClient, String reservationId ) throws IOException, ParseException {
+        LOGGER.info( "Processing full payment for booking: " + reservationId );
+        Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+
+        LOGGER.info( cbReservation.getThirdPartyIdentifier() + ": "
+                + cbReservation.getFirstName() + " " + cbReservation.getLastName() );
+        LOGGER.info( "Status: " + cbReservation.getStatus() );
+        LOGGER.info( "Checkin: " + cbReservation.getCheckinDate() );
+        LOGGER.info( "Checkout: " + cbReservation.getCheckoutDate() );
+        LOGGER.info( "Grand Total: " + cbReservation.getGrandTotal() );
+        LOGGER.info( "Balance Due: " + cbReservation.getBalanceDue() );
+
+        // check if we have anything to pay
+        if ( cbReservation.isPaid() ) {
+            LOGGER.info( "Booking is paid. Nothing to do." );
+            return;
+        }
+
+        // check if card details exist in CB
+        if ( false == cbReservation.isCardDetailsPresent() ) {
+            throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
+        }
+
+        // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
+        cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
+                cbReservation.getCreditCardId(), cbReservation.getBalanceDueAsDecimal() );
     }
 
     /**

@@ -731,15 +731,15 @@ public class WordPressDAOImpl implements WordPressDAO {
         Integer allocationScraperJobId = getLastCompletedAllocationScraperJobId();
         if ( allocationScraperJobId != null ) {
             return em.createQuery( 
-                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.bookingReference, c.checkinDate, c.bookedDate, r.comments ) "
+                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.reservationId, c.bookingReference, c.checkinDate, c.bookedDate, r.comments ) "
                     + "  FROM Allocation c "
                     + " INNER JOIN GuestCommentReportEntry r "
                     + "    ON c.reservationId = r.reservationId "
                     + " WHERE c.jobId = :allocationScraperJobId "
                     + "   AND c.paymentTotal = c.paymentOutstanding" // no deposit charged
-                    + "   AND (r.comments LIKE 'You have received a virtual credit card for this reservation%' OR "
+                    + "   AND (r.comments LIKE '%You have received a virtual credit card for this reservation%' OR "
                     + "        r.comments LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%') "
-                    + "   AND c.bookingReference LIKE 'BDC-%'", BookingWithGuestComments.class )
+                    + "   AND c.bookingSource = 'Booking.com'", BookingWithGuestComments.class )
                     .setParameter( "allocationScraperJobId", allocationScraperJobId )
                     .getResultList();
         }
@@ -751,7 +751,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         Integer allocationScraperJobId = getLastCompletedAllocationScraperJobId();
         if ( allocationScraperJobId != null ) {
             return em.createQuery(
-                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.bookingReference, c.checkinDate, c.bookedDate, r.comments ) "
+                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.reservationId, c.bookingReference, c.checkinDate, c.bookedDate, r.comments ) "
                             + "  FROM Allocation c "
                             + " INNER JOIN GuestCommentReportEntry r "
                             + "    ON c.reservationId = r.reservationId "

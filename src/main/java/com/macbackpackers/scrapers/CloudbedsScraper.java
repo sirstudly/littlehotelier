@@ -543,7 +543,7 @@ public class CloudbedsScraper {
      * @param amount how much
      * @throws IOException
      */
-    public void chargeNonRefundableBooking( WebClient webClient, String reservationId, String cardId, BigDecimal amount ) throws IOException {
+    public void chargeCardForBooking( WebClient webClient, String reservationId, String cardId, BigDecimal amount ) throws IOException {
 
         // AUTHORIZE
         LOGGER.info( "Begin AUTHORIZE for reservation " + reservationId + " for " + amount );

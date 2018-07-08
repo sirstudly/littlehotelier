@@ -19,6 +19,7 @@ public class BookingWithGuestComments {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
+    private int reservationId;
     private String bookingReference;
     private Date checkinDate; // the date of checkin
     private Date bookedDate; // the date the reservation was created
@@ -29,11 +30,20 @@ public class BookingWithGuestComments {
             Pattern.compile( "You may charge it as of ([0-9]{4}\\-[0-9]{2}\\-[0-9]{2})." );
     private static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
 
-    public BookingWithGuestComments( String bookingRef, Date checkinDate, Date bookedDate, String guestComment ) {
+    public BookingWithGuestComments( int reservationId, String bookingRef, Date checkinDate, Date bookedDate, String guestComment ) {
+        this.reservationId = reservationId;
         this.bookingReference = bookingRef;
         this.checkinDate = checkinDate;
         this.bookedDate = bookedDate;
         this.guestComment = guestComment;
+    }
+
+    public int getReservationId() {
+        return reservationId;
+    }
+
+    public void setReservationId( int reservationId ) {
+        this.reservationId = reservationId;
     }
 
     public String getBookingReference() {

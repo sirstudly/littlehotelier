@@ -28,6 +28,7 @@ public class CreatePrepaidChargeJob extends AbstractJob {
                             + " chargeable on " + a.getEarliestChargeDate() );
                     DepositChargeJob depositJob = new DepositChargeJob();
                     depositJob.setStatus( JobStatus.submitted );
+                    depositJob.setReservationId( a.getReservationId() );
                     depositJob.setBookingRef( a.getBookingReference() );
                     depositJob.setBookingDate( a.getBookedDate() );
                     dao.insertJob( depositJob );

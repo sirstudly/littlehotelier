@@ -9,7 +9,7 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationContext;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
@@ -29,17 +29,21 @@ public class DepositChargeJob extends AbstractJob {
     
     @Autowired
     @Transient
-    @Qualifier( "webClient" )
-    private WebClient webClient;
+    private ApplicationContext appContext;
 
     @Override
     public void processJob() throws Exception {
-        paymentProcessor.processDepositPayment( webClient, getId(), getBookingRef(), getBookingDate() );
-    }
 
-    @Override
-    public void finalizeJob() {
-        webClient.close(); // cleans up JS threads
+        if ( dao.isCloudbeds() ) {
+            try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+                paymentProcessor.processCardPaymentForRemainingBalance( webClient, String.valueOf( getReservationId() ) );
+            }
+        }
+        else { // LittleHotelier
+            try (WebClient webClient = appContext.getBean( "webClient", WebClient.class )) {
+                paymentProcessor.processDepositPayment( webClient, getId(), getBookingRef(), getBookingDate() );
+            }
+        }
     }
 
     /**
@@ -58,6 +62,24 @@ public class DepositChargeJob extends AbstractJob {
      */
     public void setBookingRef( String bookingRef ) {
         setParameter( "booking_ref", bookingRef );
+    }
+
+    /**
+     * Returns the reservation id.
+     * 
+     * @return reservationId
+     */
+    public int getReservationId() {
+        return Integer.parseInt( getParameter( "reservation_id" ) );
+    }
+
+    /**
+     * Sets the reservation id.
+     * 
+     * @param reservationId
+     */
+    public void setReservationId( int reservationId ) {
+        setParameter( "reservationId", String.valueOf( reservationId ) );
     }
 
     /**
