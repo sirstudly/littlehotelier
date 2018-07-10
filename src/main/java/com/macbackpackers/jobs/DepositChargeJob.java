@@ -79,7 +79,7 @@ public class DepositChargeJob extends AbstractJob {
      * @param reservationId
      */
     public void setReservationId( int reservationId ) {
-        setParameter( "reservationId", String.valueOf( reservationId ) );
+        setParameter( "reservation_id", String.valueOf( reservationId ) );
     }
 
     /**
