@@ -731,14 +731,19 @@ public class WordPressDAOImpl implements WordPressDAO {
         Integer allocationScraperJobId = getLastCompletedAllocationScraperJobId();
         if ( allocationScraperJobId != null ) {
             return em.createQuery( 
-                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.reservationId, c.bookingReference, c.checkinDate, c.bookedDate, r.comments ) "
+                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( "
+                    + "           c.reservationId, c.bookingReference, c.checkinDate, c.bookedDate, "
+                    // consolidate notes/comments into the comments field for efficiency
+                    + "           CONCAT( COALESCE( c.notes, '' ), COALESCE( r.comments, '' ) ) ) "
                     + "  FROM Allocation c "
-                    + " INNER JOIN GuestCommentReportEntry r "
+                    + "  LEFT OUTER JOIN GuestCommentReportEntry r "
                     + "    ON c.reservationId = r.reservationId "
                     + " WHERE c.jobId = :allocationScraperJobId "
                     + "   AND c.paymentTotal = c.paymentOutstanding" // no deposit charged
-                    + "   AND (r.comments LIKE '%You have received a virtual credit card for this reservation%' OR "
-                    + "        r.comments LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%') "
+                    + "   AND (r.comments LIKE '%You have received a virtual credit card for this reservation%' "
+                    + "     OR c.notes LIKE '%You have received a virtual credit card for this reservation%' "
+                    + "     OR r.comments LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%' "
+                    + "     OR c.notes LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%') "
                     + "   AND c.bookingSource = 'Booking.com'", BookingWithGuestComments.class )
                     .setParameter( "allocationScraperJobId", allocationScraperJobId )
                     .getResultList();

@@ -48,11 +48,14 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
 		 WHERE f.job_id = :jobId
 		   AND f.payment_total = f.payment_outstanding
 		   AND f.payment_total > 0
-           AND ( f.booking_source IN ('Booking.com', 'Expedia') OR
-               ( f.booking_source = 'Hostelworld &amp; Hostelbookers' AND f.rate_plan_name = 'Non-refundable' ))
-           AND (c.comments IS NULL OR 
+           AND f.booking_source IN ('Booking.com', 'Expedia')
+           AND ((c.comments IS NULL OR 
                     (c.comments NOT LIKE '%You have received a virtual credit card for this reservation%'
                  AND c.comments NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'))
+                 -- include migrated records
+            AND (f.notes IS NULL OR 
+                    (f.notes NOT LIKE '%You have received a virtual credit card for this reservation%'
+                 AND f.notes NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%')))
 		 GROUP BY f.reservation_id, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn;
     </entry>
     <entry key="group.bookings">
