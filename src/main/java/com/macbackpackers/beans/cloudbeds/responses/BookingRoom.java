@@ -20,6 +20,7 @@ public class BookingRoom {
     private String roomTypeNameShort;
     private String roomTypeId;
     private String roomNumber;
+    private String detailedRates;
 
     public String getId() {
         return id;
@@ -99,6 +100,14 @@ public class BookingRoom {
 
     public void setRoomNumber( String roomNumber ) {
         this.roomNumber = roomNumber;
+    }
+
+    public String getDetailedRates() {
+        return detailedRates;
+    }
+
+    public void setDetailedRates( String detailedRates ) {
+        this.detailedRates = detailedRates;
     }
 
     @Override

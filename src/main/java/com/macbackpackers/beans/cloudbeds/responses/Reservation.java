@@ -15,9 +15,9 @@ public class Reservation extends CloudbedsJsonResponse {
     private String lastName;
     private String email;
     private String customerId;
-    private String grandTotal;
+    private BigDecimal grandTotal;
     private String bookingDeposit;
-    private String balanceDue;
+    private BigDecimal balanceDue;
     private String bookingVia;
     private String checkinDate;
     private String checkoutDate;
@@ -29,6 +29,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String usedRoomTypes;
     private Integer kidsNumber;
     private Integer adultsNumber;
+    private String channelName;
     private String channelPaymentType;
     private String isHotelCollectBooking;
     private String paidValue;
@@ -84,11 +85,11 @@ public class Reservation extends CloudbedsJsonResponse {
         this.customerId = customerId;
     }
 
-    public String getGrandTotal() {
+    public BigDecimal getGrandTotal() {
         return grandTotal;
     }
 
-    public void setGrandTotal( String grandTotal ) {
+    public void setGrandTotal( BigDecimal grandTotal ) {
         this.grandTotal = grandTotal;
     }
 
@@ -100,12 +101,12 @@ public class Reservation extends CloudbedsJsonResponse {
         this.bookingDeposit = bookingDeposit;
     }
 
-    public String getBalanceDue() {
+    public BigDecimal getBalanceDue() {
         return balanceDue;
     }
 
-    public BigDecimal getBalanceDueAsDecimal() {
-        return new BigDecimal( getBalanceDue() );
+    public void setBalanceDue( BigDecimal balanceDue ) {
+        this.balanceDue = balanceDue;
     }
 
     /**
@@ -114,11 +115,7 @@ public class Reservation extends CloudbedsJsonResponse {
      * @return if anything is still left to be paid on booking
      */
     public boolean isPaid() {
-        return getBalanceDueAsDecimal().compareTo( BigDecimal.ZERO ) <= 0;
-    }
-
-    public void setBalanceDue( String balanceDue ) {
-        this.balanceDue = balanceDue;
+        return getBalanceDue().compareTo( BigDecimal.ZERO ) <= 0;
     }
 
     public String getBookingVia() {
@@ -211,6 +208,14 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setAdultsNumber( Integer adultsNumber ) {
         this.adultsNumber = adultsNumber;
+    }
+
+    public String getChannelName() {
+        return channelName;
+    }
+
+    public void setChannelName( String channelName ) {
+        this.channelName = channelName;
     }
 
     public String getChannelPaymentType() {

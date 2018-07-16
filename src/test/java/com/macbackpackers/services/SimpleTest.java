@@ -33,6 +33,7 @@ import org.springframework.util.StreamUtils;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
@@ -174,6 +175,14 @@ public class SimpleTest {
         }
         Assert.assertEquals( "Card ID should be the last one", "5819432", cardId );
 
+        BigDecimal totalFirstNight = r.getBookingRooms().stream()
+                .flatMap( br -> StreamSupport.stream( gson.fromJson(
+                        br.getDetailedRates(), JsonArray.class ).spliterator(), false ) )
+                .map( dr -> dr.getAsJsonObject() )
+                .filter( dr -> r.getCheckinDate().equals( dr.get( "date" ).getAsString() ) )
+                .map( dr -> dr.get( "rate" ).getAsBigDecimal() )
+                .reduce( BigDecimal.ZERO, BigDecimal::add );
+        Assert.assertEquals( new BigDecimal( "27.58" ), totalFirstNight );
     }
 
 }

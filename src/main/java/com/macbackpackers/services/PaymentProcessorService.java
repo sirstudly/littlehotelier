@@ -461,7 +461,7 @@ public class PaymentProcessorService {
 
         // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
         cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                cbReservation.getCreditCardId(), cbReservation.getBalanceDueAsDecimal() );
+                cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
 
         // mark booking as fully paid in Hostelworld
         if ( "Hostelworld & Hostelbookers".equals( cbReservation.getSourceName() ) ) {
@@ -482,7 +482,7 @@ public class PaymentProcessorService {
      * @throws IOException on i/o error
      * @throws ParseException on bonehead error
      */
-    public void processCardPaymentForRemainingBalance( WebClient webClient, String reservationId ) throws IOException, ParseException {
+    public synchronized void processCardPaymentForRemainingBalance( WebClient webClient, String reservationId ) throws IOException, ParseException {
         LOGGER.info( "Processing full payment for booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
@@ -507,7 +507,7 @@ public class PaymentProcessorService {
 
         // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
         cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                cbReservation.getCreditCardId(), cbReservation.getBalanceDueAsDecimal() );
+                cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
     }
 
     /**
