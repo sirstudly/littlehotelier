@@ -3,13 +3,17 @@ package com.macbackpackers.scrapers;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
+import java.text.DecimalFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -29,14 +33,15 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.util.NameValuePair;
-import com.google.common.base.Optional;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
+import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
@@ -51,7 +56,7 @@ public class CloudbedsScraper {
     
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
     
-    private static final DateTimeFormatter YYYY_MM_DD = DateTimeFormatter.ofPattern( "yyyy-MM-dd" );
+    private final DecimalFormat CURRENCY_FORMAT = new DecimalFormat( "###0.00" );
 
     @Autowired
     @Qualifier( "gsonForCloudbeds" )
@@ -127,7 +132,7 @@ public class CloudbedsScraper {
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
-        Optional<CloudbedsJsonResponse> response = Optional.fromNullable(
+        Optional<CloudbedsJsonResponse> response = Optional.ofNullable(
                 gson.fromJson( redirectPage.getWebResponse().getContentAsString(),
                         CloudbedsJsonResponse.class ) );
 
@@ -241,7 +246,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Pulling reservation data for #" + reservationId );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        Optional<Reservation> r = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class ) );
+        Optional<Reservation> r = Optional.ofNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class ) );
         if ( false == r.isPresent() || false == r.get().isSuccess() ) {
             if( r.isPresent() ) {
                 LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
@@ -336,17 +341,17 @@ public class CloudbedsScraper {
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
         
-        Optional<JsonElement> jelement = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ) );
+        Optional<JsonElement> jelement = Optional.ofNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ) );
         if( false == jelement.isPresent() ) {
             throw new MissingUserDataException( "Failed to retrieve reservations." );
         }
 
-        Optional<JsonObject> jobject = Optional.fromNullable( jelement.get().getAsJsonObject() );
+        Optional<JsonObject> jobject = Optional.ofNullable( jelement.get().getAsJsonObject() );
         if( false == jobject.isPresent() ) {
             throw new MissingUserDataException( "Failed to retrieve reservations." );
         }
 
-        Optional<JsonArray> jarray = Optional.fromNullable( jobject.get().getAsJsonArray( "aaData" ) );
+        Optional<JsonArray> jarray = Optional.ofNullable( jobject.get().getAsJsonArray( "aaData" ) );
         if( false == jarray.isPresent() ) {
             throw new MissingUserDataException( "Failed to retrieve reservations." );
         }
@@ -371,10 +376,11 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createGetRoomAssignmentsReport( stayDate, stayDate.plusDays( 1 ) );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Fetching staff allocations for " + stayDate.format( YYYY_MM_DD ) + " from: " + redirectPage.getUrl().getPath() );
+        LOGGER.info( "Fetching staff allocations for " + stayDate.format(
+                DateTimeFormatter.ISO_LOCAL_DATE ) + " from: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        Optional<JsonObject> rpt = Optional.fromNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
+        Optional<JsonObject> rpt = Optional.ofNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
         if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
             if ( rpt.isPresent() ) {
                 LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
@@ -535,6 +541,29 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Get all cancelled reservations with the given booking sources.
+     * 
+     * @param webClient web client instance to use
+     * @param checkinDateStart checkin date (inclusive)
+     * @param checkinDateEnd checkin date (inclusive)
+     * @param cancelDateStart cancellation date (inclusive)
+     * @param cancelDateEnd cancellation date (inclusive)
+     * @param bookingSources comma-delimited list of booking source(s)
+     * @return non-null list of reservations
+     * @throws IOException
+     */
+    public List<Reservation> getCancelledReservationsForBookingSources( WebClient webClient,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate cancelDateStart, 
+            LocalDate cancelDateEnd, String ... sourceNames ) throws IOException {
+        return getCustomers( webClient, jsonRequestFactory.createGetCancelledReservationsRequestByBookingSource(
+                checkinDateStart, checkinDateEnd, cancelDateStart, cancelDateEnd,
+                lookupBookingSourceIds( webClient, sourceNames ) ) )
+                        .stream()
+                        .map( c -> getReservationRetry( webClient, c.getId() ) )
+                        .collect( Collectors.toList() );
+    }
+
+    /**
      * Does an AUTHORIZE/CAPTURE for the given booking for the amount given.
      * 
      * @param webClient web client instance to use
@@ -652,4 +681,153 @@ public class CloudbedsScraper {
         }
         throw new UnrecoverableFault( "No CB bookings found for " + bookingRef + ": " + guestName );
     }
+
+    /**
+     * Returns the activity log for the given reservation.
+     * 
+     * @param webClient web client instance to use
+     * @param identifier the cloudbeds unique id (under the reservation name)
+     * @return list of activity log entries
+     * @throws IOException
+     */
+    public List<ActivityLogEntry> getActivityLog( WebClient webClient, String identifier ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createGetActivityLog( identifier );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            throw new MissingUserDataException( "Failed to retrieve activity log for identifier " + identifier );
+        }
+
+        final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a" );
+        List<ActivityLogEntry> logEntries = new ArrayList<ActivityLogEntry>();
+        jelement.getAsJsonObject().get( "aaData" ).getAsJsonArray().forEach( e -> {
+            ActivityLogEntry ent = new ActivityLogEntry();
+            Pattern p = Pattern.compile( "(.*)<br />(.*)" );
+            Matcher m = p.matcher( e.getAsJsonArray().get( 0 ).getAsString() );
+            if ( m.find() ) {
+                ent.setCreatedDate( LocalDateTime.parse( m.group( 1 ), DD_MM_YYYY_HH_MM ) );
+                ent.setCreatedBy( m.group( 2 ) );
+            }
+            else {
+                throw new MissingUserDataException( "Failed to parse activity log entry: " + e.getAsJsonArray().get( 0 ).getAsString() );
+            }
+            ent.setContents( e.getAsJsonArray().get( 1 ).getAsString() );
+            logEntries.add( ent );
+        } );
+        return logEntries;
+    }
+    
+    /**
+     * Retrieves the given email template.
+     * @param webClient web client instance to use
+     * @param templateId email template id
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getEmailTemplate( WebClient webClient, String templateId ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createGetEmailTemplate( templateId );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            throw new MissingUserDataException( "Failed to retrieve email template " + templateId );
+        }
+
+        EmailTemplateInfo template = new EmailTemplateInfo();
+        JsonObject elem = jelement.getAsJsonObject().get( "email_template" ).getAsJsonObject();
+        template.setId( elem.get( "id" ).getAsString() );
+        template.setEmailType( elem.get( "email_type" ).getAsString() );
+        template.setDesignType( elem.get( "design_type" ).getAsString() );
+        template.setTemplateName( elem.get( "template_name" ).getAsString() );
+        template.setSendFromAddress( elem.get( "send_from" ).getAsString() );
+        template.setSubject( elem.get( "subject" ).getAsString() );
+        template.setEmailBody( elem.get( "email_body" ).getAsString() );
+        if ( elem.get( "top_image" ) != null ) {
+            elem = elem.get( "top_image" ).getAsJsonObject();
+            template.setTopImageId( elem.get( "original_id" ).getAsString() );
+            template.setTopImageSrc( elem.get( "original_src" ).getAsString() );
+            template.setTopImageAlign( elem.get( "image_align" ).getAsString() );
+        }
+        return template;
+    }
+
+    /**
+     * Retrieves the Hostelworld late cancellation email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getHostelworldLateCancellationEmailTemplate( WebClient webClient ) throws IOException {
+
+        Page redirectPage = webClient.getPage( jsonRequestFactory.createGetPropertyContent() );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+
+        Optional<JsonElement> emailTemplate = StreamSupport.stream(
+                gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ).getAsJsonObject()
+                        .get( "email_templates" ).getAsJsonArray().spliterator(),
+                false )
+                .filter( t -> "Hostelworld Cancellation Charge".equals( t.getAsJsonObject().get( "template_name" ).getAsString() ) )
+                .findFirst();
+
+        if ( false == emailTemplate.isPresent() ) {
+            throw new MissingUserDataException( "Failed to retrieve email template" );
+        }
+
+        String emailTemplateId = emailTemplate.get().getAsJsonObject().get( "email_template_id" ).getAsString();
+        LOGGER.info( "Found HWL cancellation charge email template id: " + emailTemplateId );
+        return getEmailTemplate( webClient, emailTemplateId );
+    }
+
+    /**
+     * Sends an email to the guest for the given reservation when they cancel a hostelworld
+     * reservation and have been charged the first night.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param amount amount being charged
+     * @throws IOException
+     */
+    public void sendHostelworldLateCancellationEmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
+
+        EmailTemplateInfo template = getHostelworldLateCancellationEmailTemplate( webClient );
+        Reservation res = getReservation( webClient, reservationId );
+
+        WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
+                template, res.getIdentifier(), res.getCustomerId(), reservationId,
+                res.getEmail(), b -> b.replaceAll( "\\[first night charge\\]", "£" + CURRENCY_FORMAT.format( amount ) ) );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + reservationId );
+        }
+    }
+
+    /**
+     * Retrieves the property info.
+     * 
+     * @param webClient web client instance to use
+     * @throws non-null email template
+     * @throws IOException
+     */
+    public String getPropertyContent( WebClient webClient ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createGetPropertyContent();
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+        return redirectPage.getWebResponse().getContentAsString();
+    }
+
 }

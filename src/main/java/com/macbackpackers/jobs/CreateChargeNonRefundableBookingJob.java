@@ -35,7 +35,8 @@ public class CreateChargeNonRefundableBookingJob extends AbstractJob {
                 getBookingDate(), getBookingDate().plusDays( getDaysAhead() ), "Hostelworld & Hostelbookers" )
                 .stream()
                 .filter( p -> false == p.isPaid() )
-                .filter( p -> "Non-refundable".equalsIgnoreCase( p.getUsedRoomTypes() ) )
+                .filter( p -> "Non-refundable".equalsIgnoreCase( p.getUsedRoomTypes() ) 
+                        || "nonref".equalsIgnoreCase( p.getUsedRoomTypes() ) )
                 // should we charge cancelled bookings?
                 .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
                 .forEach( p -> {

@@ -5,6 +5,7 @@ import static com.macbackpackers.scrapers.AllocationsPageScraper.POUND;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,6 +22,7 @@ import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlLabel;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlSpan;
 import com.gargoylesoftware.htmlunit.html.HtmlTextArea;
+import com.google.gson.Gson;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.GuestDetails;
 import com.macbackpackers.beans.Payment;
@@ -63,6 +66,10 @@ public class PaymentProcessorService {
     private static final FastDateFormat DATETIME_FORMAT = FastDateFormat.getInstance( "dd/MM/yyyy HH:mm:ss" );
     private static final FastDateFormat DATETIME_STANDARD = FastDateFormat.getInstance( "yyyy-MM-dd HH:mm:ss" );
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
+
+    @Autowired
+    @Qualifier( "gsonForCloudbeds" )
+    private Gson gson;
 
     @Autowired
     private ApplicationContext context;
@@ -443,7 +450,8 @@ public class PaymentProcessorService {
             return;
         }
 
-        if ( false == "Non-refundable".equalsIgnoreCase( cbReservation.getUsedRoomTypes() ) ) {
+        if ( false == "Non-refundable".equalsIgnoreCase( cbReservation.getUsedRoomTypes() )
+                && false == "nonref".equalsIgnoreCase( cbReservation.getUsedRoomTypes() )) {
             throw new UnrecoverableFault( "ABORT! Attempting to charge a non non-refundable booking!" );
         }
 
@@ -469,7 +477,7 @@ public class PaymentProcessorService {
                 hostelworldScraper.acknowledgeFullPaymentTaken( hwlWebClient, cbReservation.getThirdPartyIdentifier() );
             }
             catch ( Exception ex ) {
-                LOGGER.error( "Failed to acknowedge payment in HWL. Meh...", ex );
+                LOGGER.error( "Failed to acknowledge payment in HWL. Meh...", ex );
             }
         }
     }
@@ -508,6 +516,61 @@ public class PaymentProcessorService {
         // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
         cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
                 cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
+    }
+
+    /**
+     * Does a AUTHORIZE/CAPTURE on the card details on the booking for the amount of the first night.
+     * 
+     * @param webClient web client for cloudbeds
+     * @param reservationId the unique cloudbeds reservation ID
+     * @param amount amount to charge
+     * @throws IOException on i/o error
+     * @throws ParseException on bonehead error
+     */
+    public synchronized void processCardPaymentDepositForFirstNight( WebClient webClient, String reservationId ) throws IOException, ParseException {
+        LOGGER.info( "Processing payment for 1st night of booking: " + reservationId );
+        Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+
+        LOGGER.info( cbReservation.getThirdPartyIdentifier() + ": "
+                + cbReservation.getFirstName() + " " + cbReservation.getLastName() );
+        LOGGER.info( "Status: " + cbReservation.getStatus() );
+        LOGGER.info( "Checkin: " + cbReservation.getCheckinDate() );
+        LOGGER.info( "Checkout: " + cbReservation.getCheckoutDate() );
+        LOGGER.info( "Grand Total: " + cbReservation.getGrandTotal() );
+        LOGGER.info( "Balance Due: " + cbReservation.getBalanceDue() );
+
+        // check if we've paid anything
+        if ( false == BigDecimal.ZERO.equals( cbReservation.getPaidValue() ) ) {
+            LOGGER.info( "Booking has already been charged " + cbReservation.getPaidValue() );
+            return;
+        }
+
+        if ( false == "canceled".equals( cbReservation.getStatus() ) ) {
+            throw new UnrecoverableFault( "Only bookings at canceled can be charged." );
+        }
+
+        // check if card details exist in CB
+        if ( false == cbReservation.isCardDetailsPresent() ) {
+            throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
+        }
+
+        BigDecimal firstNightAmount = cbReservation.getRateFirstNight( gson );
+        LOGGER.info( "First night due: " + firstNightAmount );
+        if ( firstNightAmount.compareTo( BigDecimal.ZERO ) <= 0 ) {
+            throw new IllegalStateException( "Some weirdness here. First night amount must be greater than 0." );
+        }
+        if ( firstNightAmount.compareTo( cbReservation.getBalanceDue() ) > 0 ) {
+            throw new IllegalStateException( "Some weirdness here. First night amount exceeds balance due." );
+        }
+
+        // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
+        cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
+                cbReservation.getCreditCardId(), firstNightAmount );
+
+        // send email if successful
+        cloudbedsScraper.sendHostelworldLateCancellationEmail( webClient, reservationId, firstNightAmount );
+        cloudbedsScraper.addNote( webClient, reservationId, "Late cancellation. First night successfully charged £"
+                + new DecimalFormat( "###0.00" ).format( firstNightAmount ) );
     }
 
     /**

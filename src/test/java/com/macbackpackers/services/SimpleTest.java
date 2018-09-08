@@ -9,6 +9,9 @@ import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
@@ -23,6 +26,7 @@ import java.util.stream.StreamSupport;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.junit.Assert;
 import org.junit.Test;
@@ -36,6 +40,8 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
+import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 
 public class SimpleTest {
@@ -175,14 +181,74 @@ public class SimpleTest {
         }
         Assert.assertEquals( "Card ID should be the last one", "5819432", cardId );
 
-        BigDecimal totalFirstNight = r.getBookingRooms().stream()
-                .flatMap( br -> StreamSupport.stream( gson.fromJson(
-                        br.getDetailedRates(), JsonArray.class ).spliterator(), false ) )
-                .map( dr -> dr.getAsJsonObject() )
-                .filter( dr -> r.getCheckinDate().equals( dr.get( "date" ).getAsString() ) )
-                .map( dr -> dr.get( "rate" ).getAsBigDecimal() )
-                .reduce( BigDecimal.ZERO, BigDecimal::add );
-        Assert.assertEquals( new BigDecimal( "27.58" ), totalFirstNight );
+        // first night is accumulated correctly
+        Assert.assertEquals( new BigDecimal( "27.58" ), r.getRateFirstNight( gson ) );
     }
 
+    @Test
+    public void testGetActivityLog() throws Exception {
+
+        final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a" );
+        String json = StreamUtils.copyToString( getClass().getClassLoader().getResourceAsStream(
+                "activity_log.json" ), StandardCharsets.UTF_8 );
+        JsonElement rootElem = gson.fromJson( json, JsonElement.class );
+        JsonArray logArray = rootElem.getAsJsonObject().get( "aaData" ).getAsJsonArray();
+        List<ActivityLogEntry> logEntries = new ArrayList<ActivityLogEntry>();
+        logArray.forEach( e -> {
+            ActivityLogEntry ent = new ActivityLogEntry();
+            Pattern p = Pattern.compile( "(.*)<br />(.*)" );
+            Matcher m = p.matcher( e.getAsJsonArray().get( 0 ).getAsString() );
+            if ( m.find() ) {
+                ent.setCreatedDate( LocalDateTime.parse( m.group( 1 ), DD_MM_YYYY_HH_MM ) );
+                ent.setCreatedBy( m.group( 2 ) );
+            }
+            else {
+                throw new RuntimeException( "Failed to parse activity log entry: " + e.getAsJsonArray().get( 0 ).getAsString() );
+            }
+            ent.setContents( e.getAsJsonArray().get( 1 ).getAsString() );
+            logEntries.add( ent );
+            LOGGER.info( ToStringBuilder.reflectionToString( ent ) );
+        } );
+
+        Assert.assertEquals( 8, logEntries.size() );
+    }
+    
+    @Test
+    public void testGetEmailTemplate() throws Exception {
+        String json = StreamUtils.copyToString( getClass().getClassLoader().getResourceAsStream(
+                "get_email_template_info.json" ), StandardCharsets.UTF_8 );
+        JsonObject elem = gson.fromJson( json, JsonElement.class ).getAsJsonObject().get( "email_template" ).getAsJsonObject();
+
+        EmailTemplateInfo template = new EmailTemplateInfo();
+        template.setId( elem.get( "id" ).getAsString() );
+        template.setEmailType( elem.get( "email_type" ).getAsString() );
+        template.setDesignType( elem.get( "design_type" ).getAsString() );
+        template.setTemplateName( elem.get( "template_name" ).getAsString() );
+        template.setSendFromAddress( elem.get( "send_from" ).getAsString() );
+        template.setSubject( elem.get( "subject" ).getAsString() );
+        template.setEmailBody( elem.get( "email_body" ).getAsString() );
+        if ( elem.get( "top_image" ) != null ) {
+            elem = elem.get( "top_image" ).getAsJsonObject();
+            template.setTopImageId( elem.get( "original_id" ).getAsString() );
+            template.setTopImageSrc( elem.get( "original_src" ).getAsString() );
+            template.setTopImageAlign( elem.get( "image_align" ).getAsString() );
+        }
+        LOGGER.info( ToStringBuilder.reflectionToString( template ) );
+    }
+    
+    @Test
+    public void testGetEmailTemplateId() throws Exception {
+        String json = StreamUtils.copyToString( getClass().getClassLoader().getResourceAsStream(
+                "get_content.json" ), StandardCharsets.UTF_8 );
+        
+        final String templateNameToMatch = "Hostelworld Cancellation Charge";
+        Optional<JsonElement> emailTemplate = StreamSupport.stream( 
+                gson.fromJson( json, JsonElement.class ).getAsJsonObject()
+                .get( "email_templates" ).getAsJsonArray().spliterator(), false )
+                .filter( t -> templateNameToMatch.equals( t.getAsJsonObject().get( "template_name" ).getAsString() ) )
+                .findFirst();
+        
+        Assert.assertEquals( true, emailTemplate.isPresent() );
+        Assert.assertEquals( "131832", emailTemplate.get().getAsJsonObject().get( "email_template_id" ).getAsString() );
+    }
 }

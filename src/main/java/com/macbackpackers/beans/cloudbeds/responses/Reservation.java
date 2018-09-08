@@ -3,9 +3,15 @@ package com.macbackpackers.beans.cloudbeds.responses;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.StreamSupport;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 
 public class Reservation extends CloudbedsJsonResponse {
 
@@ -21,6 +27,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String bookingVia;
     private String checkinDate;
     private String checkoutDate;
+    private String cancellationDate;
     private String sourceName;
     private String identifier;
     private String specialRequests;
@@ -32,7 +39,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String channelName;
     private String channelPaymentType;
     private String isHotelCollectBooking;
-    private String paidValue;
+    private BigDecimal paidValue;
     private List<BookingRoom> bookingRooms;
     private List<BookingNote> notes;
     private String creditCardId;
@@ -146,6 +153,34 @@ public class Reservation extends CloudbedsJsonResponse {
         return LocalDate.parse( getCheckinDate() ).compareTo( LocalDate.now() ) <= 0;
     }
 
+    public String getCancellationDate() {
+        return cancellationDate;
+    }
+
+    public void setCancellationDate( String cancellationDate ) {
+        this.cancellationDate = cancellationDate;
+    }
+
+    /**
+     * Returns true iff the cancellation date/time falls within the late-cancellation window from
+     * the checkin date (at 3pm).
+     * 
+     * @param hoursBefore3pmOnCheckinDate number of hours prior to checkin date for
+     *            late-cancellation
+     * @return true if cancellation date occurs after the late-cancellation window begins
+     */
+    public boolean isLateCancellation( int hoursBefore3pmOnCheckinDate ) {
+        // compare checkin-date (3pm)
+        LocalDateTime checkinDateTime = LocalDateTime.parse( getCheckinDate() + "T15:00:00",
+                DateTimeFormatter.ISO_LOCAL_DATE_TIME );
+
+        LocalDateTime cancellationDateTime = LocalDateTime.parse(
+                getCancellationDate(), DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss" ) );
+
+        return cancellationDateTime.plusHours( hoursBefore3pmOnCheckinDate )
+                .compareTo( checkinDateTime ) > 0;
+    }
+
     public String getSourceName() {
         return sourceName;
     }
@@ -242,11 +277,11 @@ public class Reservation extends CloudbedsJsonResponse {
         return "Channel".equals( getChannelPaymentType() ) && false == isHotelCollectBooking();
     }
 
-    public String getPaidValue() {
+    public BigDecimal getPaidValue() {
         return paidValue;
     }
 
-    public void setPaidValue( String paidValue ) {
+    public void setPaidValue( BigDecimal paidValue ) {
         this.paidValue = paidValue;
     }
 
@@ -292,6 +327,22 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setCreditCardId( String creditCardId ) {
         this.creditCardId = creditCardId;
+    }
+
+    /**
+     * Returns the amount of the first night for this booking.
+     * 
+     * @param gson Gson encoder/decoder
+     * @return non-null amount
+     */
+    public BigDecimal getRateFirstNight( Gson gson ) {
+        return getBookingRooms().stream()
+                .flatMap( br -> StreamSupport.stream( gson.fromJson(
+                        br.getDetailedRates(), JsonArray.class ).spliterator(), false ) )
+                .map( dr -> dr.getAsJsonObject() )
+                .filter( dr -> getCheckinDate().equals( dr.get( "date" ).getAsString() ) )
+                .map( dr -> dr.get( "rate" ).getAsBigDecimal() )
+                .reduce( BigDecimal.ZERO, BigDecimal::add );
     }
 
     @Override

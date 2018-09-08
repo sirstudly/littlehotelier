@@ -1,12 +1,15 @@
 package com.macbackpackers.services;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -22,11 +25,14 @@ import com.google.gson.JsonObject;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.GuestCommentReportEntry;
+import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
+import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
@@ -35,8 +41,6 @@ import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 public class CloudbedsService {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
-
-    private static final DateTimeFormatter YYYY_MM_DD = DateTimeFormatter.ofPattern( "yyyy-MM-dd" );
 
     @Autowired
     private WordPressDAO dao;
@@ -49,6 +53,9 @@ public class CloudbedsService {
 
     @Value( "${cloudbeds.property.id:0}" )
     private String PROPERTY_ID;
+
+    @Value( "${hostelworld.latecancellation.hours:48}" )
+    private int HWL_LATE_CANCEL_HOURS;
 
     /**
      * Dumps the allocations starting on the given date (inclusive).
@@ -147,6 +154,73 @@ public class CloudbedsService {
 
         return bedNameAllocations.values().stream().collect( Collectors.toList() );
     }
+    
+    /**
+     * Finds all HWL cancellations between the given dates and:
+     * <ul>
+     *   <li>if cancellation was done by 'System'</li>
+     *   <li>if first night has not been charged</li>
+     *   <li>if cancellation occurs {@code cancellationWindowHours} before checkin</li>
+     *   <li>then create job to charge first night with card-on-file</li>
+     *   <li>(which will also) and append note (charge attempt) to reservation</li>
+     *   <li>(which will also) and create separate email job to notify guest</li> 
+     * </ul>
+     * @param webClient
+     * @param cancelDateStart cancellation date inclusive
+     * @param cancelDateEnd cancellation date inclusive
+     * @throws IOException
+     */
+    public void createChargeHostelworldLateCancellationJobs( WebClient webClient, 
+            LocalDate cancelDateStart, LocalDate cancelDateEnd ) throws IOException {
+        
+        // if we're running this daily
+        // then this would apply to all cancellations done today/yesterday
+        // and checkin date would have to be between
+        //     day before yesterday (earliest) - it is possible to cancel *after* the checkin date
+        // and day after tomorrow (latest) - if cancel was done monday at 23:59, 
+        //                             then would charge if checkin on wednesday but not thursday
+        List<Reservation> cxlRes = scraper.getCancelledReservationsForBookingSources( webClient, 
+                cancelDateStart.minusDays( 1 ), cancelDateEnd.plusDays( 1 ), 
+                cancelDateStart, cancelDateEnd, "Hostelworld & Hostelbookers" );
+        
+        cxlRes.stream()
+            .peek( r -> LOGGER.info( "Res #" + r.getReservationId() + " (" + r.getThirdPartyIdentifier() 
+                    + ") " + r.getFirstName() + " " + r.getLastName() + " cancelled on " + r.getCancellationDate() 
+                    + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() ) )
+            .filter( r -> BigDecimal.ZERO.equals( r.getPaidValue() ) ) // nothing paid yet
+            .filter( r -> r.isLateCancellation( HWL_LATE_CANCEL_HOURS ) )
+            .filter( r -> isCancellationDoneBySystem( webClient, r.getIdentifier() ) )
+            .forEach( r -> {
+                LOGGER.info( "Creating ChargeHostelworldLateCancellationJob for " + r.getReservationId() );
+                ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();
+                j.setStatus( JobStatus.submitted );
+                j.setReservationId( r.getReservationId() );
+                dao.insertJob( j );
+            } );
+    }
+
+    /**
+     * Iterates through the activity log of the reservation and checks that the status was moved to
+     * Cancelled by the System user (ie. indicating that guest cancelled via HWL and it wasn't done
+     * manually by someone on the desk).
+     * 
+     * @param webClient
+     * @param identifier the cloudbeds unique id
+     * @return true iff most recent status move to Cancelled was done by System user
+     * @throws RuntimeException (wraps IOException)
+     */
+    public boolean isCancellationDoneBySystem( WebClient webClient, String identifier ) {
+        try {
+            Pattern pattern = Pattern.compile( "Reservation Status Modified from .* to Cancelled" );
+            Optional<ActivityLogEntry> statusChange = scraper.getActivityLog( webClient, identifier ).stream()
+                    .filter( p -> pattern.matcher( p.getContents() ).find() )
+                    .findFirst();
+            return statusChange.isPresent() && "System".equals( statusChange.get().getCreatedBy() );
+        }
+        catch ( IOException ex ) {
+            throw new RuntimeException( ex );
+        }
+    }
 
     /**
      * Extracts all staff beds from the given assignment report.
@@ -157,7 +231,7 @@ public class CloudbedsService {
      */
     private List<String> extractStaffBedsFromRoomAssignmentReport( JsonObject rpt, LocalDate stayDate ) {
         return rpt.get( "rooms" ).getAsJsonObject()
-                .get( stayDate.format( YYYY_MM_DD ) ).getAsJsonObject()
+                .get( stayDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) ).getAsJsonObject()
                 .entrySet().stream() // now streaming room types...
                 .flatMap( e -> e.getValue().getAsJsonObject()
                         .get( "rooms" ).getAsJsonObject()

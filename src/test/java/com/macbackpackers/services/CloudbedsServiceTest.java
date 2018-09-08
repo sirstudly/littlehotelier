@@ -41,4 +41,10 @@ public class CloudbedsServiceTest {
         List<Allocation> alloc = cloudbedsService.getAllStaffAllocations( webClient, LocalDate.now().minusDays( 1 ) );
         alloc.stream().forEach( a -> LOGGER.info( a.getRoom() + ": " + a.getBedName() + " -> " + a.getCheckinDate() + " to " + a.getCheckoutDate() ) );
     }
+
+    @Test
+    public void testCreateChargeHostelworldLateCancellationJobs() throws Exception {
+        cloudbedsService.createChargeHostelworldLateCancellationJobs( 
+                webClient, LocalDate.now().minusDays( 1 ), LocalDate.now() );
+    }
 }

@@ -97,6 +97,20 @@ public class CloudbedsScraperTest {
     }
 
     @Test
+    public void testGetCancelledReservationsForBookingSources() throws Exception {
+        List<Reservation> results = cloudbedsScraper.getCancelledReservationsForBookingSources( webClient,
+                LocalDate.now().withDayOfMonth( 17 ), // checkin start
+                LocalDate.now().withDayOfMonth( 19 ), // checkin end
+                LocalDate.now().withDayOfMonth( 18 ), // cancel start
+                LocalDate.now().withDayOfMonth( 19 ), // cancel end
+                "Hostelworld & Hostelbookers" );
+        results.stream().forEach( t -> LOGGER.info( t.getIdentifier() + " (" + t.getStatus() + ") - "
+                + t.isCardDetailsPresent() + "," + t.getThirdPartyIdentifier() + ": " +
+                t.getFirstName() + " " + t.getLastName() + " cancelled on " + t.getCancellationDate() ) );
+        LOGGER.info( "Found " + results.size() + " entries" );
+    }
+
+    @Test
     public void testAddPayment() throws Exception {
         cloudbedsScraper.addPayment( webClient, "9814194", "visa", new BigDecimal( "0.15" ), "Test payment XYZ" );
     }
@@ -137,6 +151,27 @@ public class CloudbedsScraperTest {
     public void testLookupBookingSourceId() throws Exception {
         LOGGER.info( cloudbedsScraper.lookupBookingSourceIds( webClient, 
                 "Hostelworld & Hostelbookers", "Booking.com (Channel Collect Booking)" ) );
+    }
+
+    @Test
+    public void testGetActivityLog() throws Exception {
+        cloudbedsScraper.getActivityLog( webClient, "6810494609" )
+            .stream().forEach( t -> LOGGER.info( ToStringBuilder.reflectionToString( t ) ) );
+    }
+
+    @Test
+    public void testGetHostelworldLateCancellationEmailTemplate() throws Exception {
+        LOGGER.info( ToStringBuilder.reflectionToString( cloudbedsScraper.getHostelworldLateCancellationEmailTemplate( webClient ) ) );
+    }
+
+    @Test
+    public void testSendHostelworldLateCancellationEmail() throws Exception {
+        cloudbedsScraper.sendHostelworldLateCancellationEmail( webClient, "10568885", BigDecimal.ONE );
+    }
+
+    @Test
+    public void testGetPropertyContent() throws Exception {
+        cloudbedsScraper.getPropertyContent( webClient );
     }
 
     /**
