@@ -533,6 +533,44 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Process payment (AUTH and CAPTURE) onto an existing reservation.
+     * 
+     * @param reservationId ID of reservation (as it appears in the URL)
+     * @param bookingRoomId (which "room" we're booking the payment to)
+     * @param cardType one of "mastercard", "visa". Anything else will blank the field.
+     * @param cardId unique id of card being processed
+     * @param amount amount to record
+     * @param description description
+     * @return web request
+     * @throws IOException on creation failure
+     */
+    public WebRequest createProcessPaymentRequest( String reservationId, String bookingRoomId, String cardType,
+            String cardId, BigDecimal amount, String description ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_payment" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "payment_type", "exist_credit_card" ),
+                new NameValuePair( "choose_card",
+                        cardType.equalsIgnoreCase( "mastercard" ) ? "master" : cardType.equalsIgnoreCase( "visa" ) ? "visa" : "" ),
+                new NameValuePair( "credit_card_id", cardId ),
+                new NameValuePair( "assign_to", bookingRoomId ),
+                new NameValuePair( "paid", CURRENCY_FORMAT.format( amount ) ),
+                new NameValuePair( "payment_date", LocalDate.now().format( DD_MM_YYYY ) ),
+                new NameValuePair( "cash_drawer_option", "add-to-opened-drawer" ),
+                new NameValuePair( "description", description ),
+                new NameValuePair( "isAllocatePayment", "false" ),
+                new NameValuePair( "isRequireAllocate", "false" ),
+                new NameValuePair( "process_payment", "1" ),
+                new NameValuePair( "refund_payment", "0" ),
+                new NameValuePair( "auth_payment", "0" ),
+                new NameValuePair( "keep_credit_card_info", "0" ),
+                new NameValuePair( "booking_id", reservationId ),
+                new NameValuePair( "property_id", PROPERTY_ID ),
+                new NameValuePair( "group_id", PROPERTY_ID ),
+                new NameValuePair( "version", getVersion() ) ) );
+        return webRequest;
+    }
+
+    /**
      * Records a new note onto the existing reservation.
      * 
      * @param reservationId ID of reservation (as it appears in the URL)
