@@ -43,18 +43,14 @@ public class CloudbedsScraperTest {
     WordPressDAO dao;
 
     @Autowired
-    @Qualifier( "webClientForCloudbeds" )
+//    @Qualifier( "webClientForCloudbeds" )
+    @Qualifier( "webClientJavascriptDisabled" )
     WebClient webClient;
-
+    
     @Autowired 
     @Qualifier( "gsonForCloudbeds" )
     private Gson gson;
 
-    @Test
-    public void testDoLogin() throws Exception {
-        cloudbedsScraper.login( webClient, "daniele.barco+10@cloudbeds.com", "Cloudb3ds!" );
-    }
-    
     @Test
     public void testLoadDashboard() throws Exception {
         cloudbedsScraper.loadDashboard( webClient );
@@ -79,7 +75,7 @@ public class CloudbedsScraperTest {
     @Test
     public void testGetReservations() throws Exception {
         List<Customer> results = cloudbedsScraper.getReservations( webClient, 
-                LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 30 ) );
+                LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 2 ) );
         results.stream().forEach( t -> LOGGER.info( t.toString() ) );
         LOGGER.info( "Found " + results.size() + " entries" );
     }
@@ -135,6 +131,11 @@ public class CloudbedsScraperTest {
         cloudbedsScraper.ping( webClient );
     }
     
+    @Test
+    public void testValidateLoggedIn() throws Exception {
+        cloudbedsScraper.validateLoggedIn( webClient );
+    }
+
     @Test
     public void testCopyNotes() throws Exception {
         // find all bookings with "virtual cc details"

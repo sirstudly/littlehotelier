@@ -116,6 +116,21 @@ public class LittleHotelierConfig {
         return webClient;
     }
 
+    @Bean( name = "webClientJavascriptDisabled" )
+    @Scope( "prototype" )
+    public WebClient getJavascriptDisabledWebClient() throws IOException {
+        // javascript disabled
+        WebClient webClient = new WebClient( BrowserVersion.CHROME );
+        webClient.getOptions().setTimeout( 120000 );
+        webClient.getOptions().setRedirectEnabled( true );
+        webClient.getOptions().setJavaScriptEnabled( false );
+        webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
+        webClient.getOptions().setThrowExceptionOnScriptError( false );
+        webClient.getOptions().setCssEnabled( false );
+        webClient.getOptions().setUseInsecureSSL( true );
+        return webClient;
+    }
+
     @Bean( name = "gsonForLH" )
     public Gson getGsonForLittleHotelier() {
         // these are thread safe

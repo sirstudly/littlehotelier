@@ -20,7 +20,9 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.stereotype.Component;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.config.LittleHotelierConfig;
+import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.ShutdownException;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.ProcessorService;
@@ -39,9 +41,6 @@ public class RunProcessor
 
     @Autowired
     private FileService fileService;
-
-//    @Autowired
-//    private SchedulerService scheduler;
 
     // exclusive-file lock so only ever one instance of the processor is running
     private FileLock processorLock;
@@ -154,6 +153,14 @@ public class RunProcessor
         }
 
         try {
+            // if cloudbeds, check if we can connect first
+            // this will fail-fast if not
+            WordPressDAO dao = context.getBean( WordPressDAO.class );
+            if ( dao.isCloudbeds() ) {
+                WebClient c = context.getBean( "webClientForCloudbeds", WebClient.class );
+                c.close();
+            }
+
             // server-mode: keep the processor running
             if ( line.hasOption( "S" ) ) {
                 LOGGER.info( "Running in server-mode" );

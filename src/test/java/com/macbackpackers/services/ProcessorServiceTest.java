@@ -328,8 +328,8 @@ public class ProcessorServiceTest {
         LOGGER.info( "Found " + j.getDependentJobs().size() + " dependent jobs" );
         Assert.assertThat( j.getDependentJobs().size(), Matchers.is( 1 ) );
         Job dj = j.getDependentJobs().iterator().next();
-        Assert.assertThat( dj.getClass(), Matchers.is( AllocationScraperJob.class ) );
-        Assert.assertThat( dj.getId(), Matchers.is( j.getId() - 1 ) );
+        Assert.assertEquals( dj.getClass(), AllocationScraperJob.class );
+        Assert.assertEquals( dj.getId(), j.getId() - 1 );
     }
     
     @Test
@@ -483,12 +483,11 @@ public class ProcessorServiceTest {
 
     @Test
     public void testCreateCopyCardDetailsToCloudbedsJob() throws Exception {
-        for( int i = 1; i < 24; i++) {
-            CreateCopyCardDetailsToCloudbedsJob j = new CreateCopyCardDetailsToCloudbedsJob();
-            j.setStatus( JobStatus.submitted );
-            j.setBookingDate( LocalDate.now().withMonth( 6 ).withDayOfMonth( i ) );
-            dao.insertJob( j );
-        }
+        CreateCopyCardDetailsToCloudbedsJob j = new CreateCopyCardDetailsToCloudbedsJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingDate( LocalDate.now().withDayOfMonth( 11 ) );
+        j.setDaysAhead( 4 );
+        dao.insertJob( j );
     }
 
     @Test

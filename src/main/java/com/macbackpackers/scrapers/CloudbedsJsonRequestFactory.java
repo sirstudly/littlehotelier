@@ -27,6 +27,7 @@ import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.exceptions.MissingUserDataException;
 
 /**
  * Convenience class for creating JSON requests for Cloudbeds.
@@ -49,6 +50,10 @@ public class CloudbedsJsonRequestFactory {
 
     // the current cloudbeds version we're using
     private String version;
+    // the currently loaded user agent (cached)
+    private String userAgent;
+    // the cookies in use (cached)
+    private String cookies;
 
     /**
      * Returns the current cloudbeds version we're requesting against.
@@ -61,6 +66,36 @@ public class CloudbedsJsonRequestFactory {
             version = StringUtils.isNotBlank( currentVersion ) ? currentVersion : DEFAULT_VERSION;
         }
         return version;
+    }
+
+    /**
+     * Retrieves the current Cloudbeds user-agent.
+     * 
+     * @return non-null user agent
+     */
+    public String getUserAgent() {
+        if ( userAgent == null ) {
+            userAgent = dao.getOption( "hbo_cloudbeds_useragent" );
+            if ( userAgent == null ) {
+                throw new MissingUserDataException( "Missing Cloudbeds session (user-agent)" );
+            }
+        }
+        return userAgent;
+    }
+
+    /**
+     * Retrieves the current Cloudbeds cookies.
+     * 
+     * @return non-null cookies
+     */
+    public String getCookies() {
+        if( cookies == null ) {
+            cookies = dao.getOption( "hbo_cloudbeds_cookies" );
+            if ( cookies == null ) {
+                throw new MissingUserDataException( "Missing Cloudbeds session cookies" );
+            }
+        }
+        return cookies;
     }
 
     /**
@@ -81,9 +116,11 @@ public class CloudbedsJsonRequestFactory {
         requestSettings.setAdditionalHeader( "Accept-Language", "en-GB,en-US;q=0.9,en;q=0.8" );
         requestSettings.setAdditionalHeader( "Accept-Encoding", "gzip, deflate, br" );
         requestSettings.setAdditionalHeader( "X-Requested-With", "XMLHttpRequest" );
+        requestSettings.setAdditionalHeader( "X-Used-Method", "common.ajax" );
         requestSettings.setAdditionalHeader( "Cache-Control", "max-age=0" );
         requestSettings.setAdditionalHeader( "Origin", "https://hotels.cloudbeds.com" );
-        requestSettings.setAdditionalHeader( "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36" );
+        requestSettings.setAdditionalHeader( "User-Agent", getUserAgent() );
+        requestSettings.setAdditionalHeader( "Cookie", getCookies() );
         requestSettings.setCharset( StandardCharsets.UTF_8 );
         return requestSettings;
     }

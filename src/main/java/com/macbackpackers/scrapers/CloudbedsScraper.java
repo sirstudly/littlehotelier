@@ -2,7 +2,6 @@ package com.macbackpackers.scrapers;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.net.URL;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -12,8 +11,8 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -27,12 +26,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import com.gargoylesoftware.htmlunit.HttpMethod;
 import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
-import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -43,13 +40,11 @@ import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
-import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentCardNotAcceptedException;
 import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
-import com.macbackpackers.services.FileService;
 
 @Component
 public class CloudbedsScraper {
@@ -63,12 +58,6 @@ public class CloudbedsScraper {
     private Gson gson;
 
     @Autowired
-    private FileService fileService;
-    
-    @Autowired
-    private WordPressDAO dao;
-    
-    @Autowired
     private CloudbedsJsonRequestFactory jsonRequestFactory;
 
     @Value( "${cloudbeds.property.id:0}" )
@@ -78,29 +67,20 @@ public class CloudbedsScraper {
     private int MAX_RETRY;
     
     /**
-     * Verifies that we're logged in (or otherwise log us in if not).
+     * Verifies that we're logged in (or fails fast if not).
      * 
      * @param webClient web client instance to use
      * @throws IOException on connection error
      */
     public synchronized void validateLoggedIn( WebClient webClient ) throws IOException {
 
-        // don't allow multiple threads writing to the same cookie file at the same time
-        fileService.loadCookiesFromFile( webClient );
-
         // simple request to see if we're logged in
         Optional<CloudbedsJsonResponse> response = doGetUserPermissionRequest( webClient );
 
         // if user not logged in, then response is blank
         if ( false == response.isPresent() ) {
-            LOGGER.info( "I don't think we're logged in, doing it now." );
-            login( webClient );
-
-            // retry request
-            response = doGetUserPermissionRequest( webClient );
-            if ( false == response.isPresent() ) {
-                throw new UnrecoverableFault( "Unable to login? Incorrect username/password?" );
-            }
+            LOGGER.info( "Something's wrong. I don't think we're logged in. Session cookies may need to be updated." );
+            throw new UnrecoverableFault( "Not logged in. Update session data." );
         }
 
         // if user is logged in and correct version, response is one of either {"access": true} or {"access": false}
@@ -112,7 +92,7 @@ public class CloudbedsScraper {
 
             // if still nothing, then we fail here
             if ( false == response.isPresent() || false == response.get().isSuccess() ) {
-                throw new UnrecoverableFault( "Unable to login? Incorrect username/password?" );
+                throw new UnrecoverableFault( "Not logged in. Update session data." );
             }
         }
     }
@@ -158,61 +138,7 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Logs in with the saved credentials.
-     * 
-     * @param webClient web client instance to use
-     * @return logged in page
-     * @throws IOException on page load failure
-     */
-    public HtmlPage login( WebClient webClient ) throws IOException {
-        return login( webClient, dao.getOption( "hbo_cloudbeds_username" ), dao.getOption( "hbo_cloudbeds_password" ) );
-    }
-
-    /**
-     * Logs in with the given credentials.
-     * 
-     * @param webClient web client instance to use
-     * @param username username/email
-     * @param password password
-     * @return logged in page
-     * @throws IOException on page load failure.
-     */
-    public HtmlPage login( WebClient webClient, String username, String password ) throws IOException {
-
-        if ( StringUtils.isBlank( username ) || StringUtils.isBlank( password ) ) {
-            throw new UnrecoverableFault( "Missing login details for Cloudbeds." );
-        }
-        URL url = new URL( "https://hotels.cloudbeds.com/auth/login" );
-        WebRequest requestSettings = new WebRequest( url, HttpMethod.POST );
-
-        requestSettings.setAdditionalHeader( "Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8" );
-        requestSettings.setAdditionalHeader( "Content-Type", "application/x-www-form-urlencoded" );
-        requestSettings.setAdditionalHeader( "Referer", "https://hotels.cloudbeds.com/auth/login" );
-        requestSettings.setAdditionalHeader( "Accept-Language", "en-GB,en-US;q=0.9,en;q=0.8" );
-        requestSettings.setAdditionalHeader( "Accept-Encoding", "gzip, deflate, br" );
-        requestSettings.setAdditionalHeader( "Cache-Control", "no-cache" );
-        requestSettings.setAdditionalHeader("Origin", "https://hotels.cloudbeds.com");
-        requestSettings.setAdditionalHeader( "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36" );
-        requestSettings.setAdditionalHeader( "Upgrade-Insecure-Requests", "1" );
-
-        requestSettings.setRequestParameters( Arrays.asList(
-                new NameValuePair( "email", username ),
-                new NameValuePair( "password", password ),
-                new NameValuePair( "return_url", "" ) ) );
-
-        HtmlPage redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getBaseURI() );
-
-        if ( redirectPage.getBaseURI().contains( "/login" ) ) {
-            throw new UnrecoverableFault( "Login failed." );
-        }
-
-        fileService.writeCookiesToFile( webClient );
-        return redirectPage;
-    }
-
-    /**
-     * Goes to the Cloudbeds dashboard. Will login if required.
+     * Goes to the Cloudbeds dashboard.
      * 
      * @param webClient web client instance to use
      * @return dashboard page
@@ -222,9 +148,8 @@ public class CloudbedsScraper {
         HtmlPage loadedPage = webClient.getPage( "https://hotels.cloudbeds.com/connect/" + PROPERTY_ID );
         LOGGER.info( "Loading Dashboard." );
         if ( loadedPage.getUrl().getPath().contains( "/login" ) ) {
-            fileService.loadCookiesFromFile( webClient );
-            LOGGER.info( "Oops, we're not logged in. Logging in now." );
-            login( webClient, dao.getOption( "hbo_cloudbeds_username" ), dao.getOption( "hbo_cloudbeds_password" ) );
+            LOGGER.info( "Oops, I don't think we're logged in." );
+            throw new UnrecoverableFault( "Not logged in. Update session data." );
         }
         return loadedPage;
     }

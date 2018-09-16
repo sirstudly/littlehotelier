@@ -118,8 +118,8 @@ public class FileService {
     public void loadCookiesFromFile( WebClient webClient, String filename ) throws IOException {
 
         File file = new File( filename );
-        LOGGER.info( "loading cookies from file " + filename );
         if ( file.exists() ) {
+            LOGGER.info( "loading cookies from file " + filename );
             ObjectInputStream in = new ObjectInputStream( new FileInputStream( file ) );
             try {
                 @SuppressWarnings( "unchecked" )
@@ -135,6 +135,9 @@ public class FileService {
             finally {
                 in.close();
             }
+        }
+        else {
+            LOGGER.info( "No cookies file found." );
         }
     }
 

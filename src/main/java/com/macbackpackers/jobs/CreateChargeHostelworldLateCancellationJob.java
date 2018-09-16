@@ -36,7 +36,7 @@ public class CreateChargeHostelworldLateCancellationJob extends AbstractJob {
     @Transactional
     public void processJob() throws Exception {
         cbService.createChargeHostelworldLateCancellationJobs( cbWebClient,
-                LocalDate.now().minusDays( 1 ), LocalDate.now() );
+                LocalDate.now().minusDays( 5 ), LocalDate.now() );
     }
 
     @Override
