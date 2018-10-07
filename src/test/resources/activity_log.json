@@ -1,67 +1,41 @@
-{
-    "success": true,
-    "aaData": 
-    [
-        [
-            "18\/08\/2018 11:29 AM<br \/>System",
-            "<div class=\"activityLog_modify\"><\/div>Reservation updated via myallocator <a href=\"#\" class=\"activityLogShowDetails\">Show Details<\/a><br \/><div class=\"activityLogDetails\">Reservation <a href=\"https:\/\/hotels.cloudbeds.com\/connect\/17363#\/reservations\/r4265659476\">4265659476<\/a> has been updated via a channel<\/div>"
-        ],
-
-        [
-            "18\/08\/2018 11:29 AM<br \/>System",
-            "<div class=\"activityLog_modify\"><\/div>Reservation Status Modified <a href=\"#\" class=\"activityLogShowDetails\">Show Details<\/a><br \/><div class=\"activityLogDetails\">Reservation Status Modified from Confirmed to Cancelled for <a href=\"https:\/\/hotels.cloudbeds.com\/connect\/17363#\/reservations\/r4265659476\">4265659476<\/a><\/div>"
-        ],
-
-        [
-            "18\/08\/2018 11:29 AM<br \/>System",
-            "<div class=\"activityLog_delete\"><\/div>Room Assignment Removed <a href=\"#\" class=\"activityLogShowDetails\">Show Details<\/a><br \/><div class=\"activityLogDetails\">Room 53 has its assignment removed from 18\/08\/2018 to 19\/08\/2018 on reservation <a href=\"https:\/\/hotels.cloudbeds.com\/connect\/17363#\/reservations\/r4265659476\">4265659476<\/a><\/div>"
-        ],
-
-        [
-            "16\/06\/2018 02:08 AM<br \/>Jamie Porten",
-            "<div class=\"activityLog_modify\"><\/div>Reservation Status Modified <a href=\"#\" class=\"activityLogShowDetails\">Show Details<\/a><br \/><div class=\"activityLogDetails\">Reservation Status Modified from Confirmation Pending to Confirmed for <a href=\"https:\/\/hotels.cloudbeds.com\/connect\/17363#\/reservations\/r4265659476\">4265659476<\/a><\/div>"
-        ],
-
-        [
-            "02\/06\/2018 12:44 PM<br \/>Jamie Porten",
-            "<div class=\"activityLog_create\"><\/div>Room Assigned <a href=\"#\" class=\"activityLogShowDetails\">Show Details<\/a><br \/><div class=\"activityLogDetails\">Room 53 assigned from 18\/08\/2018 to 19\/08\/2018 on reservation <a href=\"https:\/\/hotels.cloudbeds.com\/connect\/17363#\/reservations\/r4265659476\">4265659476<\/a><\/div>"
-        ],
-
-        [
-            "30\/05\/2018 04:41 PM<br \/>System",
-            "<div class=\"activityLog_create\"><\/div>Payment Added to a Reservation <a href=\"#\" class=\"activityLogShowDetails\">Show Details<\/a><br \/><div class=\"activityLogDetails\"> Payment of \u00a3 15.73 added to <a href=\"https:\/\/hotels.cloudbeds.com\/connect\/17363#\/reservations\/r4265659476\">4265659476<\/a><\/div>"
-        ],
-
-        [
-            "30\/05\/2018 04:41 PM<br \/>System",
-            "<div class=\"activityLog_create\"><\/div>Reservation Created <a href=\"#\" class=\"activityLogShowDetails\">Show Details<\/a><br \/><div class=\"activityLogDetails\">Reservation created via Import with status Confirmation Pending for Basic Double Room on 18\/08\/2018 through 19\/08\/2018. Reservation <a href=\"https:\/\/hotels.cloudbeds.com\/connect\/17363#\/reservations\/r4265659476\">#4265659476<\/a><\/div>"
-        ],
-
-        [
-            "30\/05\/2018 04:41 PM<br \/>System",
-            "<div class=\"activityLog_create\"><\/div>Room Added <a href=\"#\" class=\"activityLogShowDetails\">Show Details<\/a><br \/><div class=\"activityLogDetails\">Room 4265659476 (Basic Double Room) from 18\/08\/2018 to 19\/08\/2018 was added to reservation <a href=\"https:\/\/hotels.cloudbeds.com\/connect\/17363#\/reservations\/r4265659476\">4265659476<\/a><\/div>"
-        ]
-    ],
-
-    "iTotalRecords": "8",
-    "iTotalDisplayRecords": "8",
-    "trialLeft": null,
-    "accountStatus": 
-    {
-        "billing": 
-        {
-            "billing_portal_id": "36165",
-            "is_bp_setup_completed": "1",
-            "billing_offers": 
-            [
-                
-            ]
-        },
-
-        "hide_overdue_notice": false
-    },
-
-    "isAcceptedTosAgreement": true,
-    "announcementsNew": null,
-    "pie_new_sys_events_num": 0
+{"success":true,
+	"aaData":
+		[
+			["06\/10\/2018 08:30 AM",
+				"CRH Reception<br \/>castlerock+1@macbackpackers.com",
+				"<div class=\"activityLog_modify\"><\/div>Reservation Status Modified<br \/><div class=\"activityLogDetails\">Reservation Status Modified from Confirmed to Cancelled for Reservation <a href=\"https:\/\/macbackpackers.cloudbeds.com\/connect\/17363#\/reservations\/r2507671832\">#2507671832<\/a><\/div>"],
+			["06\/10\/2018 08:30 AM",
+				"CRH Reception<br \/>castlerock+1@macbackpackers.com",
+				"<div class=\"activityLog_delete\"><\/div>Room Assignment Removed<br \/><div class=\"activityLogDetails\">Room 23-12- Hearts has its assignment removed from 07\/10\/2018 to 08\/10\/2018 on Reservation <a href=\"https:\/\/macbackpackers.cloudbeds.com\/connect\/17363#\/reservations\/r2507671832\">#2507671832<\/a><\/div>"],
+			["30\/09\/2018 10:48 PM",
+				"CRH Reception<br \/>castlerock+1@macbackpackers.com",
+				"<div class=\"activityLog_modify\"><\/div>Room Assignment Modified<br \/><div class=\"activityLogDetails\">Reservation <a href=\"https:\/\/macbackpackers.cloudbeds.com\/connect\/17363#\/reservations\/r2507671832\">#2507671832<\/a> reassigned from accomodation 23-11- Hibs to 23-12- Hearts for 07\/10\/2018 through 08\/10\/2018<\/div>"],
+			["13\/08\/2018 02:24 AM",
+				"CRH Reception<br \/>castlerock+1@macbackpackers.com",
+				"<div class=\"activityLog_modify\"><\/div>Room Assignment Modified<br \/><div class=\"activityLogDetails\">Reservation <a href=\"https:\/\/macbackpackers.cloudbeds.com\/connect\/17363#\/reservations\/r2507671832\">#2507671832<\/a> reassigned from accomodation 23-04- Fort Willam to 23-11- Hibs for 07\/10\/2018 through 08\/10\/2018<\/div>"],
+			["29\/07\/2018 12:21 PM",
+				"System",
+				"<div class=\"activityLog_create\"><\/div>Reservation received via myallocator<br \/><div class=\"activityLogDetails\">Reservation received from Hostelworld & Hostelbookers for 16 Bed Mixed Dormitory on 07\/10\/2018 through 08\/10\/2018. Reservation <a href=\"https:\/\/macbackpackers.cloudbeds.com\/connect\/17363#\/reservations\/r2507671832\"#>2507671832<\/a><\/div>"],
+			["29\/07\/2018 12:21 PM",
+				"System",
+				"<div class=\"activityLog_create\"><\/div>Reservation Created<br \/><div class=\"activityLogDetails\">Reservation created via Myallocator with status Confirmed for 16 Bed Mixed Dormitory on 07\/10\/2018 through 08\/10\/2018. Reservation <a href=\"https:\/\/macbackpackers.cloudbeds.com\/connect\/17363#\/reservations\/r2507671832\">#2507671832<\/a><\/div>"],
+			["29\/07\/2018 12:21 PM",
+				"System",
+				"<div class=\"activityLog_create\"><\/div>Room Assigned<br \/><div class=\"activityLogDetails\">Room 23-04- Fort Willam assigned from 07\/10\/2018 to 08\/10\/2018 on Reservation <a href=\"https:\/\/macbackpackers.cloudbeds.com\/connect\/17363#\/reservations\/r2507671832\">#2507671832<\/a><\/div>"],
+			["29\/07\/2018 12:21 PM",
+				"System",
+				"<div class=\"activityLog_create\"><\/div>Room Added<br \/><div class=\"activityLogDetails\">Room 2507671832 (16 Bed Mixed Dormitory) from 07\/10\/2018 to 08\/10\/2018 was added to Reservation <a href=\"https:\/\/macbackpackers.cloudbeds.com\/connect\/17363#\/reservations\/r2507671832\">#2507671832<\/a><\/div>"]],
+	"iTotalRecords":"8",
+	"iTotalDisplayRecords":"8",
+	"trialLeft":null,
+	"accountStatus":{
+		"billing":{
+			"billing_portal_id":"36165",
+			"is_bp_setup_completed":"1",
+			"billing_offers":[]
+		},
+		"hide_overdue_notice":false
+	},"isAcceptedTosAgreement":true,
+	"announcementsNew":null,
+	"pie_new_sys_events_num":0
 }

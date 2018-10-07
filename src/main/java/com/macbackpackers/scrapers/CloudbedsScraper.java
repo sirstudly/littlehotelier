@@ -6,6 +6,7 @@ import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -631,16 +632,14 @@ public class CloudbedsScraper {
         List<ActivityLogEntry> logEntries = new ArrayList<ActivityLogEntry>();
         jelement.getAsJsonObject().get( "aaData" ).getAsJsonArray().forEach( e -> {
             ActivityLogEntry ent = new ActivityLogEntry();
-            Pattern p = Pattern.compile( "(.*)<br />(.*)" );
-            Matcher m = p.matcher( e.getAsJsonArray().get( 0 ).getAsString() );
-            if ( m.find() ) {
-                ent.setCreatedDate( LocalDateTime.parse( m.group( 1 ), DD_MM_YYYY_HH_MM ) );
-                ent.setCreatedBy( m.group( 2 ) );
+            try {
+                ent.setCreatedDate( LocalDateTime.parse( e.getAsJsonArray().get( 0 ).getAsString(), DD_MM_YYYY_HH_MM ) );
+                ent.setCreatedBy( e.getAsJsonArray().get( 1 ).getAsString() );
             }
-            else {
-                throw new MissingUserDataException( "Failed to parse activity log entry: " + e.getAsJsonArray().get( 0 ).getAsString() );
+            catch ( DateTimeParseException ex ) {
+                throw new RuntimeException( "Failed to parse activity log entry: " + e.getAsJsonArray().get( 0 ).getAsString() );
             }
-            ent.setContents( e.getAsJsonArray().get( 1 ).getAsString() );
+            ent.setContents( e.getAsJsonArray().get( 2 ).getAsString() );
             logEntries.add( ent );
         } );
         return logEntries;
