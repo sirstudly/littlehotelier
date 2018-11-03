@@ -30,7 +30,9 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AgodaChargeJob;
 import com.macbackpackers.jobs.AgodaNoChargeNoteJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
+import com.macbackpackers.jobs.BookingReportJob;
 import com.macbackpackers.jobs.ChargeNonRefundableBookingJob;
+import com.macbackpackers.jobs.CloudbedsAllocationScraperWorkerJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CopyCardDetailsFromLHJob;
 import com.macbackpackers.jobs.CreateAgodaNoChargeNoteJob;
@@ -506,5 +508,35 @@ public class ProcessorServiceTest {
         j.setDaysAhead( 15 );
         dao.insertJob( j );
     }
+    
+    @Test
+    public void testCreateAllocationScraperWorkerJob() throws Exception {
+        // dumps all bookings between date range
+        LocalDate currentDate = LocalDate.parse("2018-05-25");
+        LocalDate endDate = LocalDate.parse( "2018-10-06" );
+        while ( currentDate.isBefore( endDate ) ) {
+            CloudbedsAllocationScraperWorkerJob workerJob = new CloudbedsAllocationScraperWorkerJob();
+            workerJob.setStatus( JobStatus.submitted );
+            workerJob.setAllocationScraperJobId( 440052 ); // dbpurge job (no recs)
+            workerJob.setStartDate( currentDate );
+            workerJob.setEndDate( currentDate.plusDays( 7 ) );
+            dao.insertJob( workerJob );
+            currentDate = currentDate.plusDays( 7 ); // calendar page shows 2 weeks at a time
+        }
+    }
 
+    @Test
+    public void testCreateBookingReportJob() throws Exception {
+        // dumps all bookings between date range
+        LocalDate currentDate = LocalDate.parse("2018-05-28");
+        LocalDate endDate = LocalDate.parse( "2018-10-23" );
+        while ( currentDate.isBefore( endDate ) ) {
+            BookingReportJob workerJob = new BookingReportJob();
+            workerJob.setStatus( JobStatus.submitted );
+            workerJob.setStartDate( currentDate );
+            workerJob.setEndDate( currentDate.plusDays( 4 ) );
+            dao.insertJob( workerJob );
+            currentDate = currentDate.plusDays( 5 ); // dates are inclusive, +1
+        }
+    }
 }

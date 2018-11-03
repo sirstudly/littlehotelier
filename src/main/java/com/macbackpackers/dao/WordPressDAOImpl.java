@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BookingByCheckinDate;
+import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
@@ -104,6 +105,51 @@ public class WordPressDAOImpl implements WordPressDAO {
         else {
             LOGGER.info( "Nothing to update." );
         }
+    }
+
+    @Override
+    public void insertBookingReport( List<BookingReport> bookingReport ) {
+        if ( bookingReport.size() > 0 ) {
+            Query q = em.createNativeQuery( getBulkInsertBookingReportStatement( bookingReport ) );
+            for ( int i = 0 ; i < bookingReport.size() ; i++ ) {
+                BookingReport a = bookingReport.get( i );
+                Object params[] = a.getAsParameters();
+                for ( int j = 0 ; j < params.length ; j++ ) {
+                    q.setParameter( i * params.length + j + 1, params[j] );
+                }
+            }
+            int rowsInserted = q.executeUpdate();
+            LOGGER.info( rowsInserted + " booking report rows inserted." );
+        }
+        else {
+            LOGGER.info( "Nothing to insert." );
+        }
+    }
+    
+    @Override
+    public void deleteBookingReport( int jobId ) {
+        int rowsDeleted = em
+            .createQuery( "DELETE BookingReport WHERE jobId = :jobId" )
+            .setParameter( "jobId", jobId )
+            .executeUpdate();
+        LOGGER.info( rowsDeleted + " booking report rows deleted." );
+    }
+
+    /**
+     * Returns bulk insert statement.
+     * 
+     * @param bookingReport booking report entries to insert
+     * @return SQL statement
+     */
+    private String getBulkInsertBookingReportStatement( List<BookingReport> bookingReport ) {
+        if ( bookingReport.isEmpty() ) {
+            throw new IllegalStateException( "Nothing to insert!" );
+        }
+        String columnNames = BookingReport.getColumnNames();
+        int paramCount = StringUtils.countMatches( columnNames, ',' ) + 1;
+        return "INSERT INTO " + BookingReport.getTableName() + "(" + columnNames + ") VALUES " +
+                StringUtils.repeat(
+                        "(" + StringUtils.repeat( "?", ",", paramCount ) + ")", ",", bookingReport.size() );
     }
 
     @Override

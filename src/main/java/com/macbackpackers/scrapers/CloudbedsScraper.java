@@ -228,17 +228,31 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Get all reservations staying between the given checkin date range.
+     * Get all reservations staying between the given stay date range.
      * 
      * @param webClient web client instance to use
      * @param stayDateStart stay date (inclusive)
-     * @param stayDateEnd stay date (exclusive)
+     * @param stayDateEnd stay date (inclusive)
      * @return non-null list of customer reservations
      * @throws IOException
      */
     public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByStayDate(
                 stayDateStart, stayDateEnd ) );
+    }
+
+    /**
+     * Get all reservations staying between the given checkin date range.
+     * 
+     * @param webClient web client instance to use
+     * @param checkinDateStart checkin date (inclusive)
+     * @param checkinDateEnd checkin date (inclusive)
+     * @return non-null list of customer reservations
+     * @throws IOException
+     */
+    public List<Customer> getReservationsByCheckinDate( WebClient webClient, LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
+        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByCheckinDate(
+                checkinDateStart, checkinDateEnd ) );
     }
 
     /**

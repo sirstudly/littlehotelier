@@ -24,6 +24,7 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.RoomBed;
@@ -93,6 +94,23 @@ public class CloudbedsService {
     }
 
     /**
+     * Dumps the reservations starting on the given date (inclusive).
+     * 
+     * @param webClient web client instance to use
+     * @param jobId the job ID to associate with this dump
+     * @param startDate the start date to check reservations for (inclusive)
+     * @param endDate the end date to check reservations for (inclusive)
+     * @throws IOException on read/write error
+     */
+    public void dumpBookingReportFrom( WebClient webClient, int jobId, LocalDate startDate, LocalDate endDate ) throws IOException {
+        List<BookingReport> bookingReport = scraper.getReservationsByCheckinDate( webClient, startDate, endDate ).stream()
+                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .map( r -> new BookingReport( jobId, r ) )
+                .collect( Collectors.toList() );
+        dao.insertBookingReport( bookingReport );
+    }
+
+    /**
      * Finds all staff allocations for the given date (and the day after):
      * <ul>
      * <li>If stayDate is staff bed, stayDate + 1 is staff bed -&gt; allocation for 2 days
@@ -155,6 +173,37 @@ public class CloudbedsService {
         return bedNameAllocations.values().stream().collect( Collectors.toList() );
     }
     
+    /**
+     * Finds all staff allocations for the given date. Use this to dump raw "staff" data.
+     * 
+     * @param webClient web client instance to use
+     * @param stayDate the date we're searching on
+     * @return non-null List of all Allocations (blocked/out of service)
+     * @throws IOException on failure
+     */
+    public List<Allocation> getAllStaffAllocationsDaily( WebClient webClient, LocalDate stayDate ) throws IOException {
+
+        JsonObject rpt = scraper.getAllStaffAllocations( webClient, stayDate );
+        List<String> staffBeds = extractStaffBedsFromRoomAssignmentReport( rpt, stayDate );
+
+        Map<RoomBedLookup, RoomBed> roomBedMap = dao.fetchAllRoomBeds();
+        Map<RoomBedLookup, Allocation> bedNameAllocations = new HashMap<>();
+        staffBeds.forEach( bedname -> {
+                BedAssignment bedAssign = roomBedMatcher.parse( bedname );
+                RoomBedLookup lookupKey = new RoomBedLookup( bedAssign.getRoom(), bedAssign.getBedName() );
+                RoomBed rb = roomBedMap.get( lookupKey );
+                if ( rb == null ) {
+                    throw new MissingUserDataException( "Missing mapping for " + lookupKey );
+                }
+                Allocation a = createAllocationFromRoomBed( rb );
+                a.setCheckinDate( stayDate );
+                a.setCheckoutDate( stayDate.plusDays( 1 ) );
+                bedNameAllocations.put( lookupKey, a );
+            } );
+
+        return bedNameAllocations.values().stream().collect( Collectors.toList() );
+    }
+
     /**
      * Finds all HWL cancellations between the given dates and:
      * <ul>

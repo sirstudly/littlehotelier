@@ -20,6 +20,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String firstName;
     private String lastName;
     private String email;
+    private String countryName;
     private String customerId;
     private BigDecimal grandTotal;
     private String bookingDeposit;
@@ -82,6 +83,14 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setEmail( String email ) {
         this.email = email;
+    }
+
+    public String getCountryName() {
+        return countryName;
+    }
+
+    public void setCountryName( String countryName ) {
+        this.countryName = countryName;
     }
 
     public String getCustomerId() {

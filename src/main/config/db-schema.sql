@@ -264,6 +264,29 @@ CREATE TABLE `wp_lh_rooms` (
   KEY `lh_r_idx` (`room`,`bed_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+-- used for analytic reporting
+CREATE TABLE `rpt_bookings` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `job_id` bigint(20) unsigned NOT NULL,
+  `reservation_id` bigint(20) unsigned DEFAULT NULL,
+  `guest_name` varchar(255) DEFAULT NULL,
+  `checkin_date` datetime NOT NULL,
+  `checkout_date` datetime NOT NULL,
+  `booking_reference` varchar(50) DEFAULT NULL,
+  `booking_source` varchar(50) DEFAULT NULL,
+  `country` varchar(50) DEFAULT NULL,
+  `payment_total` decimal(10,2) DEFAULT NULL,
+  `paid_value` decimal(10,2) DEFAULT NULL,
+  `num_guests` int(10) unsigned DEFAULT NULL,
+  `booked_date` timestamp NULL DEFAULT NULL,
+  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `rpt_bookings_checkin` (`job_id`,`checkin_date`),
+  KEY `rpt_bookings_checkout` (`job_id`,`checkout_date`),
+  KEY `rpt_bookings_job_id` (`job_id`),
+  KEY `rpt_bookings_job_id_reservationid` (`job_id`,`reservation_id`),
+  KEY `rpt_bookings_job_id_bookingref` (`booking_reference`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 -- If you're dumping the table from wp_lh_calendar; then you'll need to fill these in manually
 

@@ -14,6 +14,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BookingByCheckinDate;
+import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
@@ -63,6 +64,20 @@ public interface WordPressDAO {
      * @param allocations new allocations to create
      */
     public void insertAllocations( AllocationList allocations );
+
+    /**
+     * Insert booking report records.
+     * 
+     * @param bookingReport records to insert
+     */
+    public void insertBookingReport( List<BookingReport> bookingReport );
+
+    /**
+     * Delete booking report records by jobId.
+     * 
+     * @param jobId job id
+     */
+    public void deleteBookingReport( int jobId );
 
     /**
      * Updates attributes on an existing allocation.
