@@ -3,6 +3,7 @@ package com.macbackpackers.beans;
 
 import java.util.Optional;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 
@@ -13,8 +14,8 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 public class RoomBedLookup extends RoomBed {
 
     public RoomBedLookup( String room, String bedName ) {
-        setRoom( room );
-        setBedName( bedName );
+        setRoom( StringUtils.trim( room ) );
+        setBedName( StringUtils.trim( bedName ) );
     }
 
     @Override
