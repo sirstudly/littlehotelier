@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
@@ -41,10 +42,12 @@ import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.GuestDetails;
 import com.macbackpackers.beans.Payment;
 import com.macbackpackers.beans.PxPostTransaction;
+import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.xml.TxnResponse;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.AgodaScraper;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
@@ -307,6 +310,72 @@ public class PaymentProcessorService {
         catch ( MissingUserDataException ex ) {
             reservationPageScraper.appendNote( reservationPage,
                     ex.getMessage() + " - " + DATETIME_FORMAT.format( new Date() ) + "\n" );
+        }
+    }
+
+    /**
+     * Record a completed Sagepay transaction in Cloudbeds. Either add payment info or add a note
+     * (in case of a decline).
+     * 
+     * @param id PK of wp_sagepay_tx_auth
+     * @throws RecordPaymentFailedException on record payment failure
+     * @throws IOException on i/o error
+     */
+    public synchronized void processSagepayTransaction( int id ) throws IOException, RecordPaymentFailedException {
+
+        try (WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class )) {
+            SagepayTransaction txn = wordpressDAO.fetchSagepayTransaction( id );
+            switch ( txn.getAuthStatus() ) {
+                case "OK":
+                    cloudbedsScraper.addPayment( webClient, txn.getReservationId(), txn.getMappedCardType(), txn.getPaymentAmount(),
+                            String.format( "VendorTxCode: %s, Status: %s, Detail: %s, VPS Auth Code: %s, "
+                                    + "Card Type: %s, Card Number: ************%s, Auth Code: %s",
+                                    txn.getVendorTxCode(), txn.getAuthStatus(), txn.getAuthStatusDetail(), txn.getVpsAuthCode(),
+                                    txn.getCardType(), txn.getLastFourDigits(), txn.getBankAuthCode() ) );
+                    try {
+                        cloudbedsScraper.sendSagepayPaymentConfirmationEmail( webClient, txn.getReservationId(), txn );
+                    }
+                    catch ( Exception ex ) {
+                        // don't fail the job if we can't send the email; log and continue
+                        LOGGER.error( "Failed to send email.", ex );
+                    }
+                    break;
+                case "NOTAUTHED":
+                    cloudbedsScraper.addNote( webClient, txn.getReservationId(),
+                            String.format( "The Sage Pay gateway could not authorise the transaction because "
+                                    + "the details provided by the customer were incorrect, or "
+                                    + "insufficient funds were available.\n"
+                                    + "VendorTxCode: %s\nStatus: %s\nDetail: %s\nCard Type: %s\nCard Number: ************%s\nDecline Code: %s",
+                                    txn.getVendorTxCode(), txn.getAuthStatus(), txn.getAuthStatusDetail(),
+                                    txn.getCardType(), txn.getLastFourDigits(), txn.getBankDeclineCode() ) );
+                    break;
+                case "PENDING":
+                    cloudbedsScraper.addNote( webClient, txn.getReservationId(),
+                            String.format( "Pending Sagepay transaction %s: This will be updated "
+                                    + "by Sage Pay when we receive a notification from PPRO.",
+                                    txn.getVendorTxCode() ) );
+                    break;
+                case "ABORT":
+                    cloudbedsScraper.addNote( webClient, txn.getReservationId(),
+                            String.format( "Aborted Sagepay transaction %s for %s",
+                                    txn.getVendorTxCode(),
+                                    NumberFormat.getCurrencyInstance().format( txn.getPaymentAmount() ) ) );
+                    break;
+                case "REJECTED":
+                    cloudbedsScraper.addNote( webClient, txn.getReservationId(),
+                            String.format( "The Sage Pay System rejected transaction %s because of the fraud "
+                                    + "screening rules (e.g. AVS/CV2 or 3D Secure) you have set on your account.",
+                                    txn.getVendorTxCode() ) );
+                    break;
+                case "ERROR":
+                    cloudbedsScraper.addNote( webClient, txn.getReservationId(),
+                            String.format( "A problem occurred at Sage Pay which prevented transaction %s registration. This is not normal! Contact SagePay!",
+                                    txn.getVendorTxCode() ) );
+                    LOGGER.error( "Unexpected SagePay error for transaction " + txn.getVendorTxCode() );
+                    break;
+                default:
+                    LOGGER.error( String.format( "Unsupported AUTH status %s for transaction %s", txn.getAuthStatus(), txn.getVendorTxCode() ) );
+            }
         }
     }
 

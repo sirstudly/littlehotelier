@@ -44,6 +44,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
+import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
@@ -932,6 +933,24 @@ public class WordPressDAOImpl implements WordPressDAO {
             throw new EmptyResultDataAccessException( "Unable to find PxPostTransaction with ID " + txn, 1 );
         }
         return txn;
+    }
+
+    @Override
+    public SagepayTransaction fetchSagepayTransaction( int id ) {
+        SagepayTransaction txn = em.find( SagepayTransaction.class, id );
+        if ( txn == null ) {
+            throw new EmptyResultDataAccessException( "Unable to find SagepayTransaction with ID " + id, 1 );
+        }
+        return txn;
+    }
+
+    @Override
+    public void updateSagepayTransactionProcessedDate( int id ) {
+        em.createNativeQuery( "UPDATE wp_sagepay_tx_auth "
+                + "SET processed_date = NOW(), last_updated_date = NOW() "
+                + "WHERE id = :id" )
+                .setParameter( "id", id )
+                .executeUpdate();
     }
 
     @Override

@@ -24,6 +24,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
+import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
@@ -462,6 +463,21 @@ public interface WordPressDAO {
      * @return non-null transaction
      */
     public PxPostTransaction fetchPxPostTransaction( int txnId );
+
+    /**
+     * Fetch Sagepay transaction record by primary key.
+     * 
+     * @param id unique PK on wp_sagepay_tx_auth
+     * @return non-null transaction
+     */
+    public SagepayTransaction fetchSagepayTransaction( int id );
+
+    /**
+     * Sets the processed/last updated date on the transaction record to now.
+     * 
+     * @param id unique PK on wp_sagepay_tx_auth
+     */
+    public void updateSagepayTransactionProcessedDate( int id );
 
     /**
      * Returns the last px post transaction for a given booking reference.

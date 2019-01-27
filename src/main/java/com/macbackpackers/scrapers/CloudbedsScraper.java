@@ -36,6 +36,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
@@ -704,6 +705,29 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public EmailTemplateInfo getHostelworldLateCancellationEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, "Hostelworld Cancellation Charge" );
+    }
+
+    /**
+     * Retrieves the Sagepay confirmation email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getSagepayPaymentConfirmationEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, "Sagepay Payment Confirmation" );
+    }
+
+    /**
+     * Retrieves an email template.
+     * 
+     * @param webClient web client instance to use
+     * @param templateName name of template
+     * @return non-null email template
+     * @throws IOException
+     */
+    private EmailTemplateInfo fetchEmailTemplate( WebClient webClient, String templateName ) throws IOException {
 
         Page redirectPage = webClient.getPage( jsonRequestFactory.createGetPropertyContent() );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
@@ -712,7 +736,7 @@ public class CloudbedsScraper {
                 gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ).getAsJsonObject()
                         .get( "email_templates" ).getAsJsonArray().spliterator(),
                 false )
-                .filter( t -> "Hostelworld Cancellation Charge".equals( t.getAsJsonObject().get( "template_name" ).getAsString() ) )
+                .filter( t -> templateName.equals( t.getAsJsonObject().get( "template_name" ).getAsString() ) )
                 .findFirst();
 
         if ( false == emailTemplate.isPresent() ) {
@@ -741,6 +765,37 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
                 template, res.getIdentifier(), res.getCustomerId(), reservationId,
                 res.getEmail(), b -> b.replaceAll( "\\[first night charge\\]", "£" + CURRENCY_FORMAT.format( amount ) ) );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + reservationId );
+        }
+    }
+
+    /**
+     * Sends an email to the guest for a successful payment.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param txn successful transaction
+     * @throws IOException
+     */
+    public void sendSagepayPaymentConfirmationEmail( WebClient webClient, String reservationId, SagepayTransaction txn ) throws IOException {
+
+        EmailTemplateInfo template = getSagepayPaymentConfirmationEmailTemplate( webClient );
+        Reservation res = getReservation( webClient, reservationId );
+
+        WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
+                template, res.getIdentifier(), res.getCustomerId(), reservationId,
+                txn.getEmail(), 
+                b -> b.replaceAll( "\\[vendor tx code\\]", txn.getVendorTxCode() )
+                    .replaceAll( "\\[payment total\\]", CURRENCY_FORMAT.format( txn.getPaymentAmount() ) )
+                    .replaceAll( "\\[card type\\]", txn.getCardType() )
+                    .replaceAll( "\\[last 4 digits\\]", txn.getLastFourDigits() ));
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
