@@ -24,6 +24,7 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.ShutdownException;
+import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.ProcessorService;
 
@@ -158,6 +159,8 @@ public class RunProcessor
             WordPressDAO dao = context.getBean( WordPressDAO.class );
             if ( dao.isCloudbeds() ) {
                 WebClient c = context.getBean( "webClientForCloudbeds", WebClient.class );
+                CloudbedsScraper cloudbedsScraper = context.getBean( CloudbedsScraper.class );
+                cloudbedsScraper.getReservations( c, "999999999" ); // keep session alive
                 c.close();
             }
 
