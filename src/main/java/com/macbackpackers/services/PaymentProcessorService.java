@@ -327,19 +327,28 @@ public class PaymentProcessorService {
             SagepayTransaction txn = wordpressDAO.fetchSagepayTransaction( id );
             switch ( txn.getAuthStatus() ) {
                 case "OK":
-                    cloudbedsScraper.addPayment( webClient, txn.getReservationId(), txn.getMappedCardType(), txn.getPaymentAmount(),
-                            String.format( "VendorTxCode: %s, Status: %s, Detail: %s, VPS Auth Code: %s, "
-                                    + "Card Type: %s, Card Number: ************%s, Auth Code: %s",
-                                    txn.getVendorTxCode(), txn.getAuthStatus(), txn.getAuthStatusDetail(), txn.getVpsAuthCode(),
-                                    txn.getCardType(), txn.getLastFourDigits(), txn.getBankAuthCode() ) );
-                    try {
-                        cloudbedsScraper.sendSagepayPaymentConfirmationEmail( webClient, txn.getReservationId(), txn );
+                    // check if payment already exists
+                    Reservation res = cloudbedsScraper.getReservationRetry( webClient, txn.getReservationId() );
+                    if( cloudbedsScraper.isExistsSagepayPaymentWithVendorTxCode( webClient, res, txn.getVendorTxCode() ) ) {
+                        LOGGER.info( "Transaction " + txn.getVendorTxCode() + " has already been processed. Nothing to do." );
                     }
-                    catch ( Exception ex ) {
-                        // don't fail the job if we can't send the email; log and continue
-                        LOGGER.error( "Failed to send email.", ex );
+                    else {
+                        cloudbedsScraper.addPayment( webClient, res, txn.getMappedCardType(), txn.getPaymentAmount(),
+                                String.format( "VendorTxCode: %s, Status: %s, Detail: %s, VPS Auth Code: %s, "
+                                        + "Card Type: %s, Card Number: ************%s, Auth Code: %s",
+                                        txn.getVendorTxCode(), txn.getAuthStatus(), txn.getAuthStatusDetail(), txn.getVpsAuthCode(),
+                                        txn.getCardType(), txn.getLastFourDigits(), txn.getBankAuthCode() ) );
+                        try {
+                            cloudbedsScraper.sendSagepayPaymentConfirmationEmail( webClient, res, txn );
+                        }
+                        catch ( Exception ex ) {
+                            // don't fail the job if we can't send the email; log and continue
+                            LOGGER.error( "Failed to send email.", ex );
+                        }
                     }
+                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
                     break;
+
                 case "NOTAUTHED":
                     cloudbedsScraper.addNote( webClient, txn.getReservationId(),
                             String.format( "The Sage Pay gateway could not authorise the transaction because "
@@ -348,31 +357,41 @@ public class PaymentProcessorService {
                                     + "VendorTxCode: %s\nStatus: %s\nDetail: %s\nCard Type: %s\nCard Number: ************%s\nDecline Code: %s",
                                     txn.getVendorTxCode(), txn.getAuthStatus(), txn.getAuthStatusDetail(),
                                     txn.getCardType(), txn.getLastFourDigits(), txn.getBankDeclineCode() ) );
+                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
                     break;
+
                 case "PENDING":
                     cloudbedsScraper.addNote( webClient, txn.getReservationId(),
                             String.format( "Pending Sagepay transaction %s: This will be updated "
                                     + "by Sage Pay when we receive a notification from PPRO.",
                                     txn.getVendorTxCode() ) );
+                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
                     break;
+
                 case "ABORT":
                     cloudbedsScraper.addNote( webClient, txn.getReservationId(),
                             String.format( "Aborted Sagepay transaction %s for %s",
                                     txn.getVendorTxCode(),
                                     NumberFormat.getCurrencyInstance().format( txn.getPaymentAmount() ) ) );
+                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
                     break;
+
                 case "REJECTED":
                     cloudbedsScraper.addNote( webClient, txn.getReservationId(),
                             String.format( "The Sage Pay System rejected transaction %s because of the fraud "
                                     + "screening rules (e.g. AVS/CV2 or 3D Secure) you have set on your account.",
                                     txn.getVendorTxCode() ) );
+                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
                     break;
+
                 case "ERROR":
                     cloudbedsScraper.addNote( webClient, txn.getReservationId(),
                             String.format( "A problem occurred at Sage Pay which prevented transaction %s registration. This is not normal! Contact SagePay!",
                                     txn.getVendorTxCode() ) );
                     LOGGER.error( "Unexpected SagePay error for transaction " + txn.getVendorTxCode() );
+                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
                     break;
+
                 default:
                     LOGGER.error( String.format( "Unsupported AUTH status %s for transaction %s", txn.getAuthStatus(), txn.getVendorTxCode() ) );
             }

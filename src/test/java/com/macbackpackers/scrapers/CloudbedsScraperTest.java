@@ -60,9 +60,16 @@ public class CloudbedsScraperTest {
     }
 
     @Test
-    public void testLoadBooking() throws Exception {
-        Reservation r = cloudbedsScraper.getReservation( webClient, "10384646" );
+    public void testGetReservation() throws Exception {
+        Reservation r = cloudbedsScraper.getReservation( webClient, "10569063" );
         LOGGER.info( ToStringBuilder.reflectionToString( r ) );
+    }
+    
+    @Test
+    public void testGetTransactionsByReservation() throws Exception {
+        Reservation r = cloudbedsScraper.getReservation( webClient, "10569063" );
+        Assert.assertThat( cloudbedsScraper.isExistsSagepayPaymentWithVendorTxCode( webClient, r, "x" ), Matchers.is( false ) );
+        Assert.assertThat( cloudbedsScraper.isExistsSagepayPaymentWithVendorTxCode( webClient, r, "CASTLE-ROCK-7878681082-1548474047" ), Matchers.is( true ) );
     }
 
     @Test
@@ -108,7 +115,9 @@ public class CloudbedsScraperTest {
 
     @Test
     public void testAddPayment() throws Exception {
-        cloudbedsScraper.addPayment( webClient, "9814194", "visa", new BigDecimal( "0.15" ), "Test payment XYZ" );
+        cloudbedsScraper.addPayment( webClient,
+                cloudbedsScraper.getReservation( webClient, "9814194" ),
+                "visa", new BigDecimal( "0.15" ), "Test payment XYZ" );
     }
     
     @Test

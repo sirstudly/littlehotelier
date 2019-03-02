@@ -300,6 +300,43 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Get all transactions by reservation.
+     * 
+     * @param webClient web client instance to use
+     * @param reservation cloudbeds reservation
+     * @return non-null list of transactions
+     * @throws IOException
+     */
+    public boolean isExistsSagepayPaymentWithVendorTxCode( WebClient webClient, Reservation res, String vendorTxCode ) throws IOException {
+        
+        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res );
+        LOGGER.info( "Going to: " + requestSettings.getUrl().getPath() );
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        Optional<JsonObject> rpt = Optional.ofNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
+        if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
+            if ( rpt.isPresent() ) {
+                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+            }
+            throw new MissingUserDataException( "Failed response." );
+        }
+
+        // look for the existence of a payment record with matching vendor tx code
+        Pattern p = Pattern.compile( "VendorTxCode: (.*?)," );
+        Optional<String> txnNote = StreamSupport.stream(
+                rpt.get().get( "records" ).getAsJsonArray().spliterator(), false )
+                .filter( r -> r.getAsJsonObject().has( "notes" ) )
+                .map( r -> r.getAsJsonObject().get( "notes" ).getAsString() )
+                .filter( n -> {
+                    Matcher m = p.matcher( n );
+                    return m.find() && vendorTxCode.equals( m.group( 1 ) );
+                } )
+                .findFirst();
+        return txnNote.isPresent();
+    }
+
+    /**
      * Finds all staff allocations for the given date (and the day after):
      * <ul>
      * <li>If stayDate is staff bed, stayDate + 1 is staff bed -&gt; allocation for 2 days
@@ -336,28 +373,27 @@ public class CloudbedsScraper {
      * Add a payment record to the given reservation.
      * 
      * @param webClient web client instance to use
-     * @param reservationId unique reservation ID
+     * @param res cloudbeds reservation
      * @param cardType one of "mastercard", "visa". Anything else will blank the field.
      * @param amount amount to add
      * @param description description of payment
      * @throws IOException on page load failure
      * @throws RecordPaymentFailedException payment record failure
      */
-    public void addPayment( WebClient webClient, String reservationId, String cardType, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
+    public void addPayment( WebClient webClient, Reservation res, String cardType, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
 
         // first we need to find a "room" we're booking to
         // it doesn't actually map to a room, just an assigned guest
         // it doesn't even have to be an allocated room
-        Reservation reservation = getReservation( webClient, reservationId );
-        if ( reservation.getBookingRooms() == null || reservation.getBookingRooms().isEmpty() ) {
+        if ( res.getBookingRooms() == null || res.getBookingRooms().isEmpty() ) {
             throw new MissingUserDataException( "Unable to find allocation to assign payment to!" );
         }
 
         // just take the first one
-        String bookingRoomId = reservation.getBookingRooms().get( 0 ).getId();
+        String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
 
         WebRequest requestSettings = jsonRequestFactory.createAddNewPaymentRequest(
-                reservationId, bookingRoomId, cardType, amount, description );
+                res.getReservationId(), bookingRoomId, cardType, amount, description );
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
@@ -744,7 +780,7 @@ public class CloudbedsScraper {
         }
 
         String emailTemplateId = emailTemplate.get().getAsJsonObject().get( "email_template_id" ).getAsString();
-        LOGGER.info( "Found HWL cancellation charge email template id: " + emailTemplateId );
+        LOGGER.info( "Found " + templateName + " email template id: " + emailTemplateId );
         return getEmailTemplate( webClient, emailTemplateId );
     }
 
@@ -780,18 +816,16 @@ public class CloudbedsScraper {
      * Sends an email to the guest for a successful payment.
      * 
      * @param webClient web client instance to use
-     * @param reservationId associated reservation
+     * @param res associated reservation
      * @param txn successful transaction
      * @throws IOException
      */
-    public void sendSagepayPaymentConfirmationEmail( WebClient webClient, String reservationId, SagepayTransaction txn ) throws IOException {
+    public void sendSagepayPaymentConfirmationEmail( WebClient webClient, Reservation res, SagepayTransaction txn ) throws IOException {
 
         EmailTemplateInfo template = getSagepayPaymentConfirmationEmailTemplate( webClient );
-        Reservation res = getReservation( webClient, reservationId );
 
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
-                template, res.getIdentifier(), res.getCustomerId(), reservationId,
-                txn.getEmail(), 
+                template, res.getIdentifier(), res.getCustomerId(), res.getReservationId(), txn.getEmail(), 
                 b -> b.replaceAll( "\\[vendor tx code\\]", txn.getVendorTxCode() )
                     .replaceAll( "\\[payment total\\]", CURRENCY_FORMAT.format( txn.getPaymentAmount() ) )
                     .replaceAll( "\\[card type\\]", txn.getCardType() )
@@ -803,7 +837,7 @@ public class CloudbedsScraper {
 
         JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + reservationId );
+            throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + res.getReservationId() );
         }
     }
 

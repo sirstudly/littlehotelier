@@ -26,6 +26,7 @@ import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
+import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 
@@ -601,6 +602,28 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "auth_payment", "0" ),
                 new NameValuePair( "keep_credit_card_info", "0" ),
                 new NameValuePair( "booking_id", reservationId ),
+                new NameValuePair( "property_id", PROPERTY_ID ),
+                new NameValuePair( "group_id", PROPERTY_ID ),
+                new NameValuePair( "version", getVersion() ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Retrieves all transactions for a given reservation.
+     * 
+     * @param res cloudbeds reservation
+     * @return web request
+     * @throws IOException on creation failure
+     */
+    public WebRequest createGetTransactionsByReservationRequest( Reservation res ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reports/transactions_by_reservation" );
+        String roomIdentifiers = res.getBookingRooms().stream()
+                .map( br -> "\"" + br.getRoomIdentifier() + "\"" )
+                .collect( Collectors.joining( "," ) );
+                
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "booking_id", res.getReservationId() ),
+                new NameValuePair( "options", "{\"filters\":{\"from\":\"\",\"to\":\"\",\"filter\":\"\",\"res_room_identifier\":[" + roomIdentifiers + "],\"user\":\"all\",\"posted\":[\"1\"],\"description\":[]},\"group\":{\"main\":\"\",\"sub\":\"\"},\"sort\":{\"column\":\"datetime_transaction\",\"order\":\"desc\"},\"loaded_filter\":1}" ),
                 new NameValuePair( "property_id", PROPERTY_ID ),
                 new NameValuePair( "group_id", PROPERTY_ID ),
                 new NameValuePair( "version", getVersion() ) ) );

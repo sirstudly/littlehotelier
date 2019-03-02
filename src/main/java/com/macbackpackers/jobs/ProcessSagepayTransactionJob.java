@@ -24,12 +24,6 @@ public class ProcessSagepayTransactionJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         paymentProcessor.processSagepayTransaction( getTxnId() );
-        try {
-            dao.updateSagepayTransactionProcessedDate( getTxnId() );
-        }
-        catch ( Exception ex ) {
-            LOGGER.error( "Exception updating processed date", ex );
-        }
     }
 
     public int getTxnId() {
