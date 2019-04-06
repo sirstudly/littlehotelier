@@ -5,6 +5,7 @@ import static com.macbackpackers.scrapers.AllocationsPageScraper.POUND;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
@@ -17,7 +18,10 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.mail.MessagingException;
+
 import org.apache.commons.collections.ListUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
@@ -43,6 +47,7 @@ import com.macbackpackers.beans.GuestDetails;
 import com.macbackpackers.beans.Payment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.SagepayTransaction;
+import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.xml.TxnResponse;
 import com.macbackpackers.dao.WordPressDAO;
@@ -68,6 +73,7 @@ public class PaymentProcessorService {
     
     private static final FastDateFormat DATETIME_FORMAT = FastDateFormat.getInstance( "dd/MM/yyyy HH:mm:ss" );
     private static final FastDateFormat DATETIME_STANDARD = FastDateFormat.getInstance( "yyyy-MM-dd HH:mm:ss" );
+    private static final DecimalFormat CURRENCY_FORMAT = new DecimalFormat( "###0.00" );
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
 
     @Autowired
@@ -320,11 +326,32 @@ public class PaymentProcessorService {
      * @param id PK of wp_sagepay_tx_auth
      * @throws RecordPaymentFailedException on record payment failure
      * @throws IOException on i/o error
+     * @throws MessagingException 
      */
-    public synchronized void processSagepayTransaction( int id ) throws IOException, RecordPaymentFailedException {
+    public synchronized void processSagepayTransaction( int id ) throws IOException, RecordPaymentFailedException, MessagingException {
 
         try (WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class )) {
             SagepayTransaction txn = wordpressDAO.fetchSagepayTransaction( id );
+            
+            // INVOICE transaction
+            if ( txn.getBookingReference() == null ) {
+                try {
+                    LOGGER.info( "No booking reference. Processing as invoice payment..." );
+                    if ( "OK".equals( txn.getAuthStatus() ) ) {
+                        LOGGER.info( "Successful payment. Sending email to " + txn.getEmail() );
+                        sendSagepayPaymentConfirmationEmail( webClient, txn );
+                    }
+                    else {
+                        LOGGER.info( "Transaction status is " + txn.getAuthStatus() + ". Nothing to do..." );
+                    }
+                }
+                finally {
+                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
+                }
+                return;
+            }
+
+            // otherwise BOOKING transaction
             switch ( txn.getAuthStatus() ) {
                 case "OK":
                     // check if payment already exists
@@ -398,6 +425,28 @@ public class PaymentProcessorService {
         }
     }
 
+    /**
+     * Sends a payment confirmation email using the given template and transaction.
+     * This differs from the other method in that it is not tied to a current booking.
+     * 
+     * @param webClient web client instance to use
+     * @param txn successful sagepay transaction
+     * @throws IOException 
+     * @throws MessagingException 
+     */
+    public void sendSagepayPaymentConfirmationEmail( WebClient webClient, SagepayTransaction txn ) throws IOException, MessagingException {
+        EmailTemplateInfo template = cloudbedsScraper.getSagepayPaymentConfirmationEmailTemplate( webClient );
+        gmailService.sendEmail( txn.getEmail(), txn.getFirstName() + " " + txn.getLastName(), template.getSubject(),
+                IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
+                    .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
+                    .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
+                    .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
+                        .replaceAll( "\\[vendor tx code\\]", txn.getVendorTxCode() )
+                        .replaceAll( "\\[payment total\\]", CURRENCY_FORMAT.format( txn.getPaymentAmount() ) )
+                        .replaceAll( "\\[card type\\]", txn.getCardType() )
+                        .replaceAll( "\\[last 4 digits\\]", txn.getLastFourDigits() ) ) );
+    }
+    
     /**
      * Copies the card details from LH (or HWL/AGO/EXP) to CB if it doesn't already exist.
      * 

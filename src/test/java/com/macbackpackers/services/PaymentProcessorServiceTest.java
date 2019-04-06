@@ -138,4 +138,9 @@ public class PaymentProcessorServiceTest {
     public void testChargeNonRefundableBooking() throws Exception {
         paymentService.chargeNonRefundableBooking( cbWebClient, "11068108" );
     }
+    
+    @Test
+    public void testSendSagepayEmail() throws Exception {
+        paymentService.sendSagepayPaymentConfirmationEmail( cbWebClient, dao.fetchSagepayTransaction( 34 ) );
+    }
 }

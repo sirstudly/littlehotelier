@@ -25,6 +25,12 @@ public class SagepayTransaction {
     @Column( name = "booking_reference" )
     private String bookingReference;
 
+    @Column( name = "first_name" )
+    private String firstName;
+
+    @Column( name = "last_name" )
+    private String lastName;
+
     @Column( name = "email" )
     private String email;
 
@@ -77,6 +83,22 @@ public class SagepayTransaction {
 
     public void setBookingReference( String bookingReference ) {
         this.bookingReference = bookingReference;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName( String firstName ) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName( String lastName ) {
+        this.lastName = lastName;
     }
 
     public String getEmail() {
