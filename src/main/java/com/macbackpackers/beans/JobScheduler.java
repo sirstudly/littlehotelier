@@ -212,14 +212,19 @@ public class JobScheduler {
             return ChronoUnit.MINUTES.between( getLastRunDate().toInstant(), Instant.now() ) > getRepeatTimeMinutes();
         }
         else if( null != getRepeatDailyAt() ) {
+
             // if we're repeating daily, check if we've already passed the time today
             LocalDateTime repeatAt = LocalDateTime.now()
-                        .withHour( getRepeatDailyHour() )
-                        .withMinute( getRepeatDailyMinute() );
-            
+                    .withHour( getRepeatDailyHour() )
+                    .withMinute( getRepeatDailyMinute() );
+
+            // if the repeat time is in the future, dial it back a day to get the last time it should've run
+            if ( LocalDateTime.now().isBefore( repeatAt ) ) {
+                repeatAt = repeatAt.minusDays( 1 );
+            }
+
             // if we've passed this time and we haven't yet run it
-            return LocalDateTime.now().isAfter( repeatAt ) 
-                    && getLastRunDate().toLocalDateTime().isBefore( repeatAt );
+            return getLastRunDate().toLocalDateTime().isBefore( repeatAt );
         }
         throw new IllegalStateException( "Eh? Nothing to do!" );
     }
