@@ -743,6 +743,17 @@ public class CloudbedsScraper {
     public EmailTemplateInfo getHostelworldLateCancellationEmailTemplate( WebClient webClient ) throws IOException {
         return fetchEmailTemplate( webClient, "Hostelworld Cancellation Charge" );
     }
+    
+    /**
+     * Retrieves the Hostelworld non-refundable charged successful email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getHostelworldNonRefundableSuccessfulEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, "Hostelworld Non-Refundable Charge Successful" );
+    }
 
     /**
      * Retrieves the Sagepay confirmation email template.
@@ -809,6 +820,34 @@ public class CloudbedsScraper {
         JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + reservationId );
+        }
+    }
+
+    /**
+     * Sends an email to the guest for the given reservation when the hostelworld
+     * non-refundable reservation has been charged successfully.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param amount amount being charged
+     * @throws IOException
+     */
+    public void sendHostelworldNonRefundableSuccessfulEmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
+
+        EmailTemplateInfo template = getHostelworldNonRefundableSuccessfulEmailTemplate( webClient );
+        Reservation res = getReservation( webClient, reservationId );
+
+        WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
+                template, res.getIdentifier(), res.getCustomerId(), reservationId,
+                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + CURRENCY_FORMAT.format( amount ) ) );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            throw new UnrecoverableFault( "Failed to send confirmation email for reservation " + reservationId );
         }
     }
 

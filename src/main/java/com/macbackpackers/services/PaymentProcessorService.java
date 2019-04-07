@@ -617,6 +617,10 @@ public class PaymentProcessorService {
                 LOGGER.error( "Failed to acknowledge payment in HWL. Meh...", ex );
             }
         }
+
+        // send email if successful
+        cloudbedsScraper.sendHostelworldNonRefundableSuccessfulEmail( webClient, reservationId, cbReservation.getBalanceDue() );
+        cloudbedsScraper.addNote( webClient, reservationId, "Outstanding balance successfully charged and email sent." );
     }
 
     /**
