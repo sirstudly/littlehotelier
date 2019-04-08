@@ -43,6 +43,7 @@ import com.google.api.services.gmail.GmailScopes;
 import com.google.api.services.gmail.model.ListMessagesResponse;
 import com.google.api.services.gmail.model.Message;
 import com.google.api.services.gmail.model.MessagePart;
+import com.google.api.services.gmail.model.Profile;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
@@ -285,8 +286,27 @@ public class GmailService {
      */
     public void sendEmail( String toAddress, String toName, String subject, String bodyText ) 
             throws MessagingException, IOException {
-        Message message = createMessageWithEmail( createEmail( toAddress, toName, subject, bodyText ) );
+        Message message = createMessageWithEmail( createEmail( toAddress, toName, null, subject, bodyText ) );
         message = connectAsClient().users().messages().send( GMAIL_USER, message ).execute();
+        LOGGER.info( "Sent message " + message.getId() + ": " + message.toPrettyString() );
+    }
+
+    /**
+     * Sends an email from the current email address including a CC to self.
+     * 
+     * @param toAddress email address of the receiver
+     * @param toName (optional) name for destination address
+     * @param subject subject of the email
+     * @param bodyText body text of the email
+     * @throws IOException on send error
+     * @throws MessagingException on message creation exception
+     */
+    public void sendEmailCcSelf( String toAddress, String toName, String subject, String bodyText )
+            throws MessagingException, IOException {
+        Gmail gmail = connectAsClient();
+        Profile p = gmail.users().getProfile( GMAIL_USER ).execute();
+        Message message = createMessageWithEmail( createEmail( toAddress, toName, p.getEmailAddress(), subject, bodyText ) );
+        message = gmail.users().messages().send( GMAIL_USER, message ).execute();
         LOGGER.info( "Sent message " + message.getId() + ": " + message.toPrettyString() );
     }
 
@@ -295,13 +315,14 @@ public class GmailService {
      *
      * @param toAddress email address of the receiver
      * @param toName (optional) name for destination address
+     * @param ccAddress (optional) CC email address
      * @param subject subject of the email
      * @param bodyText body text of the email
      * @return the MimeMessage to be used to send email
      * @throws MessagingException
      * @throws UnsupportedEncodingException address unparseable 
      */
-    private MimeMessage createEmail( String toAddress, String toName, String subject, String bodyText ) throws MessagingException, UnsupportedEncodingException {
+    private MimeMessage createEmail( String toAddress, String toName, String ccAddress, String subject, String bodyText ) throws MessagingException, UnsupportedEncodingException {
         Properties props = new Properties();
         Session session = Session.getDefaultInstance( props, null );
         MimeMessage email = new MimeMessage( session );
@@ -310,6 +331,9 @@ public class GmailService {
         InternetAddress emailDest = StringUtils.isBlank( toName ) ? 
                 new InternetAddress( toAddress ) : new InternetAddress( toAddress, toName );
         email.addRecipient( javax.mail.Message.RecipientType.TO, emailDest );
+        if ( StringUtils.isNotBlank( ccAddress ) ) {
+            email.addRecipient( javax.mail.Message.RecipientType.CC, new InternetAddress( ccAddress ) );
+        }
         email.setSubject( subject );
         email.setContent( bodyText, "text/html; charset=utf-8" );
         return email;

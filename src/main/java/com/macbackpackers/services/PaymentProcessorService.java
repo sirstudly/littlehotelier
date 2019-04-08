@@ -436,7 +436,7 @@ public class PaymentProcessorService {
      */
     public void sendSagepayPaymentConfirmationEmail( WebClient webClient, SagepayTransaction txn ) throws IOException, MessagingException {
         EmailTemplateInfo template = cloudbedsScraper.getSagepayPaymentConfirmationEmailTemplate( webClient );
-        gmailService.sendEmail( txn.getEmail(), txn.getFirstName() + " " + txn.getLastName(), template.getSubject(),
+        gmailService.sendEmailCcSelf( txn.getEmail(), txn.getFirstName() + " " + txn.getLastName(), template.getSubject(),
                 IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
                     .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
                     .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
