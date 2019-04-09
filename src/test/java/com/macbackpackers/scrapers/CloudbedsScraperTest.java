@@ -216,4 +216,9 @@ public class CloudbedsScraperTest {
         page.getWebClient().waitForBackgroundJavaScript( 60000 ); // wait for page to load
         LOGGER.info( page.asXml() );
     }
+    
+    @Test
+    public void testGetEmailTemplateLastSentDate() throws Exception {
+        LOGGER.info( cloudbedsScraper.getEmailLastSentDate( webClient, "10569023", "Hostelworld Non-Refundable Charge Declined" ).toString() );
+    }
 }

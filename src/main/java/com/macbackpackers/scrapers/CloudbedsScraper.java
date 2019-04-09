@@ -756,6 +756,17 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Retrieves the Hostelworld non-refundable charged declined email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getHostelworldNonRefundableDeclinedEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, "Hostelworld Non-Refundable Charge Declined" );
+    }
+
+    /**
      * Retrieves the Sagepay confirmation email template.
      * 
      * @param webClient web client instance to use
@@ -793,6 +804,34 @@ public class CloudbedsScraper {
         String emailTemplateId = emailTemplate.get().getAsJsonObject().get( "email_template_id" ).getAsString();
         LOGGER.info( "Found " + templateName + " email template id: " + emailTemplateId );
         return getEmailTemplate( webClient, emailTemplateId );
+    }
+
+    /**
+     * Retrieves the most recent time the email template was used to send an email to a guest for
+     * the given booking.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId ID of reservation
+     * @param templateName name of template
+     * @return non-null email template
+     * @throws IOException
+     */
+    public Optional<LocalDateTime> getEmailLastSentDate( WebClient webClient, String reservationId, String templateName ) throws IOException {
+
+        Page redirectPage = webClient.getPage( jsonRequestFactory.createGetEmailDeliveryLogRequest( reservationId ) );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            throw new MissingUserDataException( "Failed to retrieve email log for reservation " + reservationId );
+        }
+
+        final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a" );
+        return StreamSupport.stream( jelement.getAsJsonObject().get( "aaData" )
+                .getAsJsonArray().spliterator(), false )
+                .filter( e -> templateName.equals( e.getAsJsonObject().get( "template" ).getAsString() ) )
+                .map( e -> LocalDateTime.parse( e.getAsJsonObject().get( "event_date" ).getAsString(), DD_MM_YYYY_HH_MM ) )
+                .findFirst();
     }
 
     /**
@@ -848,6 +887,36 @@ public class CloudbedsScraper {
         JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             throw new UnrecoverableFault( "Failed to send confirmation email for reservation " + reservationId );
+        }
+    }
+
+    /**
+     * Sends an email to the guest for the given reservation when an attempt to charge the hostelworld
+     * non-refundable reservation but was declined.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param amount amount being charged
+     * @param paymentURL the payment URL to include in the email
+     * @throws IOException
+     */
+    public void sendHostelworldNonRefundableDeclinedEmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException {
+
+        EmailTemplateInfo template = getHostelworldNonRefundableDeclinedEmailTemplate( webClient );
+        Reservation res = getReservation( webClient, reservationId );
+
+        WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
+                template, res.getIdentifier(), res.getCustomerId(), reservationId,
+                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + CURRENCY_FORMAT.format( amount ) )
+                        .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            throw new UnrecoverableFault( "Failed to send charge declined email for reservation " + reservationId );
         }
     }
 

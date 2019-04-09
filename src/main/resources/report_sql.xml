@@ -41,26 +41,32 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
  GROUP BY job_id, reservation_id, checkin_date, checkout_date, data_href, notes, lh_status, booking_reference, booking_source, booked_date, eta, viewed_yn
     </entry>
     <entry key="unpaid.deposit.report">
-		INSERT INTO wp_lh_rpt_unpaid_deposit( job_id, guest_name, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn, created_date )
-		SELECT f.job_id, GROUP_CONCAT( DISTINCT f.guest_name ) `guest_name`, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn, MAX(f.created_date) `created_date`
-		  FROM wp_lh_calendar f
-		  LEFT OUTER JOIN wp_lh_rpt_guest_comments c ON f.reservation_id = c.reservation_id
-		 WHERE f.job_id = :jobId
-		   AND f.payment_total = f.payment_outstanding
-		   AND f.payment_total > 0
-           AND f.booking_source IN ('Booking.com', 'Expedia')
-           AND ((c.comments IS NULL OR 
-                    (c.comments NOT LIKE '%You have received a virtual credit card for this reservation%'
-                 AND c.comments NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'
-                 AND c.comments NOT LIKE '%The VCC shown is still not active.%'))
-                 -- include migrated records
-            AND (f.notes IS NULL OR 
-                    (f.notes NOT LIKE '%You have received a virtual credit card for this reservation%'
-                 AND f.notes NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%')))
-		 GROUP BY f.reservation_id, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn;
+        INSERT INTO wp_lh_rpt_unpaid_deposit( job_id, guest_name, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn, created_date )
+        SELECT f.job_id, GROUP_CONCAT( DISTINCT f.guest_name ) `guest_name`, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn, MAX(f.created_date) `created_date`
+          FROM wp_lh_calendar f
+          LEFT OUTER JOIN wp_lh_rpt_guest_comments c ON f.reservation_id = c.reservation_id
+         WHERE f.job_id = :jobId
+           AND ((       f.payment_total = f.payment_outstanding
+                    AND f.payment_total > 0
+                    AND f.booking_source IN ('Booking.com', 'Expedia')
+                    AND ((c.comments IS NULL OR 
+                            (c.comments NOT LIKE '%You have received a virtual credit card for this reservation%'
+                         AND c.comments NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'
+                         AND c.comments NOT LIKE '%The VCC shown is still not active.%'))
+                         -- include migrated records
+                         AND (f.notes IS NULL OR 
+                             (f.notes NOT LIKE '%You have received a virtual credit card for this reservation%'
+                         AND f.notes NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'))))
+               OR ( -- include non-refundable bookings
+                        f.booking_source = 'Hostelworld &amp; Hostelbookers'
+                    AND f.rate_plan_name IN ('Non-refundable', 'nonref')
+                    AND f.payment_outstanding &gt; 0
+                    AND f.booked_date &lt; DATE_SUB(NOW(), INTERVAL 2 DAY) -- leave a window until we process it
+                   ))
+         GROUP BY f.reservation_id, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn;
     </entry>
     <entry key="group.bookings">
-	    INSERT INTO `wp_lh_group_bookings` (job_id, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn)
+        INSERT INTO `wp_lh_group_bookings` (job_id, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn)
         SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, CASE WHEN :propertyManager = 'cloudbeds' THEN num_guests ELSE SUM(num_guests) END `num_guests`, notes, viewed_yn
           FROM ( -- some duplicates may occur; remove them first
                 SELECT job_id, room, bed_name, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn 

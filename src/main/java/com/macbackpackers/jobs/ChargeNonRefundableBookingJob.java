@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import com.gargoylesoftware.htmlunit.WebClient;
-import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.services.PaymentProcessorService;
 
 /**
@@ -30,19 +29,9 @@ public class ChargeNonRefundableBookingJob extends AbstractJob {
     @Transient
     private PaymentProcessorService paymentProcessor;
 
-    @Transient
-    private int numRetriesOverride = 2; // forced lower default to avoid spamming card txns
-
     @Override
     public void processJob() throws Exception {
-        try {
-            paymentProcessor.chargeNonRefundableBooking( cbWebClient, getReservationId() );
-        }
-        catch ( PaymentNotAuthorizedException ex ) {
-            LOGGER.info( "Payment not authorized. Lowering retry count on job to 1 to avoid spamming card" );
-            numRetriesOverride = 1;
-            throw ex;
-        }
+        paymentProcessor.chargeNonRefundableBooking( cbWebClient, getReservationId() );
     }
 
     @Override
@@ -70,7 +59,7 @@ public class ChargeNonRefundableBookingJob extends AbstractJob {
 
     @Override
     public int getRetryCount() {
-        return numRetriesOverride;
+        return 1; // don't try this more than once; can always recover manually
     }
 
 }

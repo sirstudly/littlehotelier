@@ -480,6 +480,14 @@ public interface WordPressDAO {
     public void updateSagepayTransactionProcessedDate( int id );
 
     /**
+     * Inserts a record into the wp_booking_lookup_key table.
+     * 
+     * @param reservationId the unique cloudbeds reference
+     * @param key the lookup key
+     */
+    public void insertBookingLookupKey( String reservationId, String key );
+
+    /**
      * Returns the last px post transaction for a given booking reference.
      * 
      * @param bookingReference the LH booking reference
@@ -572,4 +580,11 @@ public interface WordPressDAO {
      * @return non-null email template
      */
     public String getGuestCheckoutEmailTemplate();
+
+    /**
+     * Returns the base URL for the payment portal.
+     *
+     * @return non-null URL
+     */
+    public String getBookingPaymentsURL();
 }

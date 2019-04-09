@@ -15,6 +15,8 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -52,6 +54,7 @@ import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.xml.TxnResponse;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.AgodaScraper;
@@ -75,6 +78,10 @@ public class PaymentProcessorService {
     private static final FastDateFormat DATETIME_STANDARD = FastDateFormat.getInstance( "yyyy-MM-dd HH:mm:ss" );
     private static final DecimalFormat CURRENCY_FORMAT = new DecimalFormat( "###0.00" );
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
+
+    // all allowable characters for lookup key
+    private static String LOOKUPKEY_CHARSET = "2345678ABCDEFGHJKLMNPQRSTUVWXYZ";
+    private static int LOOKUPKEY_LENGTH = 7;
 
     @Autowired
     @Qualifier( "gsonForCloudbeds" )
@@ -399,7 +406,7 @@ public class PaymentProcessorService {
                     cloudbedsScraper.addNote( webClient, txn.getReservationId(),
                             String.format( "Aborted Sagepay transaction %s for %s",
                                     txn.getVendorTxCode(),
-                                    NumberFormat.getCurrencyInstance().format( txn.getPaymentAmount() ) ) );
+                                    NumberFormat.getCurrencyInstance(Locale.UK).format( txn.getPaymentAmount() ) ) );
                     wordpressDAO.updateSagepayTransactionProcessedDate( id );
                     break;
 
@@ -420,7 +427,7 @@ public class PaymentProcessorService {
                     break;
 
                 default:
-                    LOGGER.error( String.format( "Unsupported AUTH status %s for transaction %s", txn.getAuthStatus(), txn.getVendorTxCode() ) );
+                    throw new UnrecoverableFault( String.format( "Unsupported AUTH status %s for transaction %s", txn.getAuthStatus(), txn.getVendorTxCode() ) );
             }
         }
     }
@@ -604,23 +611,57 @@ public class PaymentProcessorService {
             }
         }
 
-        // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
-        cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
+        try {
+            // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
+            cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
+                    cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
+    
+            // mark booking as fully paid in Hostelworld
+            if ( "Hostelworld & Hostelbookers".equals( cbReservation.getSourceName() ) ) {
+                try (WebClient hwlWebClient = context.getBean( "webClientForHostelworld", WebClient.class )) {
+                    hostelworldScraper.acknowledgeFullPaymentTaken( hwlWebClient, cbReservation.getThirdPartyIdentifier() );
+                }
+                catch ( Exception ex ) {
+                    LOGGER.error( "Failed to acknowledge payment in HWL. Meh...", ex );
+                }
 
-        // mark booking as fully paid in Hostelworld
-        if ( "Hostelworld & Hostelbookers".equals( cbReservation.getSourceName() ) ) {
-            try (WebClient hwlWebClient = context.getBean( "webClientForHostelworld", WebClient.class )) {
-                hostelworldScraper.acknowledgeFullPaymentTaken( hwlWebClient, cbReservation.getThirdPartyIdentifier() );
+                // send email if successful
+                cloudbedsScraper.sendHostelworldNonRefundableSuccessfulEmail( webClient, reservationId, cbReservation.getBalanceDue() );
             }
-            catch ( Exception ex ) {
-                LOGGER.error( "Failed to acknowledge payment in HWL. Meh...", ex );
+
+            cloudbedsScraper.addNote( webClient, reservationId, "Outstanding balance successfully charged and email sent." );
+        }
+        catch ( PaymentNotAuthorizedException payEx ) {
+            LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
+
+            if ( cloudbedsScraper.getEmailLastSentDate( webClient, reservationId,
+                    "Hostelworld Non-Refundable Charge Declined" ).isPresent() ) {
+                LOGGER.info( "Declined payment email already sent. Not going to do it again..." );
+            }
+            else {
+                LOGGER.info( "Sending declined payment email" );
+                String lookupKey = generateRandomLookupKey( LOOKUPKEY_LENGTH );
+                String paymentURL = wordpressDAO.getBookingPaymentsURL() + lookupKey;
+                wordpressDAO.insertBookingLookupKey( reservationId, lookupKey );
+                cloudbedsScraper.sendHostelworldNonRefundableDeclinedEmail( webClient, reservationId, cbReservation.getBalanceDue(), paymentURL );
+                cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
             }
         }
+    }
 
-        // send email if successful
-        cloudbedsScraper.sendHostelworldNonRefundableSuccessfulEmail( webClient, reservationId, cbReservation.getBalanceDue() );
-        cloudbedsScraper.addNote( webClient, reservationId, "Outstanding balance successfully charged and email sent." );
+    /**
+     * Returns a random lookup key with the given length.
+     * 
+     * @param keyLength length of lookup key
+     * @return string generated key
+     */
+    private String generateRandomLookupKey( int keyLength ) {
+        StringBuffer result = new StringBuffer();
+        Random r = new Random();
+        for ( int i = 0 ; i < keyLength ; i++ ) {
+            result.append( LOOKUPKEY_CHARSET.charAt( r.nextInt( LOOKUPKEY_CHARSET.length() ) ) );
+        }
+        return result.toString();
     }
 
     /**

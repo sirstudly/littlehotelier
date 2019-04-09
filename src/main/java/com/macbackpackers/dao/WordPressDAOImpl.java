@@ -954,6 +954,14 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public void insertBookingLookupKey( String reservationId, String key ) {
+        em.createNativeQuery( "INSERT INTO wp_booking_lookup_key ( reservation_id, lookup_key ) VALUES (?, ?)" )
+                .setParameter( 1, reservationId )
+                .setParameter( 2, key )
+                .executeUpdate();
+    }
+
+    @Override
     public void updatePxPostStatus( int txnId, String maskedCardNumber, boolean successful, String statusXml ) {
         PxPostTransaction txn = fetchPxPostTransaction( txnId );
         if( maskedCardNumber != null ) {
@@ -1053,6 +1061,11 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     public String getGuestCheckoutEmailTemplate() {
         return getNotNullOption( "hbo_guest_email_template" );
+    }
+
+    @Override
+    public String getBookingPaymentsURL() {
+        return getNotNullOption( "hbo_booking_payments_url" );
     }
 
     /**

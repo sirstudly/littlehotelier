@@ -696,6 +696,50 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Retrieves the email log for a reservation.
+     * 
+     * @param reservationId ID of reservation (as it appears in the URL)
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createGetEmailDeliveryLogRequest( String reservationId ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/emails/get_email_delivery_log" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "sEcho", "1" ),
+                new NameValuePair( "iColumns", "5" ),
+                new NameValuePair( "sColumns", ",,,," ),
+                new NameValuePair( "iDisplayStart", "0" ),
+                new NameValuePair( "iDisplayLength", "100" ),
+                new NameValuePair( "mDataProp_0", "event_date" ),
+                new NameValuePair( "bRegex_0", "false" ),
+                new NameValuePair( "bSearchable_0", "true" ),
+                new NameValuePair( "bSortable_0", "true" ),
+                new NameValuePair( "mDataProp_1", "email" ),
+                new NameValuePair( "bRegex_1", "false" ),
+                new NameValuePair( "bSearchable_1", "true" ),
+                new NameValuePair( "bSortable_1", "true" ),
+                new NameValuePair( "mDataProp_2", "template" ),
+                new NameValuePair( "bRegex_2", "false" ),
+                new NameValuePair( "bSearchable_2", "true" ),
+                new NameValuePair( "bSortable_2", "true" ),
+                new NameValuePair( "mDataProp_3", "subject" ),
+                new NameValuePair( "bRegex_3", "false" ),
+                new NameValuePair( "bSearchable_3", "true" ),
+                new NameValuePair( "bSortable_3", "false" ),
+                new NameValuePair( "mDataProp_4", "4" ),
+                new NameValuePair( "bRegex", "false" ),
+                new NameValuePair( "iSortCol_0", "0" ),
+                new NameValuePair( "sSortDir_0", "desc" ),
+                new NameValuePair( "iSortingCols", "1" ),
+                new NameValuePair( "booking_id", reservationId ),
+                new NameValuePair( "email_status", "all" ),
+                new NameValuePair( "property_id", PROPERTY_ID ),
+                new NameValuePair( "group_id", PROPERTY_ID ),
+                new NameValuePair( "version", getVersion() ) ) );
+        return webRequest;
+    }
+
+    /**
      * Authorises a guest credit card.
      * 
      * @param reservationId the unique CB reservation id
