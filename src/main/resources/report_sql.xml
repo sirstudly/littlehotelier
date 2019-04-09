@@ -51,7 +51,8 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
            AND f.booking_source IN ('Booking.com', 'Expedia')
            AND ((c.comments IS NULL OR 
                     (c.comments NOT LIKE '%You have received a virtual credit card for this reservation%'
-                 AND c.comments NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'))
+                 AND c.comments NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'
+                 AND c.comments NOT LIKE '%The VCC shown is still not active.%'))
                  -- include migrated records
             AND (f.notes IS NULL OR 
                     (f.notes NOT LIKE '%You have received a virtual credit card for this reservation%'

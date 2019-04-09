@@ -19,7 +19,7 @@ public class CreatePrepaidChargeJob extends AbstractJob {
 
         // find all BDC bookings with unpaid deposits that use a virtual CC
         // and create a job for each of them if they're currently chargeable
-        dao.fetchPrepaidBDCBookingsWithUnpaidDeposits()
+        dao.fetchPrepaidBDCBookingsWithOutstandingBalance()
                 .stream()
                 // include bookings that are about to arrive (in case we couldn't charge them yet)
                 .filter( p -> p.isChargeableDateInPast() || p.isCheckinDateTodayOrTomorrow() )

@@ -310,12 +310,12 @@ public interface WordPressDAO {
     public List<UnpaidDepositReportEntry> fetchUnpaidDepositReport( int allocationScraperJobId );
 
     /**
-     * Returns a List of all BDC bookings which use a prepaid "virtual" CC and where no payment has
-     * yet been taken. The data is retrieved from the last successful AllocationScraperJob.
+     * Returns a List of all BDC bookings which use a prepaid "virtual" CC and where there is still a balance
+     * outstanding. The data is retrieved from the last successful AllocationScraperJob.
      * 
      * @return non-null list of booking references
      */
-    public List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithUnpaidDeposits();
+    public List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithOutstandingBalance();
 
     /**
      * Retrieves all Agoda bookings that don't have a no charge note in either the user comments nor

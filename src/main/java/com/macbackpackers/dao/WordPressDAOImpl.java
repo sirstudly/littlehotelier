@@ -774,7 +774,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
     
     @Override
-    public List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithUnpaidDeposits() {
+    public List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithOutstandingBalance() {
         Integer allocationScraperJobId = getLastCompletedAllocationScraperJobId();
         if ( allocationScraperJobId != null ) {
             return em.createQuery( 
@@ -786,7 +786,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                     + "  LEFT OUTER JOIN GuestCommentReportEntry r "
                     + "    ON c.reservationId = r.reservationId "
                     + " WHERE c.jobId = :allocationScraperJobId "
-                    + "   AND c.paymentTotal = c.paymentOutstanding" // no deposit charged
+                    + "   AND c.paymentOutstanding > 0"
                     + "   AND (r.comments LIKE '%You have received a virtual credit card for this reservation%' "
                     + "     OR c.notes LIKE '%You have received a virtual credit card for this reservation%' "
                     + "     OR r.comments LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%' "
