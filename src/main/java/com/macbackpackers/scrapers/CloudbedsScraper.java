@@ -55,6 +55,13 @@ public class CloudbedsScraper {
     
     private final DecimalFormat CURRENCY_FORMAT = new DecimalFormat( "###0.00" );
 
+    public static final String TEMPLATE_HWL_CANCELLATION_CHARGE = "Hostelworld Cancellation Charge";
+    public static final String TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_SUCCESSFUL = "Hostelworld Non-Refundable Charge Successful";
+    public static final String TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_DECLINED = "Hostelworld Non-Refundable Charge Declined";
+    public static final String TEMPLATE_SAGEPAY_PAYMENT_CONFIRMATION = "Sagepay Payment Confirmation";
+    public static final String TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL = "Deposit Charge Successful";
+    public static final String TEMPLATE_DEPOSIT_CHARGE_DECLINED = "Deposit Charge Declined";
+
     @Autowired
     @Qualifier( "gsonForCloudbeds" )
     private Gson gson;
@@ -191,6 +198,8 @@ public class CloudbedsScraper {
             }
             // save the last one on the list (if more than one)
             r.get().setCreditCardId( cardId );
+            r.get().setCreditCardType( creditCardsElem.getAsJsonObject()
+                    .get( cardId ).getAsJsonObject().get( "card_type" ).getAsString() );
         }
         return r.get();
     }
@@ -741,9 +750,9 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public EmailTemplateInfo getHostelworldLateCancellationEmailTemplate( WebClient webClient ) throws IOException {
-        return fetchEmailTemplate( webClient, "Hostelworld Cancellation Charge" );
+        return fetchEmailTemplate( webClient, TEMPLATE_HWL_CANCELLATION_CHARGE );
     }
-    
+
     /**
      * Retrieves the Hostelworld non-refundable charged successful email template.
      * 
@@ -752,7 +761,7 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public EmailTemplateInfo getHostelworldNonRefundableSuccessfulEmailTemplate( WebClient webClient ) throws IOException {
-        return fetchEmailTemplate( webClient, "Hostelworld Non-Refundable Charge Successful" );
+        return fetchEmailTemplate( webClient, TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_SUCCESSFUL );
     }
 
     /**
@@ -763,7 +772,7 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public EmailTemplateInfo getHostelworldNonRefundableDeclinedEmailTemplate( WebClient webClient ) throws IOException {
-        return fetchEmailTemplate( webClient, "Hostelworld Non-Refundable Charge Declined" );
+        return fetchEmailTemplate( webClient, TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_DECLINED );
     }
 
     /**
@@ -774,7 +783,29 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public EmailTemplateInfo getSagepayPaymentConfirmationEmailTemplate( WebClient webClient ) throws IOException {
-        return fetchEmailTemplate( webClient, "Sagepay Payment Confirmation" );
+        return fetchEmailTemplate( webClient, TEMPLATE_SAGEPAY_PAYMENT_CONFIRMATION );
+    }
+
+    /**
+     * Retrieves the deposit successfully charged email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getDepositChargeSuccessfulEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL );
+    }
+
+    /**
+     * Retrieves the deposit charge declined email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getDepositChargeDeclinedEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_DEPOSIT_CHARGE_DECLINED );
     }
 
     /**
@@ -946,6 +977,62 @@ public class CloudbedsScraper {
         JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + res.getReservationId() );
+        }
+    }
+    
+    /**
+     * Sends an email to the guest for the given reservation when the deposit has been charged successfully.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param amount amount being charged
+     * @throws IOException
+     */
+    public void sendDepositChargeSuccessfulEmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
+
+        EmailTemplateInfo template = getDepositChargeSuccessfulEmailTemplate( webClient );
+        Reservation res = getReservation( webClient, reservationId );
+
+        WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
+                template, res.getIdentifier(), res.getCustomerId(), reservationId,
+                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + CURRENCY_FORMAT.format( amount ) ) );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            throw new UnrecoverableFault( "Failed to send deposit charge successful email for reservation " + reservationId );
+        }
+    }
+
+    /**
+     * Sends an email to the guest for the given reservation when the deposit charge was declined.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param amount amount being charged
+     * @param paymentURL URL to payment portal
+     * @throws IOException
+     */
+    public void sendDepositChargeDeclinedEmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException {
+
+        EmailTemplateInfo template = getDepositChargeDeclinedEmailTemplate( webClient );
+        Reservation res = getReservation( webClient, reservationId );
+
+        WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
+                template, res.getIdentifier(), res.getCustomerId(), reservationId,
+                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + CURRENCY_FORMAT.format( amount ) )
+                        .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            throw new UnrecoverableFault( "Failed to send deposit charge declined email for reservation " + reservationId );
         }
     }
 

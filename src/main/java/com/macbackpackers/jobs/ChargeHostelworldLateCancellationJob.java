@@ -41,7 +41,7 @@ public class ChargeHostelworldLateCancellationJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         try {
-            paymentProcessor.processCardPaymentDepositForFirstNight( cbWebClient, getReservationId() );
+            paymentProcessor.processHostelworldLateCancellationCharge( cbWebClient, getReservationId() );
         }
         catch ( PaymentNotAuthorizedException ex ) {
             LOGGER.info( "Payment not authorized. Lowering retry count on job to 1 to avoid spamming card" );

@@ -214,6 +214,97 @@ public class PaymentProcessorService {
     }
 
     /**
+     * Attempt to charge the deposit payment for the given reservation. This method does nothing if
+     * the payment outstanding != payment total.
+     * 
+     * @param webClient web client to use
+     * @param reservationId unique CB reservation
+     * @throws IOException on I/O error
+     */
+    public synchronized void processDepositPayment( WebClient webClient, String reservationId ) throws IOException {
+        LOGGER.info( "Processing deposit payment for reservation " + reservationId );
+        Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+
+        LOGGER.info( cbReservation.getThirdPartyIdentifier() + ": "
+                + cbReservation.getFirstName() + " " + cbReservation.getLastName() );
+        LOGGER.info( "Source: " + cbReservation.getSourceName() );
+        LOGGER.info( "Status: " + cbReservation.getStatus() );
+        LOGGER.info( "Checkin: " + cbReservation.getCheckinDate() );
+        LOGGER.info( "Checkout: " + cbReservation.getCheckoutDate() );
+        LOGGER.info( "Grand Total: " + cbReservation.getGrandTotal() );
+        LOGGER.info( "Balance Due: " + cbReservation.getBalanceDue() );
+
+        // check if we have anything to pay
+        if ( cbReservation.getPaidValue().compareTo( BigDecimal.ZERO ) > 0 ) {
+            LOGGER.info( "Booking has non-zero paid amount. Not charging deposit." );
+            return;
+        }
+        else if ( "canceled".equals( cbReservation.getStatus() ) ) {
+            LOGGER.info( "Booking is cancelled. Not charging." );
+            return;
+        }
+        // group bookings must be approved/charged manually
+        else if ( cbReservation.getNumberOfGuests() >= wordpressDAO.getGroupBookingSize() ) {
+            LOGGER.info( "Reservation " + reservationId + " has " + cbReservation.getNumberOfGuests() + " guests. Payment must be done manually for groups." );
+            return;
+        }
+
+        // check if card details exist in CB
+        if ( false == cbReservation.isCardDetailsPresent() ) {
+            throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
+        }
+        else if( cbReservation.isAmexCard() ) {
+            cloudbedsScraper.addNote( webClient, reservationId, "Card is AMEX. Charge manually using POS terminal." );
+            return;
+        }
+
+        // either take first night, or a percentage amount
+        BigDecimal depositAmount;
+        if ( false == "first_night".equals( bdcDepositStrategy ) && "Booking.com".equals( cbReservation.getSourceName() ) ) {
+            BigDecimal percentToCharge = new BigDecimal( bdcDepositStrategy );
+            depositAmount = cbReservation.getGrandTotal().multiply( percentToCharge ).setScale( 2, RoundingMode.HALF_UP );
+            LOGGER.info( "Deposit amount due: " + depositAmount );
+        }
+        else {
+            depositAmount = cbReservation.getRateFirstNight( gson );
+            LOGGER.info( "First night due: " + depositAmount );
+        }
+
+        if ( depositAmount.compareTo( BigDecimal.ZERO ) <= 0 ) {
+            throw new IllegalStateException( "Some weirdness here. First night amount must be greater than 0." );
+        }
+        if ( depositAmount.compareTo( cbReservation.getBalanceDue() ) > 0 ) {
+            throw new IllegalStateException( "Some weirdness here. First night amount exceeds balance due." );
+        }
+
+        try {
+            // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
+            cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
+                    cbReservation.getCreditCardId(), depositAmount );
+    
+            // send email if successful
+            cloudbedsScraper.sendDepositChargeSuccessfulEmail( webClient, reservationId, depositAmount );
+            cloudbedsScraper.addNote( webClient, reservationId,
+                    "Successfully charged deposit of £" + CURRENCY_FORMAT.format( depositAmount ) );
+        }
+        catch ( PaymentNotAuthorizedException payEx ) {
+            LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
+
+            if ( cloudbedsScraper.getEmailLastSentDate( webClient, reservationId,
+                    CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED ).isPresent() ) {
+                LOGGER.info( "Declined payment email already sent. Not going to do it again..." );
+            }
+            else {
+                LOGGER.info( "Sending declined payment email" );
+                String paymentURL = generateUniquePaymentURL( reservationId );
+                cloudbedsScraper.sendDepositChargeDeclinedEmail( webClient, reservationId, depositAmount, paymentURL );
+                cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
+            }
+        }
+
+    }
+
+    /**
      * Loads the given booking and processes any payments (if applicable).
      * 
      * @param webClient web client used for LH
@@ -358,6 +449,7 @@ public class PaymentProcessorService {
                 return;
             }
 
+            LOGGER.info( "Processing transaction with status " + txn.getAuthStatus() + " for booking ref " + txn.getBookingReference() );
             // otherwise BOOKING transaction
             switch ( txn.getAuthStatus() ) {
                 case "OK":
@@ -598,6 +690,15 @@ public class PaymentProcessorService {
                 && false == "nonref".equalsIgnoreCase( cbReservation.getUsedRoomTypes() )) {
             throw new UnrecoverableFault( "ABORT! Attempting to charge a non non-refundable booking!" );
         }
+        // group bookings must be approved/charged manually
+        else if ( cbReservation.getNumberOfGuests() >= wordpressDAO.getGroupBookingSize() ) {
+            LOGGER.info( "Reservation " + reservationId + " has " + cbReservation.getNumberOfGuests() + " guests. Payment must be done manually for groups." );
+            return;
+        }
+        else if( cbReservation.isAmexCard() ) {
+            cloudbedsScraper.addNote( webClient, reservationId, "Card is AMEX. Charge manually using POS terminal." );
+            return;
+        }
 
         // check if card details exist in CB; copy over if req'd
         if ( false == cbReservation.isCardDetailsPresent() ) {
@@ -640,13 +741,24 @@ public class PaymentProcessorService {
             }
             else {
                 LOGGER.info( "Sending declined payment email" );
-                String lookupKey = generateRandomLookupKey( LOOKUPKEY_LENGTH );
-                String paymentURL = wordpressDAO.getBookingPaymentsURL() + lookupKey;
-                wordpressDAO.insertBookingLookupKey( reservationId, lookupKey );
+                String paymentURL = generateUniquePaymentURL( reservationId );
                 cloudbedsScraper.sendHostelworldNonRefundableDeclinedEmail( webClient, reservationId, cbReservation.getBalanceDue(), paymentURL );
                 cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
             }
         }
+    }
+
+    /**
+     * Creates a new payment URL for the given reservation.
+     * 
+     * @param reservationId unique Cloudbeds reservation ID
+     * @return payment URL
+     */
+    private String generateUniquePaymentURL( String reservationId ) {
+        String lookupKey = generateRandomLookupKey( LOOKUPKEY_LENGTH );
+        String paymentURL = wordpressDAO.getBookingPaymentsURL() + lookupKey;
+        wordpressDAO.insertBookingLookupKey( reservationId, lookupKey );
+        return paymentURL;
     }
 
     /**
@@ -678,6 +790,7 @@ public class PaymentProcessorService {
 
         LOGGER.info( cbReservation.getThirdPartyIdentifier() + ": "
                 + cbReservation.getFirstName() + " " + cbReservation.getLastName() );
+        LOGGER.info( "Source: " + cbReservation.getSourceName() );
         LOGGER.info( "Status: " + cbReservation.getStatus() );
         LOGGER.info( "Checkin: " + cbReservation.getCheckinDate() );
         LOGGER.info( "Checkout: " + cbReservation.getCheckoutDate() );
@@ -708,8 +821,9 @@ public class PaymentProcessorService {
      * @param amount amount to charge
      * @throws IOException on i/o error
      * @throws ParseException on bonehead error
+     * @throws MessagingException on failed email (amex card only)
      */
-    public synchronized void processCardPaymentDepositForFirstNight( WebClient webClient, String reservationId ) throws IOException, ParseException {
+    public synchronized void processHostelworldLateCancellationCharge( WebClient webClient, String reservationId ) throws IOException, ParseException, MessagingException {
         LOGGER.info( "Processing payment for 1st night of booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
@@ -734,6 +848,14 @@ public class PaymentProcessorService {
         // check if card details exist in CB
         if ( false == cbReservation.isCardDetailsPresent() ) {
             throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
+        }
+        else if( cbReservation.isAmexCard() ) {
+            cloudbedsScraper.addNote( webClient, reservationId, "Attempt to charge late-cancellation but card is AMEX. Charge manually using POS terminal." );
+            gmailService.sendEmailToSelf( "Late Cancellation HWL-" + cbReservation.getThirdPartyIdentifier() + ": "
+                    + cbReservation.getFirstName() + " " + cbReservation.getLastName(),
+                    IOUtils.resourceToString( "/hwl_late_cxl_amex_email_template.html", StandardCharsets.UTF_8 )
+                            .replaceAll( "__RESERVATION_ID__", cbReservation.getIdentifier() ) );
+            return;
         }
 
         BigDecimal firstNightAmount = cbReservation.getRateFirstNight( gson );

@@ -66,10 +66,10 @@ public class CreateAgodaChargeJob extends AbstractJob {
                 .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
                 .filter( p -> p.isCheckinDateTodayOrInPast() )
                 .forEach( p -> {
-                    LOGGER.info( "Creating a DepositChargeJob for booking "
+                    LOGGER.info( "Creating a PrepaidChargeJob for booking "
                             + p.getThirdPartyIdentifier() + " (" + p.getStatus() + ")" );
                     LOGGER.info( p.getFirstName() + " " + p.getLastName() );
-                    DepositChargeJob chargeJob = new DepositChargeJob();
+                    PrepaidChargeJob chargeJob = new PrepaidChargeJob();
                     chargeJob.setStatus( JobStatus.submitted );
                     chargeJob.setReservationId( Integer.parseInt( p.getReservationId() ) );
                     dao.insertJob( chargeJob );

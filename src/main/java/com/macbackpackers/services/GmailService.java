@@ -311,6 +311,22 @@ public class GmailService {
     }
 
     /**
+     * Sends an email from the current email address to the current email address.
+     * 
+     * @param subject subject of the email
+     * @param bodyText body text of the email
+     * @throws IOException on send error
+     * @throws MessagingException on message creation exception
+     */
+    public void sendEmailToSelf( String subject, String bodyText ) throws MessagingException, IOException {
+        Gmail gmail = connectAsClient();
+        Profile p = gmail.users().getProfile( GMAIL_USER ).execute();
+        Message message = createMessageWithEmail( createEmail( p.getEmailAddress(), "Reception", null, subject, bodyText ) );
+        message = gmail.users().messages().send( GMAIL_USER, message ).execute();
+        LOGGER.info( "Sent message " + message.getId() + ": " + message.toPrettyString() );
+    }
+
+    /**
      * Create a MimeMessage using the parameters provided.
      *
      * @param toAddress email address of the receiver

@@ -36,7 +36,7 @@ public class DepositChargeJob extends AbstractJob {
 
         if ( dao.isCloudbeds() ) {
             try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-                paymentProcessor.processCardPaymentForRemainingBalance( webClient, String.valueOf( getReservationId() ) );
+                paymentProcessor.processDepositPayment( webClient, String.valueOf( getReservationId() ) );
             }
         }
         else { // LittleHotelier

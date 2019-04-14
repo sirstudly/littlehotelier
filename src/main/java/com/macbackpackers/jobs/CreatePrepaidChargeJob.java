@@ -7,7 +7,7 @@ import javax.persistence.Entity;
 import com.macbackpackers.beans.JobStatus;
 
 /**
- * Job that creates {@link DepositChargeJob}s for all BDC bookings
+ * Job that creates {@link PrepaidChargeJob}s for all prepaid bookings
  * with virtual CCs that are currently chargeable.
  */
 @Entity
@@ -24,14 +24,12 @@ public class CreatePrepaidChargeJob extends AbstractJob {
                 // include bookings that are about to arrive (in case we couldn't charge them yet)
                 .filter( p -> p.isChargeableDateInPast() || p.isCheckinDateTodayOrTomorrow() )
                 .forEach( a -> {
-                    LOGGER.info( "Creating a DepositChargeJob for booking " + a.getBookingReference() 
+                    LOGGER.info( "Creating a PrepaidChargeJob for booking " + a.getBookingReference() 
                             + " chargeable on " + a.getEarliestChargeDate() );
-                    DepositChargeJob depositJob = new DepositChargeJob();
-                    depositJob.setStatus( JobStatus.submitted );
-                    depositJob.setReservationId( a.getReservationId() );
-                    depositJob.setBookingRef( a.getBookingReference() );
-                    depositJob.setBookingDate( a.getBookedDate() );
-                    dao.insertJob( depositJob );
+                    PrepaidChargeJob chargeJob = new PrepaidChargeJob();
+                    chargeJob.setStatus( JobStatus.submitted );
+                    chargeJob.setReservationId( a.getReservationId() );
+                    dao.insertJob( chargeJob );
                 } );
     }
 

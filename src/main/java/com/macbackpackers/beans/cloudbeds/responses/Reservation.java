@@ -44,6 +44,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private List<BookingRoom> bookingRooms;
     private List<BookingNote> notes;
     private String creditCardId;
+    private String creditCardType;
 
     public String getReservationId() {
         return reservationId;
@@ -338,6 +339,18 @@ public class Reservation extends CloudbedsJsonResponse {
         this.creditCardId = creditCardId;
     }
 
+    public String getCreditCardType() {
+        return creditCardType;
+    }
+
+    public boolean isAmexCard() {
+        return "amex".equals( getCreditCardType() );
+    }
+
+    public void setCreditCardType( String creditCardType ) {
+        this.creditCardType = creditCardType;
+    }
+
     /**
      * Returns the amount of the first night for this booking.
      * 
@@ -352,6 +365,19 @@ public class Reservation extends CloudbedsJsonResponse {
                 .filter( dr -> getCheckinDate().equals( dr.get( "date" ).getAsString() ) )
                 .map( dr -> dr.get( "rate" ).getAsBigDecimal() )
                 .reduce( BigDecimal.ZERO, BigDecimal::add );
+    }
+
+    public int getNumberOfGuests() {
+        return (getAdultsNumber() == null ? 0 : getAdultsNumber())
+                + (getKidsNumber() == null ? 0 : getKidsNumber());
+
+    }
+
+    public boolean isPrepaid() {
+        return getSpecialRequests() != null && (
+                getSpecialRequests().contains( "You have received a virtual credit card for this reservation" ) ||
+                getSpecialRequests().contains( "THIS RESERVATION HAS BEEN PRE-PAID" ) ||
+                getSpecialRequests().contains( "The VCC shown is still not active" ));
     }
 
     @Override
