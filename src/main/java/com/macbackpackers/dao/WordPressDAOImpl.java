@@ -954,10 +954,11 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    public void insertBookingLookupKey( String reservationId, String key ) {
-        em.createNativeQuery( "INSERT INTO wp_booking_lookup_key ( reservation_id, lookup_key ) VALUES (?, ?)" )
+    public void insertBookingLookupKey( String reservationId, String key, BigDecimal paymentRequested ) {
+        em.createNativeQuery( "INSERT INTO wp_booking_lookup_key ( reservation_id, lookup_key, payment_requested ) VALUES (?, ?, ?)" )
                 .setParameter( 1, reservationId )
                 .setParameter( 2, key )
+                .setParameter( 3, paymentRequested )
                 .executeUpdate();
     }
 

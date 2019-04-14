@@ -296,7 +296,7 @@ public class PaymentProcessorService {
             }
             else {
                 LOGGER.info( "Sending declined payment email" );
-                String paymentURL = generateUniquePaymentURL( reservationId );
+                String paymentURL = generateUniquePaymentURL( reservationId, depositAmount );
                 cloudbedsScraper.sendDepositChargeDeclinedEmail( webClient, reservationId, depositAmount, paymentURL );
                 cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
             }
@@ -741,7 +741,7 @@ public class PaymentProcessorService {
             }
             else {
                 LOGGER.info( "Sending declined payment email" );
-                String paymentURL = generateUniquePaymentURL( reservationId );
+                String paymentURL = generateUniquePaymentURL( reservationId, null );
                 cloudbedsScraper.sendHostelworldNonRefundableDeclinedEmail( webClient, reservationId, cbReservation.getBalanceDue(), paymentURL );
                 cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
             }
@@ -752,12 +752,13 @@ public class PaymentProcessorService {
      * Creates a new payment URL for the given reservation.
      * 
      * @param reservationId unique Cloudbeds reservation ID
+     * @param paymentRequested (optional) payment requested
      * @return payment URL
      */
-    private String generateUniquePaymentURL( String reservationId ) {
+    private String generateUniquePaymentURL( String reservationId, BigDecimal paymentRequested ) {
         String lookupKey = generateRandomLookupKey( LOOKUPKEY_LENGTH );
         String paymentURL = wordpressDAO.getBookingPaymentsURL() + lookupKey;
-        wordpressDAO.insertBookingLookupKey( reservationId, lookupKey );
+        wordpressDAO.insertBookingLookupKey( reservationId, lookupKey, paymentRequested );
         return paymentURL;
     }
 

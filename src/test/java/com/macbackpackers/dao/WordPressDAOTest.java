@@ -642,4 +642,11 @@ public class WordPressDAOTest {
     public void testIsJobCurrentlyPending() {
         LOGGER.info( "pending: " + dao.isJobCurrentlyPending( "com.macbackpackers.jobs.ConfirmDepositAmountsJob" ) );        
     }
+
+    @Test
+    public void testInsertBookingLookupKey() {
+        dao.insertBookingLookupKey( "12345678", "ABCDEFG", null );
+        dao.insertBookingLookupKey( "12345678", "BCDEFGH", new BigDecimal("2.3") );
+        dao.insertBookingLookupKey( "12345678", "CDEFGHI", new BigDecimal("12.34") );
+    }
 }

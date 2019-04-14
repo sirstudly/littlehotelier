@@ -484,8 +484,9 @@ public interface WordPressDAO {
      * 
      * @param reservationId the unique cloudbeds reference
      * @param key the lookup key
+     * @param paymentRequested (optional) payment amount
      */
-    public void insertBookingLookupKey( String reservationId, String key );
+    public void insertBookingLookupKey( String reservationId, String key, BigDecimal paymentRequested );
 
     /**
      * Returns the last px post transaction for a given booking reference.
