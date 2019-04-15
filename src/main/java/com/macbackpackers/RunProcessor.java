@@ -16,6 +16,7 @@ import org.quartz.SchedulerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.stereotype.Component;
@@ -26,6 +27,7 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.ShutdownException;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.services.FileService;
+import com.macbackpackers.services.GmailService;
 import com.macbackpackers.services.ProcessorService;
 
 /**
@@ -43,9 +45,15 @@ public class RunProcessor
     @Autowired
     private FileService fileService;
 
+    @Autowired
+    private WordPressDAO dao;
+    
+    @Autowired
+    private ApplicationContext context;
+
     // exclusive-file lock so only ever one instance of the processor is running
     private FileLock processorLock;
-
+    
     // make sure only one instance is running by checking a file-level lock
     private boolean checkLock = true;
 
@@ -116,6 +124,37 @@ public class RunProcessor
     }
 
     /**
+     * Make sure we can connect to Cloudbeds (if applicable). Email support if 3 failed logins in a
+     * row.
+     * 
+     * @throws Exception if unable to establish cloudbeds session
+     */
+    public void initCloudbeds() throws Exception {
+        // if cloudbeds, check if we can connect first
+        // this will fail-fast if not
+        if ( dao.isCloudbeds() ) {
+            String failedLoginCountStr = dao.getOption( "hbo_failed_logins" );
+            int failedLoginCount = failedLoginCountStr == null ? 0 : Integer.parseInt( failedLoginCountStr );
+            if ( failedLoginCount == 3 ) {
+                String supportEmail = dao.getOption( "hbo_support_email" );
+                if ( supportEmail != null ) {
+                    GmailService gmail = context.getBean( GmailService.class );
+                    gmail.sendEmail( supportEmail, null, "Login Failed", "Help! I'm no longer able to login to Cloudbeds!! -RONBOT" );
+                }
+            }
+            try (WebClient c = context.getBean( "webClientForCloudbeds", WebClient.class )) {
+                CloudbedsScraper cloudbedsScraper = context.getBean( CloudbedsScraper.class );
+                cloudbedsScraper.getReservations( c, "999999999" ); // keep session alive
+                dao.setOption( "hbo_failed_logins", "0" ); // reset
+            }
+            catch ( Exception ex ) {
+                dao.setOption( "hbo_failed_logins", String.valueOf( ++failedLoginCount ) ); // increment
+                throw ex;
+            }
+        }
+    }
+
+    /**
      * Runs the processor.
      * 
      * @param args no arguments expected
@@ -154,15 +193,7 @@ public class RunProcessor
         }
 
         try {
-            // if cloudbeds, check if we can connect first
-            // this will fail-fast if not
-            WordPressDAO dao = context.getBean( WordPressDAO.class );
-            if ( dao.isCloudbeds() ) {
-                WebClient c = context.getBean( "webClientForCloudbeds", WebClient.class );
-                CloudbedsScraper cloudbedsScraper = context.getBean( CloudbedsScraper.class );
-                cloudbedsScraper.getReservations( c, "999999999" ); // keep session alive
-                c.close();
-            }
+            processor.initCloudbeds();
 
             // server-mode: keep the processor running
             if ( line.hasOption( "S" ) ) {
