@@ -57,7 +57,7 @@ public class CreateAgodaChargeJob extends AbstractJob {
     }
 
     private void processJobForCloudbeds( WebClient webClient ) throws Exception {
-        cbScraper.getReservationsForBookingSources( webClient,
+        cbScraper.getReservationsForBookingSources( webClient, null, null,
                 LocalDate.now().minusDays( getDaysBack() ), LocalDate.now(), "Agoda (Channel Collect Booking)" )
                 .stream()
                 .filter( p -> false == p.isPaid() )

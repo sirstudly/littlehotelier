@@ -279,22 +279,25 @@ public class CloudbedsJsonRequestFactory {
     /**
      * Get all reservations matching the given booking source(s) and booked dates.
      * 
+     * @param checkinDateStart checkin date (inclusive)
+     * @param checkinDateEnd checkin date (inclusive)
      * @param bookedDateStart booked date (inclusive)
      * @param bookedDateEnd booked date (inclusive)
      * @param bookingSourceIds comma-delimited list of booking source Id(s)
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetReservationsRequestByBookingSource( LocalDate bookedDateStart,
+    public WebRequest createGetReservationsRequestByBookingSource( 
+            LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate bookedDateStart,
             LocalDate bookedDateEnd, String bookingSourceIds ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         webRequest.setRequestParameters( getCommonReservationsQueryParameters(
-                new NameValuePair( "date_start[0]", "" ),
-                new NameValuePair( "date_start[1]", "" ),
+                new NameValuePair( "date_start[0]", checkinDateStart == null ? "" : checkinDateStart.format( YYYY_MM_DD ) ),
+                new NameValuePair( "date_start[1]", checkinDateEnd == null ? "" : checkinDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_end[0]", "" ),
                 new NameValuePair( "date_end[1]", "" ),
-                new NameValuePair( "booking_date[0]", bookedDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "booking_date[1]", bookedDateEnd.format( YYYY_MM_DD ) ),
+                new NameValuePair( "booking_date[0]", bookedDateStart == null ? "" : bookedDateStart.format( YYYY_MM_DD ) ),
+                new NameValuePair( "booking_date[1]", bookedDateEnd == null ? "" : bookedDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "status", "all" ),
                 new NameValuePair( "source", bookingSourceIds ) ) );
         return webRequest;

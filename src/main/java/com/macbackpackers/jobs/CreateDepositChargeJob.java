@@ -37,7 +37,8 @@ public class CreateDepositChargeJob extends AbstractJob {
     public void processJob() throws Exception {
         if ( dao.isCloudbeds() ) {
             try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-                processJobForCloudbeds( webClient );
+                processNewlyBookedDepositJobsForCloudbeds( webClient );
+                processUpcomingBDCDepositJobsForCloudbeds( webClient );
             }
         }
         else {
@@ -47,14 +48,51 @@ public class CreateDepositChargeJob extends AbstractJob {
         }
     }
 
-    private void processJobForCloudbeds( WebClient webClient ) throws Exception {
+    /**
+     * Create DepositChargeJobs for any new bookings without a deposit from BDC/Expedia.
+     * 
+     * @param webClient
+     * @throws Exception
+     */
+    private void processNewlyBookedDepositJobsForCloudbeds( WebClient webClient ) throws Exception {
         CloudbedsScraper cbScraper = appContext.getBean( CloudbedsScraper.class );
         cbScraper.getReservationsForBookingSources( webClient,
+                null, null,
                 LocalDate.now().minusDays( getDaysBack() ), LocalDate.now(),
                 "Booking.com (Hotel Collect Booking)", "Expedia (Hotel Collect Booking)" )
                 .stream()
                 .filter( p -> p.getPaidValue().equals( BigDecimal.ZERO ) )
                 .filter( p -> p.isHotelCollectBooking() )
+                .filter( p -> p.isCardDetailsPresent() )
+                .filter( p -> false == p.isPrepaid() )
+                .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
+                .forEach( p -> {
+                    LOGGER.info( "Creating a DepositChargeJob for " + p.getSourceName() + " #"
+                            + p.getThirdPartyIdentifier() + " (" + p.getStatus() + ")" );
+                    LOGGER.info( p.getFirstName() + " " + p.getLastName() );
+                    DepositChargeJob chargeJob = new DepositChargeJob();
+                    chargeJob.setStatus( JobStatus.submitted );
+                    chargeJob.setReservationId( Integer.parseInt( p.getReservationId() ) );
+                    dao.insertJob( chargeJob );
+                } );
+    }
+
+    /**
+     * Card details hidden until a day or two before checkin date. Charge a normal deposit
+     * in these instances.
+     * 
+     * @param webClient
+     * @throws Exception
+     */
+    private void processUpcomingBDCDepositJobsForCloudbeds( WebClient webClient ) throws Exception {
+        CloudbedsScraper cbScraper = appContext.getBean( CloudbedsScraper.class );
+        cbScraper.getReservationsForBookingSources( webClient,
+                LocalDate.now(), LocalDate.now().plusDays( 7 ),
+                null, null, "Booking.com (Hotel Collect Booking)" )
+                .stream()
+                .filter( p -> p.getPaidValue().equals( BigDecimal.ZERO ) )
+                .filter( p -> p.isHotelCollectBooking() )
+                .filter( p -> p.isCardDetailsPresent() )
                 .filter( p -> false == p.isPrepaid() )
                 .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
                 .forEach( p -> {

@@ -47,7 +47,7 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
           LEFT OUTER JOIN wp_lh_rpt_guest_comments c ON f.reservation_id = c.reservation_id
          WHERE f.job_id = :jobId
            AND ((       f.payment_total = f.payment_outstanding
-                    AND f.payment_total > 0
+                    AND f.payment_total &gt; 0
                     AND f.booking_source IN ('Booking.com', 'Expedia')
                     AND ((c.comments IS NULL OR 
                             (c.comments NOT LIKE '%You have received a virtual credit card for this reservation%'
@@ -57,6 +57,13 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
                          AND (f.notes IS NULL OR 
                              (f.notes NOT LIKE '%You have received a virtual credit card for this reservation%'
                          AND f.notes NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'))))
+               OR ( -- any prepaid bookings with a checkin date of today or earlier should be charged in full by now
+                        f.payment_outstanding &gt; 0
+                    AND f.booking_source IN ('Booking.com')
+                    AND f.checkin_date &lt; NOW()
+                    AND (   c.comments LIKE '%You have received a virtual credit card for this reservation%'
+                         OR c.comments LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'
+                         OR c.comments LIKE '%The VCC shown is still not active.%'))
                OR ( -- include non-refundable bookings
                         f.booking_source = 'Hostelworld &amp; Hostelbookers'
                     AND f.rate_plan_name IN ('Non-refundable', 'nonref')

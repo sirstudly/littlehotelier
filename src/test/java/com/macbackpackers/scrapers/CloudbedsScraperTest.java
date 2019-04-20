@@ -89,7 +89,7 @@ public class CloudbedsScraperTest {
 
     @Test
     public void testGetReservationsForBookingSources() throws Exception {
-        List<Reservation> results = cloudbedsScraper.getReservationsForBookingSources( webClient,
+        List<Reservation> results = cloudbedsScraper.getReservationsForBookingSources( webClient, null, null,
                 LocalDate.now().withMonth( 5 ).withDayOfMonth( 30 ),
                 LocalDate.now().withMonth( 5 ).withDayOfMonth( 30 ),
                 "Hostelworld & Hostelbookers", "Agoda (Channel Collect Booking)" );
@@ -219,6 +219,25 @@ public class CloudbedsScraperTest {
     
     @Test
     public void testGetEmailTemplateLastSentDate() throws Exception {
-        LOGGER.info( cloudbedsScraper.getEmailLastSentDate( webClient, "10569023", "Hostelworld Non-Refundable Charge Declined" ).toString() );
+        LOGGER.info( cloudbedsScraper.getEmailLastSentDate( webClient, "19443322", CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED ).toString() );
     }
+    
+    @Test
+    public void testCreateDepositChargeJobForBDC() throws Exception {
+        cloudbedsScraper.getReservationsForBookingSources( webClient,
+                LocalDate.now(), LocalDate.now().plusDays( 7 ),
+                null, null, "Booking.com (Hotel Collect Booking)" )
+                .stream()
+                .filter( p -> p.getPaidValue().equals( BigDecimal.ZERO ) )
+                .filter( p -> p.isHotelCollectBooking() )
+                .filter( p -> p.isCardDetailsPresent() )
+                .filter( p -> false == p.isPrepaid() )
+                .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
+                .forEach( p -> {
+                    LOGGER.info( "Creating a DepositChargeJob for " + p.getSourceName() + " #"
+                            + p.getThirdPartyIdentifier() + " (" + p.getStatus() + ")" );
+                    LOGGER.info( p.getFirstName() + " " + p.getLastName() );
+                } );
+    }
+
 }

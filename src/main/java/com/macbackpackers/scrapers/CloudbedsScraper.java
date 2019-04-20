@@ -511,6 +511,8 @@ public class CloudbedsScraper {
      * Get all reservations with the given booking sources.
      * 
      * @param webClient web client instance to use
+     * @param checkinDateStart checkin date (inclusive)
+     * @param checkinDateEnd checkin date (inclusive)
      * @param bookedDateStart booked date (inclusive)
      * @param bookedDateEnd booked date (inclusive)
      * @param bookingSources comma-delimited list of booking source(s)
@@ -518,9 +520,11 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<Reservation> getReservationsForBookingSources( WebClient webClient,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd, 
             LocalDate bookedDateStart, LocalDate bookedDateEnd, String ... sourceNames ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByBookingSource(
-                bookedDateStart, bookedDateEnd, lookupBookingSourceIds( webClient, sourceNames ) ) )
+                checkinDateStart, checkinDateEnd, bookedDateStart, bookedDateEnd,
+                lookupBookingSourceIds( webClient, sourceNames ) ) )
                         .stream()
                         .map( c -> getReservationRetry( webClient, c.getId() ) )
                         .collect( Collectors.toList() );
@@ -860,6 +864,7 @@ public class CloudbedsScraper {
         final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a" );
         return StreamSupport.stream( jelement.getAsJsonObject().get( "aaData" )
                 .getAsJsonArray().spliterator(), false )
+                .filter( e -> false == e.getAsJsonObject().get( "template" ).isJsonNull() )
                 .filter( e -> templateName.equals( e.getAsJsonObject().get( "template" ).getAsString() ) )
                 .map( e -> LocalDateTime.parse( e.getAsJsonObject().get( "event_date" ).getAsString(), DD_MM_YYYY_HH_MM ) )
                 .findFirst();

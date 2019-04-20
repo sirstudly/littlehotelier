@@ -36,7 +36,7 @@ public class CreateCopyCardDetailsToCloudbedsJob extends AbstractJob {
     @Override
     @Transactional
     public void processJob() throws Exception {
-        cbScraper.getReservationsForBookingSources( cbWebClient,
+        cbScraper.getReservationsForBookingSources( cbWebClient, null, null,
                 getBookingDate(), getBookingDate().plusDays( getDaysAhead() ), "Hostelworld & Hostelbookers" )
                 .stream()
                 .filter( p -> false == p.isCardDetailsPresent() )
