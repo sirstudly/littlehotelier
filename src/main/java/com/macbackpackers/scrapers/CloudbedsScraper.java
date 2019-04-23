@@ -69,12 +69,18 @@ public class CloudbedsScraper {
     @Autowired
     private CloudbedsJsonRequestFactory jsonRequestFactory;
 
-    @Value( "${cloudbeds.property.id:0}" )
-    private String PROPERTY_ID;
-
     @Value( "${process.jobs.retries:3}" )
     private int MAX_RETRY;
-    
+
+    /**
+     * Retrieves the current Cloudbeds property ID.
+     * 
+     * @return non-null property ID
+     */
+    public String getPropertyId() {
+        return jsonRequestFactory.getPropertyId();
+    }
+
     /**
      * Verifies that we're logged in (or fails fast if not).
      * 
@@ -154,7 +160,7 @@ public class CloudbedsScraper {
      * @throws IOException on navigation failure
      */
     public HtmlPage loadDashboard( WebClient webClient ) throws IOException {
-        HtmlPage loadedPage = webClient.getPage( "https://hotels.cloudbeds.com/connect/" + PROPERTY_ID );
+        HtmlPage loadedPage = webClient.getPage( "https://hotels.cloudbeds.com/connect/" + getPropertyId() );
         LOGGER.info( "Loading Dashboard." );
         if ( loadedPage.getUrl().getPath().contains( "/login" ) ) {
             LOGGER.info( "Oops, I don't think we're logged in." );

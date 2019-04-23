@@ -216,7 +216,8 @@ public class JobScheduler {
             // if we're repeating daily, check if we've already passed the time today
             LocalDateTime repeatAt = LocalDateTime.now()
                     .withHour( getRepeatDailyHour() )
-                    .withMinute( getRepeatDailyMinute() );
+                    .withMinute( getRepeatDailyMinute() )
+                    .withSecond( 0 );
 
             // if the repeat time is in the future, dial it back a day to get the last time it should've run
             if ( LocalDateTime.now().isBefore( repeatAt ) ) {

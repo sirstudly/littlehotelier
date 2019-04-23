@@ -52,9 +52,6 @@ public class CloudbedsService {
     @Autowired
     private RoomBedMatcher roomBedMatcher;
 
-    @Value( "${cloudbeds.property.id:0}" )
-    private String PROPERTY_ID;
-
     @Value( "${hostelworld.latecancellation.hours:48}" )
     private int HWL_LATE_CANCEL_HOURS;
 
@@ -334,7 +331,7 @@ public class CloudbedsService {
                 a.setBookingSource( r.getSourceName() );
                 a.setCheckinDate( LocalDate.parse( br.getStartDate() ) );
                 a.setCheckoutDate( LocalDate.parse( br.getEndDate() ) );
-                a.setDataHref( "/connect/" + PROPERTY_ID + "#/reservations/" + r.getReservationId());
+                a.setDataHref( "/connect/" + scraper.getPropertyId() + "#/reservations/" + r.getReservationId());
                 a.setGuestName( r.getFirstName() + " " + r.getLastName() );
                 a.setJobId( jobId );
                 a.setNumberGuests( r.getAdultsNumber() + r.getKidsNumber() );

@@ -175,38 +175,6 @@ CREATE TABLE `wp_lh_group_bookings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
-CREATE TABLE `wp_hw_booking` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `guest_name` varchar(255) DEFAULT NULL,
-  `guest_email` varchar(255) DEFAULT NULL,
-  `guest_phone` varchar(255) DEFAULT NULL,
-  `guest_nationality` varchar(255) DEFAULT NULL,
-  `payment_total` decimal(10,2) DEFAULT NULL,
-  `payment_outstanding` decimal(10,2) DEFAULT NULL,
-  `persons` varchar(255) DEFAULT NULL,
-  `booking_reference` varchar(255) DEFAULT NULL,
-  `booking_source` varchar(255) DEFAULT NULL,
-  `booked_date` datetime NULL DEFAULT NULL,
-  `arrival_time` datetime NULL DEFAULT NULL,
-  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
-
-CREATE TABLE `wp_hw_booking_dates` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `hw_booking_id` bigint(20) unsigned NOT NULL,
-  `room_type_id` int(10) unsigned DEFAULT NULL,
-  `room_type` varchar(255) DEFAULT NULL,
-  `booked_date` datetime NOT NULL,
-  `persons` int(10) unsigned NOT NULL,
-  `price` decimal(10,2) DEFAULT NULL,
-  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `hw_fk_bookingid` (`hw_booking_id`), -- no foreign key due to hibernate
-  KEY `hw_booked_date` (`booked_date`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
-
-
 CREATE TABLE `wp_lh_rpt_guest_comments` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `reservation_id` bigint(20) unsigned DEFAULT NULL,
@@ -514,6 +482,37 @@ SELECT DISTINCT 100000 + room_type_id `id`, 'Unallocated' `room`, null `bed_name
  WHERE room IN ('1','2','4','5','6','Room 03');
 
 *************** END FORT WILLIAM ***************/
+
+
+/***  START LOCHSIDE *********
+INSERT INTO wp_lh_rooms(id, room_type_id, room, bed_name)
+SELECT DISTINCT room_id, room_type_id, room, bed_name
+  FROM wp_lh_calendar WHERE job_id = 1
+  AND room_id is not null
+  order by room, bed_name;  
+  
+UPDATE wp_lh_rooms
+   SET capacity = 4, room_type = 'MX', active_yn = 'Y' WHERE room IN ( 'Room 01', 'Room 16', 'Room 21', 'Room 24', 'Room 26' );
+UPDATE wp_lh_rooms
+   SET capacity = 4, room_type = 'F', active_yn = 'Y' WHERE room IN ( 'Room 12', 'Room 13' );
+UPDATE wp_lh_rooms
+   SET capacity = 6, room_type = 'MX', active_yn = 'Y' WHERE room IN ( 'Room 23' );
+UPDATE wp_lh_rooms
+   SET capacity = 8, room_type = 'MX', active_yn = 'Y' WHERE room IN ( 'Room 03' );
+UPDATE wp_lh_rooms
+   SET capacity = 1, room_type = 'SGL', active_yn = 'Y' WHERE room IN ( 'Single Room' );
+UPDATE wp_lh_rooms
+   SET capacity = 2, room_type = 'TWN', active_yn = 'Y' WHERE room IN ( 'Twin Room 02', 'Twin Room 14' );
+
+-- Staff rooms have no records so insert manually
+-- i don't actually know what the ids are but don't think it matters unless guests are actually booked into them
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES ('222222-1', 'xRoom 22', 'A', 4, 222222, 'LT_MIXED', 'Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES ('222222-2', 'xRoom 22', 'B', 4, 222222, 'LT_MIXED', 'Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES ('222222-3', 'xRoom 22', 'C', 4, 222222, 'LT_MIXED', 'Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES ('222222-4', 'xRoom 22', 'D', 4, 222222, 'LT_MIXED', 'Y');
+INSERT INTO `wp_lh_rooms` (`id`,`room`,`bed_name`,`capacity`,`room_type_id`,`room_type`,`active_yn`) VALUES ('333333-1', 'xRoom 25', 'TWIN', 2, 333333, 'LT_TWIN', 'Y');
+
+*************** END LOCHSIDE ***************/
 
 -- scheduled jobs
 /*
