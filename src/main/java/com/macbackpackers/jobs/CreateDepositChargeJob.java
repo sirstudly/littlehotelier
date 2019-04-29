@@ -5,8 +5,10 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 
 import javax.persistence.DiscriminatorValue;
@@ -37,8 +39,10 @@ public class CreateDepositChargeJob extends AbstractJob {
     public void processJob() throws Exception {
         if ( dao.isCloudbeds() ) {
             try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-                processNewlyBookedDepositJobsForCloudbeds( webClient );
-                processUpcomingBDCDepositJobsForCloudbeds( webClient );
+                HashSet<DepositChargeJob> jobs = new HashSet<>(); // make unique
+                jobs.addAll( collectNewlyBookedDepositJobsForCloudbeds( webClient ) );
+                jobs.addAll( collectUpcomingBDCDepositJobsForCloudbeds( webClient ) );
+                jobs.stream().forEach( j -> dao.insertJob( j ) );
             }
         }
         else {
@@ -52,9 +56,11 @@ public class CreateDepositChargeJob extends AbstractJob {
      * Create DepositChargeJobs for any new bookings without a deposit from BDC/Expedia.
      * 
      * @param webClient
+     * @return non-null list of jobs
      * @throws Exception
      */
-    private void processNewlyBookedDepositJobsForCloudbeds( WebClient webClient ) throws Exception {
+    private List<DepositChargeJob> collectNewlyBookedDepositJobsForCloudbeds( WebClient webClient ) throws Exception {
+        List<DepositChargeJob> jobs = new ArrayList<>();
         CloudbedsScraper cbScraper = appContext.getBean( CloudbedsScraper.class );
         cbScraper.getReservationsForBookingSources( webClient,
                 null, null,
@@ -73,8 +79,9 @@ public class CreateDepositChargeJob extends AbstractJob {
                     DepositChargeJob chargeJob = new DepositChargeJob();
                     chargeJob.setStatus( JobStatus.submitted );
                     chargeJob.setReservationId( Integer.parseInt( p.getReservationId() ) );
-                    dao.insertJob( chargeJob );
+                    jobs.add( chargeJob );
                 } );
+        return jobs;
     }
 
     /**
@@ -82,9 +89,11 @@ public class CreateDepositChargeJob extends AbstractJob {
      * in these instances.
      * 
      * @param webClient
+     * @return non-null list of jobs
      * @throws Exception
      */
-    private void processUpcomingBDCDepositJobsForCloudbeds( WebClient webClient ) throws Exception {
+    private List<DepositChargeJob> collectUpcomingBDCDepositJobsForCloudbeds( WebClient webClient ) throws Exception {
+        List<DepositChargeJob> jobs = new ArrayList<>();
         CloudbedsScraper cbScraper = appContext.getBean( CloudbedsScraper.class );
         cbScraper.getReservationsForBookingSources( webClient,
                 LocalDate.now(), LocalDate.now().plusDays( 7 ),
@@ -102,8 +111,9 @@ public class CreateDepositChargeJob extends AbstractJob {
                     DepositChargeJob chargeJob = new DepositChargeJob();
                     chargeJob.setStatus( JobStatus.submitted );
                     chargeJob.setReservationId( Integer.parseInt( p.getReservationId() ) );
-                    dao.insertJob( chargeJob );
+                    jobs.add( chargeJob );
                 } );
+        return jobs;
     }
 
     private void processJobForLittleHotelier( WebClient webClient ) throws Exception {

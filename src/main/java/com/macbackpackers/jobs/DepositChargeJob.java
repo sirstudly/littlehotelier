@@ -8,6 +8,7 @@ import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.Transient;
 
+import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
@@ -104,6 +105,22 @@ public class DepositChargeJob extends AbstractJob {
     @Override
     public int getRetryCount() {
         return 2; // don't attempt too many times
+    }
+
+    @Override
+    public boolean equals( Object obj ) {
+        if( obj instanceof DepositChargeJob ) {
+            DepositChargeJob other = DepositChargeJob.class.cast( obj );
+            return new EqualsBuilder()
+                    // just look at reservation ID
+                    .append( getReservationId(), other.getReservationId() ).isEquals();
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return new Integer( getReservationId() ).hashCode();
     }
 
 }
