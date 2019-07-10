@@ -30,6 +30,7 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AgodaChargeJob;
 import com.macbackpackers.jobs.AgodaNoChargeNoteJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
+import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
 import com.macbackpackers.jobs.BookingReportJob;
 import com.macbackpackers.jobs.ChargeNonRefundableBookingJob;
 import com.macbackpackers.jobs.CloudbedsAllocationScraperWorkerJob;
@@ -539,4 +540,14 @@ public class ProcessorServiceTest {
             currentDate = currentDate.plusDays( 5 ); // dates are inclusive, +1
         }
     }
+
+    @Test
+    public void testCreateBDCMarkCreditCardInvalidJob() throws Exception {
+        BDCMarkCreditCardInvalidJob j = new BDCMarkCreditCardInvalidJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBdcReservationId( "2141932992" );
+        j.setLast4Digits( "4583" );
+        dao.insertJob( j );
+    }
+
 }

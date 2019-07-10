@@ -2,6 +2,7 @@
 package com.macbackpackers.beans.cloudbeds.responses;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -45,6 +46,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private List<BookingNote> notes;
     private String creditCardId;
     private String creditCardType;
+    private String creditCardLast4Digits;
 
     public String getReservationId() {
         return reservationId;
@@ -351,6 +353,14 @@ public class Reservation extends CloudbedsJsonResponse {
         this.creditCardType = creditCardType;
     }
 
+    public String getCreditCardLast4Digits() {
+        return creditCardLast4Digits;
+    }
+
+    public void setCreditCardLast4Digits( String creditCardLast4Digits ) {
+        this.creditCardLast4Digits = creditCardLast4Digits;
+    }
+
     /**
      * Returns the amount of the first night for this booking.
      * 
@@ -364,7 +374,8 @@ public class Reservation extends CloudbedsJsonResponse {
                 .map( dr -> dr.getAsJsonObject() )
                 .filter( dr -> getCheckinDate().equals( dr.get( "date" ).getAsString() ) )
                 .map( dr -> dr.get( "rate" ).getAsBigDecimal() )
-                .reduce( BigDecimal.ZERO, BigDecimal::add );
+                .reduce( BigDecimal.ZERO, BigDecimal::add )
+                .setScale( 2, RoundingMode.HALF_UP );
     }
 
     public int getNumberOfGuests() {

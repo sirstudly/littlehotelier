@@ -127,6 +127,7 @@ public class CloudbedsScraper {
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
+        LOGGER.info( redirectPage.getWebResponse().getContentAsString() ); // to be removed
         Optional<CloudbedsJsonResponse> response = Optional.ofNullable(
                 gson.fromJson( redirectPage.getWebResponse().getContentAsString(),
                         CloudbedsJsonResponse.class ) );
@@ -191,6 +192,7 @@ public class CloudbedsScraper {
             if( r.isPresent() ) {
                 LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
             }
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new MissingUserDataException( "Reservation not found." );
         }
 
@@ -204,8 +206,9 @@ public class CloudbedsScraper {
             }
             // save the last one on the list (if more than one)
             r.get().setCreditCardId( cardId );
-            r.get().setCreditCardType( creditCardsElem.getAsJsonObject()
-                    .get( cardId ).getAsJsonObject().get( "card_type" ).getAsString() );
+            JsonObject cardObj = creditCardsElem.getAsJsonObject().get( cardId ).getAsJsonObject();
+            r.get().setCreditCardType( cardObj.get( "card_type" ).getAsString() );
+            r.get().setCreditCardLast4Digits( cardObj.get( "card_number" ).getAsString() );
         }
         return r.get();
     }
@@ -928,6 +931,7 @@ public class CloudbedsScraper {
 
         JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send confirmation email for reservation " + reservationId );
         }
     }
@@ -987,6 +991,7 @@ public class CloudbedsScraper {
 
         JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + res.getReservationId() );
         }
     }

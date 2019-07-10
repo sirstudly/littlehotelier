@@ -25,6 +25,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.config.LittleHotelierConfig;
@@ -222,6 +223,13 @@ public class CloudbedsScraperTest {
         LOGGER.info( cloudbedsScraper.getEmailLastSentDate( webClient, "19443322", CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED ).toString() );
     }
     
+    @Test
+    public void testSendSagepayPaymentConfirmationEmail() throws Exception {
+        SagepayTransaction txn = dao.fetchSagepayTransaction( 192 );
+        Reservation res = cloudbedsScraper.getReservationRetry( webClient, txn.getReservationId() );
+        cloudbedsScraper.sendSagepayPaymentConfirmationEmail( webClient, res, txn );
+    }
+
     @Test
     public void testCreateDepositChargeJobForBDC() throws Exception {
         cloudbedsScraper.getReservationsForBookingSources( webClient,
