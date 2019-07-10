@@ -135,7 +135,13 @@ public class ProcessorService {
         ExecutorService executor = Executors.newFixedThreadPool( threadCount );
         CyclicBarrier barrier = new CyclicBarrier( threadCount );
         
-        while(true) {
+        while ( true ) {
+            try {
+                createOverdueScheduledJobs();
+            }
+            catch ( Throwable th ) {
+                LOGGER.error( "Error creating overdue scheduled jobs", th );
+            }
             for ( int i = 0 ; i < threadCount ; i++ ) {
                 JobProcessorThread th = new JobProcessorThread( barrier );
                 autowireBeanFactory.autowireBean( th );
