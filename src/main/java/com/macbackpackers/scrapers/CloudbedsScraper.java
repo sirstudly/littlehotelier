@@ -12,8 +12,8 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -53,8 +53,6 @@ public class CloudbedsScraper {
     
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
     
-    private final DecimalFormat CURRENCY_FORMAT = new DecimalFormat( "###0.00" );
-
     public static final String TEMPLATE_HWL_CANCELLATION_CHARGE = "Hostelworld Cancellation Charge";
     public static final String TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_SUCCESSFUL = "Hostelworld Non-Refundable Charge Successful";
     public static final String TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_DECLINED = "Hostelworld Non-Refundable Charge Declined";
@@ -79,6 +77,15 @@ public class CloudbedsScraper {
      */
     public String getPropertyId() {
         return jsonRequestFactory.getPropertyId();
+    }
+
+    /**
+     * Returns new instance of a currency format (2 decimals) cause it's not thread safe.
+     * 
+     * @return new currency format
+     */
+    public DecimalFormat getCurrencyFormat() {
+        return new DecimalFormat( "###0.00" );
     }
 
     /**
@@ -163,6 +170,24 @@ public class CloudbedsScraper {
     public HtmlPage loadDashboard( WebClient webClient ) throws IOException {
         HtmlPage loadedPage = webClient.getPage( "https://hotels.cloudbeds.com/connect/" + getPropertyId() );
         LOGGER.info( "Loading Dashboard." );
+        if ( loadedPage.getUrl().getPath().contains( "/login" ) ) {
+            LOGGER.info( "Oops, I don't think we're logged in." );
+            throw new UnrecoverableFault( "Not logged in. Update session data." );
+        }
+        return loadedPage;
+    }
+
+    /**
+     * Goes to the reservation page.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId cloudbeds reservation id (in URL)
+     * @return reservation page
+     * @throws IOException on navigation failure
+     */
+    public HtmlPage loadReservationPage( WebClient webClient, String reservationId ) throws IOException {
+        HtmlPage loadedPage = webClient.getPage( "https://hotels.cloudbeds.com/connect/" + getPropertyId() + "#/reservations/" + reservationId );
+        LOGGER.info( "Loading reservation " + reservationId );
         if ( loadedPage.getUrl().getPath().contains( "/login" ) ) {
             LOGGER.info( "Oops, I don't think we're logged in." );
             throw new UnrecoverableFault( "Not logged in. Update session data." );
@@ -895,7 +920,7 @@ public class CloudbedsScraper {
 
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
                 template, res.getIdentifier(), res.getCustomerId(), reservationId,
-                res.getEmail(), b -> b.replaceAll( "\\[first night charge\\]", "£" + CURRENCY_FORMAT.format( amount ) ) );
+                res.getEmail(), b -> b.replaceAll( "\\[first night charge\\]", "£" + getCurrencyFormat().format( amount ) ) );
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
@@ -903,6 +928,7 @@ public class CloudbedsScraper {
 
         JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + reservationId );
         }
     }
@@ -923,7 +949,7 @@ public class CloudbedsScraper {
 
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
                 template, res.getIdentifier(), res.getCustomerId(), reservationId,
-                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + CURRENCY_FORMAT.format( amount ) ) );
+                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + getCurrencyFormat().format( amount ) ) );
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
@@ -953,7 +979,7 @@ public class CloudbedsScraper {
 
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
                 template, res.getIdentifier(), res.getCustomerId(), reservationId,
-                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + CURRENCY_FORMAT.format( amount ) )
+                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + getCurrencyFormat().format( amount ) )
                         .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) );
 
         Page redirectPage = webClient.getPage( requestSettings );
@@ -962,6 +988,7 @@ public class CloudbedsScraper {
 
         JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send charge declined email for reservation " + reservationId );
         }
     }
@@ -981,7 +1008,7 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
                 template, res.getIdentifier(), res.getCustomerId(), res.getReservationId(), txn.getEmail(), 
                 b -> b.replaceAll( "\\[vendor tx code\\]", txn.getVendorTxCode() )
-                    .replaceAll( "\\[payment total\\]", CURRENCY_FORMAT.format( txn.getPaymentAmount() ) )
+                    .replaceAll( "\\[payment total\\]", getCurrencyFormat().format( txn.getPaymentAmount() ) )
                     .replaceAll( "\\[card type\\]", txn.getCardType() )
                     .replaceAll( "\\[last 4 digits\\]", txn.getLastFourDigits() ));
 
@@ -1011,7 +1038,7 @@ public class CloudbedsScraper {
 
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
                 template, res.getIdentifier(), res.getCustomerId(), reservationId,
-                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + CURRENCY_FORMAT.format( amount ) ) );
+                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + getCurrencyFormat().format( amount ) ) );
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
@@ -1019,6 +1046,7 @@ public class CloudbedsScraper {
 
         JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send deposit charge successful email for reservation " + reservationId );
         }
     }
@@ -1039,7 +1067,7 @@ public class CloudbedsScraper {
 
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
                 template, res.getIdentifier(), res.getCustomerId(), reservationId,
-                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + CURRENCY_FORMAT.format( amount ) )
+                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + getCurrencyFormat().format( amount ) )
                         .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) );
 
         Page redirectPage = webClient.getPage( requestSettings );
@@ -1048,6 +1076,7 @@ public class CloudbedsScraper {
 
         JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send deposit charge declined email for reservation " + reservationId );
         }
     }

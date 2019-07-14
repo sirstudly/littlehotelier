@@ -391,6 +391,19 @@ public class Reservation extends CloudbedsJsonResponse {
                 getSpecialRequests().contains( "The VCC shown is still not active" ));
     }
 
+    /**
+     * Searches all notes for the given substring.
+     * 
+     * @param substr substring to match
+     * @return true if at least one note contains substring, false otherwise
+     */
+    public boolean containsNote( String substr ) {
+        return getNotes() != null && getNotes().stream()
+                .filter( n -> n.getNotes().contains( substr ) )
+                .findFirst()
+                .isPresent();
+    }
+
     @Override
     public String toString() {
         return ToStringBuilder.reflectionToString( this );

@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
-import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.time.Duration;
@@ -76,7 +75,6 @@ public class PaymentProcessorService {
     
     private static final FastDateFormat DATETIME_FORMAT = FastDateFormat.getInstance( "dd/MM/yyyy HH:mm:ss" );
     private static final FastDateFormat DATETIME_STANDARD = FastDateFormat.getInstance( "yyyy-MM-dd HH:mm:ss" );
-    private static final DecimalFormat CURRENCY_FORMAT = new DecimalFormat( "###0.00" );
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
 
     // all allowable characters for lookup key
@@ -115,6 +113,9 @@ public class PaymentProcessorService {
     @Autowired
     private ExpediaApiService expediaService;
 
+    @Autowired
+    private CloudbedsService cloudbedsService;
+    
     @Autowired
     private GmailService gmailService;
     
@@ -220,8 +221,9 @@ public class PaymentProcessorService {
      * @param webClient web client to use
      * @param reservationId unique CB reservation
      * @throws IOException on I/O error
+     * @throws MessagingException 
      */
-    public synchronized void processDepositPayment( WebClient webClient, String reservationId ) throws IOException {
+    public synchronized void processDepositPayment( WebClient webClient, String reservationId ) throws IOException, MessagingException {
         LOGGER.info( "Processing deposit payment for reservation " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
@@ -283,9 +285,9 @@ public class PaymentProcessorService {
                     cbReservation.getCreditCardId(), depositAmount );
     
             // send email if successful
-            cloudbedsScraper.sendDepositChargeSuccessfulEmail( webClient, reservationId, depositAmount );
+            cloudbedsService.sendDepositChargeSuccessfulGmail( webClient, reservationId, depositAmount );
             cloudbedsScraper.addNote( webClient, reservationId,
-                    "Successfully charged deposit of £" + CURRENCY_FORMAT.format( depositAmount ) );
+                    "Successfully charged deposit of £" + cloudbedsScraper.getCurrencyFormat().format( depositAmount ) );
         }
         catch ( PaymentNotAuthorizedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
@@ -297,8 +299,8 @@ public class PaymentProcessorService {
             else {
                 LOGGER.info( "Sending declined payment email" );
                 String paymentURL = generateUniquePaymentURL( reservationId, depositAmount );
-                cloudbedsScraper.sendDepositChargeDeclinedEmail( webClient, reservationId, depositAmount, paymentURL );
-                cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
+                cloudbedsService.sendDepositChargeDeclinedGmail( webClient, reservationId, depositAmount, paymentURL );
+//                cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
             }
         }
 
@@ -465,7 +467,7 @@ public class PaymentProcessorService {
                                         txn.getVendorTxCode(), txn.getAuthStatus(), txn.getAuthStatusDetail(), txn.getVpsAuthCode(),
                                         txn.getCardType(), txn.getLastFourDigits(), txn.getBankAuthCode() ) );
                         try {
-                            cloudbedsScraper.sendSagepayPaymentConfirmationEmail( webClient, res, txn );
+                            cloudbedsService.sendSagepayPaymentConfirmationGmail( webClient, res, txn );
                         }
                         catch ( Exception ex ) {
                             // don't fail the job if we can't send the email; log and continue
@@ -541,7 +543,7 @@ public class PaymentProcessorService {
                     .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
                     .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
                         .replaceAll( "\\[vendor tx code\\]", txn.getVendorTxCode() )
-                        .replaceAll( "\\[payment total\\]", CURRENCY_FORMAT.format( txn.getPaymentAmount() ) )
+                        .replaceAll( "\\[payment total\\]", cloudbedsScraper.getCurrencyFormat().format( txn.getPaymentAmount() ) )
                         .replaceAll( "\\[card type\\]", txn.getCardType() )
                         .replaceAll( "\\[last 4 digits\\]", txn.getLastFourDigits() ) ) );
     }
@@ -667,8 +669,9 @@ public class PaymentProcessorService {
      * @param reservationId the unique cloudbeds reservation ID
      * @throws IOException on i/o error
      * @throws ParseException on bonehead error
+     * @throws MessagingException 
      */
-    public void chargeNonRefundableBooking( WebClient webClient, String reservationId ) throws IOException, ParseException {
+    public void chargeNonRefundableBooking( WebClient webClient, String reservationId ) throws IOException, ParseException, MessagingException {
         LOGGER.info( "Processing charge of non-refundable booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
@@ -727,7 +730,12 @@ public class PaymentProcessorService {
                 }
 
                 // send email if successful
-                cloudbedsScraper.sendHostelworldNonRefundableSuccessfulEmail( webClient, reservationId, cbReservation.getBalanceDue() );
+                try {
+                    cloudbedsService.sendHostelworldNonRefundableSuccessfulGmail( webClient, reservationId, cbReservation.getBalanceDue() );
+                }
+                catch ( Exception ex ) {
+                    LOGGER.error( "Failed to send confirmation email...continuing", ex );
+                }
             }
 
             cloudbedsScraper.addNote( webClient, reservationId, "Outstanding balance successfully charged and email sent." );
@@ -742,8 +750,8 @@ public class PaymentProcessorService {
             else {
                 LOGGER.info( "Sending declined payment email" );
                 String paymentURL = generateUniquePaymentURL( reservationId, null );
-                cloudbedsScraper.sendHostelworldNonRefundableDeclinedEmail( webClient, reservationId, cbReservation.getBalanceDue(), paymentURL );
-                cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
+                cloudbedsService.sendHostelworldNonRefundableDeclinedGmail( webClient, reservationId, cbReservation.getBalanceDue(), paymentURL );
+//                cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
             }
         }
     }
@@ -873,9 +881,14 @@ public class PaymentProcessorService {
                 cbReservation.getCreditCardId(), firstNightAmount );
 
         // send email if successful
-        cloudbedsScraper.sendHostelworldLateCancellationEmail( webClient, reservationId, firstNightAmount );
+        try {
+            cloudbedsService.sendHostelworldLateCancellationGmail( webClient, reservationId, firstNightAmount );
+        }
+        catch ( Exception ex ) {
+            LOGGER.error( "Unable to send cancellation email... continuing", ex );
+        }
         cloudbedsScraper.addNote( webClient, reservationId, "Late cancellation. First night successfully charged £"
-                + new DecimalFormat( "###0.00" ).format( firstNightAmount ) );
+                + cloudbedsScraper.getCurrencyFormat().format( firstNightAmount ) );
     }
 
     /**

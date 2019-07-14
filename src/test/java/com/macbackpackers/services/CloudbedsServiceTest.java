@@ -1,6 +1,7 @@
 
 package com.macbackpackers.services;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -16,8 +17,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.SagepayTransaction;
+import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.scrapers.CloudbedsScraper;
 
 @RunWith( SpringJUnit4ClassRunner.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
@@ -27,6 +31,9 @@ public class CloudbedsServiceTest {
 
     @Autowired
     CloudbedsService cloudbedsService;
+
+    @Autowired
+    CloudbedsScraper cloudbedsScraper;
 
     @Autowired
     WordPressDAO dao;
@@ -66,4 +73,17 @@ public class CloudbedsServiceTest {
         cloudbedsService.createChargeHostelworldLateCancellationJobs( 
                 webClient, LocalDate.now().minusDays( 1 ), LocalDate.now() );
     }
+
+    @Test
+    public void testSendSagepayPaymentConfirmationEmail() throws Exception {
+        SagepayTransaction txn = dao.fetchSagepayTransaction( 192 );
+        Reservation res = cloudbedsScraper.getReservationRetry( webClient, txn.getReservationId() );
+        cloudbedsService.sendSagepayPaymentConfirmationGmail( webClient, res, txn );
+    }
+
+    @Test
+    public void testSendHostelworldLateCancellationGmail() throws Exception {
+        cloudbedsService.sendHostelworldLateCancellationGmail( webClient, "22702371", new BigDecimal( "11.22" ) );
+    }
+
 }
