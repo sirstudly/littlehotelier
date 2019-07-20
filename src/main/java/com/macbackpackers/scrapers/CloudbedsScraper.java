@@ -136,7 +136,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.info( redirectPage.getWebResponse().getContentAsString() ); // to be removed
         Optional<CloudbedsJsonResponse> response = Optional.ofNullable(
-                gson.fromJson( redirectPage.getWebResponse().getContentAsString(),
+                fromJson( redirectPage.getWebResponse().getContentAsString(),
                         CloudbedsJsonResponse.class ) );
 
         // We get a response back and it's unsuccessful
@@ -212,7 +212,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Pulling reservation data for #" + reservationId );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        Optional<Reservation> r = Optional.ofNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class ) );
+        Optional<Reservation> r = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class ) );
         if ( false == r.isPresent() || false == r.get().isSuccess() ) {
             if( r.isPresent() ) {
                 LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
@@ -222,7 +222,7 @@ public class CloudbedsScraper {
         }
 
         // need to parse the credit_cards object manually to check for presence
-        JsonObject rootElem = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class );
+        JsonObject rootElem = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class );
         JsonElement creditCardsElem = rootElem.get( "credit_cards" );
         if ( creditCardsElem.isJsonObject() && creditCardsElem.getAsJsonObject().entrySet().size() > 0 ) {
             String cardId = null;
@@ -325,7 +325,7 @@ public class CloudbedsScraper {
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
         
-        Optional<JsonElement> jelement = Optional.ofNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ) );
+        Optional<JsonElement> jelement = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ) );
         if( false == jelement.isPresent() ) {
             throw new MissingUserDataException( "Failed to retrieve reservations." );
         }
@@ -357,7 +357,7 @@ public class CloudbedsScraper {
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        Optional<JsonObject> rpt = Optional.ofNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
+        Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
         if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
             if ( rpt.isPresent() ) {
                 LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
@@ -401,7 +401,7 @@ public class CloudbedsScraper {
                 DateTimeFormatter.ISO_LOCAL_DATE ) + " from: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        Optional<JsonObject> rpt = Optional.ofNullable( gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
+        Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
         if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
             if ( rpt.isPresent() ) {
                 LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
@@ -446,7 +446,7 @@ public class CloudbedsScraper {
         if( StringUtils.isBlank( jsonResponse ) ) {
             throw new MissingUserDataException( "Missing response from add payment request?" );
         }
-        CloudbedsJsonResponse response = gson.fromJson( jsonResponse, CloudbedsJsonResponse.class );
+        CloudbedsJsonResponse response = fromJson( jsonResponse, CloudbedsJsonResponse.class );
 
         // throw a wobbly if response not successful
         if ( response.isFailure() ) {
@@ -474,7 +474,7 @@ public class CloudbedsScraper {
         if ( StringUtils.isBlank( jsonResponse ) ) {
             throw new MissingUserDataException( "Missing response from add note request?" );
         }
-        CloudbedsJsonResponse response = gson.fromJson( jsonResponse, CloudbedsJsonResponse.class );
+        CloudbedsJsonResponse response = fromJson( jsonResponse, CloudbedsJsonResponse.class );
 
         // throw a wobbly if response not successful
         if ( response.isFailure() ) {
@@ -502,7 +502,7 @@ public class CloudbedsScraper {
         if ( StringUtils.isBlank( jsonResponse ) ) {
             throw new MissingUserDataException( "Missing response from add card details request?" );
         }
-        CloudbedsJsonResponse response = gson.fromJson( jsonResponse, CloudbedsJsonResponse.class );
+        CloudbedsJsonResponse response = fromJson( jsonResponse, CloudbedsJsonResponse.class );
 
         // throw a wobbly if response not successful
         if ( response.isFailure() ) {
@@ -525,7 +525,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             throw new MissingUserDataException( "Failed to retrieve source lookup." );
         }
@@ -607,7 +607,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             addNote( webClient, reservationId, "Failed to AUTHORIZE booking: " +
@@ -624,7 +624,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             addNote( webClient, reservationId, "Failed to CAPTURE booking: " +
@@ -721,7 +721,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             throw new MissingUserDataException( "Failed to retrieve activity log for identifier " + identifier );
         }
@@ -757,7 +757,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             throw new MissingUserDataException( "Failed to retrieve email template " + templateId );
         }
@@ -860,7 +860,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
 
         Optional<JsonElement> emailTemplate = StreamSupport.stream(
-                gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ).getAsJsonObject()
+                fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ).getAsJsonObject()
                         .get( "email_templates" ).getAsJsonArray().spliterator(),
                 false )
                 .filter( t -> templateName.equals( t.getAsJsonObject().get( "template_name" ).getAsString() ) )
@@ -890,7 +890,7 @@ public class CloudbedsScraper {
         Page redirectPage = webClient.getPage( jsonRequestFactory.createGetEmailDeliveryLogRequest( reservationId ) );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
 
-        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             throw new MissingUserDataException( "Failed to retrieve email log for reservation " + reservationId );
         }
@@ -926,7 +926,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + reservationId );
@@ -955,7 +955,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send confirmation email for reservation " + reservationId );
@@ -986,7 +986,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send charge declined email for reservation " + reservationId );
@@ -1016,7 +1016,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + res.getReservationId() );
@@ -1044,7 +1044,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send deposit charge successful email for reservation " + reservationId );
@@ -1074,7 +1074,7 @@ public class CloudbedsScraper {
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        JsonElement jelement = gson.fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new UnrecoverableFault( "Failed to send deposit charge declined email for reservation " + reservationId );
@@ -1097,4 +1097,21 @@ public class CloudbedsScraper {
         return redirectPage.getWebResponse().getContentAsString();
     }
 
+    /**
+     * Deserialize json into object. Logs if RuntimeException is thrown.
+     * 
+     * @param json JSON string
+     * @param clazz
+     * @return deserialized object (nullable)
+     */
+    private <T> T fromJson( String json, Class<T> clazz ) {
+        try {
+            return gson.fromJson( json, clazz );
+        }
+        catch ( RuntimeException ex ) {
+            LOGGER.error( json );
+            LOGGER.error( "Error attempting to parse JSON", ex );
+            throw ex;
+        }
+    }
 }
