@@ -71,6 +71,7 @@ public class CreateDepositChargeJob extends AbstractJob {
                 .filter( p -> p.isHotelCollectBooking() )
                 .filter( p -> p.isCardDetailsPresent() )
                 .filter( p -> false == p.isPrepaid() )
+                .filter( p -> false == p.isNonRefundable() ) // non-refundables are processed by CreateChargeNonRefundableBookingJob
                 .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
                 .forEach( p -> {
                     LOGGER.info( "Creating a DepositChargeJob for " + p.getSourceName() + " #"
@@ -103,6 +104,7 @@ public class CreateDepositChargeJob extends AbstractJob {
                 .filter( p -> p.isHotelCollectBooking() )
                 .filter( p -> p.isCardDetailsPresent() )
                 .filter( p -> false == p.isPrepaid() )
+                .filter( p -> false == p.isNonRefundable() ) // non-refundables are processed by CreateChargeNonRefundableBookingJob
                 .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
                 .forEach( p -> {
                     LOGGER.info( "Creating a DepositChargeJob for " + p.getSourceName() + " #"

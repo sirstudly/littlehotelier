@@ -54,8 +54,8 @@ public class CloudbedsScraper {
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
     
     public static final String TEMPLATE_HWL_CANCELLATION_CHARGE = "Hostelworld Cancellation Charge";
-    public static final String TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_SUCCESSFUL = "Hostelworld Non-Refundable Charge Successful";
-    public static final String TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_DECLINED = "Hostelworld Non-Refundable Charge Declined";
+    public static final String TEMPLATE_NON_REFUNDABLE_CHARGE_SUCCESSFUL = "Non-Refundable Charge Successful";
+    public static final String TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED = "Non-Refundable Charge Declined";
     public static final String TEMPLATE_SAGEPAY_PAYMENT_CONFIRMATION = "Sagepay Payment Confirmation";
     public static final String TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL = "Deposit Charge Successful";
     public static final String TEMPLATE_DEPOSIT_CHARGE_DECLINED = "Deposit Charge Declined";
@@ -599,7 +599,7 @@ public class CloudbedsScraper {
     public void chargeCardForBooking( WebClient webClient, String reservationId, String cardId, BigDecimal amount ) throws IOException {
 
         // AUTHORIZE
-        LOGGER.info( "Begin AUTHORIZE for reservation " + reservationId + " for " + amount );
+        LOGGER.info( "Begin AUTHORIZE for reservation " + reservationId + " for " + getCurrencyFormat().format( amount ) );
         WebRequest requestSettings = jsonRequestFactory.createAuthorizeCreditCardRequest(
                 reservationId, cardId, amount );
 
@@ -792,25 +792,25 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Retrieves the Hostelworld non-refundable charged successful email template.
+     * Retrieves the non-refundable charged successful email template.
      * 
      * @param webClient web client instance to use
      * @return non-null email template
      * @throws IOException
      */
-    public EmailTemplateInfo getHostelworldNonRefundableSuccessfulEmailTemplate( WebClient webClient ) throws IOException {
-        return fetchEmailTemplate( webClient, TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_SUCCESSFUL );
+    public EmailTemplateInfo getNonRefundableSuccessfulEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_NON_REFUNDABLE_CHARGE_SUCCESSFUL );
     }
 
     /**
-     * Retrieves the Hostelworld non-refundable charged declined email template.
+     * Retrieves the non-refundable charged declined email template.
      * 
      * @param webClient web client instance to use
      * @return non-null email template
      * @throws IOException
      */
-    public EmailTemplateInfo getHostelworldNonRefundableDeclinedEmailTemplate( WebClient webClient ) throws IOException {
-        return fetchEmailTemplate( webClient, TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_DECLINED );
+    public EmailTemplateInfo getNonRefundableDeclinedEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED );
     }
 
     /**
@@ -934,7 +934,7 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Sends an email to the guest for the given reservation when the hostelworld
+     * Sends an email to the guest for the given reservation when the
      * non-refundable reservation has been charged successfully.
      * 
      * @param webClient web client instance to use
@@ -942,9 +942,9 @@ public class CloudbedsScraper {
      * @param amount amount being charged
      * @throws IOException
      */
-    public void sendHostelworldNonRefundableSuccessfulEmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
+    public void sendNonRefundableSuccessfulEmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
 
-        EmailTemplateInfo template = getHostelworldNonRefundableSuccessfulEmailTemplate( webClient );
+        EmailTemplateInfo template = getNonRefundableSuccessfulEmailTemplate( webClient );
         Reservation res = getReservation( webClient, reservationId );
 
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
@@ -963,7 +963,7 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Sends an email to the guest for the given reservation when an attempt to charge the hostelworld
+     * Sends an email to the guest for the given reservation when an attempt to charge the
      * non-refundable reservation but was declined.
      * 
      * @param webClient web client instance to use
@@ -972,9 +972,9 @@ public class CloudbedsScraper {
      * @param paymentURL the payment URL to include in the email
      * @throws IOException
      */
-    public void sendHostelworldNonRefundableDeclinedEmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException {
+    public void sendNonRefundableDeclinedEmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException {
 
-        EmailTemplateInfo template = getHostelworldNonRefundableDeclinedEmailTemplate( webClient );
+        EmailTemplateInfo template = getNonRefundableDeclinedEmailTemplate( webClient );
         Reservation res = getReservation( webClient, reservationId );
 
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(

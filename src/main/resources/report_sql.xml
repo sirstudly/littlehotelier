@@ -65,7 +65,7 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
                          OR c.comments LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'
                          OR c.comments LIKE '%The VCC shown is still not active.%'))
                OR ( -- include non-refundable bookings
-                        f.booking_source = 'Hostelworld &amp; Hostelbookers'
+                        f.booking_source IN ('Hostelworld &amp; Hostelbookers', 'Booking.com')
                     AND f.rate_plan_name IN ('Non-refundable', 'nonref')
                     AND f.payment_outstanding &gt; 0
                     AND f.booked_date &lt; DATE_SUB(NOW(), INTERVAL 2 DAY) -- leave a window until we process it

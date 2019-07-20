@@ -32,11 +32,11 @@ public class CreateChargeNonRefundableBookingJob extends AbstractJob {
     @Transactional
     public void processJob() throws Exception {
         cbScraper.getReservationsForBookingSources( cbWebClient, null, null,
-                getBookingDate(), getBookingDate().plusDays( getDaysAhead() ), "Hostelworld & Hostelbookers" )
+                getBookingDate(), getBookingDate().plusDays( getDaysAhead() ),
+                "Booking.com (Hotel Collect Booking)", "Hostelworld & Hostelbookers" )
                 .stream()
                 .filter( p -> false == p.isPaid() )
-                .filter( p -> "Non-refundable".equalsIgnoreCase( p.getUsedRoomTypes() ) 
-                        || "nonref".equalsIgnoreCase( p.getUsedRoomTypes() ) )
+                .filter( p -> p.isNonRefundable() )
                 // should we charge cancelled bookings?
                 .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
                 .forEach( p -> {

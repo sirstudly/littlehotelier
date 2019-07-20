@@ -424,7 +424,7 @@ public class CloudbedsService {
     }
     
     /**
-     * Sends an email to the guest for the given reservation when the hostelworld
+     * Sends an email to the guest for the given reservation when the
      * non-refundable reservation has been charged successfully.
      * 
      * @param webClient web client instance to use
@@ -433,12 +433,12 @@ public class CloudbedsService {
      * @throws IOException
      * @throws MessagingException
      */
-    public void sendHostelworldNonRefundableSuccessfulGmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException, MessagingException {
+    public void sendNonRefundableSuccessfulGmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException, MessagingException {
 
-        EmailTemplateInfo template = scraper.getHostelworldNonRefundableSuccessfulEmailTemplate( webClient );
+        EmailTemplateInfo template = scraper.getNonRefundableSuccessfulEmailTemplate( webClient );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
 
-        final String note = CloudbedsScraper.TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_SUCCESSFUL + " email sent.";
+        final String note = CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_SUCCESSFUL + " email sent.";
 
         if ( res.containsNote( note ) ) {
             LOGGER.info( "Email already sent. Doing nothing." );
@@ -457,7 +457,7 @@ public class CloudbedsService {
     }
 
     /**
-     * Sends an email to the guest for the given reservation when an attempt to charge the hostelworld
+     * Sends an email to the guest for the given reservation when an attempt to charge the
      * non-refundable reservation but was declined.
      * 
      * @param webClient web client instance to use
@@ -467,12 +467,12 @@ public class CloudbedsService {
      * @throws IOException
      * @throws MessagingException
      */
-    public void sendHostelworldNonRefundableDeclinedGmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException, MessagingException {
+    public void sendNonRefundableDeclinedGmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException, MessagingException {
 
-        EmailTemplateInfo template = scraper.getHostelworldNonRefundableDeclinedEmailTemplate( webClient );
+        EmailTemplateInfo template = scraper.getNonRefundableDeclinedEmailTemplate( webClient );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
 
-        final String note = CloudbedsScraper.TEMPLATE_HWL_NON_REFUNDABLE_CHARGE_DECLINED + " email sent.";
+        final String note = CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED + " email sent.";
 
         if ( res.containsNote( note ) ) {
             LOGGER.info( "Email already sent. Doing nothing." );

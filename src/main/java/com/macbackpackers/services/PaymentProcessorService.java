@@ -689,8 +689,7 @@ public class PaymentProcessorService {
             return;
         }
 
-        if ( false == "Non-refundable".equalsIgnoreCase( cbReservation.getUsedRoomTypes() )
-                && false == "nonref".equalsIgnoreCase( cbReservation.getUsedRoomTypes() )) {
+        if ( false == cbReservation.isNonRefundable() ) {
             throw new UnrecoverableFault( "ABORT! Attempting to charge a non non-refundable booking!" );
         }
         // group bookings must be approved/charged manually
@@ -699,7 +698,10 @@ public class PaymentProcessorService {
             return;
         }
         else if( cbReservation.isAmexCard() ) {
-            cloudbedsScraper.addNote( webClient, reservationId, "Card is AMEX. Charge manually using POS terminal." );
+            final String AMEX_NOTE = "Card is AMEX. Charge manually using POS terminal.";
+            if( false == cbReservation.containsNote( AMEX_NOTE ) ) {
+                cloudbedsScraper.addNote( webClient, reservationId, AMEX_NOTE );
+            }
             return;
         }
 
@@ -728,14 +730,14 @@ public class PaymentProcessorService {
                 catch ( Exception ex ) {
                     LOGGER.error( "Failed to acknowledge payment in HWL. Meh...", ex );
                 }
+            }
 
-                // send email if successful
-                try {
-                    cloudbedsService.sendHostelworldNonRefundableSuccessfulGmail( webClient, reservationId, cbReservation.getBalanceDue() );
-                }
-                catch ( Exception ex ) {
-                    LOGGER.error( "Failed to send confirmation email...continuing", ex );
-                }
+            // send email if successful
+            try {
+                cloudbedsService.sendNonRefundableSuccessfulGmail( webClient, reservationId, cbReservation.getBalanceDue() );
+            }
+            catch ( Exception ex ) {
+                LOGGER.error( "Failed to send confirmation email...continuing", ex );
             }
 
             cloudbedsScraper.addNote( webClient, reservationId, "Outstanding balance successfully charged and email sent." );
@@ -744,13 +746,13 @@ public class PaymentProcessorService {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
 
             if ( cloudbedsScraper.getEmailLastSentDate( webClient, reservationId,
-                    "Hostelworld Non-Refundable Charge Declined" ).isPresent() ) {
+                    CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED ).isPresent() ) {
                 LOGGER.info( "Declined payment email already sent. Not going to do it again..." );
             }
             else {
                 LOGGER.info( "Sending declined payment email" );
                 String paymentURL = generateUniquePaymentURL( reservationId, null );
-                cloudbedsService.sendHostelworldNonRefundableDeclinedGmail( webClient, reservationId, cbReservation.getBalanceDue(), paymentURL );
+                cloudbedsService.sendNonRefundableDeclinedGmail( webClient, reservationId, cbReservation.getBalanceDue(), paymentURL );
 //                cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
             }
         }

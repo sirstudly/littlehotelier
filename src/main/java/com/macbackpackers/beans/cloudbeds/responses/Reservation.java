@@ -137,6 +137,16 @@ public class Reservation extends CloudbedsJsonResponse {
         return getBalanceDue().compareTo( BigDecimal.ZERO ) <= 0;
     }
 
+    /**
+     * Return true iff this is a non-refundable booking.
+     * 
+     * @return true if non-refundable; false otherwise
+     */
+    public boolean isNonRefundable() {
+        return "Non-refundable".equalsIgnoreCase( getUsedRoomTypes() )
+                || "nonref".equalsIgnoreCase( getUsedRoomTypes() );
+    }
+
     public String getBookingVia() {
         return bookingVia;
     }
