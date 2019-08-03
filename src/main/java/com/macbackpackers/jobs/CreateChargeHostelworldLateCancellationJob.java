@@ -2,6 +2,7 @@
 package com.macbackpackers.jobs;
 
 import java.time.LocalDate;
+import java.time.Month;
 
 import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
@@ -35,8 +36,14 @@ public class CreateChargeHostelworldLateCancellationJob extends AbstractJob {
     @Override
     @Transactional
     public void processJob() throws Exception {
-        cbService.createChargeHostelworldLateCancellationJobs( cbWebClient,
-                LocalDate.now().minusDays( 5 ), LocalDate.now() );
+        if ( dao.getOption( "siteurl" ).contains( "castlerock" ) && LocalDate.now().getMonth() == Month.AUGUST ) {
+            cbService.createChargeHostelworldLateCancellationJobsForAugust( cbWebClient,
+                    LocalDate.now().minusDays( 5 ), LocalDate.now() );
+        }
+        else {
+            cbService.createChargeHostelworldLateCancellationJobs( cbWebClient,
+                    LocalDate.now().minusDays( 5 ), LocalDate.now() );
+        }
     }
 
     @Override

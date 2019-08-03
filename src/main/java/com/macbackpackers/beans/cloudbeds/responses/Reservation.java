@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.StreamSupport;
@@ -173,6 +174,10 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public boolean isCheckinDateTodayOrInPast() {
         return LocalDate.parse( getCheckinDate() ).compareTo( LocalDate.now() ) <= 0;
+    }
+
+    public boolean isCheckinDateInAugust() {
+        return LocalDate.parse( getCheckinDate() ).getMonth() == Month.AUGUST;
     }
 
     public String getCancellationDate() {

@@ -255,6 +255,54 @@ public class CloudbedsService {
     }
 
     /**
+     * Finds all HWL cancellations between the given dates and:
+     * <ul>
+     *   <li>if cancellation was done by 'System'</li>
+     *   <li>if first night has not been charged</li>
+     *   <li>if cancellation occurs {@code cancellationWindowHours} before checkin</li>
+     *   <li>then create job to charge first night with card-on-file</li>
+     *   <li>(which will also) and append note (charge attempt) to reservation</li>
+     *   <li>(which will also) and create separate email job to notify guest</li> 
+     * </ul>
+     * @param webClient
+     * @param cancelDateStart cancellation date inclusive
+     * @param cancelDateEnd cancellation date inclusive
+     * @throws IOException
+     */
+    public void createChargeHostelworldLateCancellationJobsForAugust( WebClient webClient, 
+            LocalDate cancelDateStart, LocalDate cancelDateEnd ) throws IOException {
+        
+        final int CANCEL_PERIOD_DAYS = 7; // only for CRH
+        // if we're running this daily
+        // then this would apply to all cancellations done today/yesterday
+        // and checkin date would have to be between
+        //     day before yesterday (earliest) - it is possible to cancel *after* the checkin date
+        // and day after tomorrow (latest) - if cancel was done monday at 23:59, 
+        //                             then would charge if checkin on wednesday but not thursday
+        List<Reservation> cxlRes = scraper.getCancelledReservationsForBookingSources( webClient, 
+                cancelDateStart.minusDays( 1 ), cancelDateEnd.plusDays( 1 + CANCEL_PERIOD_DAYS ), 
+                cancelDateStart, cancelDateEnd, "Hostelworld & Hostelbookers" );
+        
+        cxlRes.stream()
+            .peek( r -> LOGGER.info( "Res #" + r.getReservationId() + " (" + r.getThirdPartyIdentifier() 
+                    + ") " + r.getFirstName() + " " + r.getLastName() + " cancelled on " + r.getCancellationDate() 
+                    + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() ) )
+            .filter( r -> BigDecimal.ZERO.equals( r.getPaidValue() ) ) // nothing paid yet
+            .filter( r -> r.isCheckinDateInAugust() )
+            .filter( r -> r.isLateCancellation( 24 * CANCEL_PERIOD_DAYS ) ) // 7-day cancellation policy
+            .filter( r -> isCancellationDoneBySystem( webClient, r.getIdentifier() ) )
+            .filter( r -> false == "21640839".equals( r.getReservationId() ) ) // skip these bookings on Aug-1
+            .filter( r -> false == "22631533".equals( r.getReservationId() ) )
+            .forEach( r -> {
+                LOGGER.info( "Creating ChargeHostelworldLateCancellationJob (August) for " + r.getReservationId() );
+                ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();
+                j.setStatus( JobStatus.submitted );
+                j.setReservationId( r.getReservationId() );
+                dao.insertJob( j );
+            } );
+    }
+
+    /**
      * Iterates through the activity log of the reservation and checks that the status was moved to
      * Cancelled by the System user (ie. indicating that guest cancelled via HWL and it wasn't done
      * manually by someone on the desk).

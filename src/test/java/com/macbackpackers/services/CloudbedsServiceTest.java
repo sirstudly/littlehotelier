@@ -75,6 +75,12 @@ public class CloudbedsServiceTest {
     }
 
     @Test
+    public void testCreateChargeHostelworldLateCancellationForAugustJobs() throws Exception {
+        cloudbedsService.createChargeHostelworldLateCancellationJobsForAugust(
+                webClient, LocalDate.now().minusDays( 5 ), LocalDate.now() );
+    }
+
+    @Test
     public void testSendSagepayPaymentConfirmationEmail() throws Exception {
         SagepayTransaction txn = dao.fetchSagepayTransaction( 192 );
         Reservation res = cloudbedsScraper.getReservationRetry( webClient, txn.getReservationId() );

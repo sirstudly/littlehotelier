@@ -256,7 +256,11 @@ public class PaymentProcessorService {
             throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
         }
         else if( cbReservation.isAmexCard() ) {
-            cloudbedsScraper.addNote( webClient, reservationId, "Card is AMEX. Charge manually using POS terminal." );
+            final String AMEX_NOTE = "Card is AMEX. Charge manually using POS terminal.";
+            LOGGER.info( AMEX_NOTE );
+            if ( false == cbReservation.containsNote( AMEX_NOTE ) ) {
+                cloudbedsScraper.addNote( webClient, reservationId, AMEX_NOTE );
+            }
             return;
         }
 
@@ -869,6 +873,38 @@ public class PaymentProcessorService {
             return;
         }
 
+        // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
+        BigDecimal amountToCharge = getLateCancellationAmountToCharge( cbReservation );
+        cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
+                cbReservation.getCreditCardId(), amountToCharge );
+
+        // send email if successful
+        try {
+            cloudbedsService.sendHostelworldLateCancellationGmail( webClient, reservationId, amountToCharge );
+        }
+        catch ( Exception ex ) {
+            LOGGER.error( "Unable to send cancellation email... continuing", ex );
+        }
+        cloudbedsScraper.addNote( webClient, reservationId, "Late cancellation. Successfully charged £"
+                + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) );
+    }
+    
+    /**
+     * Returns the late cancellation amount to charge for a booking.
+     * @param cbReservation reservation being checked
+     * @return value greater than 0
+     */
+    private BigDecimal getLateCancellationAmountToCharge( Reservation cbReservation ) {
+
+        // august for HSH/RMB - charge the full amount
+        if ( cbReservation.isCheckinDateInAugust() && false == wordpressDAO.getOption( "siteurl" ).contains( "castlerock" ) ) {
+            if ( cbReservation.getBalanceDue().compareTo( BigDecimal.ZERO ) <= 0 ) {
+                throw new IllegalStateException( "Some weirdness here. Outstanding balance must be greater than 0." );
+            }
+            return cbReservation.getBalanceDue();
+        }
+
+        // otherwise, for non-August or CRH (incl. August) - just the first night
         BigDecimal firstNightAmount = cbReservation.getRateFirstNight( gson );
         LOGGER.info( "First night due: " + firstNightAmount );
         if ( firstNightAmount.compareTo( BigDecimal.ZERO ) <= 0 ) {
@@ -877,20 +913,7 @@ public class PaymentProcessorService {
         if ( firstNightAmount.compareTo( cbReservation.getBalanceDue() ) > 0 ) {
             throw new IllegalStateException( "Some weirdness here. First night amount exceeds balance due." );
         }
-
-        // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
-        cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                cbReservation.getCreditCardId(), firstNightAmount );
-
-        // send email if successful
-        try {
-            cloudbedsService.sendHostelworldLateCancellationGmail( webClient, reservationId, firstNightAmount );
-        }
-        catch ( Exception ex ) {
-            LOGGER.error( "Unable to send cancellation email... continuing", ex );
-        }
-        cloudbedsScraper.addNote( webClient, reservationId, "Late cancellation. First night successfully charged £"
-                + cloudbedsScraper.getCurrencyFormat().format( firstNightAmount ) );
+        return firstNightAmount;
     }
 
     /**
