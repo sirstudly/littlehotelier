@@ -10,8 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.macbackpackers.services.CloudbedsService;
 
 /**
- * Job that marks the given card invalid on Booking.com Not currently enabled as not sure how to
- * handle when guest updates their card.
+ * Job that marks the given card invalid on Booking.com.
  *
  */
 @Entity
