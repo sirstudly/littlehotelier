@@ -18,10 +18,14 @@ import javax.mail.MessagingException;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 import com.gargoylesoftware.htmlunit.WebClient;
@@ -39,7 +43,9 @@ import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
+import com.macbackpackers.scrapers.BookingComScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
@@ -56,10 +62,19 @@ public class CloudbedsService {
     private CloudbedsScraper scraper;
     
     @Autowired
+    private BookingComScraper bdcScraper;
+
+    @Autowired
     private GmailService gmailService;
     
     @Autowired
     private RoomBedMatcher roomBedMatcher;
+
+    @Autowired
+    private ApplicationContext appContext;
+
+    @Autowired
+    private GenericObjectPool<WebDriver> driverFactory;
 
     @Value( "${hostelworld.latecancellation.hours:48}" )
     private int HWL_LATE_CANCEL_HOURS;
@@ -603,6 +618,43 @@ public class CloudbedsService {
                                     .replaceAll( "\\[charge amount\\]", "£" + scraper.getCurrencyFormat().format( amount ) )
                                     .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) ) );
             scraper.addNote( webClient, reservationId, note + " " + paymentURL );
+        }
+    }
+
+    /**
+     * Marks the latest card (on booking) invalid on booking.com.
+     * 
+     * @param reservationId cloudbeds unique reservation id
+     * @throws Exception
+     */
+    public void markCreditCardInvalidOnBDC( String reservationId ) throws Exception {
+        final int MAX_WAIT_SECONDS = 60;
+        WebDriver driver = driverFactory.borrowObject();
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+            WebDriverWait wait = new WebDriverWait( driver, MAX_WAIT_SECONDS );
+            Reservation r = scraper.getReservationRetry( webClient, reservationId );
+
+            LOGGER.info( r.getThirdPartyIdentifier() + ": " + r.getFirstName() + " " + r.getLastName() );
+            LOGGER.info( "Source: " + r.getSourceName() );
+            LOGGER.info( "Status: " + r.getStatus() );
+            LOGGER.info( "Checkin: " + r.getCheckinDate() );
+            LOGGER.info( "Checkout: " + r.getCheckoutDate() );
+            LOGGER.info( "Grand Total: " + r.getGrandTotal() );
+            LOGGER.info( "Balance Due: " + r.getBalanceDue() );
+
+            if ( false == "Booking.com".equals( r.getSourceName() ) ) {
+                throw new UnrecoverableFault( "Unsupported booking source " + r.getSourceName() );
+            }
+            bdcScraper.markCreditCardAsInvalid( driver, wait, r.getThirdPartyIdentifier(), r.getCreditCardLast4Digits() );
+
+            // if we got this far, then we've updated BDC. leave a note as well...
+            final String INVALID_CC_NOTE = "Marked card ending in " + r.getCreditCardLast4Digits() + " invalid on BDC.";
+            if ( false == r.containsNote( INVALID_CC_NOTE ) ) {
+                scraper.addNote( webClient, reservationId, INVALID_CC_NOTE );
+            }
+        }
+        finally {
+            driverFactory.returnObject( driver );
         }
     }
 }

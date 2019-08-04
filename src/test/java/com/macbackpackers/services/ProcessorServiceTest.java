@@ -545,8 +545,7 @@ public class ProcessorServiceTest {
     public void testCreateBDCMarkCreditCardInvalidJob() throws Exception {
         BDCMarkCreditCardInvalidJob j = new BDCMarkCreditCardInvalidJob();
         j.setStatus( JobStatus.submitted );
-        j.setBdcReservationId( "2141932992" );
-        j.setLast4Digits( "4583" );
+        j.setReservationId( "23996337" );
         dao.insertJob( j );
     }
 

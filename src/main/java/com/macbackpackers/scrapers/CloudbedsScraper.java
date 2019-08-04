@@ -465,6 +465,7 @@ public class CloudbedsScraper {
     public void addNote( WebClient webClient, String reservationId, String note ) throws IOException {
 
         WebRequest requestSettings = jsonRequestFactory.createAddNoteRequest( reservationId, note );
+        LOGGER.info( "Adding note: " + note + " to reservation " + reservationId );
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "POST: " + redirectPage.getUrl().getPath() );

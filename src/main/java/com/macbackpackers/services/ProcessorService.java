@@ -28,8 +28,6 @@ public class ProcessorService {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
-    private static final Object CLASS_LEVEL_LOCK = new Object();
-
     @Value( "${processor.thread.count:1}" )
     private int threadCount;
 
@@ -214,29 +212,30 @@ public class ProcessorService {
 
     /**
      * Copies the log file from this host to the remote host in {@code destinationLogLocation}.
+     * Synchronized so only one copy job to take place at a time system-wide.
      * 
      * @param jobId ID of the job to copy
      * @throws InterruptedException on process timeout
      * @throws IOException on copy error
      */
-    private void copyJobLogToRemoteHost( int jobId ) throws InterruptedException, IOException {
-        // only allow one copy job to take place at a time system-wide
-        synchronized ( CLASS_LEVEL_LOCK ) {
-            if ( false == SystemUtils.IS_OS_WINDOWS && StringUtils.isNotBlank( destinationLogLocation ) ) {
-                LOGGER.info( "Compressing log file" );
-                ProcessBuilder pb = new ProcessBuilder( "gzip" );
-                pb.redirectInput( new File( localLogDirectory + "/job-" + jobId + ".log" ) );
-                pb.redirectOutput( new File( localLogDirectory + "/job-" + jobId + ".gz" ) );
-                Process p = pb.start();
-                int exitVal = p.waitFor();
-                LOGGER.info( "GZipped file completed with exit code(" + exitVal + ")" );
+    private synchronized void copyJobLogToRemoteHost( int jobId ) throws InterruptedException, IOException {
 
-                pb = new ProcessBuilder( "scp", localLogDirectory + "/job-" + jobId + ".gz", destinationLogLocation );
-                LOGGER.info( "Copying log file" );
-                p = pb.start();
-                exitVal = p.waitFor();
-                LOGGER.info( "Log file copy completed with exit code(" + exitVal + ")" );
-            }
+        if ( false == SystemUtils.IS_OS_WINDOWS && StringUtils.isNotBlank( destinationLogLocation ) ) {
+            LOGGER.info( "Compressing log file" );
+            ProcessBuilder pb = new ProcessBuilder( "gzip" );
+            pb.redirectInput( new File( localLogDirectory + "/job-" + jobId + ".log" ) );
+            pb.redirectOutput( new File( localLogDirectory + "/job-" + jobId + ".gz" ) );
+            Process p = pb.start();
+            int exitVal = p.waitFor();
+            LOGGER.info( "GZipped file completed with exit code(" + exitVal + ")" );
+
+            pb = new ProcessBuilder( "scp", localLogDirectory + "/job-" + jobId + ".gz", destinationLogLocation );
+            pb.redirectOutput( new File( localLogDirectory + "/job-" + jobId + ".log" ) );
+            pb.redirectError( new File( localLogDirectory + "/job-" + jobId + ".log" ) );
+            LOGGER.info( "Copying log file" );
+            p = pb.start();
+            exitVal = p.waitFor();
+            LOGGER.info( "Log file copy completed with exit code(" + exitVal + ")" );
         }
     }
 }

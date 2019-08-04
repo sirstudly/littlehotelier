@@ -45,6 +45,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlTextArea;
 import com.google.gson.Gson;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.GuestDetails;
+import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.Payment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.SagepayTransaction;
@@ -56,6 +57,7 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
 import com.macbackpackers.scrapers.AgodaScraper;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
@@ -257,7 +259,6 @@ public class PaymentProcessorService {
         }
         else if( cbReservation.isAmexCard() ) {
             final String AMEX_NOTE = "Card is AMEX. Charge manually using POS terminal.";
-            LOGGER.info( AMEX_NOTE );
             if ( false == cbReservation.containsNote( AMEX_NOTE ) ) {
                 cloudbedsScraper.addNote( webClient, reservationId, AMEX_NOTE );
             }
@@ -305,6 +306,15 @@ public class PaymentProcessorService {
                 String paymentURL = generateUniquePaymentURL( reservationId, depositAmount );
                 cloudbedsService.sendDepositChargeDeclinedGmail( webClient, reservationId, depositAmount, paymentURL );
 //                cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
+
+                // CRH only until I can authenticate BDC for HSH/RMB
+                if ( "Booking.com".equals( cbReservation.getSourceName() ) &&
+                        wordpressDAO.getOption( "siteurl" ).contains( "castlerock" ) ) {
+                    BDCMarkCreditCardInvalidJob j = new BDCMarkCreditCardInvalidJob();
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( reservationId );
+                    wordpressDAO.insertJob( j );
+                }
             }
         }
 

@@ -14,16 +14,27 @@ import java.io.Serializable;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
+import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.stream.StreamSupport;
 
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.time.FastDateFormat;
+import org.openqa.selenium.WebDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.util.Cookie;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 
 @Service
 public class FileService {
@@ -31,6 +42,11 @@ public class FileService {
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     private static final String COOKIE_FILE = "cookie.file";
+    private static final FastDateFormat DATETIME_STANDARD = FastDateFormat.getInstance( "MMM dd, yyyy h:mm:ss a" );
+    
+    @Autowired
+    @Qualifier("gsonForCloudbeds")
+    private Gson gson;
 
     /**
      * Attempts to acquire an exclusive lock on the given file. Creates the file first if it doesn't
@@ -142,6 +158,46 @@ public class FileService {
     }
 
     /**
+     * Loads cookies written from the previous session if found.
+     * 
+     * @param webDriver
+     * @param filename name of cookie file
+     * @throws IOException on read error
+     */
+    public void loadCookiesFromFile( WebDriver webDriver, String filename ) throws IOException {
+
+        File file = new File( filename );
+        if ( file.exists() ) {
+            LOGGER.info( "loading cookies from file " + filename );
+            try (FileInputStream fis = new FileInputStream( file )) {
+                JsonArray cookies = gson.fromJson( IOUtils.toString( fis, StandardCharsets.UTF_8 ), JsonArray.class );
+                StreamSupport.stream( cookies.spliterator(), false )
+                        .map( c -> c.getAsJsonObject() )
+                        .forEach( c -> webDriver.manage().addCookie( new org.openqa.selenium.Cookie(
+                                c.get( "name" ).getAsString(),
+                                c.get( "value" ).getAsString(),
+                                c.get( "domain" ).getAsString(),
+                                c.get( "path" ).getAsString(),
+                                c.has( "expiry" ) ? parseDate( c.get( "expiry" ).getAsString() ) : null,
+                                c.get( "is_secure" ).getAsBoolean(),
+                                c.get( "is_http_only" ).getAsBoolean() ) ) );
+            }
+        }
+        else {
+            LOGGER.info( "No cookies file found." );
+        }
+    }
+
+    private Date parseDate( String date ) {
+        try {
+            return DATETIME_STANDARD.parse( date );
+        }
+        catch ( ParseException e ) {
+            throw new RuntimeException( e );
+        }
+    }
+
+    /**
      * Taken from Chrome (Under Developer Tools, Application, Cookies). Having trouble logging into
      * LH using just username and password.
      * 
@@ -198,6 +254,18 @@ public class FileService {
         ObjectOutput out = new ObjectOutputStream( new FileOutputStream( filename ) );
         out.writeObject( webClient.getCookieManager().getCookies() );
         out.close();
+    }
+    
+    /**
+     * Serialises the current cookies to disk.
+     * 
+     * @throws IOException on serialisation error
+     */
+    public void writeCookiesToFile( WebDriver webDriver, String filename ) throws IOException {
+        LOGGER.info( "writing cookies to file " + filename );
+        try (FileOutputStream fos = new FileOutputStream( filename )) {
+            IOUtils.write( gson.toJson( webDriver.manage().getCookies() ), fos, StandardCharsets.UTF_8 );
+        }
     }
     
     /**
