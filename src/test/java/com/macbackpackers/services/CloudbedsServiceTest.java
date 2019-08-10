@@ -77,7 +77,7 @@ public class CloudbedsServiceTest {
     @Test
     public void testCreateChargeHostelworldLateCancellationForAugustJobs() throws Exception {
         cloudbedsService.createChargeHostelworldLateCancellationJobsForAugust(
-                webClient, LocalDate.now().minusDays( 5 ), LocalDate.now() );
+                webClient, LocalDate.now().minusDays( 7 ), LocalDate.now() );
     }
 
     @Test

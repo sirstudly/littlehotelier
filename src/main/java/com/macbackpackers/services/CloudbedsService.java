@@ -287,7 +287,9 @@ public class CloudbedsService {
     public void createChargeHostelworldLateCancellationJobsForAugust( WebClient webClient, 
             LocalDate cancelDateStart, LocalDate cancelDateEnd ) throws IOException {
         
-        final int CANCEL_PERIOD_DAYS = 7; // only for CRH
+        // 7 days for CRH; 14 days for RMB/HSH
+        final int CANCEL_PERIOD_DAYS = dao.getOption( "siteurl" ).contains( "castlerock" ) ? 7 : 14;
+
         // if we're running this daily
         // then this would apply to all cancellations done today/yesterday
         // and checkin date would have to be between
@@ -304,14 +306,14 @@ public class CloudbedsService {
                     + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() ) )
             .filter( r -> BigDecimal.ZERO.equals( r.getPaidValue() ) ) // nothing paid yet
             .filter( r -> r.isCheckinDateInAugust() )
-            .filter( r -> r.isLateCancellation( 24 * CANCEL_PERIOD_DAYS - 9 ) ) // 7-day cancellation policy (from midnight the following day) : 13:00 to 00:00 = 9 hrs
+            .filter( r -> r.isLateCancellation( 24 * CANCEL_PERIOD_DAYS - 9 ) ) // (from midnight the following day) : 13:00 to 00:00 = 9 hrs
             .filter( r -> isCancellationDoneBySystem( webClient, r.getIdentifier() ) )
             .forEach( r -> {
                 LOGGER.info( "Creating ChargeHostelworldLateCancellationJob (August) for " + r.getReservationId() );
-                ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();
-                j.setStatus( JobStatus.submitted );
-                j.setReservationId( r.getReservationId() );
-                dao.insertJob( j );
+//                ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();
+//                j.setStatus( JobStatus.submitted );
+//                j.setReservationId( r.getReservationId() );
+//                dao.insertJob( j );
             } );
     }
 
