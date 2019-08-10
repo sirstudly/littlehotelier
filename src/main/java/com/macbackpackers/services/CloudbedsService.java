@@ -304,10 +304,8 @@ public class CloudbedsService {
                     + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() ) )
             .filter( r -> BigDecimal.ZERO.equals( r.getPaidValue() ) ) // nothing paid yet
             .filter( r -> r.isCheckinDateInAugust() )
-            .filter( r -> r.isLateCancellation( 24 * CANCEL_PERIOD_DAYS ) ) // 7-day cancellation policy
+            .filter( r -> r.isLateCancellation( 24 * CANCEL_PERIOD_DAYS - 9 ) ) // 7-day cancellation policy (from midnight the following day) : 13:00 to 00:00 = 9 hrs
             .filter( r -> isCancellationDoneBySystem( webClient, r.getIdentifier() ) )
-            .filter( r -> false == "21640839".equals( r.getReservationId() ) ) // skip these bookings on Aug-1
-            .filter( r -> false == "22631533".equals( r.getReservationId() ) )
             .forEach( r -> {
                 LOGGER.info( "Creating ChargeHostelworldLateCancellationJob (August) for " + r.getReservationId() );
                 ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();

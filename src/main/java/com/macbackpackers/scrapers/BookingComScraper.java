@@ -225,7 +225,8 @@ public class BookingComScraper {
             wordPressDAO.setOption( "hbo_bdc_session", m.group( 1 ) );
         }
         else {
-            throw new MissingUserDataException( "Unable to find session id from " + url );
+            LOGGER.info( "Unable to find session id from " + url );
+            //throw new MissingUserDataException( "Unable to find session id from " + url );
         }
     }
 }
