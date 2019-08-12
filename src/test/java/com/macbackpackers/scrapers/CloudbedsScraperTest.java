@@ -43,8 +43,8 @@ public class CloudbedsScraperTest {
     WordPressDAO dao;
 
     @Autowired
-//    @Qualifier( "webClientForCloudbeds" )
-    @Qualifier( "webClientJavascriptDisabled" )
+    @Qualifier( "webClientForCloudbeds" )
+//    @Qualifier( "webClientJavascriptDisabled" )
     WebClient webClient;
     
     @Autowired 
@@ -65,7 +65,7 @@ public class CloudbedsScraperTest {
         Page dashboard = webClient.getCurrentWindow().getEnclosedPage();
         LOGGER.info( dashboard.getWebResponse().getContentAsString() );
     }
-
+    
     @Test
     public void testGetReservation() throws Exception {
         Reservation r = cloudbedsScraper.getReservation( webClient, "10569063" );
@@ -179,11 +179,6 @@ public class CloudbedsScraperTest {
     @Test
     public void testGetHostelworldLateCancellationEmailTemplate() throws Exception {
         LOGGER.info( ToStringBuilder.reflectionToString( cloudbedsScraper.getHostelworldLateCancellationEmailTemplate( webClient ) ) );
-    }
-
-    @Test
-    public void testSendHostelworldLateCancellationEmail() throws Exception {
-        cloudbedsScraper.sendHostelworldLateCancellationEmail( webClient, "10568885", BigDecimal.ONE );
     }
 
     @Test

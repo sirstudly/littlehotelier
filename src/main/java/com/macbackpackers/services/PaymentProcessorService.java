@@ -58,6 +58,12 @@ import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
+import com.macbackpackers.jobs.SendDepositChargeDeclinedEmailJob;
+import com.macbackpackers.jobs.SendDepositChargeSuccessfulEmailJob;
+import com.macbackpackers.jobs.SendHostelworldLateCancellationEmailJob;
+import com.macbackpackers.jobs.SendNonRefundableDeclinedEmailJob;
+import com.macbackpackers.jobs.SendNonRefundableSuccessfulEmailJob;
+import com.macbackpackers.jobs.SendSagepayPaymentConfirmationEmailJob;
 import com.macbackpackers.scrapers.AgodaScraper;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
@@ -115,9 +121,6 @@ public class PaymentProcessorService {
     @Autowired
     private ExpediaApiService expediaService;
 
-    @Autowired
-    private CloudbedsService cloudbedsService;
-    
     @Autowired
     private GmailService gmailService;
     
@@ -288,11 +291,15 @@ public class PaymentProcessorService {
             // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
             cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
                     cbReservation.getCreditCardId(), depositAmount );
-    
-            // send email if successful
-            cloudbedsService.sendDepositChargeSuccessfulGmail( webClient, reservationId, depositAmount );
             cloudbedsScraper.addNote( webClient, reservationId,
                     "Successfully charged deposit of £" + cloudbedsScraper.getCurrencyFormat().format( depositAmount ) );
+
+            // send email if successful
+            SendDepositChargeSuccessfulEmailJob job = new SendDepositChargeSuccessfulEmailJob();
+            job.setReservationId( reservationId );
+            job.setAmount( depositAmount );
+            job.setStatus( JobStatus.submitted );
+            wordpressDAO.insertJob( job );
         }
         catch ( PaymentNotAuthorizedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
@@ -302,10 +309,14 @@ public class PaymentProcessorService {
                 LOGGER.info( "Declined payment email already sent. Not going to do it again..." );
             }
             else {
-                LOGGER.info( "Sending declined payment email" );
+                LOGGER.info( "Creating declined deposit charge email job" );
                 String paymentURL = generateUniquePaymentURL( reservationId, depositAmount );
-                cloudbedsService.sendDepositChargeDeclinedGmail( webClient, reservationId, depositAmount, paymentURL );
-//                cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
+                SendDepositChargeDeclinedEmailJob job = new SendDepositChargeDeclinedEmailJob();
+                job.setReservationId( reservationId );
+                job.setAmount( depositAmount );
+                job.setPaymentURL( paymentURL );
+                job.setStatus( JobStatus.submitted );
+                wordpressDAO.insertJob( job );
 
                 // CRH only until I can authenticate BDC for HSH/RMB
                 if ( "Booking.com".equals( cbReservation.getSourceName() ) &&
@@ -480,13 +491,12 @@ public class PaymentProcessorService {
                                         + "Card Type: %s, Card Number: ************%s, Auth Code: %s",
                                         txn.getVendorTxCode(), txn.getAuthStatus(), txn.getAuthStatusDetail(), txn.getVpsAuthCode(),
                                         txn.getCardType(), txn.getLastFourDigits(), txn.getBankAuthCode() ) );
-                        try {
-                            cloudbedsService.sendSagepayPaymentConfirmationGmail( webClient, res, txn );
-                        }
-                        catch ( Exception ex ) {
-                            // don't fail the job if we can't send the email; log and continue
-                            LOGGER.error( "Failed to send email.", ex );
-                        }
+                        LOGGER.info( "Creating SendSagepayPaymentConfirmationEmailJob for " + res.getIdentifier() );
+                        SendSagepayPaymentConfirmationEmailJob j = new SendSagepayPaymentConfirmationEmailJob();
+                        j.setStatus( JobStatus.submitted );
+                        j.setReservationId( txn.getReservationId() );
+                        j.setSagepayTxnId( id );
+                        wordpressDAO.insertJob( j );
                     }
                     wordpressDAO.updateSagepayTransactionProcessedDate( id );
                     break;
@@ -713,6 +723,7 @@ public class PaymentProcessorService {
         }
         else if( cbReservation.isAmexCard() ) {
             final String AMEX_NOTE = "Card is AMEX. Charge manually using POS terminal.";
+            LOGGER.info( AMEX_NOTE );
             if( false == cbReservation.containsNote( AMEX_NOTE ) ) {
                 cloudbedsScraper.addNote( webClient, reservationId, AMEX_NOTE );
             }
@@ -735,6 +746,8 @@ public class PaymentProcessorService {
             // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
             cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
                     cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
+            cloudbedsScraper.addNote( webClient, reservationId, "Outstanding balance of "
+                    + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) + " successfully charged." );
     
             // mark booking as fully paid in Hostelworld
             if ( "Hostelworld & Hostelbookers".equals( cbReservation.getSourceName() ) ) {
@@ -747,14 +760,11 @@ public class PaymentProcessorService {
             }
 
             // send email if successful
-            try {
-                cloudbedsService.sendNonRefundableSuccessfulGmail( webClient, reservationId, cbReservation.getBalanceDue() );
-            }
-            catch ( Exception ex ) {
-                LOGGER.error( "Failed to send confirmation email...continuing", ex );
-            }
-
-            cloudbedsScraper.addNote( webClient, reservationId, "Outstanding balance successfully charged and email sent." );
+            SendNonRefundableSuccessfulEmailJob job = new SendNonRefundableSuccessfulEmailJob();
+            job.setReservationId( reservationId );
+            job.setAmount( cbReservation.getBalanceDue() );
+            job.setStatus( JobStatus.submitted );
+            wordpressDAO.insertJob( job );
         }
         catch ( PaymentNotAuthorizedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
@@ -766,8 +776,13 @@ public class PaymentProcessorService {
             else {
                 LOGGER.info( "Sending declined payment email" );
                 String paymentURL = generateUniquePaymentURL( reservationId, null );
-                cloudbedsService.sendNonRefundableDeclinedGmail( webClient, reservationId, cbReservation.getBalanceDue(), paymentURL );
-//                cloudbedsScraper.addNote( webClient, reservationId, "Payment declined email sent. " + paymentURL );
+
+                SendNonRefundableDeclinedEmailJob job = new SendNonRefundableDeclinedEmailJob();
+                job.setReservationId( reservationId );
+                job.setAmount( cbReservation.getBalanceDue() );
+                job.setPaymentURL( paymentURL );
+                job.setStatus( JobStatus.submitted );
+                wordpressDAO.insertJob( job );
             }
         }
     }
@@ -887,16 +902,15 @@ public class PaymentProcessorService {
         BigDecimal amountToCharge = getLateCancellationAmountToCharge( cbReservation );
         cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
                 cbReservation.getCreditCardId(), amountToCharge );
-
-        // send email if successful
-        try {
-            cloudbedsService.sendHostelworldLateCancellationGmail( webClient, reservationId, amountToCharge );
-        }
-        catch ( Exception ex ) {
-            LOGGER.error( "Unable to send cancellation email... continuing", ex );
-        }
         cloudbedsScraper.addNote( webClient, reservationId, "Late cancellation. Successfully charged £"
                 + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) );
+
+        // send email if successful
+        SendHostelworldLateCancellationEmailJob job = new SendHostelworldLateCancellationEmailJob();
+        job.setReservationId( reservationId );
+        job.setAmount( amountToCharge );
+        job.setStatus( JobStatus.submitted );
+        wordpressDAO.insertJob( job );
     }
     
     /**

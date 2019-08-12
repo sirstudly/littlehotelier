@@ -51,8 +51,14 @@ import com.macbackpackers.jobs.DumpHostelworldBookingsByArrivalDateJob;
 import com.macbackpackers.jobs.DumpHostelworldBookingsByBookedDateJob;
 import com.macbackpackers.jobs.GroupBookingsReportJob;
 import com.macbackpackers.jobs.ManualChargeJob;
+import com.macbackpackers.jobs.ProcessSagepayTransactionJob;
 import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.jobs.SendAllUnsentEmailJob;
+import com.macbackpackers.jobs.SendDepositChargeDeclinedEmailJob;
+import com.macbackpackers.jobs.SendDepositChargeSuccessfulEmailJob;
+import com.macbackpackers.jobs.SendHostelworldLateCancellationEmailJob;
+import com.macbackpackers.jobs.SendNonRefundableDeclinedEmailJob;
+import com.macbackpackers.jobs.SendNonRefundableSuccessfulEmailJob;
 import com.macbackpackers.jobs.SplitRoomReservationReportJob;
 import com.macbackpackers.jobs.UnpaidDepositReportJob;
 import com.macbackpackers.jobs.UpdateLittleHotelierSettingsJob;
@@ -549,4 +555,46 @@ public class ProcessorServiceTest {
         dao.insertJob( j );
     }
 
+    @Test
+    public void testProcessSagepayTransactionJob() throws Exception {
+        ProcessSagepayTransactionJob j = new ProcessSagepayTransactionJob();
+        j.setStatus( JobStatus.submitted );
+        j.setTxnId( 252 );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void testSendEmailJobs() throws Exception {
+        SendDepositChargeDeclinedEmailJob j1 = new SendDepositChargeDeclinedEmailJob();
+        j1.setReservationId( "10569063" );
+        j1.setAmount( BigDecimal.ONE );
+        j1.setPaymentURL( "https://pay.macbackpackers.com/booking/CRH/FFF1234" );
+        j1.setStatus( JobStatus.submitted );
+        dao.insertJob( j1 );
+
+        SendDepositChargeSuccessfulEmailJob j2 = new SendDepositChargeSuccessfulEmailJob();
+        j2.setReservationId( "10569063" );
+        j2.setAmount( new BigDecimal( "2" ) );
+        j2.setStatus( JobStatus.submitted );
+        dao.insertJob( j2 );
+
+        SendHostelworldLateCancellationEmailJob j3 = new SendHostelworldLateCancellationEmailJob();
+        j3.setReservationId( "10569063" );
+        j3.setAmount( new BigDecimal( "3" ) );
+        j3.setStatus( JobStatus.submitted );
+        dao.insertJob( j3 );
+
+        SendNonRefundableDeclinedEmailJob j4 = new SendNonRefundableDeclinedEmailJob();
+        j4.setReservationId( "10569063" );
+        j4.setAmount( new BigDecimal( "4" ) );
+        j4.setPaymentURL( "https://pay.macbackpackers.com/booking/CRH/F001234" );
+        j4.setStatus( JobStatus.submitted );
+        dao.insertJob( j4 );
+
+        SendNonRefundableSuccessfulEmailJob j5 = new SendNonRefundableSuccessfulEmailJob();
+        j5.setReservationId( "10569063" );
+        j5.setAmount( new BigDecimal( "5" ) );
+        j5.setStatus( JobStatus.submitted );
+        dao.insertJob( j5 );
+    }
 }

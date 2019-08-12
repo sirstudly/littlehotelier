@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -63,6 +64,9 @@ public class CloudbedsService {
     
     @Autowired
     private BookingComScraper bdcScraper;
+
+    @Autowired
+    private CaptchaSolverService captchaService;
 
     @Autowired
     private GmailService gmailService;
@@ -423,6 +427,34 @@ public class CloudbedsService {
     }
 
     /**
+     * Sends an email to the guest for a successful payment.
+     * 
+     * @param webClient web client instance to use
+     * @param res associated reservation
+     * @param txn successful transaction
+     * @throws IOException
+     */
+    public void sendSagepayPaymentConfirmationEmail( WebClient webClient, String reservationId, int sagepayTxnId ) throws IOException {
+
+        EmailTemplateInfo template = scraper.getSagepayPaymentConfirmationEmailTemplate( webClient );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            SagepayTransaction txn = dao.fetchSagepayTransaction( sagepayTxnId );
+            sendEmailFromTemplate( webClient, template, res, txn.getEmail(),
+                b -> b.replaceAll( "\\[vendor tx code\\]", txn.getVendorTxCode() )
+                    .replaceAll( "\\[payment total\\]", scraper.getCurrencyFormat().format( txn.getPaymentAmount() ) )
+                    .replaceAll( "\\[card type\\]", txn.getCardType() )
+                    .replaceAll( "\\[last 4 digits\\]", txn.getLastFourDigits() ) );
+            scraper.addNote( webClient, reservationId, note );
+        }
+    }
+    
+    /**
      * Sends a payment confirmation email using the given template, reservation and transaction.
      * 
      * Same as {@link CloudbedsScraper#sendSagepayPaymentConfirmationEmail(WebClient, Reservation, SagepayTransaction)
@@ -433,14 +465,16 @@ public class CloudbedsService {
      * @throws IOException 
      * @throws MessagingException 
      */
-    public void sendSagepayPaymentConfirmationGmail( WebClient webClient, Reservation res, SagepayTransaction txn ) throws IOException, MessagingException {
+    public void sendSagepayPaymentConfirmationGmail( WebClient webClient, String reservationId, int sagepayTxnId ) throws IOException, MessagingException {
         EmailTemplateInfo template = scraper.getSagepayPaymentConfirmationEmailTemplate( webClient );
-        final String note = CloudbedsScraper.TEMPLATE_SAGEPAY_PAYMENT_CONFIRMATION + " email sent.";
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
 
         if ( res.containsNote( note ) ) {
-            LOGGER.info( "Email already sent. Doing nothing." );
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
         }
         else {
+            SagepayTransaction txn = dao.fetchSagepayTransaction( sagepayTxnId );
             gmailService.sendEmail( txn.getEmail(), txn.getFirstName() + " " + txn.getLastName(), template.getSubject(),
                     IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
                             .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
@@ -462,16 +496,40 @@ public class CloudbedsService {
      * @param reservationId associated reservation
      * @param amount amount being charged
      * @throws IOException
+     */
+    public void sendHostelworldLateCancellationEmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
+        EmailTemplateInfo template = scraper.getHostelworldLateCancellationEmailTemplate( webClient );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            sendEmailFromTemplate( webClient, template, res,
+                    b -> b.replaceAll( "\\[first night charge\\]", "£" + scraper.getCurrencyFormat().format( amount ) ) );
+            scraper.addNote( webClient, reservationId, note );
+        }
+    }
+
+    /**
+     * Sends an email to the guest for the given reservation when they cancel a hostelworld
+     * reservation and have been charged the first night.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param amount amount being charged
+     * @throws IOException
      * @throws MessagingException
      */
     public void sendHostelworldLateCancellationGmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException, MessagingException {
 
         EmailTemplateInfo template = scraper.getHostelworldLateCancellationEmailTemplate( webClient );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
-        final String note = CloudbedsScraper.TEMPLATE_HWL_CANCELLATION_CHARGE + " email sent.";
+        final String note = template.getTemplateName() + " email sent.";
 
         if ( res.containsNote( note ) ) {
-            LOGGER.info( "Email already sent. Doing nothing." );
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
         }
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
@@ -485,7 +543,32 @@ public class CloudbedsService {
             scraper.addNote( webClient, reservationId, note );
         }
     }
-    
+
+    /**
+     * Sends an email to the guest for the given reservation when the non-refundable reservation has
+     * been charged successfully.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param amount amount being charged
+     * @throws IOException
+     */
+    public void sendNonRefundableSuccessfulEmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
+
+        EmailTemplateInfo template = scraper.getNonRefundableSuccessfulEmailTemplate( webClient );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            sendEmailFromTemplate( webClient, template, res,
+                    b -> b.replaceAll( "\\[charge amount\\]", "£" + scraper.getCurrencyFormat().format( amount ) ) );
+            scraper.addNote( webClient, reservationId, note );
+        }
+    }
+
     /**
      * Sends an email to the guest for the given reservation when the
      * non-refundable reservation has been charged successfully.
@@ -500,11 +583,10 @@ public class CloudbedsService {
 
         EmailTemplateInfo template = scraper.getNonRefundableSuccessfulEmailTemplate( webClient );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
-
-        final String note = CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_SUCCESSFUL + " email sent.";
+        final String note = template.getTemplateName() + " email sent.";
 
         if ( res.containsNote( note ) ) {
-            LOGGER.info( "Email already sent. Doing nothing." );
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
         }
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
@@ -528,17 +610,43 @@ public class CloudbedsService {
      * @param amount amount being charged
      * @param paymentURL the payment URL to include in the email
      * @throws IOException
+     */
+    public void sendNonRefundableDeclinedEmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException {
+
+        EmailTemplateInfo template = scraper.getNonRefundableDeclinedEmailTemplate( webClient );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            sendEmailFromTemplate( webClient, template, res,
+                    b -> b.replaceAll( "\\[charge amount\\]", "£" + scraper.getCurrencyFormat().format( amount ) )
+                            .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) );
+            scraper.addNote( webClient, reservationId, note );
+        }
+    }
+
+    /**
+     * Sends an email to the guest for the given reservation when an attempt to charge the
+     * non-refundable reservation but was declined.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param amount amount being charged
+     * @param paymentURL the payment URL to include in the email
+     * @throws IOException
      * @throws MessagingException
      */
     public void sendNonRefundableDeclinedGmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException, MessagingException {
 
         EmailTemplateInfo template = scraper.getNonRefundableDeclinedEmailTemplate( webClient );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
-
-        final String note = CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED + " email sent.";
+        final String note = template.getTemplateName() + " email sent.";
 
         if ( res.containsNote( note ) ) {
-            LOGGER.info( "Email already sent. Doing nothing." );
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
         }
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
@@ -562,17 +670,41 @@ public class CloudbedsService {
      * @param reservationId associated reservation
      * @param amount amount being charged
      * @throws IOException
+     */
+    public void sendDepositChargeSuccessfulEmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
+
+        EmailTemplateInfo template = scraper.getDepositChargeSuccessfulEmailTemplate( webClient );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            sendEmailFromTemplate( webClient, template, res,
+                    b -> b.replaceAll( "\\[charge amount\\]", "£" + scraper.getCurrencyFormat().format( amount ) ) );
+            scraper.addNote( webClient, reservationId, note );
+        }
+    }
+
+    /**
+     * Sends an email to the guest for the given reservation when the deposit has been charged
+     * successfully.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param amount amount being charged
+     * @throws IOException
      * @throws MessagingException
      */
     public void sendDepositChargeSuccessfulGmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException, MessagingException {
 
         EmailTemplateInfo template = scraper.getDepositChargeSuccessfulEmailTemplate( webClient );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
-
-        final String note = CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL + " email sent.";
+        final String note = template.getTemplateName() + " email sent.";
 
         if ( res.containsNote( note ) ) {
-            LOGGER.info( "Email already sent. Doing nothing." );
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
         }
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
@@ -595,17 +727,42 @@ public class CloudbedsService {
      * @param amount amount being charged
      * @param paymentURL URL to payment portal
      * @throws IOException
+     */
+    public void sendDepositChargeDeclinedEmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException {
+
+        EmailTemplateInfo template = scraper.getDepositChargeDeclinedEmailTemplate( webClient );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            sendEmailFromTemplate( webClient, template, res,
+                    b -> b.replaceAll( "\\[charge amount\\]", "£" + scraper.getCurrencyFormat().format( amount ) )
+                            .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) );
+            scraper.addNote( webClient, reservationId, note + " " + paymentURL );
+        }
+    }
+
+    /**
+     * Sends an email to the guest for the given reservation when the deposit charge was declined.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param amount amount being charged
+     * @param paymentURL URL to payment portal
+     * @throws IOException
      * @throws MessagingException
      */
     public void sendDepositChargeDeclinedGmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException, MessagingException {
 
         EmailTemplateInfo template = scraper.getDepositChargeDeclinedEmailTemplate( webClient );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
-
-        final String note = CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED + " email sent.";
+        final String note = template.getTemplateName() + " email sent.";
 
         if ( res.containsNote( note ) ) {
-            LOGGER.info( "Email already sent. Doing nothing." );
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
         }
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
@@ -619,6 +776,37 @@ public class CloudbedsService {
                                     .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) ) );
             scraper.addNote( webClient, reservationId, note + " " + paymentURL );
         }
+    }
+
+    /**
+     * Sends an email from a booking from an email template.
+     * 
+     * @param webClient
+     * @param template email template
+     * @param res reservation to send from
+     * @param emailTo email recipient (overrides reservation email)
+     * @param transformBodyFn and transformation on the email body
+     * @throws IOException
+     */
+    private synchronized void sendEmailFromTemplate( WebClient webClient, EmailTemplateInfo template, Reservation res,
+            String emailTo, Function<String, String> transformBodyFn ) throws IOException {
+        // synchronized because CAPTCHA can only handle one request at a time
+        scraper.sendEmailFromTemplate( webClient, template, res, emailTo, transformBodyFn,
+                captchaService.solveRecaptchaV3( webClient, res.getReservationId() ) );
+    }    
+
+    /**
+     * Sends an email from a booking from an email template.
+     * 
+     * @param webClient
+     * @param template email template
+     * @param res reservation to send from
+     * @param transformBodyFn and transformation on the email body
+     * @throws IOException
+     */
+    private void sendEmailFromTemplate( WebClient webClient, EmailTemplateInfo template, Reservation res,
+            Function<String, String> transformBodyFn ) throws IOException {
+        sendEmailFromTemplate( webClient, template, res, res.getEmail(), transformBodyFn );
     }
 
     /**

@@ -449,6 +449,13 @@ public interface WordPressDAO {
     public int getGroupBookingSize();
 
     /**
+     * Returns our 2Captcha API key.
+     * 
+     * @return API key (null if not found)
+     */
+    public String get2CaptchaApiKey();
+
+    /**
      * Sets the wordpress option for the given property.
      * 
      * @param property name of key to get

@@ -451,12 +451,13 @@ public class CloudbedsJsonRequestFactory {
      * @param reservationId the reservation id (from address bar)
      * @param emailAddress email recipient
      * @param transformBodyFn apply any transforms to the email body
+     * @param token captcha token
      * @return non-null web request
      * @throws IOException
      */
     public WebRequest createSendCustomEmail( EmailTemplateInfo template, String identifier, 
             String customerId, String reservationId, String emailAddress, 
-            Function<String, String> transformBodyFn ) throws IOException {
+            Function<String, String> transformBodyFn, String token ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/emails/send_composed_email" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "identifier", identifier ), // the unique id of reservation
@@ -477,8 +478,12 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "email[top_image][original_src]", template.getTopImageSrc() ),
                 new NameValuePair( "email[top_image][original_id]", template.getTopImageId() ),
                 new NameValuePair( "email[top_image][image_align]", template.getTopImageAlign() ),
+                new NameValuePair( "hidden_captcha", token ),
+                new NameValuePair( "visible_captcha", "" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "contains_pii", "0" ),
+                new NameValuePair( "suppress_client_errors", "true" ),
                 new NameValuePair( "version", getVersion() ) ) );
         return webRequest;
     }
@@ -805,4 +810,22 @@ public class CloudbedsJsonRequestFactory {
         return webRequest;
     }
 
+    public WebRequest createVerifyCaptchaRequest(String token) throws IOException {
+        WebRequest requestSettings = new WebRequest( new URL( "https://hotels.cloudbeds.com/captcha/verify" ), HttpMethod.POST );
+        requestSettings.setAdditionalHeader( "accept", "*/*" );
+        requestSettings.setAdditionalHeader( "content-type", "application/x-www-form-urlencoded; charset=UTF-8" );
+        requestSettings.setAdditionalHeader( "referer", "https://hotels.cloudbeds.com/connect/" + getPropertyId() );
+        requestSettings.setAdditionalHeader( "accept-language", "en-GB,en-US;q=0.9,en;q=0.8" );
+        requestSettings.setAdditionalHeader( "accept-encoding", "gzip, deflate, br" );
+        requestSettings.setAdditionalHeader( "x-requested-with", "XMLHttpRequest" );
+        requestSettings.setAdditionalHeader( "authority", "hotels.cloudbeds.com" );
+        requestSettings.setAdditionalHeader( "origin", "https://hotels.cloudbeds.com" );
+        requestSettings.setAdditionalHeader( "user-agent", getUserAgent() );
+        requestSettings.setAdditionalHeader( "cookie", getCookies() );
+        requestSettings.setCharset( StandardCharsets.UTF_8 );
+
+        requestSettings.setRequestParameters( Arrays.asList(
+                new NameValuePair( "token", token ) ) );
+        return requestSettings;
+    }
 }

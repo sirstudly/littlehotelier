@@ -901,6 +901,12 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    @Transactional( readOnly = true )
+    public String get2CaptchaApiKey() {
+        return getOption( "hbo_2captcha_api_key" );
+    }
+
+    @Override
     public void setOption( String property, String value ) {
         em.createNativeQuery(
                 "   INSERT INTO " + wordpressPrefix + "options(option_name, option_value) "

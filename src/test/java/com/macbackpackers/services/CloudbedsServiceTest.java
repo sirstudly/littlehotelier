@@ -83,8 +83,7 @@ public class CloudbedsServiceTest {
     @Test
     public void testSendSagepayPaymentConfirmationEmail() throws Exception {
         SagepayTransaction txn = dao.fetchSagepayTransaction( 192 );
-        Reservation res = cloudbedsScraper.getReservationRetry( webClient, txn.getReservationId() );
-        cloudbedsService.sendSagepayPaymentConfirmationGmail( webClient, res, txn );
+        cloudbedsService.sendSagepayPaymentConfirmationGmail( webClient, txn.getReservationId(), 192 );
     }
 
     @Test
@@ -92,4 +91,9 @@ public class CloudbedsServiceTest {
         cloudbedsService.sendHostelworldLateCancellationGmail( webClient, "22702371", new BigDecimal( "11.22" ) );
     }
 
+    @Test
+    public void testSendHostelworldLateCancellationEmail() throws Exception {
+        cloudbedsService.sendHostelworldLateCancellationEmail( webClient, "10568885", BigDecimal.ONE );
+    }
+    
 }

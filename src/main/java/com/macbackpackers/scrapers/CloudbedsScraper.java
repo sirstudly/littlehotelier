@@ -14,6 +14,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -36,7 +37,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
-import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
@@ -906,22 +906,22 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Sends an email to the guest for the given reservation when they cancel a hostelworld
-     * reservation and have been charged the first night.
+     * Sends an email from a booking from an email template.
      * 
-     * @param webClient web client instance to use
-     * @param reservationId associated reservation
-     * @param amount amount being charged
+     * @param webClient
+     * @param template email template
+     * @param res reservation to send from
+     * @param emailTo email recipient (overrides reservation email)
+     * @param transformBodyFn and transformation on the email body
+     * @param token the solved recaptcha token
      * @throws IOException
      */
-    public void sendHostelworldLateCancellationEmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
-
-        EmailTemplateInfo template = getHostelworldLateCancellationEmailTemplate( webClient );
-        Reservation res = getReservation( webClient, reservationId );
+    public void sendEmailFromTemplate( WebClient webClient, EmailTemplateInfo template, Reservation res,
+            String emailTo, Function<String, String> transformBodyFn, String token ) throws IOException {
 
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
-                template, res.getIdentifier(), res.getCustomerId(), reservationId,
-                res.getEmail(), b -> b.replaceAll( "\\[first night charge\\]", "£" + getCurrencyFormat().format( amount ) ) );
+                template, res.getIdentifier(), res.getCustomerId(), res.getReservationId(),
+                emailTo, transformBodyFn, token );
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
@@ -930,155 +930,7 @@ public class CloudbedsScraper {
         JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
-            throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + reservationId );
-        }
-    }
-
-    /**
-     * Sends an email to the guest for the given reservation when the
-     * non-refundable reservation has been charged successfully.
-     * 
-     * @param webClient web client instance to use
-     * @param reservationId associated reservation
-     * @param amount amount being charged
-     * @throws IOException
-     */
-    public void sendNonRefundableSuccessfulEmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
-
-        EmailTemplateInfo template = getNonRefundableSuccessfulEmailTemplate( webClient );
-        Reservation res = getReservation( webClient, reservationId );
-
-        WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
-                template, res.getIdentifier(), res.getCustomerId(), reservationId,
-                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + getCurrencyFormat().format( amount ) ) );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
-        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
-            throw new UnrecoverableFault( "Failed to send confirmation email for reservation " + reservationId );
-        }
-    }
-
-    /**
-     * Sends an email to the guest for the given reservation when an attempt to charge the
-     * non-refundable reservation but was declined.
-     * 
-     * @param webClient web client instance to use
-     * @param reservationId associated reservation
-     * @param amount amount being charged
-     * @param paymentURL the payment URL to include in the email
-     * @throws IOException
-     */
-    public void sendNonRefundableDeclinedEmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException {
-
-        EmailTemplateInfo template = getNonRefundableDeclinedEmailTemplate( webClient );
-        Reservation res = getReservation( webClient, reservationId );
-
-        WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
-                template, res.getIdentifier(), res.getCustomerId(), reservationId,
-                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + getCurrencyFormat().format( amount ) )
-                        .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
-        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
-            throw new UnrecoverableFault( "Failed to send charge declined email for reservation " + reservationId );
-        }
-    }
-
-    /**
-     * Sends an email to the guest for a successful payment.
-     * 
-     * @param webClient web client instance to use
-     * @param res associated reservation
-     * @param txn successful transaction
-     * @throws IOException
-     */
-    public void sendSagepayPaymentConfirmationEmail( WebClient webClient, Reservation res, SagepayTransaction txn ) throws IOException {
-
-        EmailTemplateInfo template = getSagepayPaymentConfirmationEmailTemplate( webClient );
-
-        WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
-                template, res.getIdentifier(), res.getCustomerId(), res.getReservationId(), txn.getEmail(), 
-                b -> b.replaceAll( "\\[vendor tx code\\]", txn.getVendorTxCode() )
-                    .replaceAll( "\\[payment total\\]", getCurrencyFormat().format( txn.getPaymentAmount() ) )
-                    .replaceAll( "\\[card type\\]", txn.getCardType() )
-                    .replaceAll( "\\[last 4 digits\\]", txn.getLastFourDigits() ));
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
-        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
-            throw new UnrecoverableFault( "Failed to send late cancellation email for reservation " + res.getReservationId() );
-        }
-    }
-    
-    /**
-     * Sends an email to the guest for the given reservation when the deposit has been charged successfully.
-     * 
-     * @param webClient web client instance to use
-     * @param reservationId associated reservation
-     * @param amount amount being charged
-     * @throws IOException
-     */
-    public void sendDepositChargeSuccessfulEmail( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
-
-        EmailTemplateInfo template = getDepositChargeSuccessfulEmailTemplate( webClient );
-        Reservation res = getReservation( webClient, reservationId );
-
-        WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
-                template, res.getIdentifier(), res.getCustomerId(), reservationId,
-                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + getCurrencyFormat().format( amount ) ) );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
-        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
-            throw new UnrecoverableFault( "Failed to send deposit charge successful email for reservation " + reservationId );
-        }
-    }
-
-    /**
-     * Sends an email to the guest for the given reservation when the deposit charge was declined.
-     * 
-     * @param webClient web client instance to use
-     * @param reservationId associated reservation
-     * @param amount amount being charged
-     * @param paymentURL URL to payment portal
-     * @throws IOException
-     */
-    public void sendDepositChargeDeclinedEmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException {
-
-        EmailTemplateInfo template = getDepositChargeDeclinedEmailTemplate( webClient );
-        Reservation res = getReservation( webClient, reservationId );
-
-        WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
-                template, res.getIdentifier(), res.getCustomerId(), reservationId,
-                res.getEmail(), b -> b.replaceAll( "\\[charge amount\\]", "£" + getCurrencyFormat().format( amount ) )
-                        .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
-        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
-            throw new UnrecoverableFault( "Failed to send deposit charge declined email for reservation " + reservationId );
+            throw new UnrecoverableFault( "Failed to send " + template.getTemplateName() + " email for reservation " + res.getReservationId() );
         }
     }
 
