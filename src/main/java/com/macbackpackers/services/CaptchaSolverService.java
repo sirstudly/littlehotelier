@@ -39,7 +39,7 @@ public class CaptchaSolverService {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
-    @Value( "${captcha.maxattempts:10}" )
+    @Value( "${captcha.maxattempts:20}" )
     private int MAX_SOLVE_ATTEMPTS;
 
     @Autowired
@@ -224,6 +224,7 @@ public class CaptchaSolverService {
             return req;
         }
         else {
+            LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
             throw new MissingUserDataException( "Failed to retrieve captcha key." );
         }
     }

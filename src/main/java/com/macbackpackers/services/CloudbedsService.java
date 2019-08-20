@@ -314,10 +314,10 @@ public class CloudbedsService {
             .filter( r -> isCancellationDoneBySystem( webClient, r.getIdentifier() ) )
             .forEach( r -> {
                 LOGGER.info( "Creating ChargeHostelworldLateCancellationJob (August) for " + r.getReservationId() );
-//                ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();
-//                j.setStatus( JobStatus.submitted );
-//                j.setReservationId( r.getReservationId() );
-//                dao.insertJob( j );
+                ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();
+                j.setStatus( JobStatus.submitted );
+                j.setReservationId( r.getReservationId() );
+                dao.insertJob( j );
             } );
     }
 
