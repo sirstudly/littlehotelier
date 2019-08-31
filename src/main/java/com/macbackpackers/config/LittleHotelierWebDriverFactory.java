@@ -26,7 +26,7 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
     @Value( "${chromescraper.maxwait.seconds:60}" )
     private int maxWaitSeconds;
 
-    @Value( "${chromescraper.driver.options:--headless --disable-gpu --ignore-certificate-errors}" )
+    @Value( "${chromescraper.driver.options:user-data-dir=chromeprofile --headless --disable-gpu --start-maximized --ignore-certificate-errors}" )
     private String chromeOptions;
 
     @Override

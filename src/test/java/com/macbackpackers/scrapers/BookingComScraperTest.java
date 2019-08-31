@@ -55,4 +55,9 @@ public class BookingComScraperTest {
     public void testMarkCardInvalid() throws Exception {
         scraper.markCreditCardAsInvalid( driver, wait, "3913632669", "7916" );
     }
+
+    @Test
+    public void testGetVirtualCardBalance() throws Exception {
+        scraper.getVirtualCardBalance( driver, wait, "3804638594" );
+    }
 }

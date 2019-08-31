@@ -25,6 +25,9 @@ import org.apache.commons.collections.ListUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,6 +69,7 @@ import com.macbackpackers.jobs.SendNonRefundableSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendSagepayPaymentConfirmationEmailJob;
 import com.macbackpackers.scrapers.AgodaScraper;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
+import com.macbackpackers.scrapers.BookingComScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.scrapers.ChromeScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -129,6 +133,12 @@ public class PaymentProcessorService {
     
     @Autowired
     private ChromeScraper chromeScraper;
+
+    @Autowired
+    private BookingComScraper bdcScraper;
+
+    @Autowired
+    private GenericObjectPool<WebDriver> driverFactory;
 
     /**
      * Attempt to charge the deposit payment for the given reservation. This method
@@ -821,10 +831,9 @@ public class PaymentProcessorService {
      * 
      * @param webClient web client for cloudbeds
      * @param reservationId the unique cloudbeds reservation ID
-     * @throws IOException on i/o error
-     * @throws ParseException on bonehead error
+     * @throws Exception
      */
-    public synchronized void processCardPaymentForRemainingBalance( WebClient webClient, String reservationId ) throws IOException, ParseException {
+    public synchronized void processCardPaymentForRemainingBalance( WebClient webClient, String reservationId ) throws Exception {
         LOGGER.info( "Processing full payment for booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
@@ -849,8 +858,36 @@ public class PaymentProcessorService {
         }
 
         // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
-        cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
+        try {
+            cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
+                    cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
+        }
+        catch ( PaymentNotAuthorizedException ex ) {
+
+            // failed to charge a prepaid card... probably a change to the reservation
+            // try to lookup the correct amount on BDC
+            if ( "Booking.com".equals( cbReservation.getSourceName() ) && cbReservation.isPrepaid() 
+                    && wordpressDAO.getOption( "hbo_bdc_username" ) != null ) {
+                LOGGER.info( "Looks like a prepaid card... Looking up actual value to charge on BDC" );
+                WebDriver driver = driverFactory.borrowObject();
+                try {
+                    WebDriverWait wait = new WebDriverWait( driver, 60 );
+                    BigDecimal amountToCharge = bdcScraper.getVirtualCardBalance( driver, wait, cbReservation.getThirdPartyIdentifier() );
+                    LOGGER.info( "Attempting to charge " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + " instead." );
+                    cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
+                            cbReservation.getCreditCardId(), amountToCharge );
+                    cloudbedsScraper.addNote( webClient, reservationId, 
+                            "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so the remaining balance should be PAID BY THE GUEST ON ARRIVAL." );
+                }
+                finally {
+                    driverFactory.returnObject( driver );
+                }
+            }
+            else {
+                // can't do anything else; rethrow
+                throw ex;
+            }
+        }
     }
 
     /**

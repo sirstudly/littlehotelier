@@ -7,10 +7,12 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
@@ -26,37 +28,26 @@ import org.springframework.stereotype.Component;
 
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
-import com.macbackpackers.services.FileService;
 
 @Component
 public class BookingComScraper {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
-    /** for saving login credentials */
-    private static final String COOKIE_FILE = "booking.com.cookies";
-
-    @Autowired
-    private FileService fileService;
-
     @Autowired
     private WordPressDAO wordPressDAO;
-
-    // enable for 2fa verification
-    private boolean doVerification = false;
 
     /**
      * Logs into BDC providing the necessary credentials.
      * 
      * @param driver web client
      * @param wait
-     * @throws IOException 
+     * @throws IOException
      */
     public void doLogin( WebDriver driver, WebDriverWait wait ) throws IOException {
         doLogin( driver, wait,
                 wordPressDAO.getOption( "hbo_bdc_username" ),
-                wordPressDAO.getOption( "hbo_bdc_password" ),
-                wordPressDAO.getOption( "hbo_bdc_session" ) );
+                wordPressDAO.getOption( "hbo_bdc_password" ) );
     }
 
     /**
@@ -66,23 +57,18 @@ public class BookingComScraper {
      * @param wait
      * @param username user credentials
      * @param password user credentials
-     * @param session previous session id (if available)
-     * @throws IOException 
+     * @param lasturl previous home URL (optional) - contains previous session
+     * @throws IOException
      */
-    public void doLogin( WebDriver driver, WebDriverWait wait, String username, String password, String session ) throws IOException {
+    public synchronized void doLogin( WebDriver driver, WebDriverWait wait, String username, String password ) throws IOException {
 
         if ( username == null || password == null ) {
             throw new MissingUserDataException( "Missing BDC username/password" );
         }
 
-        // we need to navigate first before loading the cookies for that domain
-        driver.get( "https://www.booking.com/" );
-        if ( new File( COOKIE_FILE ).exists() ) {
-            fileService.loadCookiesFromFile( driver, COOKIE_FILE );
-        }
-
-        driver.get( "https://admin.booking.com/hotel/hoteladmin/general/dashboard.html?lang=en&hotel_id="
-                + username + (session == null ? "" : "&ses=" + session) );
+        String lasturl = wordPressDAO.getOption( "hbo_bdc_lasturl" );
+        driver.get( lasturl == null ? "https://admin.booking.com/hotel/hoteladmin/general/dashboard.html?lang=en&hotel_id=" + username : lasturl );
+        LOGGER.info( "Loading Booking.com website: " + driver.getCurrentUrl() );
 
         if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
             LOGGER.info( "Doesn't look like we're logged in. Logging into Booking.com" );
@@ -102,23 +88,55 @@ public class BookingComScraper {
             nextButton.click();
             wait.until( stalenessOf( nextButton ) );
 
-            List<WebElement> phoneLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-call-verification-link')]" ) );
-            if ( phoneLinks.size() > 0 && false == doVerification ) {
-                throw new MissingUserDataException( "Verification required for BDC?" );
+            // if this is the first time we're doing this, we'll need to go thru 2FA
+            if ( driver.findElements( By.xpath( "//h1[text()='Verification method']" ) ).size() > 0 ) {
+
+                LOGGER.info( "BDC verification required" );
+                List<WebElement> phoneLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-call-verification-link')]" ) );
+                List<WebElement> smsLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-sms-verification-link')]" ) );
+
+                String verificationMode = wordPressDAO.getOption( "hbo_bdc_verificationmode" );
+                if ( "sms".equalsIgnoreCase( verificationMode ) && smsLinks.size() > 0 ) {
+                    LOGGER.info( "Performing SMS verification" );
+                    smsLinks.get( 0 ).click();
+                    WebElement selectedPhone = driver.findElement( By.id( "selected_phone" ) );
+                    if ( false == selectedPhone.getText().endsWith( "4338" ) ) {
+                        throw new MissingUserDataException( "Phone number not registered: " + selectedPhone.getText() );
+                    }
+
+                    WebElement sendCodeBtn = driver.findElement( By.xpath( "//span[text()='Send verification code']" ) );
+                    sendCodeBtn.click();
+
+                    // now blank out the code and wait for it to appear
+                    WebElement smsCode = driver.findElement( By.id( "sms_code" ) );
+                    smsCode.sendKeys( fetch2FACode() );
+
+                    nextButton = driver.findElement( By.xpath( "//span[text()='Verify now']/.." ) );
+                    nextButton.click();
+                    wait.until( stalenessOf( nextButton ) );
+                    LOGGER.debug( driver.getPageSource() );
+                }
+                else if ( "phone".equalsIgnoreCase( verificationMode ) && phoneLinks.size() > 0 ) {
+                    LOGGER.info( "Performing phone verification" );
+                    phoneLinks.get( 0 ).click();
+                    nextButton = driver.findElement( By.xpath( "//span[text()='Call now']/.." ) );
+                    nextButton.click();
+
+                    WebElement smsCode = driver.findElement( By.id( "sms_code" ) );
+                    smsCode.sendKeys( fetch2FACode() );
+
+                    nextButton = driver.findElement( By.xpath( "//span[text()='Verify now']/.." ) );
+                    nextButton.click();
+                    wait.until( stalenessOf( nextButton ) );
+                    LOGGER.info( driver.getPageSource() );
+                }
+                else {
+                    throw new MissingUserDataException( "Verification required for BDC?" );
+                }
             }
-            else if ( doVerification ) {
-                // if this is the first time we're doing this, we'll need to go thru 2FA
-                phoneLinks.get( 0 ).click();
-                nextButton = driver.findElement( By.xpath( "//span[text()='Call now']/.." ) );
-                nextButton.click();
 
-                WebElement smsCode = driver.findElement( By.id( "sms_code" ) );
-                smsCode.sendKeys( "XXXXXXX" ); // SET BREAKPOINT HERE
-
-                nextButton = driver.findElement( By.xpath( "//span[text()='Verify now']/.." ) );
-                nextButton.click();
-                wait.until( stalenessOf( nextButton ) );
-                LOGGER.info( driver.getPageSource() );
+            if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
+                throw new MissingUserDataException( "Failed to login to BDC" );
             }
 
         }
@@ -126,11 +144,40 @@ public class BookingComScraper {
         // if we're actually logged in, we should get the hostel name identified here...
         LOGGER.info( "Property name identified as: " + driver.getTitle() );
 
-        // save credentials to disk so we don't need to do this again
-        fileService.writeCookiesToFile( driver, COOKIE_FILE );
-        LOGGER.info( "Logged into Booking.com. Saving current session." );
+        // verify we are logged in
+        if ( false == driver.getCurrentUrl().startsWith( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/home.html" ) ) {
+            LOGGER.info( "Current URL: " + driver.getCurrentUrl() );
+            LOGGER.info( driver.getPageSource() );
+            throw new MissingUserDataException( "Are we logged in? Unexpected URL." );
+        }
+
+        LOGGER.info( "Logged into Booking.com. Saving current URL." );
         LOGGER.info( "Loaded " + driver.getCurrentUrl() );
-        updateSession( driver.getCurrentUrl() );
+        wordPressDAO.setOption( "hbo_bdc_lasturl", driver.getCurrentUrl() );
+    }
+
+    /**
+     * First _blanks out_ the 2FA code from the DB and waits for it to be re-populated. This is done
+     * outside this application.
+     * 
+     * @return non-null 2FA code
+     * @throws MissingUserDataException on timeout (1 + 10 minutes)
+     */
+    private String fetch2FACode() throws MissingUserDataException {
+        // now blank out the code and wait for it to appear
+        LOGGER.info( "waiting for hbo_bdc_2facode to be set..." );
+        wordPressDAO.setOption( "hbo_bdc_2facode", "" );
+        sleep( 60 );
+        // force timeout after 10 minutes (60x10 seconds)
+        for ( int i = 0 ; i < 60 ; i++ ) {
+            String scaCode = wordPressDAO.getOption( "hbo_bdc_2facode" );
+            if ( StringUtils.isNotBlank( scaCode ) ) {
+                return scaCode;
+            }
+            LOGGER.info( "waiting for another 10 seconds..." );
+            sleep( 10 );
+        }
+        throw new MissingUserDataException( "2FA code timeout waiting for BDC verification." );
     }
 
     /**
@@ -139,10 +186,11 @@ public class BookingComScraper {
      * @param driver
      * @param wait
      * @param reservationId the BDC reference
-     * @throws IOException 
+     * @throws IOException
      */
     public void lookupReservation( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException {
         doLogin( driver, wait );
+        LOGGER.info( "Looking up reservation " + reservationId );
 
         WebElement searchInput = driver.findElement( By.xpath( "//input[@placeholder='Search for reservations']" ) );
         searchInput.sendKeys( reservationId + "\n" );
@@ -156,7 +204,7 @@ public class BookingComScraper {
         LOGGER.info( "Loaded " + driver.getCurrentUrl() );
         LOGGER.debug( driver.getPageSource() );
 
-        if ( false == driver.getTitle().contains( "Reservation details" ) ) {
+        if ( false == driver.getTitle().contains( "Reservation Details" ) ) {
             File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
             FileUtils.copyFile( scrFile, new File( "logs/bdc_reservation_" + reservationId + ".png" ) );
             throw new IOException( "Unable to load reservation details" );
@@ -164,16 +212,25 @@ public class BookingComScraper {
     }
 
     /**
-     * Looks up a given reservation in BDC and returns the total amount for the booking.
+     * Looks up a given reservation in BDC and returns the virtual card balance on the booking.
      * 
      * @param driver
      * @param wait
      * @param reservationId the BDC reference
-     * @throws Exception if booking not found or I/O error
+     * @return the amount available on the VCC
+     * @throws IOException if unable to login
+     * @throws NoSuchElementException if VCC details not found
      */
-    public BigDecimal getTotalAmountFromReservation( WebDriver driver, WebDriverWait wait, String reservationId ) {
-        WebElement totalAmount = driver.findElement( By.xpath( "//span[text() = 'Commissionable amount:']/following-sibling::span" ) );
-        return new BigDecimal( totalAmount.getText().replaceAll( "£", "" ) );
+    public BigDecimal getVirtualCardBalance( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException, NoSuchElementException {
+        lookupReservation( driver, wait, reservationId );
+        WebElement totalAmount = driver.findElement( By.xpath( "//p[@class='reservation_bvc--balance']" ) );
+        Pattern p = Pattern.compile( "Virtual card balance: £(\\d+\\.\\d*)" );
+        Matcher m = p.matcher( totalAmount.getText() );
+        if ( m.find() == false ) {
+            throw new NoSuchElementException( "Couldn't find virtual card balance from '" + totalAmount.getText() );
+        }
+        LOGGER.info( "Found VCC balance of " + m.group( 1 ) );
+        return new BigDecimal( m.group( 1 ) );
     }
 
     /**
@@ -213,20 +270,12 @@ public class BookingComScraper {
         LOGGER.info( "Card marked as invalid." );
     }
 
-    /**
-     * Updates the current session ID when logged into BDC.
-     * 
-     * @param url currently logged in BDC page.
-     */
-    private void updateSession( String url ) {
-        Pattern p = Pattern.compile( "ses=([0-9a-f]+)" );
-        Matcher m = p.matcher( url );
-        if ( m.find() ) {
-            wordPressDAO.setOption( "hbo_bdc_session", m.group( 1 ) );
+    private void sleep( int seconds ) {
+        try {
+            Thread.sleep( seconds * 1000 );
         }
-        else {
-            LOGGER.info( "Unable to find session id from " + url );
-            //throw new MissingUserDataException( "Unable to find session id from " + url );
+        catch ( InterruptedException e ) {
+            // nothing to do
         }
     }
 }
