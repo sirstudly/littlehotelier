@@ -29,7 +29,7 @@ public class PrepaidChargeJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            paymentProcessor.processCardPaymentForRemainingBalance( webClient, String.valueOf( getReservationId() ) );
+            paymentProcessor.processPrepaidBooking( webClient, String.valueOf( getReservationId() ) );
         }
     }
 

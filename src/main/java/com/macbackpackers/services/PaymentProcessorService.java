@@ -827,13 +827,13 @@ public class PaymentProcessorService {
     }
 
     /**
-     * Does a AUTHORIZE/CAPTURE on the card details on the booking for the balance remaining.
+     * Does a AUTHORIZE/CAPTURE on the card details on the prepaid booking.
      * 
      * @param webClient web client for cloudbeds
      * @param reservationId the unique cloudbeds reservation ID
      * @throws Exception
      */
-    public synchronized void processCardPaymentForRemainingBalance( WebClient webClient, String reservationId ) throws Exception {
+    public synchronized void processPrepaidBooking( WebClient webClient, String reservationId ) throws Exception {
         LOGGER.info( "Processing full payment for booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
@@ -865,6 +865,10 @@ public class PaymentProcessorService {
         // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
         // if we have BDC login details, try to get the VCC balance to charge
         if ( wordpressDAO.getOption( "hbo_bdc_username" ) != null ) {
+            if ( cbReservation.containsNote( "VCC has been charged for the full amount" ) ) {
+                LOGGER.info( "I think this has already been charged... Nothing to do." );
+                return;
+            }
             LOGGER.info( "Looks like a prepaid card... Looking up actual value to charge on BDC" );
             WebDriver driver = driverFactory.borrowObject();
             try {
