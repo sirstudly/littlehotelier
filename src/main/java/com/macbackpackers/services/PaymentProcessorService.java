@@ -852,41 +852,40 @@ public class PaymentProcessorService {
             return;
         }
 
-        // check if card details exist in CB
         if ( false == cbReservation.isCardDetailsPresent() ) {
             throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
         }
+        if ( false == "Booking.com".equals( cbReservation.getSourceName() ) ) {
+            throw new MissingUserDataException( "Unsupported source " + cbReservation.getSourceName() );
+        }
+        if ( false == cbReservation.isPrepaid() ) {
+            throw new MissingUserDataException( "Booking not identified as a prepaid booking" );
+        }
 
         // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
-        try {
-            cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                    cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
-        }
-        catch ( PaymentNotAuthorizedException ex ) {
+        // if we have BDC login details, try to get the VCC balance to charge
+        if ( wordpressDAO.getOption( "hbo_bdc_username" ) != null ) {
+            LOGGER.info( "Looks like a prepaid card... Looking up actual value to charge on BDC" );
+            WebDriver driver = driverFactory.borrowObject();
+            try {
+                WebDriverWait wait = new WebDriverWait( driver, 60 );
+                BigDecimal amountToCharge = bdcScraper.getVirtualCardBalance( driver, wait, cbReservation.getThirdPartyIdentifier() );
+                LOGGER.info( "Attempting to charge " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + " instead." );
+                cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
+                        cbReservation.getCreditCardId(), amountToCharge );
 
-            // failed to charge a prepaid card... probably a change to the reservation
-            // try to lookup the correct amount on BDC
-            if ( "Booking.com".equals( cbReservation.getSourceName() ) && cbReservation.isPrepaid() 
-                    && wordpressDAO.getOption( "hbo_bdc_username" ) != null ) {
-                LOGGER.info( "Looks like a prepaid card... Looking up actual value to charge on BDC" );
-                WebDriver driver = driverFactory.borrowObject();
-                try {
-                    WebDriverWait wait = new WebDriverWait( driver, 60 );
-                    BigDecimal amountToCharge = bdcScraper.getVirtualCardBalance( driver, wait, cbReservation.getThirdPartyIdentifier() );
-                    LOGGER.info( "Attempting to charge " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + " instead." );
-                    cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                            cbReservation.getCreditCardId(), amountToCharge );
-                    cloudbedsScraper.addNote( webClient, reservationId, 
+                if ( false == cbReservation.getBalanceDue().equals( amountToCharge ) ) {
+                    cloudbedsScraper.addNote( webClient, reservationId,
                             "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so the remaining balance should be PAID BY THE GUEST ON ARRIVAL." );
                 }
-                finally {
-                    driverFactory.returnObject( driver );
-                }
             }
-            else {
-                // can't do anything else; rethrow
-                throw ex;
+            finally {
+                driverFactory.returnObject( driver );
             }
+        }
+        else {
+            cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
+                    cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
         }
     }
 
