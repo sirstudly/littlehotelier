@@ -224,7 +224,7 @@ public class BookingComScraper {
     public BigDecimal getVirtualCardBalance( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException, NoSuchElementException {
         lookupReservation( driver, wait, reservationId );
         WebElement totalAmount = driver.findElement( By.xpath( "//p[@class='reservation_bvc--balance']" ) );
-        Pattern p = Pattern.compile( "Virtual card balance: £(\\d+\\.\\d*)" );
+        Pattern p = Pattern.compile( "Virtual card balance: £(\\d+\\.?\\d*)" );
         Matcher m = p.matcher( totalAmount.getText() );
         if ( m.find() == false ) {
             throw new NoSuchElementException( "Couldn't find virtual card balance from '" + totalAmount.getText() );
@@ -266,7 +266,8 @@ public class BookingComScraper {
         Select amountTypeSelect = new Select( driver.findElement( By.name( "amount_type" ) ) );
         amountTypeSelect.selectByValue( "first" );
 
-        driver.findElement( By.xpath( "//button/span[text()='Confirm']/.." ) ).click();
+        WebElement confirmBtn = driver.findElement( By.xpath( "//button/span[contains(text(), 'Confirm')]" ) );
+        confirmBtn.click();
         LOGGER.info( "Card marked as invalid." );
     }
 

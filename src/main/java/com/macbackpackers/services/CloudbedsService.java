@@ -833,6 +833,9 @@ public class CloudbedsService {
             if ( false == "Booking.com".equals( r.getSourceName() ) ) {
                 throw new UnrecoverableFault( "Unsupported booking source " + r.getSourceName() );
             }
+            if ( r.getBalanceDue().compareTo( BigDecimal.ZERO ) <= 0 ) {
+                throw new IllegalStateException( "Outstanding balance must be greater than 0. Nothing to do." );
+            }
             bdcScraper.markCreditCardAsInvalid( driver, wait, r.getThirdPartyIdentifier(), r.getCreditCardLast4Digits() );
 
             // if we got this far, then we've updated BDC. leave a note as well...

@@ -18,7 +18,6 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.SagepayTransaction;
-import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -96,4 +95,8 @@ public class CloudbedsServiceTest {
         cloudbedsService.sendHostelworldLateCancellationEmail( webClient, "10568885", BigDecimal.ONE );
     }
     
+    @Test
+    public void testMarkCreditCardInvalidOnBDC() throws Exception {
+        cloudbedsService.markCreditCardInvalidOnBDC( "25201392" );
+    }
 }

@@ -617,7 +617,7 @@ public class CloudbedsScraper {
         }
 
         // CAPTURE
-        LOGGER.info( "Begin CAPTURE for reservation " + reservationId  + " for " + amount );
+        LOGGER.info( "Begin CAPTURE for reservation " + reservationId  + " for " + getCurrencyFormat().format( amount ) );
         requestSettings = jsonRequestFactory.createCaptureCreditCardRequest(
                 reservationId, cardId, amount );
 
