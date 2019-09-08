@@ -99,4 +99,9 @@ public class CloudbedsServiceTest {
     public void testMarkCreditCardInvalidOnBDC() throws Exception {
         cloudbedsService.markCreditCardInvalidOnBDC( "25201392" );
     }
+
+    @Test
+    public void testLoginAndSaveSession() throws Exception {
+        cloudbedsService.loginAndSaveSession( webClient );
+    }
 }

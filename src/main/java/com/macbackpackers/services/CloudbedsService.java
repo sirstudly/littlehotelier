@@ -1,7 +1,11 @@
 package com.macbackpackers.services;
 
+import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
+
+import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -17,19 +21,27 @@ import java.util.stream.StreamSupport;
 
 import javax.mail.MessagingException;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
@@ -55,6 +67,10 @@ import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 public class CloudbedsService {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+
+    @Autowired
+    @Qualifier( "gsonForCloudbeds" )
+    private Gson gson;
 
     @Autowired
     private WordPressDAO dao;
@@ -846,6 +862,120 @@ public class CloudbedsService {
         }
         finally {
             driverFactory.returnObject( driver );
+        }
+    }
+
+    /**
+     * Logs into Cloudbeds providing the necessary credentials and saves
+     * the current session parameters so this app can do it's thaang.
+     * 
+     * @param webClient web client for 2captcha requests
+     * @throws Exception 
+     */
+    public void loginAndSaveSession( WebClient webClient ) throws Exception {
+        final int MAX_WAIT_SECONDS = 60;
+        WebDriver driver = driverFactory.borrowObject();
+        try {
+            WebDriverWait wait = new WebDriverWait( driver, MAX_WAIT_SECONDS );
+            doLogin( webClient, driver, wait,
+                    dao.getOption( "hbo_cloudbeds_username" ),
+                    dao.getOption( "hbo_cloudbeds_password" ) );
+        }
+        finally {
+            driverFactory.returnObject( driver );
+        }
+    }
+
+    /**
+     * Logs into Cloudbeds with the necessary credentials.
+     * 
+     * @param webClient used for sending 2captcha requests
+     * @param driver web client to use
+     * @param wait
+     * @param username user credentials
+     * @param password user credentials
+     * @throws IOException 
+     * @throws URISyntaxException 
+     */
+    public synchronized void doLogin( WebClient webClient, WebDriver driver, WebDriverWait wait, String username, String password ) throws IOException, URISyntaxException {
+
+        if ( username == null || password == null ) {
+            throw new MissingUserDataException( "Missing username/password" );
+        }
+
+        // we need to navigate first before loading the cookies for that domain
+        driver.get( "https://hotels.cloudbeds.com/auth/login" );
+
+        WebElement usernameField = driver.findElement( By.id( "email" ) );
+        usernameField.sendKeys( username );
+
+        WebElement passwordField = driver.findElement( By.id( "password" ) );
+        passwordField.sendKeys( password );
+
+        JavascriptExecutor jse = (JavascriptExecutor) driver;
+        String token = captchaService.solveRecaptchaV2( webClient, driver.getCurrentUrl(), driver.getPageSource() );
+        jse.executeScript( String.format( "var input = $('[name=visible_captcha]'); input.val('%s'); $('#login_form button').removeClass('disabled');", token ) );
+
+        WebElement loginButton = driver.findElement( By.xpath( "//button[@type='submit']" ) );
+        loginButton.click();
+        wait.until( stalenessOf( loginButton ) );
+
+        if ( driver.getCurrentUrl().startsWith( "https://hotels.cloudbeds.com/auth/awaiting_user_verification" ) ) {
+            WebElement scaCode = driver.findElement( By.name( "token" ) );
+            scaCode.sendKeys( fetch2FACode() );
+            loginButton = driver.findElement( By.xpath( "//button[contains(text(),'Submit')]" ) );
+            loginButton.click();
+            wait.until( stalenessOf( loginButton ) );
+        }
+
+        if ( false == driver.getCurrentUrl().startsWith( "https://hotels.cloudbeds.com/connect" ) ) {
+            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
+            FileUtils.copyFile( scrFile, new File( "logs/cloudbeds_login_failed.png" ) );
+            throw new UnrecoverableFault( "2FA verification failed" );
+        }
+
+        // if we're actually logged in, we should get the hostel name identified here...
+        LOGGER.info( "Logged in title? is: " + driver.getTitle() );
+
+        // save credentials to disk so we don't need to do this again
+        dao.setOption( "hbo_cloudbeds_cookies",
+                driver.manage().getCookies().stream()
+                        .map( c -> c.getName() + "=" + c.getValue() )
+                        .collect( Collectors.joining( ";" ) ) );
+        dao.setOption( "hbo_cloudbeds_useragent",
+                jse.executeScript( "return navigator.userAgent;" ).toString() );
+    }
+
+    /**
+     * First _blanks out_ the 2FA code from the DB and waits for it to be re-populated. This is done
+     * outside this application.
+     * 
+     * @return non-null 2FA code
+     * @throws MissingUserDataException on timeout (1 + 10 minutes)
+     */
+    private String fetch2FACode() throws MissingUserDataException {
+        // now blank out the code and wait for it to appear
+        LOGGER.info( "waiting for hbo_cloudbeds_2facode to be set..." );
+        dao.setOption( "hbo_cloudbeds_2facode", "" );
+        sleep( 60 );
+        // force timeout after 10 minutes (60x10 seconds)
+        for ( int i = 0 ; i < 60 ; i++ ) {
+            String scaCode = dao.getOption( "hbo_cloudbeds_2facode" );
+            if ( StringUtils.isNotBlank( scaCode ) ) {
+                return scaCode;
+            }
+            LOGGER.info( "waiting for another 10 seconds..." );
+            sleep( 10 );
+        }
+        throw new MissingUserDataException( "2FA code timeout waiting for Cloudbeds verification." );
+    }
+
+    private void sleep( int seconds ) {
+        try {
+            Thread.sleep( seconds * 1000 );
+        }
+        catch ( InterruptedException e ) {
+            // nothing to do
         }
     }
 }
