@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
@@ -66,7 +67,8 @@ public class BookingComScraper {
             throw new MissingUserDataException( "Missing BDC username/password" );
         }
 
-        String lasturl = wordPressDAO.getOption( "hbo_bdc_lasturl" );
+        // don't use session-tracked URL if running locally (ie. for debugging)
+        String lasturl = SystemUtils.IS_OS_WINDOWS ? null : wordPressDAO.getOption( "hbo_bdc_lasturl" );
         driver.get( lasturl == null ? "https://admin.booking.com/hotel/hoteladmin/general/dashboard.html?lang=en&hotel_id=" + username : lasturl );
         LOGGER.info( "Loading Booking.com website: " + driver.getCurrentUrl() );
 
@@ -88,9 +90,12 @@ public class BookingComScraper {
             nextButton.click();
             wait.until( stalenessOf( nextButton ) );
 
-            // if this is the first time we're doing this, we'll need to go thru 2FA
-            if ( driver.findElements( By.xpath( "//h1[text()='Verification method']" ) ).size() > 0 ) {
+            if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
+                throw new MissingUserDataException( "Failed to login to BDC" );
+            }
+            else if ( false == driver.getCurrentUrl().startsWith( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/home.html" ) ) {
 
+                // if this is the first time we're doing this, we'll need to go thru 2FA
                 LOGGER.info( "BDC verification required" );
                 List<WebElement> phoneLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-call-verification-link')]" ) );
                 List<WebElement> smsLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-sms-verification-link')]" ) );
@@ -151,9 +156,11 @@ public class BookingComScraper {
             throw new MissingUserDataException( "Are we logged in? Unexpected URL." );
         }
 
-        LOGGER.info( "Logged into Booking.com. Saving current URL." );
-        LOGGER.info( "Loaded " + driver.getCurrentUrl() );
-        wordPressDAO.setOption( "hbo_bdc_lasturl", driver.getCurrentUrl() );
+        if ( false == SystemUtils.IS_OS_WINDOWS ) {
+            LOGGER.info( "Logged into Booking.com. Saving current URL." );
+            LOGGER.info( "Loaded " + driver.getCurrentUrl() );
+            wordPressDAO.setOption( "hbo_bdc_lasturl", driver.getCurrentUrl() );
+        }
     }
 
     /**
@@ -207,6 +214,12 @@ public class BookingComScraper {
         if ( false == driver.getTitle().contains( "Reservation Details" ) ) {
             File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
             FileUtils.copyFile( scrFile, new File( "logs/bdc_reservation_" + reservationId + ".png" ) );
+            throw new IOException( "Unable to load reservation details" );
+        }
+
+        WebElement bookingNumberField = driver.findElement( By.xpath( "//input[@type='hidden' and @name='res_id']" ) );
+        if ( false == reservationId.equals( bookingNumberField.getAttribute( "value" ) ) ) {
+            LOGGER.error( "Reservation ID mismatch?!: Expected " + reservationId + " but found " + bookingNumberField.getAttribute( "value" ) );
             throw new IOException( "Unable to load reservation details" );
         }
     }
