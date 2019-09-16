@@ -270,13 +270,6 @@ public class PaymentProcessorService {
         if ( false == cbReservation.isCardDetailsPresent() ) {
             throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
         }
-        else if( cbReservation.isAmexCard() ) {
-            final String AMEX_NOTE = "Card is AMEX. Charge manually using POS terminal.";
-            if ( false == cbReservation.containsNote( AMEX_NOTE ) ) {
-                cloudbedsScraper.addNote( webClient, reservationId, AMEX_NOTE );
-            }
-            return;
-        }
 
         // either take first night, or a percentage amount
         BigDecimal depositAmount;
@@ -731,14 +724,6 @@ public class PaymentProcessorService {
             LOGGER.info( "Reservation " + reservationId + " has " + cbReservation.getNumberOfGuests() + " guests. Payment must be done manually for groups." );
             return;
         }
-        else if( cbReservation.isAmexCard() ) {
-            final String AMEX_NOTE = "Card is AMEX. Charge manually using POS terminal.";
-            LOGGER.info( AMEX_NOTE );
-            if( false == cbReservation.containsNote( AMEX_NOTE ) ) {
-                cloudbedsScraper.addNote( webClient, reservationId, AMEX_NOTE );
-            }
-            return;
-        }
 
         // check if card details exist in CB; copy over if req'd
         if ( false == cbReservation.isCardDetailsPresent() ) {
@@ -900,10 +885,8 @@ public class PaymentProcessorService {
      * @param reservationId the unique cloudbeds reservation ID
      * @param amount amount to charge
      * @throws IOException on i/o error
-     * @throws ParseException on bonehead error
-     * @throws MessagingException on failed email (amex card only)
      */
-    public synchronized void processHostelworldLateCancellationCharge( WebClient webClient, String reservationId ) throws IOException, ParseException, MessagingException {
+    public synchronized void processHostelworldLateCancellationCharge( WebClient webClient, String reservationId ) throws IOException {
         LOGGER.info( "Processing payment for 1st night of booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
@@ -928,14 +911,6 @@ public class PaymentProcessorService {
         // check if card details exist in CB
         if ( false == cbReservation.isCardDetailsPresent() ) {
             throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
-        }
-        else if( cbReservation.isAmexCard() ) {
-            cloudbedsScraper.addNote( webClient, reservationId, "Attempt to charge late-cancellation but card is AMEX. Charge manually using POS terminal." );
-            gmailService.sendEmailToSelf( "Late Cancellation HWL-" + cbReservation.getThirdPartyIdentifier() + ": "
-                    + cbReservation.getFirstName() + " " + cbReservation.getLastName(),
-                    IOUtils.resourceToString( "/hwl_late_cxl_amex_email_template.html", StandardCharsets.UTF_8 )
-                            .replaceAll( "__RESERVATION_ID__", cbReservation.getIdentifier() ) );
-            return;
         }
 
         // should have credit card details at this point; attempt AUTHORIZE/CAPTURE

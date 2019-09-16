@@ -360,10 +360,6 @@ public class Reservation extends CloudbedsJsonResponse {
         return creditCardType;
     }
 
-    public boolean isAmexCard() {
-        return "amex".equals( getCreditCardType() );
-    }
-
     public void setCreditCardType( String creditCardType ) {
         this.creditCardType = creditCardType;
     }
