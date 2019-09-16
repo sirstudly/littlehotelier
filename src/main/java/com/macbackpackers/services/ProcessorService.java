@@ -230,8 +230,8 @@ public class ProcessorService {
             LOGGER.info( "GZipped file completed with exit code(" + exitVal + ")" );
 
             pb = new ProcessBuilder( "scp", localLogDirectory + "/job-" + jobId + ".gz", destinationLogLocation );
-            pb.redirectOutput( new File( localLogDirectory + "/job-" + jobId + ".log" ) );
-            pb.redirectError( new File( localLogDirectory + "/job-" + jobId + ".log" ) );
+            pb.redirectOutput( new File( localLogDirectory + "/job-" + jobId + ".scp.out" ) );
+            pb.redirectError( new File( localLogDirectory + "/job-" + jobId + ".scp.err" ) );
             LOGGER.info( "Copying log file" );
             p = pb.start();
             exitVal = p.waitFor();
