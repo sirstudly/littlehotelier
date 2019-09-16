@@ -78,6 +78,6 @@ public class SendSagepayPaymentConfirmationEmailJob extends AbstractJob {
 
     @Override
     public int getRetryCount() {
-        return 1; // don't attempt to email more than once
+        return 2; // limit failed email attempts
     }
 }
