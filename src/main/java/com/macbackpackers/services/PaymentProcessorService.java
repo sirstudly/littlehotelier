@@ -323,7 +323,7 @@ public class PaymentProcessorService {
 
                 // CRH only until I can authenticate BDC for HSH/RMB
                 if ( "Booking.com".equals( cbReservation.getSourceName() ) &&
-                        wordpressDAO.getOption( "siteurl" ).contains( "castlerock" ) ) {
+                        wordpressDAO.getOption( "hbo_bdc_username" ) != null ) {
                     BDCMarkCreditCardInvalidJob j = new BDCMarkCreditCardInvalidJob();
                     j.setStatus( JobStatus.submitted );
                     j.setReservationId( reservationId );

@@ -90,11 +90,7 @@ public class BookingComScraper {
             nextButton.click();
             wait.until( stalenessOf( nextButton ) );
 
-            if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
-                throw new MissingUserDataException( "Failed to login to BDC" );
-            }
-            else if ( false == driver.getCurrentUrl().startsWith( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/home.html" ) ) {
-
+            if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in/verification" ) ) {
                 // if this is the first time we're doing this, we'll need to go thru 2FA
                 LOGGER.info( "BDC verification required" );
                 List<WebElement> phoneLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-call-verification-link')]" ) );
@@ -147,6 +143,7 @@ public class BookingComScraper {
         }
 
         // if we're actually logged in, we should get the hostel name identified here...
+        LOGGER.info( "Current URL: " + driver.getCurrentUrl() );
         LOGGER.info( "Property name identified as: " + driver.getTitle() );
 
         // verify we are logged in
