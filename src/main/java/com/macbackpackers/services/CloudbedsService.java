@@ -852,6 +852,10 @@ public class CloudbedsService {
             if ( r.getBalanceDue().compareTo( BigDecimal.ZERO ) <= 0 ) {
                 throw new IllegalStateException( "Outstanding balance must be greater than 0. Nothing to do." );
             }
+            if ( r.containsNote( "Marking card ending in " + r.getCreditCardLast4Digits() + " as invalid for reservation" ) ) {
+                LOGGER.info( "Looks like we've already done this." );
+                return;
+            }
             bdcScraper.markCreditCardAsInvalid( driver, wait, r.getThirdPartyIdentifier(), r.getCreditCardLast4Digits() );
 
             // if we got this far, then we've updated BDC. leave a note as well...

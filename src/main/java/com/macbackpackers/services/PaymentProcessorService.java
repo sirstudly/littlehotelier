@@ -321,8 +321,8 @@ public class PaymentProcessorService {
                 job.setStatus( JobStatus.submitted );
                 wordpressDAO.insertJob( job );
 
-                // CRH only until I can authenticate BDC for HSH/RMB
                 if ( "Booking.com".equals( cbReservation.getSourceName() ) &&
+                        false == cbReservation.containsNote( "Marking card ending in " + cbReservation.getCreditCardLast4Digits() + " as invalid for reservation" ) &&
                         wordpressDAO.getOption( "hbo_bdc_username" ) != null ) {
                     BDCMarkCreditCardInvalidJob j = new BDCMarkCreditCardInvalidJob();
                     j.setStatus( JobStatus.submitted );

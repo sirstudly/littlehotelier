@@ -106,7 +106,7 @@ public class Reservation extends CloudbedsJsonResponse {
     }
 
     public BigDecimal getGrandTotal() {
-        return grandTotal;
+        return grandTotal == null ? null : grandTotal.setScale( 2, RoundingMode.HALF_UP );
     }
 
     public void setGrandTotal( BigDecimal grandTotal ) {
@@ -122,7 +122,7 @@ public class Reservation extends CloudbedsJsonResponse {
     }
 
     public BigDecimal getBalanceDue() {
-        return balanceDue;
+        return balanceDue == null ? null : balanceDue.setScale( 2, RoundingMode.HALF_UP );
     }
 
     public void setBalanceDue( BigDecimal balanceDue ) {
