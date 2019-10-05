@@ -6,6 +6,7 @@ import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.text.ParseException;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.regex.Matcher;
@@ -27,8 +28,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.services.BasicCardMask;
 
 @Component
 public class BookingComScraper {
@@ -279,6 +282,87 @@ public class BookingComScraper {
         WebElement confirmBtn = driver.findElement( By.xpath( "//button/span[contains(text(), 'Confirm')]" ) );
         confirmBtn.click();
         LOGGER.info( "Card marked as invalid." );
+    }
+
+    /**
+     * Retrieves the card details for the given booking.
+     * 
+     * @param driver
+     * @param wait
+     * @param bdcReservation BDC reservation
+     * @return credit card details
+     * @throws IOException
+     * @throws ParseException on parse error during retrieval
+     * @throws MissingUserDataException if card details are missing
+     */
+    public CardDetails returnCardDetailsForBooking( WebDriver driver, WebDriverWait wait, String bdcReservation ) throws IOException, ParseException {
+        lookupReservation( driver, wait, bdcReservation );
+
+        List<WebElement> headerViewCCDetails = driver.findElements( By.id( "js-view-cc-details-button" ) );
+        if ( headerViewCCDetails.isEmpty() ) {
+            throw new MissingUserDataException( "No card details link not available." );
+        }
+        driver.findElement( By.id( "js-view-cc-details-button" ) ).click();
+        final By SIGN_IN_LOCATOR = By.xpath( "//a[normalize-space(text())='Sign in to view credit card details']" );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( SIGN_IN_LOCATOR ) );
+
+        // the following should open a new window; focus should move to the new window automatically
+        LOGGER.info( "Logging in again to view CC details..." );
+        final String CURRENT_WINDOW = driver.getWindowHandle();
+        driver.findElement( SIGN_IN_LOCATOR ).click();
+        wait.until( ExpectedConditions.numberOfWindowsToBe( 2 ) );
+
+        // switch to other window
+        driver.getWindowHandles().stream()
+            .filter( w -> false == CURRENT_WINDOW.equals( w ) )
+            .findFirst()
+            .map( w -> driver.switchTo().window( w ) )
+            .orElseThrow( () -> new IOException("Unable to find new login window.") );
+        
+        // login again
+        WebElement usernameField = driver.findElement( By.id( "loginname" ) );
+        usernameField.sendKeys( wordPressDAO.getOption( "hbo_bdc_username" ) );
+
+        WebElement nextButton = driver.findElement( By.xpath( "//span[text()='Next']/.." ) );
+        nextButton.click();
+
+        // wait until password field is visible
+        wait.until( ExpectedConditions.visibilityOfElementLocated( By.id( "password" ) ) );
+        WebElement passwordField = driver.findElement( By.id( "password" ) );
+        passwordField.sendKeys( wordPressDAO.getOption( "hbo_bdc_password" ) );
+
+        nextButton = driver.findElement( By.xpath( "//span[text()='Sign in']/.." ) );
+        nextButton.click();
+        wait.until( stalenessOf( nextButton ) );
+
+        wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( "//th[normalize-space(text())='Credit Card Details']" ) ) );
+        CardDetails cardDetails = new CardDetails();
+        cardDetails.setName( driver.findElement( By.xpath( "//td[text()=\"Card holder's name:\"]/following-sibling::td" ) ).getText().trim() );
+        cardDetails.setCardNumber( driver.findElement( By.xpath( "//td[text()='Card number:']/following-sibling::td" ) ).getText().trim() );
+        cardDetails.setCardType( driver.findElement( By.xpath( "//td[text()='Card type:']/following-sibling::td" ) ).getText().trim() );
+        cardDetails.setExpiry( parseExpiryDate( driver.findElement( By.xpath( "//td[text()='Expiration Date:']/following-sibling::td" ) ).getText().trim() ) );
+        cardDetails.setCvv( StringUtils.trimToNull( driver.findElement( By.xpath( "//td[text()='CVC Code:']/following-sibling::td" ) ).getText() ) );
+        LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( cardDetails.getCardNumber() ) + " for " + cardDetails.getName() );
+
+        // we're done here
+        driver.findElement( By.xpath( "//button[text()='Close']" ) ).click();
+        return cardDetails;
+    }
+
+    /**
+     * Converts "MM / YYYY" to MMYY
+     *
+     * @param bdcExpiryFormat non-null expiry date
+     * @return 4 digit expiry of format MMYY
+     * @throws ParseException on parse failure
+     */
+    private static String parseExpiryDate( String bdcExpiryFormat ) throws ParseException {
+        Pattern p = Pattern.compile( "(\\d{2})\\s*/\\s*\\d{2}(\\d{2})" );
+        Matcher m = p.matcher( bdcExpiryFormat );
+        if ( false == m.find() ) {
+            throw new ParseException( "Unable to get card expiry date", 0 );
+        }
+        return m.group( 1 ) + m.group( 2 );
     }
 
     private void sleep( int seconds ) {

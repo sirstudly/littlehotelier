@@ -60,4 +60,9 @@ public class BookingComScraperTest {
     public void testGetVirtualCardBalance() throws Exception {
         scraper.getVirtualCardBalance( driver, wait, "3804638594" );
     }
+
+    @Test
+    public void testReturnCardDetailsForBooking() throws Exception {
+        scraper.returnCardDetailsForBooking( driver, wait, "3218755671" );
+    }
 }

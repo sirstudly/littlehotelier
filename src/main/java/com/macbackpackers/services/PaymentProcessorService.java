@@ -640,15 +640,15 @@ public class PaymentProcessorService {
     }
 
     /**
-     * Copies the card details (for HWL/AGO/EXP) to CB if it doesn't already exist.
+     * Copies the card details (for HWL/BDC/EXP) to CB if it doesn't already exist.
      * 
      * @param webClient web client for cloudbeds
      * @param reservationId the unique cloudbeds reservation ID
-     * @throws IOException on i/o error
-     * @throws ParseException on bonehead error
      * @return the loaded reservation
+     * @throws Exception on failure
+     * @deprecated this won't work anymore - the save credit card request is now tokenized in CB; probably easier to do this in Chrome now
      */
-    public Reservation copyCardDetailsToCloudbeds( WebClient webClient, String reservationId ) throws IOException, ParseException {
+    public Reservation copyCardDetailsToCloudbeds( WebClient webClient, String reservationId ) throws Exception {
         LOGGER.info( "Processing reservation " + reservationId );
 
         // check if card details exist in CB
@@ -668,6 +668,17 @@ public class PaymentProcessorService {
             LOGGER.info( "Retrieving EXP customer card details" );
             ccDetails = expediaService.returnCardDetailsForBooking(
                     cbReservation.getThirdPartyIdentifier() ).getCardDetails();
+        }
+        else if ( "Booking.com".equals( cbReservation.getSourceName() ) ) {
+            LOGGER.info( "Retrieving BDC customer card details for BDC#" + cbReservation.getThirdPartyIdentifier() );
+            WebDriver driver = driverFactory.borrowObject();
+            try {
+                WebDriverWait wait = new WebDriverWait( driver, 60 );
+                ccDetails = bdcScraper.returnCardDetailsForBooking( driver, wait, cbReservation.getThirdPartyIdentifier() );
+            }
+            finally {
+                driverFactory.returnObject( driver );
+            }
         }
 //        else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
 //            LOGGER.info( "Retrieving AGO customer card details" );
@@ -694,11 +705,9 @@ public class PaymentProcessorService {
      * 
      * @param webClient web client for cloudbeds
      * @param reservationId the unique cloudbeds reservation ID
-     * @throws IOException on i/o error
-     * @throws ParseException on bonehead error
-     * @throws MessagingException 
+     * @throws Exception on any kind of error
      */
-    public void chargeNonRefundableBooking( WebClient webClient, String reservationId ) throws IOException, ParseException, MessagingException {
+    public void chargeNonRefundableBooking( WebClient webClient, String reservationId ) throws Exception {
         LOGGER.info( "Processing charge of non-refundable booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
@@ -727,8 +736,14 @@ public class PaymentProcessorService {
 
         // check if card details exist in CB; copy over if req'd
         if ( false == cbReservation.isCardDetailsPresent() ) {
-            LOGGER.info( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Attempting to copy if available." );
-            copyCardDetailsToCloudbeds( webClient, reservationId );
+            final String NOTE = "Missing card details found for reservation " + cbReservation.getReservationId();
+            
+            if( false == cbReservation.containsNote( NOTE ) ) {
+                cloudbedsScraper.addNote( webClient, reservationId, NOTE );
+            }
+            
+            // for the time being, just throw an exception... will fix if it's a common occurrence
+//            copyCardDetailsToCloudbeds( webClient, reservationId ); NO LONGER SUPPORTED
 
             // requery; if still not available, something has gone wrong somewhere
             cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
