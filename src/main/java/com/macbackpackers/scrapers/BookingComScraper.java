@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,6 +16,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.openqa.selenium.By;
+import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
@@ -214,13 +215,23 @@ public class BookingComScraper {
         if ( false == driver.getTitle().contains( "Reservation Details" ) ) {
             File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
             FileUtils.copyFile( scrFile, new File( "logs/bdc_reservation_" + reservationId + ".png" ) );
-            throw new IOException( "Unable to load reservation details" );
+            throw new IOException( "Unable to load reservation details. Are we on the wrong page?" );
         }
 
-        WebElement bookingNumberField = driver.findElement( By.xpath( "//input[@type='hidden' and @name='res_id']" ) );
-        if ( false == reservationId.equals( bookingNumberField.getAttribute( "value" ) ) ) {
-            LOGGER.error( "Reservation ID mismatch?!: Expected " + reservationId + " but found " + bookingNumberField.getAttribute( "value" ) );
-            throw new IOException( "Unable to load reservation details" );
+        // multiple places where the booking reference can appear; it should be in one of these
+        LOGGER.info( "Looking up reservation ID by hidden field." );
+        By bookingNumberPath = By.xpath( "//input[@type='hidden' and @name='res_id'] "
+                + "| //p/span[text()='Booking number:']/../following-sibling::p "
+                + "| //div[not(contains(@class, 'hidden-print'))]/span[normalize-space(text())='Booking number:']/following-sibling::span" );
+        WebElement bookingNumberField = driver.findElement( bookingNumberPath );
+        String resIdFromPage = "input".equals( bookingNumberField.getTagName() ) ? bookingNumberField.getAttribute( "value" ) : bookingNumberField.getText();
+
+        if ( false == reservationId.equals( resIdFromPage ) ) {
+            LOGGER.error( "Reservation ID mismatch?!: Expected " + reservationId + " but found " + resIdFromPage );
+            LOGGER.info( driver.getPageSource() );
+            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
+            FileUtils.copyFile( scrFile, new File( "logs/bdc_reservation_" + reservationId + ".png" ) );
+            throw new IOException( "Unable to load reservation details. Reservation ID mismatch!" );
         }
     }
 
@@ -236,14 +247,59 @@ public class BookingComScraper {
      */
     public BigDecimal getVirtualCardBalance( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException, NoSuchElementException {
         lookupReservation( driver, wait, reservationId );
-        WebElement totalAmount = driver.findElement( By.xpath( "//p[@class='reservation_bvc--balance']" ) );
-        Pattern p = Pattern.compile( "Virtual card balance: £(\\d+\\.?\\d*)" );
-        Matcher m = p.matcher( totalAmount.getText() );
+
+        try {
+            // two different views of a booking? this one is from CRH
+            LOGGER.info( "Looking up VCC balance (attempt 1)" );
+            return fetchVccBalanceFromPage( driver,
+                    By.xpath( "//p[@class='reservation_bvc--balance']" ),
+                    Pattern.compile( "Virtual card balance: £(\\d+\\.?\\d*)" ),
+                    e -> e.getText() );
+        }
+        catch ( NoSuchElementException ex ) {
+            try { // this view is from HSH
+                LOGGER.info( "Looking up VCC balance (attempt 2)" );
+                return fetchVccBalanceFromPage( driver,
+                        By.xpath( "//div/span[normalize-space(text())='Virtual card balance:']/../following-sibling::div" ),
+                        Pattern.compile( "£(\\d+\\.?\\d*)" ),
+                        e -> getTextNode( e ) ); // remove any subelements in case of a partial charge
+            }
+            catch ( NoSuchElementException ex2 ) {
+                LOGGER.info( "Unable to find VCC amount to charge." );
+                // the next line will either a) display that we have already fully charged the VCC or
+                // b) throw an exception if we can't find anything wrt the VCC amount to charge
+                LOGGER.info( "Looks like we've already charged it! BDC message: " + driver.findElement( By.xpath( "//div[contains(@class, 'fully_charged')]" ) ).getText() );
+                return BigDecimal.ZERO;
+            }
+        }
+    }
+
+    private BigDecimal fetchVccBalanceFromPage( WebDriver driver, By path, Pattern p, Function<WebElement, String> fn ) {
+        String totalAmount = fn.apply( driver.findElement( path ) );
+
+        LOGGER.info( "Used pattern " + p.pattern() + " to match " + path );
+        Matcher m = p.matcher( totalAmount );
         if ( m.find() == false ) {
-            throw new NoSuchElementException( "Couldn't find virtual card balance from '" + totalAmount.getText() );
+            throw new NoSuchElementException( "Couldn't find virtual card balance from '" + totalAmount );
         }
         LOGGER.info( "Found VCC balance of " + m.group( 1 ) );
         return new BigDecimal( m.group( 1 ) );
+    }
+
+    /**
+     * Takes a parent element and strips out the textContent of all child elements and returns
+     * textNode content only
+     * 
+     * @param e the parent element
+     * @return the text from the child textNodes
+     */
+    private static String getTextNode( WebElement e ) {
+        String text = e.getText().trim();
+        List<WebElement> children = e.findElements( By.xpath( "./*" ) );
+        for ( WebElement child : children ) {
+            text = text.replaceFirst( child.getText(), "" ).trim();
+        }
+        return text;
     }
 
     /**

@@ -874,13 +874,15 @@ public class PaymentProcessorService {
             try {
                 WebDriverWait wait = new WebDriverWait( driver, 60 );
                 BigDecimal amountToCharge = bdcScraper.getVirtualCardBalance( driver, wait, cbReservation.getThirdPartyIdentifier() );
-                LOGGER.info( "Attempting to charge " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
-                cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                        cbReservation.getCreditCardId(), amountToCharge );
-
-                if ( 0 != cbReservation.getBalanceDue().compareTo( amountToCharge ) ) {
-                    cloudbedsScraper.addNote( webClient, reservationId,
-                            "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL." );
+                if( amountToCharge.compareTo( BigDecimal.ZERO ) > 0 ) {
+                    LOGGER.info( "Attempting to charge " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
+                    cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
+                            cbReservation.getCreditCardId(), amountToCharge );
+    
+                    if ( 0 != cbReservation.getBalanceDue().compareTo( amountToCharge ) ) {
+                        cloudbedsScraper.addNote( webClient, reservationId,
+                                "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL." );
+                    }
                 }
             }
             finally {
