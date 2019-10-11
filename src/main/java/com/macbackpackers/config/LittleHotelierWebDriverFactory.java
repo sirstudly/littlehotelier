@@ -40,8 +40,7 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
         WebDriver driver = new ChromeDriver( options );
 
         // configure wait-time when finding elements on the page
-        driver.manage().timeouts().implicitlyWait( maxWaitSeconds, TimeUnit.SECONDS );
-        driver.manage().timeouts().pageLoadTimeout( maxWaitSeconds * 2, TimeUnit.SECONDS );
+        driver.manage().timeouts().pageLoadTimeout( maxWaitSeconds, TimeUnit.SECONDS );
 
         return driver;
     }
@@ -57,6 +56,7 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
     @Override
     public void destroyObject( PooledObject<WebDriver> pooledObj ) throws Exception {
         pooledObj.getObject().close();
+        pooledObj.getObject().quit();
     }
 
 }
