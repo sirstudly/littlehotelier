@@ -31,11 +31,11 @@ public class SendSagepayPaymentConfirmationEmailJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            if ( StringUtils.isBlank( dao.get2CaptchaApiKey() ) ) {
-                cloudbedsService.sendSagepayPaymentConfirmationGmail( webClient, getReservationId(), getSagepayTxnId() );
+            if ( dao.isCloudbedsEmailEnabled() ) {
+                cloudbedsService.sendSagepayPaymentConfirmationEmail( webClient, getReservationId(), getSagepayTxnId() );
             }
             else {
-                cloudbedsService.sendSagepayPaymentConfirmationEmail( webClient, getReservationId(), getSagepayTxnId() );
+                cloudbedsService.sendSagepayPaymentConfirmationGmail( webClient, getReservationId(), getSagepayTxnId() );
             }
         }
     }

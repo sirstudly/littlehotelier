@@ -33,11 +33,11 @@ public class SendHostelworldLateCancellationEmailJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            if ( StringUtils.isBlank( dao.get2CaptchaApiKey() ) ) {
-                cloudbedsService.sendHostelworldLateCancellationGmail( webClient, getReservationId(), getAmount() );
+            if ( dao.isCloudbedsEmailEnabled() ) {
+                cloudbedsService.sendHostelworldLateCancellationEmail( webClient, getReservationId(), getAmount() );
             }
             else {
-                cloudbedsService.sendHostelworldLateCancellationEmail( webClient, getReservationId(), getAmount() );
+                cloudbedsService.sendHostelworldLateCancellationGmail( webClient, getReservationId(), getAmount() );
             }
         }
     }

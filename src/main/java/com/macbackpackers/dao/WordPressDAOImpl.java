@@ -9,6 +9,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -51,6 +52,7 @@ import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
+import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
 
 @Repository
 @Transactional
@@ -367,6 +369,31 @@ public class WordPressDAOImpl implements WordPressDAO {
             throw new EmptyResultDataAccessException( "Unable to find Job with ID " + id, 1 );
         }
         return j;
+    }
+
+    @Override
+    public Optional<ResetCloudbedsSessionJob> fetchResetCloudbedsSessionJob() {
+        List<Integer> jobs = em
+                .createQuery( "SELECT id FROM AbstractJob "
+                        + "     WHERE (status = :submittedStatus "
+                        + "        OR (status = :processingStatus AND processedBy = :processedBy))"
+                        + "       AND classname = 'com.macbackpackers.jobs.ResetCloudbedsSessionJob'"
+                        + "     ORDER by id",
+                        Integer.class )
+                .setParameter( "submittedStatus", JobStatus.submitted )
+                .setParameter( "processingStatus", JobStatus.processing )
+                // processedBy includes name of current thread
+                // if we terminated the job prematurely (and are now re-running it)
+                // this will eventually be picked up by the same thread and be run again
+                .setParameter( "processedBy", getUniqueProcessorId() )
+                .getResultList();
+
+        if( jobs.size() > 0 ) {
+            ResetCloudbedsSessionJob j = em.find( ResetCloudbedsSessionJob.class, jobs.get( 0 ) );
+            j.setStatus( JobStatus.processing );
+            return Optional.of( j );
+        }
+        return Optional.empty();
     }
 
     @SuppressWarnings( "unchecked" )
@@ -904,6 +931,12 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Transactional( readOnly = true )
     public String get2CaptchaApiKey() {
         return getOption( "hbo_2captcha_api_key" );
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public boolean isCloudbedsEmailEnabled() {
+        return "true".equalsIgnoreCase( getOption( "hbo_cloudbeds_email_enabled" ) );
     }
 
     @Override

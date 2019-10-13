@@ -33,11 +33,11 @@ public class SendNonRefundableDeclinedEmailJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            if ( StringUtils.isBlank( dao.get2CaptchaApiKey() ) ) {
-                cloudbedsService.sendNonRefundableDeclinedGmail( webClient, getReservationId(), getAmount(), getPaymentURL() );
+            if ( dao.isCloudbedsEmailEnabled() ) {
+                cloudbedsService.sendNonRefundableDeclinedEmail( webClient, getReservationId(), getAmount(), getPaymentURL() );
             }
             else {
-                cloudbedsService.sendNonRefundableDeclinedEmail( webClient, getReservationId(), getAmount(), getPaymentURL() );
+                cloudbedsService.sendNonRefundableDeclinedGmail( webClient, getReservationId(), getAmount(), getPaymentURL() );
             }
         }
     }

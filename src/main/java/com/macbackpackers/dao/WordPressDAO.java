@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import javax.persistence.NoResultException;
 
@@ -30,6 +31,7 @@ import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.jobs.AbstractJob;
+import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
 
 public interface WordPressDAO {
 
@@ -215,6 +217,13 @@ public interface WordPressDAO {
      * @throws EmptyResultDataAccessException if job not found
      */
     public AbstractJob fetchJobById( int id ) throws EmptyResultDataAccessException;
+
+    /**
+     * Finds any outstanding {@link ResetCloudbedsSessionJob}s and returns the first one.
+     * 
+     * @return first ResetCloudbedsSessionJob if any
+     */
+    public Optional<ResetCloudbedsSessionJob> fetchResetCloudbedsSessionJob();
 
     /**
      * Returns a list of active jobs to schedule with the scheduler.
@@ -454,6 +463,13 @@ public interface WordPressDAO {
      * @return API key (null if not found)
      */
     public String get2CaptchaApiKey();
+
+    /**
+     * Returns true iff to send emails via Cloudbeds (rather than Gmail).
+     * 
+     * @return true to send email in cloudbeds, false otherwise.
+     */
+    public boolean isCloudbedsEmailEnabled();
 
     /**
      * Sets the wordpress option for the given property.

@@ -238,4 +238,16 @@ public class ProcessorService {
             LOGGER.info( "Log file copy completed with exit code(" + exitVal + ")" );
         }
     }
+
+    /**
+     * Runs any ResetCloudbedsSessionJobs if found.
+     */
+    public void processCloudbedsResetLoginJobs() {
+        dao.fetchResetCloudbedsSessionJob()
+                .ifPresent( j -> {
+                    LOGGER.info( "Found ResetCloudbedsSessionJob, running..." );
+                    autowireBeanFactory.autowireBean( j );
+                    processJob( j );
+                } );
+    }
 }

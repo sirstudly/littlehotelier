@@ -33,11 +33,11 @@ public class SendDepositChargeSuccessfulEmailJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            if ( StringUtils.isBlank( dao.get2CaptchaApiKey() ) ) {
-                cloudbedsService.sendDepositChargeSuccessfulGmail( webClient, getReservationId(), getAmount() );
+            if ( dao.isCloudbedsEmailEnabled() ) {
+                cloudbedsService.sendDepositChargeSuccessfulEmail( webClient, getReservationId(), getAmount() );
             }
             else {
-                cloudbedsService.sendDepositChargeSuccessfulEmail( webClient, getReservationId(), getAmount() );
+                cloudbedsService.sendDepositChargeSuccessfulGmail( webClient, getReservationId(), getAmount() );
             }
         }
     }
