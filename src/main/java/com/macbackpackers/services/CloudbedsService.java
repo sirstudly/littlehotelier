@@ -1,6 +1,7 @@
 package com.macbackpackers.services;
 
 import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
+import static org.openqa.selenium.support.ui.ExpectedConditions.titleContains;
 
 import java.io.File;
 import java.io.IOException;
@@ -939,6 +940,7 @@ public class CloudbedsService {
         }
 
         // if we're actually logged in, we should get the hostel name identified here...
+        wait.until( titleContains( "Dashboard" ) );
         LOGGER.info( "Logged in title? is: " + driver.getTitle() );
 
         // save credentials to disk so we don't need to do this again
