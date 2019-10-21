@@ -290,6 +290,33 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Retrieves all reservations within the given checkin/stay date range.
+     * 
+     * @param stayDateStart checkin date (inclusive)
+     * @param stayDateEnd checkin date (inclusive)
+     * @param checkinDateStart checkin date (inclusive)
+     * @param checkinDateEnd checkin date (inclusive)
+     * @param statuses comma-delimited list of statuses (optional)
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createGetReservationsRequest( LocalDate stayDateStart, LocalDate stayDateEnd,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
+        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+                new NameValuePair( "status", StringUtils.isBlank(statuses) ? "all" : statuses ),
+                new NameValuePair( "date_start[0]", checkinDateStart == null ? "" : checkinDateStart.format( YYYY_MM_DD ) ),
+                new NameValuePair( "date_start[1]", checkinDateEnd == null ? "" : checkinDateEnd.format( YYYY_MM_DD ) ),
+                new NameValuePair( "date_end[0]", "" ),
+                new NameValuePair( "date_end[1]", "" ),
+                new NameValuePair( "date_stay[0]", stayDateStart == null ? "" : stayDateStart.format( YYYY_MM_DD ) ),
+                new NameValuePair( "date_stay[1]", stayDateEnd == null ? "" : stayDateEnd.format( YYYY_MM_DD ) ),
+                new NameValuePair( "booking_date[0]", "" ),
+                new NameValuePair( "booking_date[1]", "" ) ) );
+        return webRequest;
+    }
+
+    /**
      * Get all reservations matching the given booking source(s) and booked dates.
      * 
      * @param checkinDateStart checkin date (inclusive)
@@ -464,7 +491,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "customer_id", customerId ),
                 new NameValuePair( "reservation_id", reservationId ),
                 new NameValuePair( "email[design_type]", template.getDesignType() ),
-                new NameValuePair( "email[email_body]", transformBodyFn.apply( template.getEmailBody() ) ),
+                new NameValuePair( "email[email_body]", transformBodyFn == null ? template.getEmailBody() : transformBodyFn.apply( template.getEmailBody() ) ),
                 new NameValuePair( "email[email_template_id]", template.getId() ),
                 new NameValuePair( "email[email_type]", template.getEmailType() ),
                 new NameValuePair( "email[lang]", "en" ),

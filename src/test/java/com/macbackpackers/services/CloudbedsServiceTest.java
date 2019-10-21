@@ -104,4 +104,18 @@ public class CloudbedsServiceTest {
     public void testLoginAndSaveSession() throws Exception {
         cloudbedsService.loginAndSaveSession( webClient );
     }
+
+    @Test
+    public void testCreateBulkEmailJob() throws Exception {
+        cloudbedsService.createBulkEmailJob(webClient, "Hogmanay at Castle Rock!",
+                LocalDate.now().withMonth( 12 ).withDayOfMonth( 31 ), 
+                LocalDate.now().withMonth( 12 ).withDayOfMonth( 31 ),
+                null, null, "confirmed,not_confirmed" );
+    }
+
+    @Test
+    public void testSendTemplatedGmail() throws Exception {
+        cloudbedsService.sendTemplatedGmail( webClient, "10568885", "Hogmanay at Castle Rock!" );
+    }
+
 }

@@ -286,6 +286,24 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Get all reservations within the given date ranges.
+     * 
+     * @param webClient web client instance to use
+     * @param stayDateStart stay date (inclusive)
+     * @param stayDateEnd stay date (inclusive)
+     * @param checkinDateStart checkin date (inclusive)
+     * @param checkinDateEnd checkin date (inclusive)
+     * @param statuses comma-delimited list of statuses (optional)
+     * @return non-null list of customer reservations
+     * @throws IOException
+     */
+    public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
+        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest(
+                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, statuses ) );
+    }
+
+    /**
      * Get all reservations staying between the given checkin date range.
      * 
      * @param webClient web client instance to use
@@ -855,7 +873,7 @@ public class CloudbedsScraper {
      * @return non-null email template
      * @throws IOException
      */
-    private EmailTemplateInfo fetchEmailTemplate( WebClient webClient, String templateName ) throws IOException {
+    public EmailTemplateInfo fetchEmailTemplate( WebClient webClient, String templateName ) throws IOException {
 
         Page redirectPage = webClient.getPage( jsonRequestFactory.createGetPropertyContent() );
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );

@@ -59,6 +59,7 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
+import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
@@ -336,6 +337,40 @@ public class CloudbedsService {
                 j.setReservationId( r.getReservationId() );
                 dao.insertJob( j );
             } );
+    }
+
+    /**
+     * Creates SendTemplatedEmailJobs for the given parameters.
+     * 
+     * @param webClient
+     * @param templateName mandatory email template
+     * @param stayDateStart (optional inclusive)
+     * @param stayDateEnd (optional inclusive)
+     * @param checkinDateStart (optional inclusive)
+     * @param checkinDateEnd (optional inclusive)
+     * @param statuses (optional)
+     * @throws IOException
+     */
+    public void createBulkEmailJob( WebClient webClient, String templateName,
+            LocalDate stayDateStart, LocalDate stayDateEnd,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
+
+        scraper.getReservations( webClient,
+                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, statuses ).stream()
+                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .filter( r -> false == "Macb Tour".equals( r.getLastName() ) )
+                .filter( r -> false == "Emma Young".equals( r.getFirstName() + " " + r.getLastName() ) )
+                .filter( r -> false == r.containsNote( templateName + " email sent." ) )
+                .forEach( r -> {
+                    LOGGER.info( "Creating SendTemplatedEmailJob for Res #" + r.getReservationId()
+                    + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                    + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
+                    SendTemplatedEmailJob j = new SendTemplatedEmailJob();
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( r.getReservationId() );
+                    j.setEmailTemplate( templateName );
+                    dao.insertJob( j );
+                } );
     }
 
     /**
@@ -792,6 +827,58 @@ public class CloudbedsService {
                                     .replaceAll( "\\[charge amount\\]", "£" + scraper.getCurrencyFormat().format( amount ) )
                                     .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) ) );
             scraper.addNote( webClient, reservationId, note + " " + paymentURL );
+        }
+    }
+
+    /**
+     * Sends an email to the guest for the given reservation.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param templateName email template (mandatory)
+     * @throws IOException
+     */
+    public void sendTemplatedEmail( WebClient webClient, String reservationId, String templateName ) throws IOException {
+
+        EmailTemplateInfo template = scraper.fetchEmailTemplate( webClient, templateName );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            sendEmailFromTemplate( webClient, template, res, null );
+            scraper.addNote( webClient, reservationId, note );
+        }
+    }
+
+    /**
+     * Sends an email to the guest for the given reservation.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param templateName email template (mandatory)
+     * @throws IOException
+     */
+    public void sendTemplatedGmail( WebClient webClient, String reservationId, String templateName ) throws IOException, MessagingException {
+
+        EmailTemplateInfo template = scraper.fetchEmailTemplate( webClient, templateName );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
+                    template.getSubject().replaceAll( "\\[conf number\\]", res.getIdentifier() ),
+                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
+                            .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
+                            .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
+                            .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
+                                    .replaceAll( "\\[first name\\]", res.getFirstName() ) ) );
+            scraper.addNote( webClient, reservationId, note );
         }
     }
 
