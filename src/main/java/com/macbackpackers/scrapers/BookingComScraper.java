@@ -73,7 +73,7 @@ public class BookingComScraper {
 
         // don't use session-tracked URL if running locally (ie. for debugging)
         String lasturl = SystemUtils.IS_OS_WINDOWS ? null : wordPressDAO.getOption( "hbo_bdc_lasturl" );
-        driver.get( lasturl == null ? "https://admin.booking.com/hotel/hoteladmin/general/dashboard.html?lang=en&hotel_id=" + username : lasturl );
+        driver.get( lasturl == null ? "https://admin.booking.com/hotel/hoteladmin/" : lasturl );
         LOGGER.info( "Loading Booking.com website: " + driver.getCurrentUrl() );
 
         if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
@@ -268,7 +268,8 @@ public class BookingComScraper {
                 LOGGER.info( "Unable to find VCC amount to charge." );
                 // the next line will either a) display that we have already fully charged the VCC or
                 // b) throw an exception if we can't find anything wrt the VCC amount to charge
-                LOGGER.info( "Looks like we've already charged it! BDC message: " + driver.findElement( By.xpath( "//div[contains(@class, 'fully_charged')]" ) ).getText() );
+                LOGGER.info( "Looks like we've already charged it! BDC message: "
+                        + driver.findElement( By.xpath( "//div[contains(@class, 'fully_charged')] | //span[contains(text(),'successfully charged the total amount')]" ) ).getText() );
                 return BigDecimal.ZERO;
             }
         }
@@ -277,7 +278,8 @@ public class BookingComScraper {
     private BigDecimal fetchVccBalanceFromPage( WebDriver driver, By path, Pattern p, Function<WebElement, String> fn ) {
         String totalAmount = fn.apply( driver.findElement( path ) );
 
-        LOGGER.info( "Used pattern " + p.pattern() + " to match " + path );
+        LOGGER.info( "Matched " + totalAmount + " from " + path );
+        LOGGER.info( "Attempting match with pattern " + p.pattern() );
         Matcher m = p.matcher( totalAmount );
         if ( m.find() == false ) {
             throw new NoSuchElementException( "Couldn't find virtual card balance from '" + totalAmount );
