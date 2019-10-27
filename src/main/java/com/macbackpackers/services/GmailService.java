@@ -477,7 +477,7 @@ public class GmailService {
      */
     public GoogleClientSecrets getGmailClientSecret() throws IOException {
         // Load client secrets.
-        InputStream in = getClass().getResourceAsStream( oauthClientIdFile );
+        InputStream in = getClass().getClassLoader().getResourceAsStream( oauthClientIdFile );
         if( in == null ) {
             throw new FileNotFoundException( "Unable to find OAuth client id file: " + oauthClientIdFile );
         }
