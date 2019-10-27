@@ -248,6 +248,10 @@ public class BookingComScraper {
     public BigDecimal getVirtualCardBalance( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException, NoSuchElementException {
         lookupReservation( driver, wait, reservationId );
 
+        // payment details loaded by javascript
+        final By PAYMENT_DETAILS_BLOCK = By.xpath( "//span[normalize-space(text())='Virtual credit card'] | //span[contains(text(),'successfully charged')]" );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( PAYMENT_DETAILS_BLOCK ) );
+
         try {
             // two different views of a booking? this one is from CRH
             LOGGER.info( "Looking up VCC balance (attempt 1)" );
