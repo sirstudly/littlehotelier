@@ -780,7 +780,8 @@ public class PaymentProcessorService {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
 
             if ( cloudbedsScraper.getEmailLastSentDate( webClient, reservationId,
-                    CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED ).isPresent() ) {
+                    CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED ).isPresent() ||
+                    cbReservation.containsNote( CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED ) ) {
                 LOGGER.info( "Declined payment email already sent. Not going to do it again..." );
             }
             else {
