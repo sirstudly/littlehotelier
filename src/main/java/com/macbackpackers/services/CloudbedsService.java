@@ -490,7 +490,7 @@ public class CloudbedsService {
 
         EmailTemplateInfo template = scraper.getSagepayPaymentConfirmationEmailTemplate( webClient );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
-        final String note = template.getTemplateName() + " email sent.";
+        final String note = template.getTemplateName() + " email sent for txn " + sagepayTxnId;
 
         if ( res.containsNote( note ) ) {
             LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
@@ -520,7 +520,7 @@ public class CloudbedsService {
     public void sendSagepayPaymentConfirmationGmail( WebClient webClient, String reservationId, int sagepayTxnId ) throws IOException, MessagingException {
         EmailTemplateInfo template = scraper.getSagepayPaymentConfirmationEmailTemplate( webClient );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
-        final String note = template.getTemplateName() + " email sent.";
+        final String note = template.getTemplateName() + " email sent for txn " + sagepayTxnId;
 
         if ( res.containsNote( note ) ) {
             LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
