@@ -646,10 +646,9 @@ public class PaymentProcessorService {
      * @param reservationId the unique cloudbeds reservation ID
      * @return the loaded reservation
      * @throws Exception on failure
-     * @deprecated this won't work anymore - the save credit card request is now tokenized in CB; probably easier to do this in Chrome now
      */
     public Reservation copyCardDetailsToCloudbeds( WebClient webClient, String reservationId ) throws Exception {
-        LOGGER.info( "Processing reservation " + reservationId );
+        LOGGER.info( "Copying card details for reservation " + reservationId );
 
         // check if card details exist in CB
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
@@ -741,9 +740,8 @@ public class PaymentProcessorService {
             if( false == cbReservation.containsNote( NOTE ) ) {
                 cloudbedsScraper.addNote( webClient, reservationId, NOTE );
             }
-            
-            // for the time being, just throw an exception... will fix if it's a common occurrence
-//            copyCardDetailsToCloudbeds( webClient, reservationId ); NO LONGER SUPPORTED
+
+            copyCardDetailsToCloudbeds( webClient, reservationId );
 
             // requery; if still not available, something has gone wrong somewhere
             cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
