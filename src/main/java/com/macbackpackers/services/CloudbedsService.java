@@ -973,6 +973,11 @@ public class CloudbedsService {
                     dao.getOption( "hbo_cloudbeds_username" ),
                     dao.getOption( "hbo_cloudbeds_password" ) );
         }
+        catch ( Exception ex ) {
+            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
+            FileUtils.copyFile( scrFile, new File( "logs/cloudbeds_login_failed.png" ) );
+            LOGGER.info( "Error attempting to login. Screenshot saved as cloudbeds_login_failed.png" );
+        }
         finally {
             driverFactory.returnObject( driver );
         }
