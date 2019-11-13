@@ -7,7 +7,6 @@ import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.Transient;
 
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
@@ -32,7 +31,7 @@ public class SendNonRefundableSuccessfulEmailJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
             if ( dao.isCloudbedsEmailEnabled() ) {
                 cloudbedsService.sendNonRefundableSuccessfulEmail( webClient, getReservationId(), getAmount() );
             }

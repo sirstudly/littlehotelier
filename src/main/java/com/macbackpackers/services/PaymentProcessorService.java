@@ -458,7 +458,7 @@ public class PaymentProcessorService {
      */
     public synchronized void processSagepayTransaction( int id ) throws IOException, RecordPaymentFailedException, MessagingException {
 
-        try (WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class )) {
+        try (WebClient webClient = context.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
             SagepayTransaction txn = wordpressDAO.fetchSagepayTransaction( id );
             
             // INVOICE transaction

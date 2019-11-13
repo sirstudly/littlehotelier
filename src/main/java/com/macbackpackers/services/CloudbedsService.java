@@ -922,7 +922,7 @@ public class CloudbedsService {
     public void markCreditCardInvalidOnBDC( String reservationId ) throws Exception {
         final int MAX_WAIT_SECONDS = 60;
         WebDriver driver = driverFactory.borrowObject();
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
             WebDriverWait wait = new WebDriverWait( driver, MAX_WAIT_SECONDS );
             Reservation r = scraper.getReservationRetry( webClient, reservationId );
 

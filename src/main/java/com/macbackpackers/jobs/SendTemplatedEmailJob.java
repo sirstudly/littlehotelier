@@ -29,7 +29,7 @@ public class SendTemplatedEmailJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
             if ( dao.isCloudbedsEmailEnabled() ) {
                 cloudbedsService.sendTemplatedEmail( webClient, getReservationId(), getEmailTemplate() );
             }

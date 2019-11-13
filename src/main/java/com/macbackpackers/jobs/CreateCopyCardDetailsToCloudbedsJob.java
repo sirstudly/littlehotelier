@@ -26,7 +26,7 @@ public class CreateCopyCardDetailsToCloudbedsJob extends AbstractJob {
 
     @Autowired
     @Transient
-    @Qualifier( "webClientForCloudbeds" )
+    @Qualifier( "webClientForCloudbedsNoValidate" )
     private WebClient cbWebClient;
 
     @Autowired

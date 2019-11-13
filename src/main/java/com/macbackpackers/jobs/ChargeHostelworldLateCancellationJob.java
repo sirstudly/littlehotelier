@@ -28,7 +28,7 @@ public class ChargeHostelworldLateCancellationJob extends AbstractJob {
 
     @Autowired
     @Transient
-    @Qualifier( "webClientForCloudbeds" )
+    @Qualifier( "webClientForCloudbedsNoValidate" )
     private WebClient cbWebClient;
 
     @Autowired

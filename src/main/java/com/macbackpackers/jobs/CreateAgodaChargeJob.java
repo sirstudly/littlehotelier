@@ -45,7 +45,7 @@ public class CreateAgodaChargeJob extends AbstractJob {
     public void processJob() throws Exception {
 
         if ( dao.isCloudbeds() ) {
-            try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+            try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
                 processJobForCloudbeds( webClient );
             }
         }

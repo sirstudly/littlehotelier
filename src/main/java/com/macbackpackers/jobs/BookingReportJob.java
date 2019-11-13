@@ -28,7 +28,7 @@ public class BookingReportJob extends AbstractJob {
 
     @Autowired
     @Transient
-    @Qualifier( "webClientForCloudbeds" )
+    @Qualifier( "webClientForCloudbedsNoValidate" )
     private WebClient webClient;
 
     @Override
