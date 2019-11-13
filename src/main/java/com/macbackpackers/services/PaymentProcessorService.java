@@ -670,14 +670,7 @@ public class PaymentProcessorService {
         }
         else if ( "Booking.com".equals( cbReservation.getSourceName() ) ) {
             LOGGER.info( "Retrieving BDC customer card details for BDC#" + cbReservation.getThirdPartyIdentifier() );
-            WebDriver driver = driverFactory.borrowObject();
-            try {
-                WebDriverWait wait = new WebDriverWait( driver, 60 );
-                ccDetails = bdcScraper.returnCardDetailsForBooking( driver, wait, cbReservation.getThirdPartyIdentifier() );
-            }
-            finally {
-                driverFactory.returnObject( driver );
-            }
+            ccDetails = retrieveCardDetailsFromBDC( cbReservation );
         }
 //        else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
 //            LOGGER.info( "Retrieving AGO customer card details" );
@@ -696,6 +689,19 @@ public class PaymentProcessorService {
         }
         cloudbedsScraper.addCardDetails( webClient, cbReservation.getReservationId(), ccDetails );
         return cbReservation;
+    }
+
+    private CardDetails retrieveCardDetailsFromBDC( Reservation cbReservation ) throws Exception, IOException, ParseException {
+        CardDetails ccDetails;
+        WebDriver driver = driverFactory.borrowObject();
+        try {
+            WebDriverWait wait = new WebDriverWait( driver, 60 );
+            ccDetails = bdcScraper.returnCardDetailsForBooking( driver, wait, cbReservation.getThirdPartyIdentifier() );
+        }
+        finally {
+            driverFactory.returnObject( driver );
+        }
+        return ccDetails;
     }
 
     /**
@@ -852,7 +858,7 @@ public class PaymentProcessorService {
         }
 
         if ( false == cbReservation.isCardDetailsPresent() ) {
-            throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
+            cbReservation = copyCardDetailsToCloudbeds( webClient, reservationId );
         }
         if ( false == "Booking.com".equals( cbReservation.getSourceName() ) ) {
             throw new MissingUserDataException( "Unsupported source " + cbReservation.getSourceName() );
