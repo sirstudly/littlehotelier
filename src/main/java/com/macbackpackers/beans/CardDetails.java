@@ -46,6 +46,9 @@ public class CardDetails {
         if ( cardNumber.matches( "^((2[2-7])|(5[1-5]))\\d+" ) ) {
             return "master";
         }
+        if ( cardNumber.matches( "^3[47]\\d+" ) ) {
+            return "amex";
+        }
         throw new IllegalArgumentException( "Unsupported card found. BIN: " + cardNumber.substring( 0, 6 ) );
     }
 

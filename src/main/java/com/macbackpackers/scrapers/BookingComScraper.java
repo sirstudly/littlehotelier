@@ -360,12 +360,12 @@ public class BookingComScraper {
     public CardDetails returnCardDetailsForBooking( WebDriver driver, WebDriverWait wait, String bdcReservation ) throws IOException, ParseException {
         lookupReservation( driver, wait, bdcReservation );
 
-        List<WebElement> headerViewCCDetails = driver.findElements( By.id( "js-view-cc-details-button" ) );
+        List<WebElement> headerViewCCDetails = driver.findElements( By.xpath( "//button/*/span[normalize-space(text())='View credit card details']" ) );
         if ( headerViewCCDetails.isEmpty() ) {
-            throw new MissingUserDataException( "No card details link not available." );
+            throw new MissingUserDataException( "No card details link available." );
         }
-        driver.findElement( By.id( "js-view-cc-details-button" ) ).click();
-        final By SIGN_IN_LOCATOR = By.xpath( "//a[normalize-space(text())='Sign in to view credit card details']" );
+        headerViewCCDetails.get( 0 ).click();
+        final By SIGN_IN_LOCATOR = By.xpath( "//a/span[normalize-space(text())='Sign in to view credit card details']" );
         wait.until( ExpectedConditions.visibilityOfElementLocated( SIGN_IN_LOCATOR ) );
 
         // the following should open a new window; focus should move to the new window automatically
@@ -397,10 +397,10 @@ public class BookingComScraper {
         nextButton.click();
         wait.until( stalenessOf( nextButton ) );
 
-        wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( "//th[normalize-space(text())='Credit Card Details']" ) ) );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( "//th[contains(text(),'Credit Card Details')]" ) ) );
         CardDetails cardDetails = new CardDetails();
         cardDetails.setName( driver.findElement( By.xpath( "//td[text()=\"Card holder's name:\"]/following-sibling::td" ) ).getText().trim() );
-        cardDetails.setCardNumber( driver.findElement( By.xpath( "//td[text()='Card number:']/following-sibling::td" ) ).getText().trim() );
+        cardDetails.setCardNumber( driver.findElement( By.xpath( "//td[text()='Card number:']/following-sibling::td" ) ).getText().replaceAll("\\s", "") );
         cardDetails.setCardType( driver.findElement( By.xpath( "//td[text()='Card type:']/following-sibling::td" ) ).getText().trim() );
         cardDetails.setExpiry( parseExpiryDate( driver.findElement( By.xpath( "//td[text()='Expiration Date:']/following-sibling::td" ) ).getText().trim() ) );
         cardDetails.setCvv( StringUtils.trimToNull( driver.findElement( By.xpath( "//td[text()='CVC Code:']/following-sibling::td" ) ).getText() ) );
