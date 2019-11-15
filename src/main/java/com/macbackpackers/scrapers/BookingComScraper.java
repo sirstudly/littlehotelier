@@ -405,15 +405,23 @@ public class BookingComScraper {
         lookupReservation( driver, wait, bdcReservation );
 
         // payment details loaded by javascript
-        final By PAYMENT_DETAILS_BLOCK = By.xpath( "//span[normalize-space(text())='Virtual credit card'] | //span[contains(text(),'successfully charged')]" );
+        final By PAYMENT_DETAILS_BLOCK = By.xpath( "//span[normalize-space(text())='Virtual credit card'] "
+                + "| //span[contains(text(),'successfully charged')] "
+                + "| //span[contains(text(),'This virtual card is no longer active')] "
+                + "| //span[contains(text(),\"This virtual card isn't active anymore\")]" );
         wait.until( ExpectedConditions.visibilityOfElementLocated( PAYMENT_DETAILS_BLOCK ) );
 
-        List<WebElement> headerViewCCDetails = driver.findElements( By.xpath( "//button/*/span[normalize-space(text())='View credit card details']" ) );
+        List<WebElement> headerViewCCDetails = driver.findElements( By.xpath( "//span[normalize-space(text())='View credit card details']" ) );
         if ( headerViewCCDetails.isEmpty() ) {
+            WebElement paymentDetails = driver.findElement( PAYMENT_DETAILS_BLOCK );
+            if ( paymentDetails.getText().contains( "This virtual card is no longer active." )
+                    || paymentDetails.getText().contains( "This virtual card isn't active anymore" ) ) {
+                throw new MissingUserDataException( "This virtual card is no longer active." );
+            }
             throw new MissingUserDataException( "No card details link available." );
         }
         headerViewCCDetails.get( 0 ).click();
-        final By SIGN_IN_LOCATOR = By.xpath( "//a/span[normalize-space(text())='Sign in to view credit card details']" );
+        final By SIGN_IN_LOCATOR = By.xpath( "//span[normalize-space(text())='Sign in to view credit card details']" );
         wait.until( ExpectedConditions.visibilityOfElementLocated( SIGN_IN_LOCATOR ) );
 
         // the following should open a new window; focus should move to the new window automatically
@@ -430,18 +438,13 @@ public class BookingComScraper {
             .orElseThrow( () -> new IOException("Unable to find new login window.") );
         
         // login again
-        WebElement usernameField = driver.findElement( By.id( "loginname" ) );
+        WebElement usernameField = findElement( driver, wait, By.id( "loginname" ) );
         usernameField.sendKeys( wordPressDAO.getOption( "hbo_bdc_username" ) );
-
-        WebElement nextButton = driver.findElement( By.xpath( "//span[text()='Next']/.." ) );
-        nextButton.click();
-
-        // wait until password field is visible
-        wait.until( ExpectedConditions.visibilityOfElementLocated( By.id( "password" ) ) );
-        WebElement passwordField = driver.findElement( By.id( "password" ) );
+        findElement( driver, wait, By.xpath( "//span[text()='Next']/.." ) ).click();
+        WebElement passwordField = findElement( driver, wait, By.id( "password" ) );
         passwordField.sendKeys( wordPressDAO.getOption( "hbo_bdc_password" ) );
 
-        nextButton = driver.findElement( By.xpath( "//span[text()='Sign in']/.." ) );
+        WebElement nextButton = findElement( driver, wait, By.xpath( "//span[text()='Sign in']/.." ) );
         nextButton.click();
         wait.until( stalenessOf( nextButton ) );
 
@@ -483,5 +486,17 @@ public class BookingComScraper {
         catch ( InterruptedException e ) {
             // nothing to do
         }
+    }
+
+    /**
+     * Waits until element is visible and returns it.
+     * 
+     * @param wait
+     * @param by
+     * @return visible element
+     */
+    private WebElement findElement( WebDriver driver, WebDriverWait wait, By by ) {
+        wait.until( ExpectedConditions.visibilityOfElementLocated( by ) );
+        return driver.findElement( by );
     }
 }
