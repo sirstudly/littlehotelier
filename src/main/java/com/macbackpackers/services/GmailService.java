@@ -284,7 +284,7 @@ public class GmailService {
      * @throws IOException on send error
      * @throws MessagingException on message creation exception
      */
-    public void sendEmail( String toAddress, String toName, String subject, String bodyText ) 
+    public synchronized void sendEmail( String toAddress, String toName, String subject, String bodyText ) 
             throws MessagingException, IOException {
         Message message = createMessageWithEmail( createEmail( toAddress, toName, null, subject, bodyText ) );
         message = connectAsClient().users().messages().send( GMAIL_USER, message ).execute();
@@ -301,7 +301,7 @@ public class GmailService {
      * @throws IOException on send error
      * @throws MessagingException on message creation exception
      */
-    public void sendEmailCcSelf( String toAddress, String toName, String subject, String bodyText )
+    public synchronized void sendEmailCcSelf( String toAddress, String toName, String subject, String bodyText )
             throws MessagingException, IOException {
         Gmail gmail = connectAsClient();
         Profile p = gmail.users().getProfile( GMAIL_USER ).execute();
@@ -318,7 +318,7 @@ public class GmailService {
      * @throws IOException on send error
      * @throws MessagingException on message creation exception
      */
-    public void sendEmailToSelf( String subject, String bodyText ) throws MessagingException, IOException {
+    public synchronized void sendEmailToSelf( String subject, String bodyText ) throws MessagingException, IOException {
         Gmail gmail = connectAsClient();
         Profile p = gmail.users().getProfile( GMAIL_USER ).execute();
         Message message = createMessageWithEmail( createEmail( p.getEmailAddress(), "Reception", null, subject, bodyText ) );
