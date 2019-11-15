@@ -394,7 +394,6 @@ public class CloudbedsService {
                     LOGGER.info( "Creating PrepaidChargeJob for Res #" + r.getReservationId()
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
                             + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
-                    LOGGER.info( r.getCreditCardId() + " " + r.getCreditCardLast4Digits() );
                     PrepaidChargeJob j = new PrepaidChargeJob();
                     j.setStatus( JobStatus.submitted );
                     j.setReservationId( r.getReservationId() );

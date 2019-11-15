@@ -50,10 +50,4 @@ public class PrepaidChargeJob extends AbstractJob {
     public void setReservationId( String reservationId ) {
         setParameter( "reservation_id", reservationId );
     }
-
-    @Override
-    public int getRetryCount() {
-        return 2; // don't attempt too many times
-    }
-
 }

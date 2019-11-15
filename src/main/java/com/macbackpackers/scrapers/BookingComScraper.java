@@ -81,72 +81,7 @@ public class BookingComScraper {
 
         if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
             LOGGER.info( "Doesn't look like we're logged in. Logging into Booking.com" );
-
-            WebElement usernameField = driver.findElement( By.id( "loginname" ) );
-            usernameField.sendKeys( username );
-
-            WebElement nextButton = driver.findElement( By.xpath( "//span[text()='Next']/.." ) );
-            nextButton.click();
-
-            // wait until password field is visible
-            wait.until( ExpectedConditions.visibilityOfElementLocated( By.id( "password" ) ) );
-            WebElement passwordField = driver.findElement( By.id( "password" ) );
-            passwordField.sendKeys( password );
-
-            nextButton = driver.findElement( By.xpath( "//span[text()='Sign in']/.." ) );
-            nextButton.click();
-            wait.until( stalenessOf( nextButton ) );
-
-            if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in/verification" ) ) {
-                // if this is the first time we're doing this, we'll need to go thru 2FA
-                LOGGER.info( "BDC verification required" );
-                List<WebElement> phoneLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-call-verification-link')]" ) );
-                List<WebElement> smsLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-sms-verification-link')]" ) );
-
-                String verificationMode = wordPressDAO.getOption( "hbo_bdc_verificationmode" );
-                if ( "sms".equalsIgnoreCase( verificationMode ) && smsLinks.size() > 0 ) {
-                    LOGGER.info( "Performing SMS verification" );
-                    smsLinks.get( 0 ).click();
-                    WebElement selectedPhone = driver.findElement( By.id( "selected_phone" ) );
-                    if ( false == selectedPhone.getText().endsWith( "4338" ) ) {
-                        throw new MissingUserDataException( "Phone number not registered: " + selectedPhone.getText() );
-                    }
-
-                    WebElement sendCodeBtn = driver.findElement( By.xpath( "//span[text()='Send verification code']" ) );
-                    sendCodeBtn.click();
-
-                    // now blank out the code and wait for it to appear
-                    WebElement smsCode = driver.findElement( By.id( "sms_code" ) );
-                    smsCode.sendKeys( fetch2FACode() );
-
-                    nextButton = driver.findElement( By.xpath( "//span[text()='Verify now']/.." ) );
-                    nextButton.click();
-                    wait.until( stalenessOf( nextButton ) );
-                    LOGGER.debug( driver.getPageSource() );
-                }
-                else if ( "phone".equalsIgnoreCase( verificationMode ) && phoneLinks.size() > 0 ) {
-                    LOGGER.info( "Performing phone verification" );
-                    phoneLinks.get( 0 ).click();
-                    nextButton = driver.findElement( By.xpath( "//span[text()='Call now']/.." ) );
-                    nextButton.click();
-
-                    WebElement smsCode = driver.findElement( By.id( "sms_code" ) );
-                    smsCode.sendKeys( fetch2FACode() );
-
-                    nextButton = driver.findElement( By.xpath( "//span[text()='Verify now']/.." ) );
-                    nextButton.click();
-                    wait.until( stalenessOf( nextButton ) );
-                    LOGGER.info( driver.getPageSource() );
-                }
-                else {
-                    throw new MissingUserDataException( "Verification required for BDC?" );
-                }
-            }
-
-            if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
-                throw new MissingUserDataException( "Failed to login to BDC" );
-            }
-
+            doLoginForm( driver, wait, username, password );
         }
 
         // if we're actually logged in, we should get the hostel name identified here...
@@ -164,6 +99,74 @@ public class BookingComScraper {
             LOGGER.info( "Logged into Booking.com. Saving current URL." );
             LOGGER.info( "Loaded " + driver.getCurrentUrl() );
             wordPressDAO.setOption( "hbo_bdc_lasturl", driver.getCurrentUrl() );
+        }
+    }
+
+    /**
+     * Performs sign-in from the sign-in screen.
+     * 
+     * @param driver web client to use
+     * @param wait
+     * @param username user credentials
+     * @param password user credentials
+     */
+    private void doLoginForm( WebDriver driver, WebDriverWait wait, String username, String password ) {
+
+        WebElement usernameField = findElement( driver, wait, By.id( "loginname" ) );
+        usernameField.sendKeys( wordPressDAO.getOption( "hbo_bdc_username" ) );
+        findElement( driver, wait, By.xpath( "//span[text()='Next']/.." ) ).click();
+        WebElement passwordField = findElement( driver, wait, By.id( "password" ) );
+        passwordField.sendKeys( wordPressDAO.getOption( "hbo_bdc_password" ) );
+
+        WebElement nextButton = findElement( driver, wait, By.xpath( "//span[text()='Sign in']/.." ) );
+        nextButton.click();
+        wait.until( stalenessOf( nextButton ) );
+
+        if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in/verification" ) ||
+                driver.getCurrentUrl().startsWith( "https://secure-admin.booking.com/2fa/" ) ) {
+            // if this is the first time we're doing this, we'll need to go thru 2FA
+            LOGGER.info( "BDC verification required" );
+            List<WebElement> phoneLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-call-verification-link')] | //input[@value='call']" ) );
+            List<WebElement> smsLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-sms-verification-link')] | //input[@value='sms']" ) );
+
+            String verificationMode = wordPressDAO.getOption( "hbo_bdc_verificationmode" );
+            if ( "sms".equalsIgnoreCase( verificationMode ) && smsLinks.size() > 0 ) {
+                LOGGER.info( "Performing SMS verification" );
+                smsLinks.get( 0 ).click();
+                WebElement selectedPhone = driver.findElement( By.xpath( "//*[@id='selected_phone'] | //select[@name='phone_id_sms']" ) );
+                if ( false == selectedPhone.getText().trim().endsWith( "4338" ) ) {
+                    throw new MissingUserDataException( "Phone number not registered: " + selectedPhone.getText() );
+                }
+
+                driver.findElement( By.xpath( "//span[text()='Send verification code'] "
+                        + "| //div[contains(@class,'cta-phone')]/input[@value='Send text message']" ) ).click();
+
+                // now blank out the code and wait for it to appear
+                findElement( driver, wait, By.xpath( "//*[@id='sms_code' or @id='ask_pin_input']" ) ).sendKeys( fetch2FACode() );
+
+                nextButton = driver.findElement( By.xpath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" ) );
+                nextButton.click();
+                wait.until( stalenessOf( nextButton ) );
+            }
+            else if ( "phone".equalsIgnoreCase( verificationMode ) && phoneLinks.size() > 0 ) {
+                LOGGER.info( "Performing phone verification" );
+                phoneLinks.get( 0 ).click();
+                nextButton = driver.findElement( By.xpath( "//span[text()='Call now']/.." ) );
+                nextButton.click();
+
+                findElement( driver, wait, By.xpath( "//*[@id='sms_code' or @id='ask_pin_input']" ) ).sendKeys( fetch2FACode() );
+
+                nextButton = driver.findElement( By.xpath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" ) );
+                nextButton.click();
+                wait.until( stalenessOf( nextButton ) );
+            }
+            else {
+                throw new MissingUserDataException( "Verification required for BDC?" );
+            }
+        }
+
+        if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
+            throw new MissingUserDataException( "Failed to login to BDC" );
         }
     }
 
@@ -411,7 +414,7 @@ public class BookingComScraper {
                 + "| //span[contains(text(),\"This virtual card isn't active anymore\")]" );
         wait.until( ExpectedConditions.visibilityOfElementLocated( PAYMENT_DETAILS_BLOCK ) );
 
-        List<WebElement> headerViewCCDetails = driver.findElements( By.xpath( "//span[normalize-space(text())='View credit card details']" ) );
+        List<WebElement> headerViewCCDetails = driver.findElements( By.xpath( "//button/span/span[normalize-space(text())='View credit card details']/../.." ) );
         if ( headerViewCCDetails.isEmpty() ) {
             WebElement paymentDetails = driver.findElement( PAYMENT_DETAILS_BLOCK );
             if ( paymentDetails.getText().contains( "This virtual card is no longer active." )
@@ -436,17 +439,9 @@ public class BookingComScraper {
             .findFirst()
             .map( w -> driver.switchTo().window( w ) )
             .orElseThrow( () -> new IOException("Unable to find new login window.") );
-        
-        // login again
-        WebElement usernameField = findElement( driver, wait, By.id( "loginname" ) );
-        usernameField.sendKeys( wordPressDAO.getOption( "hbo_bdc_username" ) );
-        findElement( driver, wait, By.xpath( "//span[text()='Next']/.." ) ).click();
-        WebElement passwordField = findElement( driver, wait, By.id( "password" ) );
-        passwordField.sendKeys( wordPressDAO.getOption( "hbo_bdc_password" ) );
 
-        WebElement nextButton = findElement( driver, wait, By.xpath( "//span[text()='Sign in']/.." ) );
-        nextButton.click();
-        wait.until( stalenessOf( nextButton ) );
+        // login again
+        doLoginForm( driver, wait, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
 
         wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( "//th[contains(text(),'Credit Card Details')]" ) ) );
         CardDetails cardDetails = new CardDetails();
@@ -458,7 +453,7 @@ public class BookingComScraper {
         LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( cardDetails.getCardNumber() ) + " for " + cardDetails.getName() );
 
         // we're done here
-        driver.findElement( By.xpath( "//button[text()='Close']" ) ).click();
+        driver.findElement( By.xpath( "//div[contains(@class,'sbm')]/button[text()='Close']" ) ).click();
         driver.switchTo().window( CURRENT_WINDOW ); // switch back to main tab
         return cardDetails;
     }

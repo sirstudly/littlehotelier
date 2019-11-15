@@ -710,7 +710,7 @@ public class PaymentProcessorService {
         CardDetails ccDetails;
         WebDriver driver = driverFactory.borrowObject();
         try {
-            WebDriverWait wait = new WebDriverWait( driver, 60 );
+            WebDriverWait wait = new WebDriverWait( driver, 30 );
             ccDetails = bdcScraper.returnCardDetailsForBooking( driver, wait, cbReservation.getThirdPartyIdentifier() );
         }
         catch ( Exception ex ) {
