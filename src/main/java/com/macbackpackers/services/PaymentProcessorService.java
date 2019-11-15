@@ -17,6 +17,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -695,7 +696,7 @@ public class PaymentProcessorService {
         return cbReservation;
     }
 
-    private CardDetails retrieveCardDetailsFromBDC( Reservation cbReservation ) throws Exception, IOException, ParseException {
+    private CardDetails retrieveCardDetailsFromBDC( Reservation cbReservation ) throws Exception {
         CardDetails ccDetails;
         WebDriver driver = driverFactory.borrowObject();
         try {
@@ -704,7 +705,7 @@ public class PaymentProcessorService {
         }
         catch ( Exception ex ) {
             File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            String filename = "logs/bdc_reservation_" + cbReservation.getIdentifier() + ".png";
+            String filename = "logs/bdc_" + cbReservation.getThirdPartyIdentifier() + "-" + UUID.randomUUID() + ".png";
             FileUtils.copyFile( scrFile, new File( filename ) );
             LOGGER.error( "Screenshot saved in " + filename );
             LOGGER.info( driver.getPageSource() );
