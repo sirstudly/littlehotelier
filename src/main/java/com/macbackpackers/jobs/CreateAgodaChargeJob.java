@@ -71,7 +71,7 @@ public class CreateAgodaChargeJob extends AbstractJob {
                     LOGGER.info( p.getFirstName() + " " + p.getLastName() );
                     PrepaidChargeJob chargeJob = new PrepaidChargeJob();
                     chargeJob.setStatus( JobStatus.submitted );
-                    chargeJob.setReservationId( Integer.parseInt( p.getReservationId() ) );
+                    chargeJob.setReservationId( p.getReservationId() );
                     dao.insertJob( chargeJob );
                 } );
     }

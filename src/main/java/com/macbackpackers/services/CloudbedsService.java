@@ -59,6 +59,7 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
+import com.macbackpackers.jobs.PrepaidChargeJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -369,6 +370,34 @@ public class CloudbedsService {
                     j.setStatus( JobStatus.submitted );
                     j.setReservationId( r.getReservationId() );
                     j.setEmailTemplate( templateName );
+                    dao.insertJob( j );
+                } );
+    }
+
+    /**
+     * Creates charge jobs for any prepaid canceled BDC bookings over the given dates.
+     * 
+     * @param webClient
+     * @param checkinDateStart (optional inclusive)
+     * @param checkinDateEnd (optional inclusive)
+     * @throws IOException
+     */
+    public void createCanceledPrepaidBDCBookingsChargeJobs(WebClient webClient,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
+
+        scraper.getCancelledReservationsForBookingSources( webClient,
+                checkinDateStart, checkinDateEnd, null, null,
+                "Booking.com (Channel Collect Booking)" ).stream()
+                .filter( r -> r.isPrepaid() )
+                .filter( r -> r.getGrandTotal().equals( r.getBalanceDue() ) ) // nothing charged
+                .forEach( r -> {
+                    LOGGER.info( "Creating PrepaidChargeJob for Res #" + r.getReservationId()
+                            + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
+                    LOGGER.info( r.getCreditCardId() + " " + r.getCreditCardLast4Digits() );
+                    PrepaidChargeJob j = new PrepaidChargeJob();
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( r.getReservationId() );
                     dao.insertJob( j );
                 } );
     }

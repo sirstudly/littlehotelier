@@ -363,8 +363,8 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "date_start[1]", checkinDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_end[0]", "" ),
                 new NameValuePair( "date_end[1]", "" ),
-                new NameValuePair( "cancellation_date[0]", cancelDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "cancellation_date[1]", cancelDateEnd.format( YYYY_MM_DD ) ),
+                new NameValuePair( "cancellation_date[0]", cancelDateStart == null ? "" : cancelDateStart.format( YYYY_MM_DD ) ),
+                new NameValuePair( "cancellation_date[1]", cancelDateEnd == null ? "" : cancelDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "status", "canceled" ),
                 new NameValuePair( "source", bookingSourceIds ) ) );
         return webRequest;

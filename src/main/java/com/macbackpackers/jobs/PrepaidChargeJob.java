@@ -29,7 +29,7 @@ public class PrepaidChargeJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
-            paymentProcessor.processPrepaidBooking( webClient, String.valueOf( getReservationId() ) );
+            paymentProcessor.processPrepaidBooking( webClient, getReservationId() );
         }
     }
 
@@ -38,8 +38,8 @@ public class PrepaidChargeJob extends AbstractJob {
      * 
      * @return reservationId
      */
-    public int getReservationId() {
-        return Integer.parseInt( getParameter( "reservation_id" ) );
+    public String getReservationId() {
+        return getParameter( "reservation_id" );
     }
 
     /**
@@ -47,8 +47,8 @@ public class PrepaidChargeJob extends AbstractJob {
      * 
      * @param reservationId
      */
-    public void setReservationId( int reservationId ) {
-        setParameter( "reservation_id", String.valueOf( reservationId ) );
+    public void setReservationId( String reservationId ) {
+        setParameter( "reservation_id", reservationId );
     }
 
     @Override

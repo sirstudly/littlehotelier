@@ -28,7 +28,7 @@ public class CreatePrepaidChargeJob extends AbstractJob {
                             + " chargeable on " + a.getEarliestChargeDate() );
                     PrepaidChargeJob chargeJob = new PrepaidChargeJob();
                     chargeJob.setStatus( JobStatus.submitted );
-                    chargeJob.setReservationId( a.getReservationId() );
+                    chargeJob.setReservationId( String.valueOf( a.getReservationId() ) );
                     dao.insertJob( chargeJob );
                 } );
     }

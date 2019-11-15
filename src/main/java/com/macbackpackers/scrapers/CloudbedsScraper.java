@@ -212,9 +212,9 @@ public class CloudbedsScraper {
         LOGGER.info( "Pulling reservation data for #" + reservationId );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
-        Optional<Reservation> r = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class ) );
-        if ( false == r.isPresent() || false == r.get().isSuccess() ) {
-            if( r.isPresent() ) {
+        Reservation r = fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class );
+        if ( r == null || false == r.isSuccess() ) {
+            if( r != null ) {
                 LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
             }
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
@@ -228,14 +228,18 @@ public class CloudbedsScraper {
             String cardId = null;
             for ( Iterator<Entry<String, JsonElement>> it = creditCardsElem.getAsJsonObject().entrySet().iterator() ; it.hasNext() ; ) {
                 cardId = it.next().getKey();
+
+                // save the last one on the list (if more than one)
+                JsonObject cardObj = creditCardsElem.getAsJsonObject().get( cardId ).getAsJsonObject();
+                if ( false == "1".equals( cardObj.get( "is_cc_data_purged" ).getAsString() ) &&
+                        "1".equals( cardObj.get( "is_active" ).getAsString() ) ) {
+                    r.setCreditCardId( cardId );
+                    r.setCreditCardType( cardObj.get( "card_type" ).getAsString() );
+                    r.setCreditCardLast4Digits( cardObj.get( "card_number" ).getAsString() );
+                }
             }
-            // save the last one on the list (if more than one)
-            r.get().setCreditCardId( cardId );
-            JsonObject cardObj = creditCardsElem.getAsJsonObject().get( cardId ).getAsJsonObject();
-            r.get().setCreditCardType( cardObj.get( "card_type" ).getAsString() );
-            r.get().setCreditCardLast4Digits( cardObj.get( "card_number" ).getAsString() );
         }
-        return r.get();
+        return r;
     }
 
     /**
