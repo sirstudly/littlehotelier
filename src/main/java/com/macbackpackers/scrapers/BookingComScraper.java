@@ -408,6 +408,7 @@ public class BookingComScraper {
 
         // we're done here
         driver.findElement( By.xpath( "//button[text()='Close']" ) ).click();
+        driver.switchTo().window( CURRENT_WINDOW ); // switch back to main tab
         return cardDetails;
     }
 

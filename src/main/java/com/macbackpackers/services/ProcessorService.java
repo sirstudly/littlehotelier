@@ -11,6 +11,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.openqa.selenium.WebDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -49,6 +51,9 @@ public class ProcessorService {
     @Value( "${processor.job.log.copyto:}" )
     private String destinationLogLocation; // where to copy log files (optional)
 
+    @Autowired
+    private GenericObjectPool<WebDriver> driverFactory;
+
     /**
      * Checks for any jobs that need to be run ('submitted') and processes them.
      */
@@ -83,6 +88,14 @@ public class ProcessorService {
         catch ( InterruptedException e ) {
             // ignored
         }
+    }
+
+    /**
+     * Clears out any webdrivers currently running.
+     */
+    public void shutdownDriverPool() {
+        driverFactory.clear();
+        driverFactory.close();
     }
 
     /**

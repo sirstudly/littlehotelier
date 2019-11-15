@@ -109,7 +109,13 @@ public class RunProcessor
         acquireLock();
 //        dao.resetAllProcessingJobsToFailed();
         processorService.createOverdueScheduledJobs();
-        processorService.processJobs();
+
+        try {
+            processorService.processJobs();
+        }
+        finally {
+            processorService.shutdownDriverPool();
+        }
     }
 
     /**
