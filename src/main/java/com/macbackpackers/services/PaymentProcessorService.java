@@ -11,13 +11,14 @@ import java.text.NumberFormat;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -649,16 +650,27 @@ public class PaymentProcessorService {
      * 
      * @param webClient web client for cloudbeds
      * @param reservationId the unique cloudbeds reservation ID
-     * @return the loaded reservation
+     * @return the reloaded reservation
      * @throws Exception on failure
      */
     public Reservation copyCardDetailsToCloudbeds( WebClient webClient, String reservationId ) throws Exception {
-        LOGGER.info( "Copying card details for reservation " + reservationId );
+        return copyCardDetailsToCloudbeds(webClient, cloudbedsScraper.getReservationRetry( webClient, reservationId ) );
+    }
+
+    /**
+     * Copies the card details (for HWL/BDC/EXP) to CB if it doesn't already exist.
+     * 
+     * @param webClient web client for cloudbeds
+     * @param cbReservation the loaded cloudbeds reservation
+     * @return the reloaded reservation
+     * @throws Exception on failure
+     */
+    public Reservation copyCardDetailsToCloudbeds( WebClient webClient, Reservation cbReservation ) throws Exception {
+        LOGGER.info( "Copying card details for reservation " + cbReservation.getReservationId() );
 
         // check if card details exist in CB
-        Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
         if ( cbReservation.isCardDetailsPresent() ) {
-            LOGGER.info( "Card details found for reservation " + cbReservation.getReservationId() + "; skipping copy" );
+            LOGGER.info( "Card details found; skipping copy" );
             return cbReservation;
         }
 
@@ -693,7 +705,7 @@ public class PaymentProcessorService {
             ccDetails.setName( cbReservation.getFirstName() + cbReservation.getLastName() );
         }
         cloudbedsScraper.addCardDetails( webClient, cbReservation.getReservationId(), ccDetails );
-        return cbReservation;
+        return cloudbedsScraper.getReservationRetry( webClient, cbReservation.getReservationId() ); // reload reservation
     }
 
     private CardDetails retrieveCardDetailsFromBDC( Reservation cbReservation ) throws Exception {
@@ -705,10 +717,11 @@ public class PaymentProcessorService {
         }
         catch ( Exception ex ) {
             File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            String filename = "logs/bdc_" + cbReservation.getThirdPartyIdentifier() + "-" + UUID.randomUUID() + ".png";
+            String filename = "logs/bdc_" + cbReservation.getThirdPartyIdentifier() + "-"
+                    + LocalDate.now().format( DateTimeFormatter.ISO_LOCAL_DATE_TIME ) + ".png";
             FileUtils.copyFile( scrFile, new File( filename ) );
-            LOGGER.error( "Screenshot saved in " + filename );
             LOGGER.info( driver.getPageSource() );
+            LOGGER.error( "Screenshot saved in " + filename );
             throw ex;
         }
         finally {
@@ -760,10 +773,9 @@ public class PaymentProcessorService {
                 cloudbedsScraper.addNote( webClient, reservationId, NOTE );
             }
 
-            copyCardDetailsToCloudbeds( webClient, reservationId );
+            cbReservation = copyCardDetailsToCloudbeds( webClient, cbReservation );
 
-            // requery; if still not available, something has gone wrong somewhere
-            cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+            // if still not available, something has gone wrong somewhere
             if ( false == cbReservation.isCardDetailsPresent() ) {
                 throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
             }
@@ -871,7 +883,7 @@ public class PaymentProcessorService {
         }
 
         if ( false == cbReservation.isCardDetailsPresent() ) {
-            cbReservation = copyCardDetailsToCloudbeds( webClient, reservationId );
+            cbReservation = copyCardDetailsToCloudbeds( webClient, cbReservation );
         }
         if ( false == "Booking.com".equals( cbReservation.getSourceName() ) ) {
             throw new MissingUserDataException( "Unsupported source " + cbReservation.getSourceName() );
@@ -897,7 +909,8 @@ public class PaymentProcessorService {
                     cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
                             cbReservation.getCreditCardId(), amountToCharge );
     
-                    if ( 0 != cbReservation.getBalanceDue().compareTo( amountToCharge ) ) {
+                    if ( 0 != cbReservation.getBalanceDue().compareTo( amountToCharge )
+                            && false == "canceled".equals( cbReservation.getStatus() ) ) {
                         cloudbedsScraper.addNote( webClient, reservationId,
                                 "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL." );
                     }

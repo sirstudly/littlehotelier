@@ -7,6 +7,8 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.ParseException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -19,6 +21,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -203,36 +206,77 @@ public class BookingComScraper {
         WebElement searchInput = driver.findElement( By.xpath( "//input[@placeholder='Search for reservations']" ) );
         searchInput.sendKeys( reservationId + "\n" );
 
-        final By BY_RESERVATION_ANCHOR = By.xpath( "//a[@data-id='" + reservationId + "']" );
-        wait.until( ExpectedConditions.visibilityOfElementLocated( BY_RESERVATION_ANCHOR ) );
-
-        WebElement searchAnchor = driver.findElement( BY_RESERVATION_ANCHOR );
-        driver.get( searchAnchor.getAttribute( "href" ) );
-
-        LOGGER.info( "Loaded " + driver.getCurrentUrl() );
-        LOGGER.debug( driver.getPageSource() );
-
-        if ( false == driver.getTitle().contains( "Reservation Details" ) ) {
-            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            FileUtils.copyFile( scrFile, new File( "logs/bdc_reservation_" + reservationId + ".png" ) );
-            throw new IOException( "Unable to load reservation details. Are we on the wrong page?" );
+        try {
+            LOGGER.info( "Entering reservation ID into search bar." );
+            final By BY_RESERVATION_ANCHOR = By.xpath( "//a[@data-id='" + reservationId + "']" );
+            wait.until( ExpectedConditions.visibilityOfElementLocated( BY_RESERVATION_ANCHOR ) );
+            WebElement searchAnchor = driver.findElement( BY_RESERVATION_ANCHOR );
+            LOGGER.info( "Redirecting to " + searchAnchor.getAttribute( "href" ) );
+            driver.get( searchAnchor.getAttribute( "href" ) );
         }
+        catch ( TimeoutException ex ) {
+            LOGGER.info( "Unable to find reservation from search box; attempting from reservation search" );
+            loadReservationFromSearchTab( driver, wait, reservationId );
+        }
+
+        wait.until( ExpectedConditions.titleContains( "Reservation Details" ) );
+        LOGGER.info( "Loaded " + driver.getCurrentUrl() );
 
         // multiple places where the booking reference can appear; it should be in one of these
         LOGGER.info( "Looking up reservation ID by hidden field." );
-        By bookingNumberPath = By.xpath( "//input[@type='hidden' and @name='res_id'] "
+        By BOOKING_NUMBER_XPATH = By.xpath( "//input[@type='hidden' and @name='res_id'] "
                 + "| //p/span[text()='Booking number:']/../following-sibling::p "
                 + "| //div[not(contains(@class, 'hidden-print'))]/span[normalize-space(text())='Booking number:']/following-sibling::span" );
-        WebElement bookingNumberField = driver.findElement( bookingNumberPath );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( BOOKING_NUMBER_XPATH ) );
+        WebElement bookingNumberField = driver.findElement( BOOKING_NUMBER_XPATH );
         String resIdFromPage = "input".equals( bookingNumberField.getTagName() ) ? bookingNumberField.getAttribute( "value" ) : bookingNumberField.getText();
 
         if ( false == reservationId.equals( resIdFromPage ) ) {
             LOGGER.error( "Reservation ID mismatch?!: Expected " + reservationId + " but found " + resIdFromPage );
             LOGGER.info( driver.getPageSource() );
             File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            FileUtils.copyFile( scrFile, new File( "logs/bdc_reservation_" + reservationId + ".png" ) );
+            String filename = "logs/bdc_reservation_" + reservationId + ".png";
+            FileUtils.copyFile( scrFile, new File( filename ) );
+            LOGGER.info( "Screenshot written to " + filename );
             throw new IOException( "Unable to load reservation details. Reservation ID mismatch!" );
         }
+    }
+
+    /**
+     * Goes to the Reservation (search) tab to lookup a reservation (for older bookings).
+     * @param driver
+     * @param wait
+     * @param reservationId BDC reservation
+     * @throws IOException
+     */
+    private void loadReservationFromSearchTab( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException {
+        LOGGER.info( "Loading Reservations tab" );
+        WebElement reservationsAnchor = driver.findElement( By.xpath( "//nav//a/span[normalize-space(text())='Reservations']/.." ) );
+        driver.get( reservationsAnchor.getAttribute( "href" ) );
+        LOGGER.info( "Entering checkin date to 6 months prior" );
+        WebElement dateFrom = driver.findElement( By.id( "date_from" ) );
+        dateFrom.click();
+        dateFrom.clear();
+        dateFrom.sendKeys( LocalDate.now().minusMonths( 6 ).format( DateTimeFormatter.ISO_DATE ) );
+        LOGGER.info( "Clicking on More filters..." );
+        driver.findElement( By.xpath( "//button/*/span[contains(text(),'More filters')]" ) ).click();
+        LOGGER.info( "Setting keyword(s) to reservation ID" );
+        WebElement keywords = driver.findElement( By.xpath( "//input[@name='term']" ) );
+        keywords.click();
+        keywords.sendKeys( reservationId );
+        LOGGER.info( "Clicking on 'Show'" );
+        driver.findElement( By.xpath( "//button/*/span[normalize-space(text())='Show']/.." ) ).click();
+
+        // either we get a span with "Oops, no results." or we get a table of results
+        By SEARCH_RESULTS_XPATH = By.xpath( "//span[contains(text(),'Oops, no results.')] "
+                + "| //a[contains(@href, 'res_id=" + reservationId + "')]" );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( SEARCH_RESULTS_XPATH ) );
+        WebElement searchResult = driver.findElement( SEARCH_RESULTS_XPATH );
+        if ( "span".equals( searchResult.getTagName() ) ) {
+            throw new IOException( "Reservation " + reservationId + " not found." );
+        }
+        LOGGER.info( "Reservation found. Redirecting to " + searchResult.getAttribute( "href" ) );
+        driver.get( searchResult.getAttribute( "href" ) ); // click would open a new tab
     }
 
     /**
@@ -359,6 +403,10 @@ public class BookingComScraper {
      */
     public CardDetails returnCardDetailsForBooking( WebDriver driver, WebDriverWait wait, String bdcReservation ) throws IOException, ParseException {
         lookupReservation( driver, wait, bdcReservation );
+
+        // payment details loaded by javascript
+        final By PAYMENT_DETAILS_BLOCK = By.xpath( "//span[normalize-space(text())='Virtual credit card'] | //span[contains(text(),'successfully charged')]" );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( PAYMENT_DETAILS_BLOCK ) );
 
         List<WebElement> headerViewCCDetails = driver.findElements( By.xpath( "//button/*/span[normalize-space(text())='View credit card details']" ) );
         if ( headerViewCCDetails.isEmpty() ) {
