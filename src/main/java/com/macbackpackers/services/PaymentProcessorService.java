@@ -11,8 +11,6 @@ import java.text.NumberFormat;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -717,8 +715,7 @@ public class PaymentProcessorService {
         }
         catch ( Exception ex ) {
             File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            String filename = "logs/bdc_" + cbReservation.getThirdPartyIdentifier() + "-"
-                    + LocalDate.now().format( DateTimeFormatter.ISO_LOCAL_DATE_TIME ) + ".png";
+            String filename = "logs/bdc_" + cbReservation.getThirdPartyIdentifier() + "-" + System.currentTimeMillis() + ".png";
             FileUtils.copyFile( scrFile, new File( filename ) );
             LOGGER.info( driver.getPageSource() );
             LOGGER.error( "Screenshot saved in " + filename );
