@@ -2,6 +2,7 @@ package com.macbackpackers.services;
 
 import static com.macbackpackers.scrapers.AllocationsPageScraper.POUND;
 
+import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -22,10 +23,13 @@ import java.util.regex.Pattern;
 import javax.mail.MessagingException;
 
 import org.apache.commons.collections.ListUtils;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
@@ -697,6 +701,14 @@ public class PaymentProcessorService {
         try {
             WebDriverWait wait = new WebDriverWait( driver, 60 );
             ccDetails = bdcScraper.returnCardDetailsForBooking( driver, wait, cbReservation.getThirdPartyIdentifier() );
+        }
+        catch ( Exception ex ) {
+            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
+            String filename = "logs/bdc_reservation_" + cbReservation.getIdentifier() + ".png";
+            FileUtils.copyFile( scrFile, new File( filename ) );
+            LOGGER.error( "Screenshot saved in " + filename );
+            LOGGER.info( driver.getPageSource() );
+            throw ex;
         }
         finally {
             driverFactory.returnObject( driver );
