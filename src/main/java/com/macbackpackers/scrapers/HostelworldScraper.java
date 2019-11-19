@@ -159,8 +159,7 @@ public class HostelworldScraper {
         if ( LOGIN_PAGE_TITLE.equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
 
             // create a new web client just for logging in
-            WebClient webClientForLogin = context.getBean( "webClientForHostelworldLogin", WebClient.class );
-            try {
+            try (WebClient webClientForLogin = context.getBean( "webClientForHostelworldLogin", WebClient.class )) {
                 doLogin( webClientForLogin );
                 nextPage = webClientForLogin.getPage( url );
 
@@ -174,9 +173,6 @@ public class HostelworldScraper {
                 for ( Iterator<Cookie> i = webClientForLogin.getCookieManager().getCookies().iterator() ; i.hasNext() ; ) {
                     webClient.getCookieManager().addCookie( i.next() );
                 }
-            }
-            finally {
-                webClientForLogin.close();
             }
         }
         return nextPage;
@@ -428,6 +424,11 @@ public class HostelworldScraper {
      * @throws IOException
      */
     public synchronized void acknowledgeFullPaymentTaken( WebClient webClient, String bookingRef ) throws IOException {
+
+        if ( StringUtils.isBlank( wordPressDAO.getOption( "hbo_hw_password" ) ) ) {
+            LOGGER.info( "Hostelworld password not set. Unable to acknowledge full payment on HWL." );
+            return;
+        }
 
         LOGGER.info( "Acknowledging full payment taken for HWL-" + bookingRef );
 
