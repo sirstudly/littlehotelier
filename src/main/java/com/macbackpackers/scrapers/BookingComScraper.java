@@ -413,10 +413,12 @@ public class BookingComScraper {
         final By PAYMENT_DETAILS_BLOCK = By.xpath( "//span[normalize-space(text())='Virtual credit card'] "
                 + "| //span[contains(text(),'successfully charged')] "
                 + "| //span[contains(text(),'This virtual card is no longer active')] "
-                + "| //span[contains(text(),\"This virtual card isn't active anymore\")]" );
+                + "| //span[contains(text(),\"This virtual card isn't active anymore\")] "
+                + "| //a/span/span[normalize-space(text())='View credit card details']" );
         wait.until( ExpectedConditions.visibilityOfElementLocated( PAYMENT_DETAILS_BLOCK ) );
 
-        List<WebElement> headerViewCCDetails = driver.findElements( By.xpath( "//button/span/span[normalize-space(text())='View credit card details']/../.." ) );
+        List<WebElement> headerViewCCDetails = driver.findElements( By.xpath( "//*[self::button or self::a]/span/span[normalize-space(text())='View credit card details']/../.." ) );
+        LOGGER.info( "Matched " + headerViewCCDetails.size() + " sign-in elements" );
         if ( headerViewCCDetails.isEmpty() ) {
             WebElement paymentDetails = driver.findElement( PAYMENT_DETAILS_BLOCK );
             if ( paymentDetails.getText().contains( "This virtual card is no longer active." )
@@ -425,10 +427,20 @@ public class BookingComScraper {
             }
             throw new MissingUserDataException( "No card details link available." );
         }
-        headerViewCCDetails.get( 0 ).click();
+
+        String nextLink = headerViewCCDetails.get( 0 ).getAttribute( "href" );
+        if ( StringUtils.isNotBlank( nextLink ) ) {
+            LOGGER.info( "Link found, going to " + nextLink );
+            driver.get( nextLink );
+        }
+        else {
+            LOGGER.info( "Clicking on View CC details." );
+            headerViewCCDetails.get( 0 ).click();
+        }
+
         final By SIGN_IN_LOCATOR = By.xpath( "//span[normalize-space(text())='Sign in to view credit card details']" );
         wait.until( ExpectedConditions.visibilityOfElementLocated( SIGN_IN_LOCATOR ) );
-
+            
         // the following should open a new window; focus should move to the new window automatically
         LOGGER.info( "Logging in again to view CC details..." );
         final String CURRENT_WINDOW = driver.getWindowHandle();
@@ -445,17 +457,18 @@ public class BookingComScraper {
         // login again
         doLoginForm( driver, wait, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
 
-        wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( "//th[contains(text(),'Credit Card Details')]" ) ) );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( "//th[contains(text(),'Credit Card Details')] | //th[contains(text(),'Credit card details')]" ) ) );
         CardDetails cardDetails = new CardDetails();
         cardDetails.setName( driver.findElement( By.xpath( "//td[text()=\"Card holder's name:\"]/following-sibling::td" ) ).getText().trim() );
         cardDetails.setCardNumber( driver.findElement( By.xpath( "//td[text()='Card number:']/following-sibling::td" ) ).getText().replaceAll("\\s", "") );
         cardDetails.setCardType( driver.findElement( By.xpath( "//td[text()='Card type:']/following-sibling::td" ) ).getText().trim() );
-        cardDetails.setExpiry( parseExpiryDate( driver.findElement( By.xpath( "//td[text()='Expiration Date:']/following-sibling::td" ) ).getText().trim() ) );
-        cardDetails.setCvv( StringUtils.trimToNull( driver.findElement( By.xpath( "//td[text()='CVC Code:']/following-sibling::td" ) ).getText() ) );
+        cardDetails.setExpiry( parseExpiryDate( driver.findElement( By.xpath( "//td[contains(text(),'Expiration')]/following-sibling::td" ) ).getText().trim() ) );
+        cardDetails.setCvv( StringUtils.trimToNull( driver.findElement( By.xpath( "//td[contains(text(),'CVC')]/following-sibling::td" ) ).getText() ) );
         LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( cardDetails.getCardNumber() ) + " for " + cardDetails.getName() );
 
         // we're done here
-        driver.findElement( By.xpath( "//div[contains(@class,'sbm')]/button[text()='Close']" ) ).click();
+        driver.findElement( By.xpath( "//div[contains(@class,'sbm')]/button[text()='Close'] "
+                + "| //div[@id='modal']/div/button/[text()='Close']" ) ).click();
         driver.switchTo().window( CURRENT_WINDOW ); // switch back to main tab
         return cardDetails;
     }
