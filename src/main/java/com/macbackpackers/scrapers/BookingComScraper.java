@@ -222,7 +222,9 @@ public class BookingComScraper {
             loadReservationFromSearchTab( driver, wait, reservationId );
         }
 
-        wait.until( ExpectedConditions.titleContains( "Reservation Details" ) );
+        wait.until( ExpectedConditions.or(
+                ExpectedConditions.titleContains( "Reservation Details" ),
+                ExpectedConditions.titleContains( "Reservation details" ) ) );
         LOGGER.info( "Loaded " + driver.getCurrentUrl() );
 
         // multiple places where the booking reference can appear; it should be in one of these
