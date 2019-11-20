@@ -52,6 +52,7 @@ import com.macbackpackers.jobs.DumpHostelworldBookingsByArrivalDateJob;
 import com.macbackpackers.jobs.DumpHostelworldBookingsByBookedDateJob;
 import com.macbackpackers.jobs.GroupBookingsReportJob;
 import com.macbackpackers.jobs.ManualChargeJob;
+import com.macbackpackers.jobs.PrepaidChargeJob;
 import com.macbackpackers.jobs.ProcessSagepayTransactionJob;
 import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.jobs.SendAllUnsentEmailJob;
@@ -392,6 +393,14 @@ public class ProcessorServiceTest {
     public void testCreatePrepaidChargeJob() throws Exception {
         CreatePrepaidChargeJob j = new CreatePrepaidChargeJob();
         j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void testPrepaidChargeJob() throws Exception {
+        PrepaidChargeJob j = new PrepaidChargeJob();
+        j.setStatus( JobStatus.submitted );
+        j.setReservationId( "23486284" );
         dao.insertJob( j );
     }
 

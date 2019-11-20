@@ -69,4 +69,12 @@ public abstract class AbstractJob extends Job {
         return numberRetries;
     }
 
+    /**
+     * Sets the number of attempts to run this job before aborting with a failure.
+     * 
+     * @param retries number retries
+     */
+    public void setRetryCount( int retries ) {
+        numberRetries = retries;
+    }
 }

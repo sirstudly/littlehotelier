@@ -9,10 +9,13 @@ import java.math.BigDecimal;
 import java.text.ParseException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -24,6 +27,7 @@ import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
@@ -474,6 +478,62 @@ public class BookingComScraper {
     }
 
     /**
+     * Searches for all prepaid bookings between the given dates with VCC details and can be charged
+     * immediately.
+     * 
+     * @param driver
+     * @param wait
+     * @param checkinDateStart checkin date (inclusive)
+     * @param checkinDateEnd checkin date (inclusive)
+     * @return non-null list of BDC booking refs
+     * @throws IOException
+     */
+    public List<String> getAllVCCBookingsThatCanBeCharged( WebDriver driver, WebDriverWait wait, LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
+        doLogin( driver, wait );
+        LOGGER.info( "Loading Reservations tab" );
+        WebElement reservationsAnchor = driver.findElement( By.xpath( "//nav//a/span[normalize-space(text())='Reservations']/.." ) );
+        driver.get( reservationsAnchor.getAttribute( "href" ) );
+
+        LOGGER.info( "Setting from/to dates..." ); // BDC goes all wonky if not done in this order
+        WebElement dateTo = driver.findElement( By.id( "date_to" ) );
+        dateTo.click();
+        dateTo.clear();
+        dateTo.sendKeys( checkinDateEnd.format( DateTimeFormatter.ISO_DATE ) );
+
+        WebElement dateFrom = driver.findElement( By.id( "date_from" ) );
+        dateFrom.click();
+        dateFrom.clear();
+        dateFrom.sendKeys( checkinDateStart.format( DateTimeFormatter.ISO_DATE ) );
+
+        LOGGER.info( "Clicking on More filters..." );
+        driver.findElement( By.xpath( "//button/*/span[contains(text(),'More filters')]" ) ).click();
+
+        LOGGER.info( "Clicking on 'Paid online' bookings" );
+        WebElement paidOnlineCheck = driver.findElement( By.xpath( "//span[contains(text(),'Paid online')]" ) );
+        paidOnlineCheck.click();
+        LOGGER.info( "Clicking on 'Show'" );
+        driver.findElement( By.xpath( "//button/*/span[normalize-space(text())='Show']/.." ) ).click();
+
+        // either we get a span with "Oops, no results." or we get a table of results
+        By SEARCH_RESULTS_XPATH = By.xpath( "//span[contains(text(),'Oops, no results.')] "
+                + "| //th//span[contains(text(),'Guest')]" );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( SEARCH_RESULTS_XPATH ) );
+        WebElement searchResult = driver.findElement( SEARCH_RESULTS_XPATH );
+        if ( searchResult.getText().contains( "no results" ) ) {
+            LOGGER.info( "No results.. nothing to do." );
+            return Collections.emptyList();
+        }
+
+        List<String> reservationIds = new ArrayList<>();
+        do {
+            reservationIds.addAll( driver.findElements( By.xpath( "//tr[td/div/span[contains(@class,'vcc_active_status_txt')]]/td[@data-heading='Booking number']/a" ) )
+                    .stream().map( a -> a.getText() ).collect( Collectors.toList() ) );
+        }
+        while ( loadNextResultsPage( driver, wait ) );
+        return reservationIds;
+    }
+
+    /**
      * Converts "MM / YYYY" to MMYY
      *
      * @param bdcExpiryFormat non-null expiry date
@@ -508,5 +568,36 @@ public class BookingComScraper {
     private WebElement findElement( WebDriver driver, WebDriverWait wait, By by ) {
         wait.until( ExpectedConditions.visibilityOfElementLocated( by ) );
         return driver.findElement( by );
+    }
+
+    /**
+     * The "Next" link is enabled at runtime.. this waits for the link to be enabled (if available)
+     * and returns true if it does. Returns false on timeout.
+     * 
+     * @param driver
+     * @param wait
+     * @return true (after clicking next page) or false if next page doesn't exist.
+     */
+    private boolean loadNextResultsPage( WebDriver driver, WebDriverWait wait ) {
+        LOGGER.info( "Checking next page link..." );
+        WebElement nextLink = driver.findElement( By.xpath( "//li[a[@title='Next']]" ) );
+        Actions actions = new Actions( driver );
+        actions.moveToElement( nextLink );
+        actions.perform();
+
+        try {
+            wait.until( ExpectedConditions.not( ExpectedConditions.attributeContains( nextLink, "class", "item--disabled" ) ) );
+        }
+        catch ( TimeoutException ex ) {
+            LOGGER.info( "Doesn't look like there's a next page..." );
+            return false;
+        }
+
+        // we need to wait until the table loads.. grab a reference to the first entry and wait for it to change
+        LOGGER.info( "Clicking on next page..." );
+        WebElement firstRecord = driver.findElement( By.xpath( "//tbody/tr/th/a[@target='_blank']" ) );
+        nextLink.click();
+        wait.until( ExpectedConditions.stalenessOf( firstRecord ) );
+        return true;
     }
 }

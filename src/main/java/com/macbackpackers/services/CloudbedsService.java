@@ -99,6 +99,9 @@ public class CloudbedsService {
     @Autowired
     private GenericObjectPool<WebDriver> driverFactory;
 
+    @Value( "${chromescraper.maxwait.seconds:60}" )
+    private int maxWaitSeconds;
+
     @Value( "${hostelworld.latecancellation.hours:48}" )
     private int HWL_LATE_CANCEL_HOURS;
 
@@ -338,6 +341,54 @@ public class CloudbedsService {
                 j.setReservationId( r.getReservationId() );
                 dao.insertJob( j );
             } );
+    }
+
+    /**
+     * Searches for all bookings between the given dates and creates a PrepaidChargeJob for all
+     * virtual card bookings that can be charged immediately.
+     * 
+     * @param driver
+     * @param wait
+     * @param checkinDateStart checkin date (inclusive)
+     * @param checkinDateEnd checkin date (inclusive)
+     * @throws Exception
+     */
+    public void createBDCPrepaidChargeJobs( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws Exception {
+        WebDriver driver = driverFactory.borrowObject();
+        try {
+            WebDriverWait wait = new WebDriverWait( driver, maxWaitSeconds );
+            bdcScraper.getAllVCCBookingsThatCanBeCharged( driver, wait, checkinDateStart, checkinDateEnd )
+                .stream().forEach( this::createPrepaidChargeJob );
+        }
+        finally {
+            driverFactory.returnObject( driver );
+        }
+    }
+
+    /**
+     * Searches Cloudbeds for the given BDC reservation and creates a PrepaidChargeJob for it.
+     * 
+     * @param bdcReference Booking.com reference
+     */
+    private void createPrepaidChargeJob( String bdcReference ) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
+            scraper.getReservations( webClient, bdcReference ).stream()
+                    .filter( p -> p.getSourceName().contains( "Booking.com" ) ) // just in case
+                    .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                    .filter( r -> r.getThirdPartyIdentifier().equals( bdcReference ) )
+                    .forEach( r -> {
+                        LOGGER.info( "Creating a PrepaidChargeJob for BDC-{} ({}) - {}, {} ({} to {})",
+                                bdcReference, r.getReservationId(), r.getLastName(), r.getFirstName(),
+                                r.getCheckinDate(), r.getCheckoutDate() );
+                        PrepaidChargeJob j = new PrepaidChargeJob();
+                        j.setStatus( JobStatus.submitted );
+                        j.setReservationId( r.getReservationId() );
+                        dao.insertJob( j );
+                    } );
+        }
+        catch ( IOException ex ) {
+            throw new RuntimeException( ex );
+        }
     }
 
     /**
@@ -948,10 +999,9 @@ public class CloudbedsService {
      * @throws Exception
      */
     public void markCreditCardInvalidOnBDC( String reservationId ) throws Exception {
-        final int MAX_WAIT_SECONDS = 60;
         WebDriver driver = driverFactory.borrowObject();
         try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
-            WebDriverWait wait = new WebDriverWait( driver, MAX_WAIT_SECONDS );
+            WebDriverWait wait = new WebDriverWait( driver, maxWaitSeconds );
             Reservation r = scraper.getReservationRetry( webClient, reservationId );
 
             LOGGER.info( r.getThirdPartyIdentifier() + ": " + r.getFirstName() + " " + r.getLastName() );

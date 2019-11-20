@@ -1,10 +1,16 @@
 
 package com.macbackpackers.jobs;
 
+import java.time.LocalDate;
+
 import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
+import javax.persistence.Transient;
+
+import org.springframework.beans.factory.annotation.Autowired;
 
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.services.CloudbedsService;
 
 /**
  * Job that creates {@link PrepaidChargeJob}s for all prepaid bookings
@@ -13,6 +19,10 @@ import com.macbackpackers.beans.JobStatus;
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.CreatePrepaidChargeJob" )
 public class CreatePrepaidChargeJob extends AbstractJob {
+
+    @Autowired
+    @Transient
+    private CloudbedsService cloudbedsService;
 
     @Override
     public void processJob() throws Exception {
@@ -31,6 +41,15 @@ public class CreatePrepaidChargeJob extends AbstractJob {
                     chargeJob.setReservationId( String.valueOf( a.getReservationId() ) );
                     dao.insertJob( chargeJob );
                 } );
+
+        // also, login to BDC and check for any prepaid bookings we haven't charged yet
+        try {
+            cloudbedsService.createBDCPrepaidChargeJobs( LocalDate.now().minusDays( 7 ), LocalDate.now().minusDays( 1 ) );
+        }
+        catch ( Exception ex ) {
+            setRetryCount( 1 ); // don't retry if we fail at this point
+            throw ex;
+        }
     }
 
 }

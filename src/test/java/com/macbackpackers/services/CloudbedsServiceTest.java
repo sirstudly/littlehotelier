@@ -118,4 +118,16 @@ public class CloudbedsServiceTest {
         cloudbedsService.sendTemplatedGmail( webClient, "10568885", "Hogmanay at Castle Rock!" );
     }
 
+    @Test
+    public void testCreateCanceledPrepaidBDCBookingsChargeJobs() throws Exception {
+        cloudbedsService.createCanceledPrepaidBDCBookingsChargeJobs( webClient, 
+                LocalDate.now().withMonth( 8 ).withDayOfMonth( 31 ),
+                LocalDate.now().withMonth( 11 ).withDayOfMonth( 16 ));
+    }
+
+    @Test
+    public void testCreatePrepaidChargeJobs() throws Exception {
+        cloudbedsService.createBDCPrepaidChargeJobs( 
+                LocalDate.now().minusDays( 7 ), LocalDate.now().minusDays( 1 ) );
+    }
 }

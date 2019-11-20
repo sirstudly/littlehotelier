@@ -143,4 +143,9 @@ public class PaymentProcessorServiceTest {
     public void testSendSagepayEmail() throws Exception {
         paymentService.sendSagepayPaymentConfirmationEmail( cbWebClient, dao.fetchSagepayTransaction( 34 ) );
     }
+
+    @Test
+    public void testProcessPrepaidBooking() throws Exception {
+        paymentService.processPrepaidBooking( cbWebClient, "22970476" );
+    }
 }
