@@ -44,7 +44,6 @@ public class CloudbedsScraperTest {
 
     @Autowired
     @Qualifier( "webClientForCloudbeds" )
-//    @Qualifier( "webClientJavascriptDisabled" )
     WebClient webClient;
     
     @Autowired 

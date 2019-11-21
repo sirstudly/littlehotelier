@@ -33,7 +33,7 @@ public class AllocationsPageScraperTest {
     AllocationsPageScraper scraper;
 
     @Autowired
-    @Qualifier( "webClientScriptingDisabled" )
+    @Qualifier( "webClientForCloudbeds" )
     WebClient webClient;
 
     @Autowired

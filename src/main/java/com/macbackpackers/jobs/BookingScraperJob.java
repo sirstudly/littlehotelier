@@ -30,7 +30,7 @@ public class BookingScraperJob extends AbstractJob {
 
     @Autowired
     @Transient
-    @Qualifier( "webClientScriptingDisabled" )
+    @Qualifier( "webClientForCloudbeds" )
     private WebClient webClient;
 
     @Override

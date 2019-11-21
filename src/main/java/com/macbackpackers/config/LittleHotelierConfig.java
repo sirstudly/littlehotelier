@@ -5,7 +5,8 @@ import java.io.IOException;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.openqa.selenium.WebDriver;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.context.annotation.Bean;
@@ -18,12 +19,14 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.gargoylesoftware.htmlunit.BrowserVersion;
+import com.gargoylesoftware.htmlunit.FailingHttpStatusCodeException;
 import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
+import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.WebRequest;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 
 @Configuration
@@ -33,11 +36,10 @@ import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 @PropertySource( "classpath:config.properties" )
 public class LittleHotelierConfig {
 
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+
     @Value( "${lilhotelier.bedmatcher.classname}" )
     private String lhBedMatcherClassName;
-
-    @Autowired
-    private CloudbedsScraper cloudbedsScraper;
 
     @Bean( name = "reportsSQL" )
     public PropertiesFactoryBean getSqlReports() {
@@ -85,41 +87,18 @@ public class LittleHotelierConfig {
         return webClient;
     }
 
-    @Bean( name = "webClientScriptingDisabled" )
-    @Scope( "prototype" )
-    public WebClient getWebClientWithScriptingDisabled() {
-        // try to speed things up a bit by disabling unused functionality
-        WebClient webClient = new WebClient( BrowserVersion.CHROME );
-        webClient.getOptions().setTimeout( 120000 );
-        webClient.getOptions().setRedirectEnabled( true );
-        webClient.getOptions().setJavaScriptEnabled( false );
-        webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
-        webClient.getOptions().setThrowExceptionOnScriptError( false );
-        webClient.getOptions().setCssEnabled( false );
-        webClient.getOptions().setUseInsecureSSL( true );
-        return webClient;
-    }
-
     @Bean( name = "webClientForCloudbeds" )
     @Scope( "prototype" )
     public WebClient getCloudbedsWebClient() throws IOException {
-        // javascript disabled
-        WebClient webClient = new WebClient( BrowserVersion.CHROME );
-        webClient.getOptions().setTimeout( 120000 );
-        webClient.getOptions().setRedirectEnabled( true );
-        webClient.getOptions().setJavaScriptEnabled( false );
-        webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
-        webClient.getOptions().setThrowExceptionOnScriptError( false );
-        webClient.getOptions().setCssEnabled( false );
-        webClient.getOptions().setUseInsecureSSL( true );
-        return webClient;
-    }
-
-    @Bean( name = "webClientJavascriptDisabled" )
-    @Scope( "prototype" )
-    public WebClient getJavascriptDisabledWebClient() throws IOException {
-        // javascript disabled
-        WebClient webClient = new WebClient( BrowserVersion.CHROME );
+        WebClient webClient = new WebClient( BrowserVersion.CHROME ) {
+            private static final long serialVersionUID = 3571378018703618188L;
+            @Override
+            public <P extends Page> P getPage( final WebRequest request ) throws IOException,
+                    FailingHttpStatusCodeException {
+                LOGGER.info( request.getHttpMethod() + ": " + request.getUrl() );
+                return super.getPage( request );
+            }
+        };
         webClient.getOptions().setTimeout( 120000 );
         webClient.getOptions().setRedirectEnabled( true );
         webClient.getOptions().setJavaScriptEnabled( false );

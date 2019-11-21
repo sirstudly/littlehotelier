@@ -3,14 +3,14 @@
 
     <property name="USER_HOME" value="logs" />
 
-	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-		<!-- encoders are assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
-		<encoder>
-			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36}:%line - %msg%n</pattern>
-		</encoder>
-	</appender>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- encoders are assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36}:%line - %msg%n</pattern>
+        </encoder>
+    </appender>
 
-	<!-- a separate log file for each job -->
+    <!-- a separate log file for each job -->
     <appender name="BY-JOB" class="ch.qos.logback.classic.sift.SiftingAppender">
 
         <!-- This is MDC value -->
@@ -45,15 +45,34 @@
         </sift>
     </appender>
 
-	<logger name="org.hibernate" level="INFO" />
+    <appender name="BY-CONFIG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${USER_HOME}/transport.log</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <Pattern>%d{yyyy-MM-dd HH:mm:ss} %mdc [%thread] %level %logger{35}:%line - %msg%n</Pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <FileNamePattern>${USER_HOME}/transport.%i.log.zip</FileNamePattern>
+            <MinIndex>1</MinIndex>
+            <MaxIndex>10</MaxIndex>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <MaxFileSize>50MB</MaxFileSize>
+        </triggeringPolicy>
+    </appender>
+
+    <logger name="org.hibernate" level="INFO" />
     <logger name="org.quartz" level="INFO" />
+
+    <logger name="com.macbackpackers.config" level="INFO">
+        <appender-ref ref="BY-CONFIG" />
+    </logger>
 
     <logger name="com.macbackpackers" level="INFO" additivity="false">
         <appender-ref ref="BY-JOB" />
         <appender-ref ref="STDOUT" />
     </logger>
     
-   	<root level="INFO">
-		<appender-ref ref="STDOUT" />
-	</root>
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+    </root>
 </configuration>
