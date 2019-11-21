@@ -38,7 +38,7 @@ public class CreateDepositChargeJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         if ( dao.isCloudbeds() ) {
-            try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
+            try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
                 HashSet<DepositChargeJob> jobs = new HashSet<>(); // make unique
                 jobs.addAll( collectNewlyBookedDepositJobsForCloudbeds( webClient ) );
                 jobs.addAll( collectUpcomingBDCDepositJobsForCloudbeds( webClient ) );

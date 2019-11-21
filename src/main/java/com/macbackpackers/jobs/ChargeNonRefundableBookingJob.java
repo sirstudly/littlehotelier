@@ -22,7 +22,7 @@ public class ChargeNonRefundableBookingJob extends AbstractJob {
 
     @Autowired
     @Transient
-    @Qualifier( "webClientForCloudbedsNoValidate" )
+    @Qualifier( "webClientForCloudbeds" )
     private WebClient cbWebClient;
 
     @Autowired

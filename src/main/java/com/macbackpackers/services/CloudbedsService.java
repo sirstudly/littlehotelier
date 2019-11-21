@@ -371,7 +371,7 @@ public class CloudbedsService {
      * @param bdcReference Booking.com reference
      */
     private void createPrepaidChargeJob( String bdcReference ) {
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
             scraper.getReservations( webClient, bdcReference ).stream()
                     .filter( p -> p.getSourceName().contains( "Booking.com" ) ) // just in case
                     .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
@@ -1000,7 +1000,7 @@ public class CloudbedsService {
      */
     public void markCreditCardInvalidOnBDC( String reservationId ) throws Exception {
         WebDriver driver = driverFactory.borrowObject();
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
             WebDriverWait wait = new WebDriverWait( driver, maxWaitSeconds );
             Reservation r = scraper.getReservationRetry( webClient, reservationId );
 

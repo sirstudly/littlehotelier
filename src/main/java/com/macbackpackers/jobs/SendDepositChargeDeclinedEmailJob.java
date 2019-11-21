@@ -31,7 +31,7 @@ public class SendDepositChargeDeclinedEmailJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
             if ( dao.isCloudbedsEmailEnabled() ) {
                 cloudbedsService.sendDepositChargeDeclinedEmail( webClient, getReservationId(), getAmount(), getPaymentURL() );
             }

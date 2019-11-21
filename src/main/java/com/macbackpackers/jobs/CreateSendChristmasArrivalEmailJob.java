@@ -30,7 +30,7 @@ public class CreateSendChristmasArrivalEmailJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
             cloudbedsService.createBulkEmailJob( webClient, "Arriving on Christmas Day!", null, null,
                     LocalDate.now().withMonth( 12 ).withDayOfMonth( 25 ),
                     LocalDate.now().withMonth( 12 ).withDayOfMonth( 25 ), "confirmed,not_confirmed" );

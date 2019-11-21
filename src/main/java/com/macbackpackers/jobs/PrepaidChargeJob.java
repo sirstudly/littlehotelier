@@ -28,7 +28,7 @@ public class PrepaidChargeJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
             paymentProcessor.processPrepaidBooking( webClient, getReservationId() );
         }
     }

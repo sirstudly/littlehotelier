@@ -36,7 +36,7 @@ public class DepositChargeJob extends AbstractJob {
     public void processJob() throws Exception {
 
         if ( dao.isCloudbeds() ) {
-            try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
+            try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
                 paymentProcessor.processDepositPayment( webClient, String.valueOf( getReservationId() ) );
             }
         }

@@ -103,14 +103,6 @@ public class LittleHotelierConfig {
     @Bean( name = "webClientForCloudbeds" )
     @Scope( "prototype" )
     public WebClient getCloudbedsWebClient() throws IOException {
-        WebClient webClient = getCloudbedsWebClientNoValidate();
-        cloudbedsScraper.validateLoggedIn( webClient );
-        return webClient;
-    }
-
-    @Bean( name = "webClientForCloudbedsNoValidate" )
-    @Scope( "prototype" )
-    public WebClient getCloudbedsWebClientNoValidate() throws IOException {
         // javascript disabled
         WebClient webClient = new WebClient( BrowserVersion.CHROME );
         webClient.getOptions().setTimeout( 120000 );

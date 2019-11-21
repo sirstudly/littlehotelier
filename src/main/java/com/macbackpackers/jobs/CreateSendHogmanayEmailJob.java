@@ -30,7 +30,7 @@ public class CreateSendHogmanayEmailJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbedsNoValidate", WebClient.class )) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
             cloudbedsService.createBulkEmailJob( webClient, "Hogmanay at Castle Rock!",
                     LocalDate.now().withMonth( 12 ).withDayOfMonth( 31 ),
                     LocalDate.now().withMonth( 12 ).withDayOfMonth( 31 ),

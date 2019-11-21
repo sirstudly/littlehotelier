@@ -90,7 +90,7 @@ public class BedCountJob extends AbstractJob {
 
     private WebClient getWebClient() {
         if ( webClient == null ) {
-            webClient = ctx.getBean( dao.isCloudbeds() ? "webClientForCloudbedsNoValidate" : "webClientScriptingDisabled",
+            webClient = ctx.getBean( dao.isCloudbeds() ? "webClientForCloudbeds" : "webClientScriptingDisabled",
                     WebClient.class );
         }
         return webClient;

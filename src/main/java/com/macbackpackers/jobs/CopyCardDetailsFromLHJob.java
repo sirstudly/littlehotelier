@@ -21,7 +21,7 @@ public class CopyCardDetailsFromLHJob extends AbstractJob {
 
     @Autowired
     @Transient
-    @Qualifier( "webClientForCloudbedsNoValidate" )
+    @Qualifier( "webClientForCloudbeds" )
     private WebClient cbWebClient;
 
     @Autowired
