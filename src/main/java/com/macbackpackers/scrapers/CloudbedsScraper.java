@@ -133,8 +133,6 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createGetUserHasViewCCPermisions();
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
-        LOGGER.info( redirectPage.getWebResponse().getContentAsString() ); // to be removed
         Optional<CloudbedsJsonResponse> response = Optional.ofNullable(
                 fromJson( redirectPage.getWebResponse().getContentAsString(),
                         CloudbedsJsonResponse.class ) );
@@ -169,7 +167,6 @@ public class CloudbedsScraper {
      */
     public HtmlPage loadDashboard( WebClient webClient ) throws IOException {
         HtmlPage loadedPage = webClient.getPage( "https://hotels.cloudbeds.com/connect/" + getPropertyId() );
-        LOGGER.info( "Loading Dashboard." );
         if ( loadedPage.getUrl().getPath().contains( "/login" ) ) {
             LOGGER.info( "Oops, I don't think we're logged in." );
             throw new UnrecoverableFault( "Not logged in. Update session data." );
@@ -187,7 +184,6 @@ public class CloudbedsScraper {
      */
     public HtmlPage loadReservationPage( WebClient webClient, String reservationId ) throws IOException {
         HtmlPage loadedPage = webClient.getPage( "https://hotels.cloudbeds.com/connect/" + getPropertyId() + "#/reservations/" + reservationId );
-        LOGGER.info( "Loading reservation " + reservationId );
         if ( loadedPage.getUrl().getPath().contains( "/login" ) ) {
             LOGGER.info( "Oops, I don't think we're logged in." );
             throw new UnrecoverableFault( "Not logged in. Update session data." );
@@ -209,7 +205,6 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createGetReservationRequest( reservationId );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Pulling reservation data for #" + reservationId );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         Reservation r = fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class );
@@ -343,7 +338,6 @@ public class CloudbedsScraper {
      */
     private List<Customer> getCustomers( WebClient webClient, WebRequest requestSettings ) throws IOException {
         
-        LOGGER.info( "Going to: " + requestSettings.getUrl().getPath() );
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
         
@@ -375,7 +369,6 @@ public class CloudbedsScraper {
     public boolean isExistsSagepayPaymentWithVendorTxCode( WebClient webClient, Reservation res, String vendorTxCode ) throws IOException {
         
         WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res );
-        LOGGER.info( "Going to: " + requestSettings.getUrl().getPath() );
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
@@ -419,8 +412,7 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createGetRoomAssignmentsReport( stayDate, stayDate.plusDays( 1 ) );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Fetching staff allocations for " + stayDate.format(
-                DateTimeFormatter.ISO_LOCAL_DATE ) + " from: " + redirectPage.getUrl().getPath() );
+        LOGGER.info( "Fetching staff allocations for " + stayDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
@@ -461,7 +453,6 @@ public class CloudbedsScraper {
                 res.getReservationId(), bookingRoomId, cardType, amount, description );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         String jsonResponse = redirectPage.getWebResponse().getContentAsString();
         LOGGER.debug( jsonResponse );
         
@@ -490,7 +481,6 @@ public class CloudbedsScraper {
         LOGGER.info( "Adding note: " + note + " to reservation " + reservationId );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "POST: " + redirectPage.getUrl().getPath() );
         String jsonResponse = redirectPage.getWebResponse().getContentAsString();
         LOGGER.debug( jsonResponse );
 
@@ -518,7 +508,6 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createAddCreditCardRequest( reservationId, cardDetails );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "POST for reservation " + reservationId + " to: " + redirectPage.getUrl().getPath() );
         String jsonResponse = redirectPage.getWebResponse().getContentAsString();
         LOGGER.debug( jsonResponse );
 
@@ -545,7 +534,6 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createReservationSourceLookupRequest();
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
@@ -627,7 +615,6 @@ public class CloudbedsScraper {
                 reservationId, cardId, amount );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
@@ -644,7 +631,6 @@ public class CloudbedsScraper {
                 reservationId, cardId, amount );
 
         redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
@@ -666,7 +652,6 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createPingRequest();
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
     }
 
@@ -680,9 +665,7 @@ public class CloudbedsScraper {
      */
     public HtmlPage navigateToPage( WebClient webClient, String pageURL ) throws IOException {
         // attempt to go the page directly using the current credentials
-        LOGGER.info( "Loading page: " + pageURL );
         HtmlPage nextPage = webClient.getPage( pageURL );
-        LOGGER.debug( "Now on " + nextPage.getUrl() );
         if ( nextPage.getUrl().getPath().endsWith( "/login" ) ) {
             throw new UnrecoverableFault( "Login to Cloudbeds failed. Has the password changed?" );
         }
@@ -741,7 +724,6 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createGetActivityLog( identifier );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
@@ -777,7 +759,6 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createGetEmailTemplate( templateId );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
@@ -880,7 +861,6 @@ public class CloudbedsScraper {
     public EmailTemplateInfo fetchEmailTemplate( WebClient webClient, String templateName ) throws IOException {
 
         Page redirectPage = webClient.getPage( jsonRequestFactory.createGetPropertyContent() );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
 
         Optional<JsonElement> emailTemplate = StreamSupport.stream(
                 fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ).getAsJsonObject()
@@ -911,7 +891,6 @@ public class CloudbedsScraper {
     public Optional<LocalDateTime> getEmailLastSentDate( WebClient webClient, String reservationId, String templateName ) throws IOException {
 
         Page redirectPage = webClient.getPage( jsonRequestFactory.createGetEmailDeliveryLogRequest( reservationId ) );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
 
         JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
@@ -946,7 +925,6 @@ public class CloudbedsScraper {
                 emailTo, transformBodyFn, token );
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
@@ -967,7 +945,6 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createGetPropertyContent();
 
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
         return redirectPage.getWebResponse().getContentAsString();
     }

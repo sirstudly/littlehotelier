@@ -48,7 +48,7 @@
     <appender name="BY-CONFIG" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${USER_HOME}/transport.log</file>
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-            <Pattern>%d{yyyy-MM-dd HH:mm:ss} %mdc [%thread] %level %logger{35}:%line - %msg%n</Pattern>
+            <Pattern>%d{yyyy-MM-dd HH:mm:ss} %mdc [%thread] %level - %msg%n</Pattern>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
             <FileNamePattern>${USER_HOME}/transport.%i.log.zip</FileNamePattern>
