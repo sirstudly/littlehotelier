@@ -460,7 +460,7 @@ public class CloudbedsJsonRequestFactory {
      * @throws IOException on i/o error
      */
     public WebRequest createGetPropertyContent() throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://macbackpackers.cloudbeds.com/hotel/get_content" );
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/get_content" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),

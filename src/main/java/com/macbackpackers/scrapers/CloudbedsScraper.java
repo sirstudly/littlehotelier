@@ -14,6 +14,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,6 +34,9 @@ import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -59,6 +64,17 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_SAGEPAY_PAYMENT_CONFIRMATION = "Sagepay Payment Confirmation";
     public static final String TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL = "Deposit Charge Successful";
     public static final String TEMPLATE_DEPOSIT_CHARGE_DECLINED = "Deposit Charge Declined";
+
+    // the last result of getPropertyContent() as it's an expensive operation
+    private static String propertyContent;
+
+    private static LoadingCache<String, EmailTemplateInfo> emailTemplateCache = CacheBuilder.newBuilder()
+            .build( new CacheLoader<String, EmailTemplateInfo>() {
+                @Override
+                public EmailTemplateInfo load( String templateId ) {
+                    throw new UnsupportedOperationException( "Not used." ); // logic defined in get(key, Callable)
+                }
+            } );
 
     @Autowired
     @Qualifier( "gsonForCloudbeds" )
@@ -860,22 +876,32 @@ public class CloudbedsScraper {
      */
     public EmailTemplateInfo fetchEmailTemplate( WebClient webClient, String templateName ) throws IOException {
 
-        Page redirectPage = webClient.getPage( jsonRequestFactory.createGetPropertyContent() );
+        try {
+            // retrieve email template only if this is the first time we've done it
+            return emailTemplateCache.get( templateName, new Callable<EmailTemplateInfo>() {
+                @Override
+                public EmailTemplateInfo call() throws Exception {
+                    Optional<JsonElement> emailTemplate = StreamSupport.stream(
+                            fromJson( getPropertyContent( webClient ), JsonElement.class ).getAsJsonObject()
+                                    .get( "email_templates" ).getAsJsonArray().spliterator(),
+                            false )
+                            .filter( t -> templateName.equals( t.getAsJsonObject().get( "template_name" ).getAsString() ) )
+                            .findFirst();
 
-        Optional<JsonElement> emailTemplate = StreamSupport.stream(
-                fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ).getAsJsonObject()
-                        .get( "email_templates" ).getAsJsonArray().spliterator(),
-                false )
-                .filter( t -> templateName.equals( t.getAsJsonObject().get( "template_name" ).getAsString() ) )
-                .findFirst();
+                    if ( false == emailTemplate.isPresent() ) {
+                        throw new MissingUserDataException( "Failed to retrieve email template" );
+                    }
 
-        if ( false == emailTemplate.isPresent() ) {
-            throw new MissingUserDataException( "Failed to retrieve email template" );
+                    String emailTemplateId = emailTemplate.get().getAsJsonObject().get( "email_template_id" ).getAsString();
+                    LOGGER.info( "Found " + templateName + " email template id: " + emailTemplateId );
+
+                    return getEmailTemplate( webClient, emailTemplateId );
+                }
+            } );
         }
-
-        String emailTemplateId = emailTemplate.get().getAsJsonObject().get( "email_template_id" ).getAsString();
-        LOGGER.info( "Found " + templateName + " email template id: " + emailTemplateId );
-        return getEmailTemplate( webClient, emailTemplateId );
+        catch ( ExecutionException ex ) {
+            throw new IOException( ex );
+        }
     }
 
     /**
@@ -942,11 +968,14 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public String getPropertyContent( WebClient webClient ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createGetPropertyContent();
+        if ( propertyContent == null ) {
+            WebRequest requestSettings = jsonRequestFactory.createGetPropertyContent();
 
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-        return redirectPage.getWebResponse().getContentAsString();
+            Page redirectPage = webClient.getPage( requestSettings );
+            LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+            propertyContent = redirectPage.getWebResponse().getContentAsString();
+        }
+        return propertyContent;
     }
 
     /**
