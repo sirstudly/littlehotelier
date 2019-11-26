@@ -34,6 +34,7 @@ import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -365,6 +366,17 @@ public class CloudbedsScraper {
         Optional<JsonObject> jobject = Optional.ofNullable( jelement.get().getAsJsonObject() );
         if( false == jobject.isPresent() ) {
             throw new MissingUserDataException( "Failed to retrieve reservations." );
+        }
+
+        // check if we're using an outdated version
+        if ( false == jobject.get().get( "success" ).getAsBoolean() ) {
+            String version = jobject.get().get("version").getAsString();
+            if ( StringUtils.isNotBlank( version ) && false == jsonRequestFactory.getVersion().equals( version ) ) {
+                LOGGER.info( "Looks like we're using an outdated version. Updating our records." );
+                jsonRequestFactory.setVersion( version );
+                requestSettings.getRequestParameters().add( new NameValuePair( "version", version ) );
+                return getCustomers( webClient, requestSettings );
+            }
         }
 
         Optional<JsonArray> jarray = Optional.ofNullable( jobject.get().getAsJsonArray( "aaData" ) );
