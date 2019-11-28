@@ -722,7 +722,14 @@ public class PaymentProcessorService {
             throw ex;
         }
         finally {
-            driverFactory.returnObject( driver );
+            // we can't have more than one window open... especially if that window
+            // contains credit card details (we don't want to mix it up with another booking)
+            if ( driver.getWindowHandles().size() > 1 ) {
+                driverFactory.invalidateObject( driver );
+            }
+            else {
+                driverFactory.returnObject( driver );
+            }
         }
         return ccDetails;
     }

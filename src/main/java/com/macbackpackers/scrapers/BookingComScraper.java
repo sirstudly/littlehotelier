@@ -12,6 +12,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -442,26 +443,41 @@ public class BookingComScraper {
             headerViewCCDetails.get( 0 ).click();
         }
 
-        final By SIGN_IN_LOCATOR = By.xpath( "//span[normalize-space(text())='Sign in to view credit card details']" );
-        wait.until( ExpectedConditions.visibilityOfElementLocated( SIGN_IN_LOCATOR ) );
-            
-        // the following should open a new window; focus should move to the new window automatically
-        LOGGER.info( "Logging in again to view CC details..." );
-        final String CURRENT_WINDOW = driver.getWindowHandle();
-        driver.findElement( SIGN_IN_LOCATOR ).click();
-        wait.until( ExpectedConditions.numberOfWindowsToBe( 2 ) );
+        // we may or may not need to login again to view CC details
+        final String SIGN_IN_LOCATOR_PATH = "//span[normalize-space(text())='Sign in to view credit card details']";
+        final String CC_DETAILS_PATH = "//th[contains(text(),'Credit Card Details')] | //th[contains(text(),'Credit card details')]";
+        final String CC_DETAILS_NOT_AVAIL_PATH = "//h2[contains(text(),\"credit card details aren't available\")]";
+        final WebElement locator = wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( 
+                SIGN_IN_LOCATOR_PATH + " | " + CC_DETAILS_PATH + " | " + CC_DETAILS_NOT_AVAIL_PATH ) ) );
 
-        // switch to other window
-        driver.getWindowHandles().stream()
-            .filter( w -> false == CURRENT_WINDOW.equals( w ) )
-            .findFirst()
-            .map( w -> driver.switchTo().window( w ) )
-            .orElseThrow( () -> new IOException("Unable to find new login window.") );
+        Optional<Runnable> CLOSE_WINDOW_TASK = Optional.empty();
+        if ( "h2".equals( locator.getTagName() ) ) {
+            throw new MissingUserDataException( "Credit card details aren't available." );
+        }
+        else if ( "span".equals( locator.getTagName() ) ) {
+            // the following should open a new window; switch to new window
+            LOGGER.info( "Logging in again to view CC details..." );
+            final String CURRENT_WINDOW = driver.getWindowHandle();
+            driver.findElement( By.xpath( SIGN_IN_LOCATOR_PATH ) ).click();
+            wait.until( ExpectedConditions.numberOfWindowsToBe( 2 ) );
 
-        // login again
-        doLoginForm( driver, wait, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
+            // switch to other window
+            driver.getWindowHandles().stream()
+                .filter( w -> false == CURRENT_WINDOW.equals( w ) )
+                .findFirst()
+                .map( w -> driver.switchTo().window( w ) )
+                .orElseThrow( () -> new IOException("Unable to find new login window.") );
 
-        wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( "//th[contains(text(),'Credit Card Details')] | //th[contains(text(),'Credit card details')]" ) ) );
+            // login again
+            doLoginForm( driver, wait, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
+
+            CLOSE_WINDOW_TASK = Optional.of( () -> {
+                driver.findElement( By.xpath( "//div[contains(@class,'sbm')]/button[text()='Close']" ) ).click();
+                driver.switchTo().window( CURRENT_WINDOW ); // switch back to main tab
+            } );
+        }
+
+        wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( CC_DETAILS_PATH ) ) );
         CardDetails cardDetails = new CardDetails();
         cardDetails.setName( driver.findElement( By.xpath( "//td[text()=\"Card holder's name:\"]/following-sibling::td" ) ).getText().trim() );
         cardDetails.setCardNumber( driver.findElement( By.xpath( "//td[text()='Card number:']/following-sibling::td" ) ).getText().replaceAll("\\s", "") );
@@ -470,10 +486,8 @@ public class BookingComScraper {
         cardDetails.setCvv( StringUtils.trimToNull( driver.findElement( By.xpath( "//td[contains(text(),'CVC')]/following-sibling::td" ) ).getText() ) );
         LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( cardDetails.getCardNumber() ) + " for " + cardDetails.getName() );
 
-        // we're done here
-        driver.findElement( By.xpath( "//div[contains(@class,'sbm')]/button[text()='Close'] "
-                + "| //div[@id='modal']/div/button/[text()='Close']" ) ).click();
-        driver.switchTo().window( CURRENT_WINDOW ); // switch back to main tab
+        // we're done here; close the newly opened window
+        CLOSE_WINDOW_TASK.ifPresent( t -> t.run() );
         return cardDetails;
     }
 

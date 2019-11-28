@@ -55,7 +55,6 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
 
     @Override
     public void destroyObject( PooledObject<WebDriver> pooledObj ) throws Exception {
-        pooledObj.getObject().close();
         pooledObj.getObject().quit();
     }
 
