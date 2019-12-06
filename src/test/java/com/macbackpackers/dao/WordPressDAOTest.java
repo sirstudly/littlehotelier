@@ -649,4 +649,11 @@ public class WordPressDAOTest {
         dao.insertBookingLookupKey( "12345678", "BCDEFGH", new BigDecimal("2.3") );
         dao.insertBookingLookupKey( "12345678", "CDEFGHI", new BigDecimal("12.34") );
     }
+
+    @Test
+    public void testGetReservationIdsForDepositChargeJobs() {
+        List<String> ids = dao.getReservationIdsForDepositChargeJobs( 469807, 469929 );
+        LOGGER.info( "Found " + ids.size() + " entries." );
+        ids.forEach( id -> LOGGER.info( id ) );
+    }
 }

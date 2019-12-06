@@ -130,4 +130,9 @@ public class CloudbedsServiceTest {
         cloudbedsService.createBDCPrepaidChargeJobs( 
                 LocalDate.now().minusDays( 7 ), LocalDate.now().minusDays( 1 ) );
     }
+
+    @Test
+    public void testSendDepositChargeJobRetractionEmails() {
+        cloudbedsService.sendDepositChargeJobRetractionEmails( webClient, 469807, 469929 );
+    }
 }

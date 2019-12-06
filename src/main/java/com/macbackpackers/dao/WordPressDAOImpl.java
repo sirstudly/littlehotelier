@@ -423,6 +423,19 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @SuppressWarnings( "unchecked" )
     @Override
+    public List<String> getReservationIdsForDepositChargeJobs( int jobIdStart, int jobIdEnd ) {
+        return em.createNativeQuery(
+                "SELECT DISTINCT p.value FROM wp_lh_jobs j " +
+                        "  JOIN wp_lh_job_param p ON j.job_id = p.job_id " +
+                        " WHERE j.classname = 'com.macbackpackers.jobs.DepositChargeJob'"
+                        + " AND j.job_id BETWEEN :jobIdStart AND :jobIdEnd" )
+                .setParameter( "jobIdStart", jobIdStart )
+                .setParameter( "jobIdEnd", jobIdEnd )
+                .getResultList();
+    }
+
+    @SuppressWarnings( "unchecked" )
+    @Override
     public List<Date> getCheckinDatesForAllocationScraperJobId( int jobId ) {
         // dates from calendar for a given (allocation scraper) job id
         // do not include room closures

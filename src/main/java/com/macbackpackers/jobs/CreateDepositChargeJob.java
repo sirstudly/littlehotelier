@@ -65,7 +65,7 @@ public class CreateDepositChargeJob extends AbstractJob {
         cbScraper.getReservationsForBookingSources( webClient,
                 null, null,
                 LocalDate.now().minusDays( getDaysBack() ), LocalDate.now(),
-                "Booking.com (Hotel Collect Booking)", "Expedia (Hotel Collect Booking)" )
+                "Booking.com", "Expedia" ) // bug in 7.9 where (Hotel Collect Booking) has disappeared from label
                 .stream()
                 .filter( p -> p.getPaidValue().equals( BigDecimal.ZERO ) )
                 .filter( p -> p.isHotelCollectBooking() )
@@ -98,7 +98,7 @@ public class CreateDepositChargeJob extends AbstractJob {
         CloudbedsScraper cbScraper = appContext.getBean( CloudbedsScraper.class );
         cbScraper.getReservationsForBookingSources( webClient,
                 LocalDate.now(), LocalDate.now().plusDays( 7 ),
-                null, null, "Booking.com (Hotel Collect Booking)" )
+                null, null, "Booking.com" ) // version 7.9 removed (Hotel Collect Booking) from label
                 .stream()
                 .filter( p -> p.getPaidValue().equals( BigDecimal.ZERO ) )
                 .filter( p -> p.isHotelCollectBooking() )

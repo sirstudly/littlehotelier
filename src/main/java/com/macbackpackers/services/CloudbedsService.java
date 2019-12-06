@@ -60,6 +60,7 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
 import com.macbackpackers.jobs.PrepaidChargeJob;
+import com.macbackpackers.jobs.SendDepositChargeRetractionEmailJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -389,6 +390,35 @@ public class CloudbedsService {
         catch ( IOException ex ) {
             throw new RuntimeException( ex );
         }
+    }
+
+    /**
+     * We done fucked up and charged these bookings an additional deposit amount (all HWL i think).
+     * Send a retraction email for these.
+     * 
+     * @param webClient
+     * @param jobIdStart job id inclusive
+     * @param jobIdEnd job id inclusive
+     */
+    public void sendDepositChargeJobRetractionEmails( WebClient webClient, int jobIdStart, int jobIdEnd ) {
+        List<String> ids = dao.getReservationIdsForDepositChargeJobs( jobIdStart, jobIdEnd );
+        LOGGER.info( "Found {} DepositChargeJobs", ids.size() );
+
+        // find all bookings that were hotel collect
+        // that were sent either: Deposit Charge Successful/Declined email
+        ids.stream().map( id -> scraper.getReservationRetry( webClient, id ) )
+                .filter( r -> "Hostelworld & Hostelbookers".equals( r.getSourceName() ) )
+                .filter( r -> r.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED )
+                        || r.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL ) )
+                .forEach( r -> {
+                    LOGGER.info( "Creating a SendRetractionDepositChargeJob for {} #{} - {}, {} ({} to {})",
+                            r.getSourceName(), r.getReservationId(), r.getLastName(), r.getFirstName(),
+                            r.getCheckinDate(), r.getCheckoutDate() );
+                    SendDepositChargeRetractionEmailJob j = new SendDepositChargeRetractionEmailJob();
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( r.getReservationId() );
+                    dao.insertJob( j );
+                } );
     }
 
     /**
@@ -848,6 +878,31 @@ public class CloudbedsService {
                                     .replaceAll( "\\[charge amount\\]", "£" + scraper.getCurrencyFormat().format( amount ) ) ) );
             scraper.addNote( webClient, reservationId, note );
         }
+    }
+
+    /**
+     * Sends an email to the guest for the given reservation to ignore the previous email we sent.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @throws IOException
+     * @throws MessagingException
+     */
+    public void sendDepositChargeRetractionGmail( WebClient webClient, String reservationId ) throws IOException, MessagingException {
+
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        String templateName = null;
+        if ( res.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL ) ) {
+            templateName = CloudbedsScraper.TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL;
+        }
+        else if ( res.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED ) ) {
+            templateName = CloudbedsScraper.TEMPLATE_RETRACT_DEPOSIT_CHARGE_DECLINED;
+        }
+        else {
+            throw new MissingUserDataException( "No email was sent?!" );
+        }
+
+        sendTemplatedGmail( webClient, reservationId, templateName );
     }
 
     /**

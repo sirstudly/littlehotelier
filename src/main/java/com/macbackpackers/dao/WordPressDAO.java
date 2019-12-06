@@ -289,6 +289,16 @@ public interface WordPressDAO {
     public <T extends AbstractJob> T getLastCompletedJobOfType( Class<T> jobType );
 
     /**
+     * Retrieves all reservation IDs used for all DepositChargeJobs between the given job IDs (Issue
+     * with accidentally charging incorrect bookings - need to send retraction email).
+     * 
+     * @param jobIdStart job id inclusive
+     * @param jobIdEnd job id inclusive
+     * @return non-null list
+     */
+    public List<String> getReservationIdsForDepositChargeJobs( int jobIdStart, int jobIdEnd );
+
+    /**
      * Removes records older than the given date.
      * 
      * @param specifiedDate records older than this will be removed.

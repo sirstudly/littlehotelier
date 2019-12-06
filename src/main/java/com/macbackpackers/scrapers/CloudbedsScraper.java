@@ -65,6 +65,8 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_SAGEPAY_PAYMENT_CONFIRMATION = "Sagepay Payment Confirmation";
     public static final String TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL = "Deposit Charge Successful";
     public static final String TEMPLATE_DEPOSIT_CHARGE_DECLINED = "Deposit Charge Declined";
+    public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL = "Retract Deposit Charge Successful";
+    public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_DECLINED = "Retract Deposit Charge Declined";
 
     // the last result of getPropertyContent() as it's an expensive operation
     private static String propertyContent;
@@ -570,14 +572,22 @@ public class CloudbedsScraper {
         }
         
         // drill down to each of the 3rd party OTAs matching the given source(s)
-        return StreamSupport.stream( jelement.getAsJsonObject()
+        List<String> sourceIds = StreamSupport.stream( jelement.getAsJsonObject()
                 .get( "result" ).getAsJsonArray().spliterator(), false )
                 .filter( o -> "OTA".equals( o.getAsJsonObject().get( "text" ).getAsString() ) )
                 .flatMap( o -> StreamSupport.stream(
                         o.getAsJsonObject().get( "children" ).getAsJsonArray().spliterator(), false ) )
                 .filter( p -> Arrays.asList( sourceNames ).contains( p.getAsJsonObject().get( "text" ).getAsString() ) )
                 .map( o -> o.getAsJsonObject().get( "li_attr" ).getAsJsonObject().get( "data-source-id" ).getAsString() )
-                .collect( Collectors.joining( "," ) );
+                .collect( Collectors.toList() );
+        
+        if ( sourceIds.size() != sourceNames.length ) {
+            LOGGER.warn( "Mismatch on booking source lookup: found source ids {} for sources {}", sourceIds, sourceNames );
+        }
+        if ( sourceIds.isEmpty() ) {
+            throw new IOException( "Unable to find sources for " + sourceNames );
+        }
+        return sourceIds.stream().collect( Collectors.joining( "," ) );
     }
     
     /**
