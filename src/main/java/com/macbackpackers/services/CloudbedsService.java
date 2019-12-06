@@ -894,6 +894,7 @@ public class CloudbedsService {
         String templateName = null;
         if ( res.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL ) ) {
             templateName = CloudbedsScraper.TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL;
+            scraper.addNote( webClient, reservationId, "Additional payment was taken by mistake. This has been applied against the total." );
         }
         else if ( res.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED ) ) {
             templateName = CloudbedsScraper.TEMPLATE_RETRACT_DEPOSIT_CHARGE_DECLINED;
@@ -903,6 +904,10 @@ public class CloudbedsService {
         }
 
         sendTemplatedGmail( webClient, reservationId, templateName );
+
+        if ( CloudbedsScraper.TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL.equals( templateName ) ) {
+            scraper.addNote( webClient, reservationId, "Additional payment was taken by mistake. This has been applied against the total." );
+        }
     }
 
     /**
