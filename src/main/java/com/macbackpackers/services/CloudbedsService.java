@@ -415,7 +415,7 @@ public class CloudbedsService {
                             r.getSourceName(), r.getReservationId(), r.getLastName(), r.getFirstName(),
                             r.getCheckinDate(), r.getCheckoutDate() );
                     SendDepositChargeRetractionEmailJob j = new SendDepositChargeRetractionEmailJob();
-                    j.setStatus( JobStatus.aborted );
+                    j.setStatus( JobStatus.submitted );
                     j.setReservationId( r.getReservationId() );
                     dao.insertJob( j );
                 } );
