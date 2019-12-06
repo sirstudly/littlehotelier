@@ -415,7 +415,7 @@ public class CloudbedsService {
                             r.getSourceName(), r.getReservationId(), r.getLastName(), r.getFirstName(),
                             r.getCheckinDate(), r.getCheckoutDate() );
                     SendDepositChargeRetractionEmailJob j = new SendDepositChargeRetractionEmailJob();
-                    j.setStatus( JobStatus.submitted );
+                    j.setStatus( JobStatus.aborted );
                     j.setReservationId( r.getReservationId() );
                     dao.insertJob( j );
                 } );
@@ -894,7 +894,6 @@ public class CloudbedsService {
         String templateName = null;
         if ( res.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL ) ) {
             templateName = CloudbedsScraper.TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL;
-            scraper.addNote( webClient, reservationId, "Additional payment was taken by mistake. This has been applied against the total." );
         }
         else if ( res.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED ) ) {
             templateName = CloudbedsScraper.TEMPLATE_RETRACT_DEPOSIT_CHARGE_DECLINED;
