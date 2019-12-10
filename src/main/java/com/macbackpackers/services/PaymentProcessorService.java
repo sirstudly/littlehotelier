@@ -907,9 +907,10 @@ public class PaymentProcessorService {
             WebDriver driver = driverFactory.borrowObject();
             try {
                 WebDriverWait wait = new WebDriverWait( driver, 60 );
-                BigDecimal amountToCharge = bdcScraper.getVirtualCardBalance( driver, wait, cbReservation.getThirdPartyIdentifier() );
-                if( amountToCharge.compareTo( BigDecimal.ZERO ) > 0 ) {
-                    LOGGER.info( "Attempting to charge " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
+                final BigDecimal amountToCharge = bdcScraper.getVirtualCardBalance( driver, wait, cbReservation.getThirdPartyIdentifier() );
+                final BigDecimal MINIMUM_CHARGE_AMOUNT = new BigDecimal( "0.3" );
+                LOGGER.info( "VCC balance is " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
+                if( amountToCharge.compareTo( MINIMUM_CHARGE_AMOUNT ) > 0 ) {
                     cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
                             cbReservation.getCreditCardId(), amountToCharge );
     
@@ -917,6 +918,15 @@ public class PaymentProcessorService {
                             && false == "canceled".equals( cbReservation.getStatus() ) ) {
                         cloudbedsScraper.addNote( webClient, reservationId,
                                 "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL." );
+                    }
+                }
+                else {
+                    final String NOTE = "Minimum charge amount not reached. Remaining balance not charged.";
+                    if ( cbReservation.containsNote( NOTE ) ) {
+                        LOGGER.info( NOTE );
+                    }
+                    else {
+                        cloudbedsScraper.addNote( webClient, reservationId, NOTE );
                     }
                 }
             }
