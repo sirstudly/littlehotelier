@@ -447,12 +447,16 @@ public class BookingComScraper {
         final String SIGN_IN_LOCATOR_PATH = "//span[normalize-space(text())='Sign in to view credit card details']";
         final String CC_DETAILS_PATH = "//th[contains(text(),'Credit Card Details')] | //th[contains(text(),'Credit card details')]";
         final String CC_DETAILS_NOT_AVAIL_PATH = "//h2[contains(text(),\"credit card details aren't available\")]";
+        final String CONTINUE_WITH_CC_DETAILS = "//p[normalize-space(text())='Continue to view the credit card details.']";
         final WebElement locator = wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( 
-                SIGN_IN_LOCATOR_PATH + " | " + CC_DETAILS_PATH + " | " + CC_DETAILS_NOT_AVAIL_PATH ) ) );
+                SIGN_IN_LOCATOR_PATH + " | " + CC_DETAILS_PATH + " | " + CC_DETAILS_NOT_AVAIL_PATH + " | " + CONTINUE_WITH_CC_DETAILS ) ) );
 
         Optional<Runnable> CLOSE_WINDOW_TASK = Optional.empty();
         if ( "h2".equals( locator.getTagName() ) ) {
             throw new MissingUserDataException( "Credit card details aren't available." );
+        }
+        else if ( "p".equals( locator.getTagName() ) ) {
+            doLoginForm( driver, wait, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
         }
         else if ( "span".equals( locator.getTagName() ) ) {
             // the following should open a new window; switch to new window
@@ -472,7 +476,7 @@ public class BookingComScraper {
             doLoginForm( driver, wait, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
 
             CLOSE_WINDOW_TASK = Optional.of( () -> {
-                driver.findElement( By.xpath( "//div[contains(@class,'sbm')]/button[text()='Close']" ) ).click();
+                driver.findElement( By.xpath( "//div[contains(@class,'sbm')]/button[normalize-space(text())='Close']" ) ).click();
                 driver.switchTo().window( CURRENT_WINDOW ); // switch back to main tab
             } );
         }
