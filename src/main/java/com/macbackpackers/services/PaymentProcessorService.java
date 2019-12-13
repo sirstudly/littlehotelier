@@ -909,6 +909,7 @@ public class PaymentProcessorService {
                 WebDriverWait wait = new WebDriverWait( driver, 60 );
                 final BigDecimal amountToCharge = bdcScraper.getVirtualCardBalance( driver, wait, cbReservation.getThirdPartyIdentifier() );
                 final BigDecimal MINIMUM_CHARGE_AMOUNT = new BigDecimal( "0.3" );
+                final String MODIFIED_OUTSIDE_OF_BDC = "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL.";
                 LOGGER.info( "VCC balance is " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
                 if( amountToCharge.compareTo( MINIMUM_CHARGE_AMOUNT ) > 0 ) {
                     cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
@@ -916,17 +917,20 @@ public class PaymentProcessorService {
     
                     if ( 0 != cbReservation.getBalanceDue().compareTo( amountToCharge )
                             && false == "canceled".equals( cbReservation.getStatus() ) ) {
-                        cloudbedsScraper.addNote( webClient, reservationId,
-                                "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL." );
+                        cloudbedsScraper.addNote( webClient, reservationId, MODIFIED_OUTSIDE_OF_BDC );
                     }
                 }
                 else {
-                    final String NOTE = "Minimum charge amount not reached. Remaining balance not charged.";
-                    if ( cbReservation.containsNote( NOTE ) ) {
-                        LOGGER.info( NOTE );
+                    final String MINIMUM_CHARGE_NOTE = "Minimum charge amount not reached. Remaining balance not charged.";
+                    if ( cbReservation.getBalanceDue().compareTo( MINIMUM_CHARGE_AMOUNT ) > 0
+                            && false == "canceled".equals( cbReservation.getStatus() ) ) {
+                        cloudbedsScraper.addNote( webClient, reservationId, MODIFIED_OUTSIDE_OF_BDC );
+                    }
+                    else if ( cbReservation.containsNote( MINIMUM_CHARGE_NOTE ) ) {
+                        LOGGER.info( MINIMUM_CHARGE_NOTE );
                     }
                     else {
-                        cloudbedsScraper.addNote( webClient, reservationId, NOTE );
+                        cloudbedsScraper.addNote( webClient, reservationId, MINIMUM_CHARGE_NOTE );
                     }
                 }
             }
