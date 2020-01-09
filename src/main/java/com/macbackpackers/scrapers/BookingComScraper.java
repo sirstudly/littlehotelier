@@ -604,7 +604,7 @@ public class BookingComScraper {
         actions.perform();
 
         try {
-            wait.until( ExpectedConditions.not( ExpectedConditions.attributeContains( nextLink, "class", "item--disabled" ) ) );
+            wait.until( ExpectedConditions.not( ExpectedConditions.attributeContains( nextLink, "class", "bui-pagination__item--disabled" ) ) );
         }
         catch ( TimeoutException ex ) {
             LOGGER.info( "Doesn't look like there's a next page..." );
