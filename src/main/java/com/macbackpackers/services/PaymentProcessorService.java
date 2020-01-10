@@ -861,7 +861,7 @@ public class PaymentProcessorService {
     }
 
     /**
-     * Does a AUTHORIZE/CAPTURE on the card details on the prepaid booking.
+     * Does a AUTHORIZE/CAPTURE on the card details on the prepaid BDC booking.
      * 
      * @param webClient web client for cloudbeds
      * @param reservationId the unique cloudbeds reservation ID
@@ -882,8 +882,7 @@ public class PaymentProcessorService {
 
         // check if we have anything to pay
         if ( cbReservation.isPaid() ) {
-            LOGGER.info( "Booking is paid. Nothing to do." );
-            return;
+            LOGGER.warn( "Booking is paid! Attempting to charge VCC anyways..." );
         }
 
         if ( false == cbReservation.isCardDetailsPresent() ) {

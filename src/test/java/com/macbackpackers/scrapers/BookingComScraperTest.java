@@ -1,6 +1,9 @@
 
 package com.macbackpackers.scrapers;
 
+import java.time.LocalDate;
+import java.util.List;
+
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.junit.After;
 import org.junit.Before;
@@ -8,6 +11,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
@@ -17,6 +22,8 @@ import com.macbackpackers.config.LittleHotelierConfig;
 @RunWith( SpringJUnit4ClassRunner.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class BookingComScraperTest {
+
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     /** maximum time to wait when navigating web requests */
     private static final int MAX_WAIT_SECONDS = 60;
@@ -64,5 +71,13 @@ public class BookingComScraperTest {
     @Test
     public void testReturnCardDetailsForBooking() throws Exception {
         scraper.returnCardDetailsForBooking( driver, wait, "3218755671" );
+    }
+
+    @Test
+    public void testGetAllVCCBookingsThatCanBeCharged() throws Exception {
+        List<String> bookingRefs = scraper.getAllVCCBookingsThatCanBeCharged( driver, wait,
+                LocalDate.parse( "2020-01-01" ), LocalDate.parse( "2020-01-10" ) );
+        LOGGER.info( "Found {} bookings", bookingRefs.size() );
+        bookingRefs.stream().forEach( b -> LOGGER.info( b ) );
     }
 }

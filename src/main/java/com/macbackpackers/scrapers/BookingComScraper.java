@@ -598,13 +598,14 @@ public class BookingComScraper {
      */
     private boolean loadNextResultsPage( WebDriver driver, WebDriverWait wait ) {
         LOGGER.info( "Checking next page link..." );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( "//li[contains(@class, 'bui-pagination__current-page')]" ) ) );
         WebElement nextLink = driver.findElement( By.xpath( "//li[a[@title='Next']]" ) );
         Actions actions = new Actions( driver );
         actions.moveToElement( nextLink );
         actions.perform();
 
         try {
-            wait.until( ExpectedConditions.not( ExpectedConditions.attributeContains( nextLink, "class", "bui-pagination__item--disabled" ) ) );
+            wait.until( ExpectedConditions.not( ExpectedConditions.attributeContains( nextLink, "class", "item--disabled" ) ) );
         }
         catch ( TimeoutException ex ) {
             LOGGER.info( "Doesn't look like there's a next page..." );
