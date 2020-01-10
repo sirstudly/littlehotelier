@@ -533,11 +533,11 @@ public class BookingComScraper {
         driver.findElement( By.xpath( "//button/*/span[normalize-space(text())='Show']/.." ) ).click();
 
         // either we get a span with "Oops, no results." or we get a table of results
-        By SEARCH_RESULTS_XPATH = By.xpath( "//span[contains(text(),'Oops, no results.')] "
-                + "| //th//span[contains(text(),'Guest')]" );
+        By SEARCH_RESULTS_XPATH = By.xpath( "//span[contains(text(),'No results')] "
+                + "| //th/a[contains(@class, 'bui-link')]" );
         wait.until( ExpectedConditions.visibilityOfElementLocated( SEARCH_RESULTS_XPATH ) );
         WebElement searchResult = driver.findElement( SEARCH_RESULTS_XPATH );
-        if ( searchResult.getText().contains( "no results" ) ) {
+        if ( searchResult.getText().contains( "No results" ) ) {
             LOGGER.info( "No results.. nothing to do." );
             return Collections.emptyList();
         }
