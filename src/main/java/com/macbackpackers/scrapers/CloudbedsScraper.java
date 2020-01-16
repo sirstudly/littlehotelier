@@ -227,10 +227,13 @@ public class CloudbedsScraper {
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         Reservation r = fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class );
-        if ( r == null || false == r.isSuccess() ) {
-            if( r != null ) {
-                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-            }
+        if ( r != null && false == r.isSuccess() && StringUtils.isNotBlank( r.getVersion() )
+                && false == jsonRequestFactory.getVersion().equals( r.getVersion() ) ) {
+            LOGGER.info( "Looks like we're using an outdated version. Updating our records." );
+            jsonRequestFactory.setVersion( r.getVersion() );
+            return getReservation( webClient, reservationId );
+        }
+        else if ( r == null || false == r.isSuccess() ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new MissingUserDataException( "Reservation not found." );
         }
