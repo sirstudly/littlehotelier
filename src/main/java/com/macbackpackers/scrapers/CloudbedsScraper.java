@@ -248,8 +248,8 @@ public class CloudbedsScraper {
 
                 // save the last one on the list (if more than one)
                 JsonObject cardObj = creditCardsElem.getAsJsonObject().get( cardId ).getAsJsonObject();
-                if ( false == "1".equals( cardObj.get( "is_cc_data_purged" ).getAsString() ) &&
-                        "1".equals( cardObj.get( "is_active" ).getAsString() ) ) {
+                if ( false == cardObj.get( "is_cc_data_purged" ).getAsBoolean() &&
+                        cardObj.get( "is_active" ).getAsBoolean() ) {
                     r.setCreditCardId( cardId );
                     r.setCreditCardType( cardObj.get( "card_type" ).getAsString() );
                     r.setCreditCardLast4Digits( cardObj.get( "card_number" ).getAsString() );
