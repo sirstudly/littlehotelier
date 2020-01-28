@@ -559,7 +559,7 @@ public class CloudbedsScraper {
      * Sends a source lookup request to the server.
      * 
      * @param webClient web client instance to use
-     * @param sourceName name of booking source to search for
+     * @param sourceNames names of booking source to search for (non-null)
      * @return comma-delimited list of matching source ids
      * @throws IOException
      */
@@ -585,10 +585,10 @@ public class CloudbedsScraper {
                 .collect( Collectors.toList() );
         
         if ( sourceIds.size() != sourceNames.length ) {
-            LOGGER.warn( "Mismatch on booking source lookup: found source ids {} for sources {}", sourceIds, sourceNames );
+            LOGGER.warn( "Mismatch on booking source lookup: found source ids {} for sources {}", sourceIds, Arrays.toString( sourceNames ) );
         }
         if ( sourceIds.isEmpty() ) {
-            throw new IOException( "Unable to find sources for " + sourceNames );
+            throw new IOException( "Unable to find sources for " + Arrays.toString( sourceNames ) );
         }
         return sourceIds.stream().collect( Collectors.joining( "," ) );
     }

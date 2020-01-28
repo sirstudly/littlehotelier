@@ -65,7 +65,7 @@ public class CreateDepositChargeJob extends AbstractJob {
         cbScraper.getReservationsForBookingSources( webClient,
                 null, null,
                 LocalDate.now().minusDays( getDaysBack() ), LocalDate.now(),
-                "Booking.com", "Expedia" ) // bug in 7.9 where (Hotel Collect Booking) has disappeared from label
+                "Booking.com (Hotel Collect Booking)", "Expedia (Hotel Collect Booking)" )
                 .stream()
                 .filter( p -> p.getPaidValue().equals( BigDecimal.ZERO ) )
                 .filter( p -> p.isHotelCollectBooking() )
