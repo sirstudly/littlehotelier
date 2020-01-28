@@ -98,7 +98,7 @@ public class CreateDepositChargeJob extends AbstractJob {
         CloudbedsScraper cbScraper = appContext.getBean( CloudbedsScraper.class );
         cbScraper.getReservationsForBookingSources( webClient,
                 LocalDate.now(), LocalDate.now().plusDays( 7 ),
-                null, null, "Booking.com" ) // version 7.9 removed (Hotel Collect Booking) from label
+                null, null, "Booking.com (Hotel Collect Booking)" )
                 .stream()
                 .filter( p -> p.getPaidValue().equals( BigDecimal.ZERO ) )
                 .filter( p -> p.isHotelCollectBooking() )
