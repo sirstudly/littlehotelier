@@ -33,7 +33,7 @@ public class HSHRoomBedMatcher implements RoomBedMatcher {
         LOTR ("7LOTR", "LOTR"),
         T3M ("7T3M", "T3M"),
         TMNT ("7TMNT", "TMNT"),
-        FRUIT_VEG ("4FV", "F&V"),
+        FRUIT_VEG ("4F&V", "F&V"),
         ZOO ("4Z", "Zoo"),
         UNALLOCATED ("N/A", "Unallocated");
 
