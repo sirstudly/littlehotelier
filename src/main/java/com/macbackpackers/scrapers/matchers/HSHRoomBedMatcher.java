@@ -34,7 +34,7 @@ public class HSHRoomBedMatcher implements RoomBedMatcher {
         T3M ("7T3M", "T3M"),
         TMNT ("7TMNT", "TMNT"),
         FRUIT_VEG ("4F&V", "F&V"),
-        ZOO ("4Z", "Zoo"),
+        ZOO ("4Zoo", "Zoo"),
         UNALLOCATED ("N/A", "Unallocated");
 
         final String room;
