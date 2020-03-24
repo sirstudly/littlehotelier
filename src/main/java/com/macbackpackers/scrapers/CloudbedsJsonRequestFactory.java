@@ -183,6 +183,30 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Returns a cancel reservation request.
+     * 
+     * @param reservationId unique ID of reservation
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createCancelReservationRequest( String reservationId ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/set_reserva_status" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "reservation_id", reservationId ),
+                new NameValuePair( "status", "canceled" ),
+                new NameValuePair( "send_email", "0" ),
+                new NameValuePair( "dashboard", "false" ),
+                new NameValuePair( "callback", "undefined" ),
+                new NameValuePair( "sendWithRates", "1" ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "propertyContext", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersion() ) ) );
+        return webRequest;
+    }
+
+    /**
      * Get info on all customers checking in on the given date range.
      * 
      * @param checkinDateStart checkin date (inclusive)

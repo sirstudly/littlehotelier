@@ -2,12 +2,15 @@
 package com.macbackpackers.services;
 
 import java.math.BigDecimal;
+import java.nio.charset.Charset;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 
+import org.apache.commons.io.IOUtils;
 import org.hamcrest.Matchers;
 import org.junit.Assert;
 import org.junit.Before;
@@ -32,6 +35,7 @@ import com.macbackpackers.jobs.AgodaNoChargeNoteJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
 import com.macbackpackers.jobs.BookingReportJob;
+import com.macbackpackers.jobs.CancelBookingJob;
 import com.macbackpackers.jobs.ChargeNonRefundableBookingJob;
 import com.macbackpackers.jobs.CloudbedsAllocationScraperWorkerJob;
 import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
@@ -61,10 +65,12 @@ import com.macbackpackers.jobs.SendDepositChargeSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendHostelworldLateCancellationEmailJob;
 import com.macbackpackers.jobs.SendNonRefundableDeclinedEmailJob;
 import com.macbackpackers.jobs.SendNonRefundableSuccessfulEmailJob;
+import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.jobs.SplitRoomReservationReportJob;
 import com.macbackpackers.jobs.UnpaidDepositReportJob;
 import com.macbackpackers.jobs.UpdateLittleHotelierSettingsJob;
 import com.macbackpackers.scrapers.BookingsPageScraper;
+import com.macbackpackers.scrapers.CloudbedsScraper;
 
 @RunWith( SpringJUnit4ClassRunner.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
@@ -614,5 +620,30 @@ public class ProcessorServiceTest {
         j5.setAmount( new BigDecimal( "5" ) );
         j5.setStatus( JobStatus.submitted );
         dao.insertJob( j5 );
+    }
+
+    @Test
+    public void testSendTemplatedEmailJob() throws Exception {
+        SendTemplatedEmailJob j = new SendTemplatedEmailJob();
+        j.setStatus( JobStatus.submitted );
+        j.setReservationId( "10568885" );
+        j.setEmailTemplate( CloudbedsScraper.TEMPLATE_COVID19_CLOSING );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void createCovid19CancelBookingJobs() throws Exception {
+        String rawstring = IOUtils.toString( getClass().getClassLoader().getResourceAsStream( "covid19-cancellations.txt" ),
+                Charset.defaultCharset() );
+        Arrays.asList( rawstring.split( "\n" ) ).stream()
+                .filter( line -> false == line.startsWith( "#" ) )
+                .forEach( res -> { 
+                    LOGGER.info( "Creating job for reservation " + res ); 
+                    CancelBookingJob j = new CancelBookingJob();
+                    j.setStatus( JobStatus.aborted ); // enable manually
+                    j.setReservationId( res );
+                    j.setNote( "Covid-19 - forced cancellation." );
+                    dao.insertJob( j );
+                } );
     }
 }

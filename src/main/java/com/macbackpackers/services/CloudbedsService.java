@@ -393,6 +393,34 @@ public class CloudbedsService {
     }
 
     /**
+     * Cancels an existing reservation.
+     * 
+     * @param reservationId unique booking reference
+     * @param note user note to add to reservation (optional)
+     */
+    public void cancelReservation( String reservationId, String note ) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+            Reservation r = scraper.getReservationRetry( webClient, reservationId );
+            if ( "canceled".equals( r.getStatus() ) && note != null && false == r.containsNote( note ) ) {
+                LOGGER.info( "Already canceled; adding note to booking" );
+                scraper.addNote( webClient, reservationId, note );
+            }
+            else if ( false == "confirmed".equals( r.getStatus() ) ) {
+                throw new IllegalStateException( "Reservation " + reservationId + " not in correct state to be canceled: " + r.getStatus() );
+            }
+            else {
+                scraper.cancelBooking( webClient, reservationId );
+                if ( note != null ) {
+                    scraper.addNote( webClient, reservationId, note );
+                }
+            }
+        }
+        catch ( IOException ex ) {
+            throw new RuntimeException( ex );
+        }
+    }
+
+    /**
      * We done fucked up and charged these bookings an additional deposit amount (all HWL i think).
      * Send a retraction email for these.
      * 
@@ -441,7 +469,6 @@ public class CloudbedsService {
                 stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, statuses ).stream()
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == "Macb Tour".equals( r.getLastName() ) )
-                .filter( r -> false == "Emma Young".equals( r.getFirstName() + " " + r.getLastName() ) )
                 .filter( r -> false == r.containsNote( templateName + " email sent." ) )
                 .forEach( r -> {
                     LOGGER.info( "Creating SendTemplatedEmailJob for Res #" + r.getReservationId()

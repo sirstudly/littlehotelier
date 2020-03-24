@@ -107,15 +107,19 @@ public class CloudbedsServiceTest {
 
     @Test
     public void testCreateBulkEmailJob() throws Exception {
-        cloudbedsService.createBulkEmailJob(webClient, "Hogmanay at Castle Rock!",
-                LocalDate.now().withMonth( 12 ).withDayOfMonth( 31 ), 
-                LocalDate.now().withMonth( 12 ).withDayOfMonth( 31 ),
-                null, null, "confirmed,not_confirmed" );
+        cloudbedsService.createBulkEmailJob(webClient, CloudbedsScraper.TEMPLATE_COVID19_CLOSING,
+                null, null,
+                LocalDate.now().plusDays( 1 ), LocalDate.parse( "2020-04-30" ), "confirmed,not_confirmed" );
     }
 
     @Test
     public void testSendTemplatedGmail() throws Exception {
-        cloudbedsService.sendTemplatedGmail( webClient, "10568885", "Hogmanay at Castle Rock!" );
+        cloudbedsService.sendTemplatedGmail( webClient, "10568885", CloudbedsScraper.TEMPLATE_COVID19_CLOSING );
+    }
+
+    @Test
+    public void testCancelReservation() throws Exception {
+        cloudbedsService.cancelReservation( "33055660", "Covid-19 - forced cancellation." );
     }
 
     @Test

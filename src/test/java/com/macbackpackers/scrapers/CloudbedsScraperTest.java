@@ -26,6 +26,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
+import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
@@ -223,6 +224,12 @@ public class CloudbedsScraperTest {
         LOGGER.info( cloudbedsScraper.getEmailLastSentDate( webClient, "19443322", CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED ).toString() );
     }
     
+    @Test
+    public void testFetchEmailTemplate() throws Exception {
+        EmailTemplateInfo mail = cloudbedsScraper.fetchEmailTemplate( webClient, CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL );
+        LOGGER.info( mail.getEmailBody() );
+    }
+
     @Test
     public void testCreateDepositChargeJobForBDC() throws Exception {
         cloudbedsScraper.getReservationsForBookingSources( webClient,

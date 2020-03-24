@@ -67,6 +67,7 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_DEPOSIT_CHARGE_DECLINED = "Deposit Charge Declined";
     public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL = "Retract Deposit Charge Successful";
     public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_DECLINED = "Retract Deposit Charge Declined";
+    public static final String TEMPLATE_COVID19_CLOSING = "Coronavirus- Doors Closing";
 
     // the last result of getPropertyContent() as it's an expensive operation
     private static String propertyContent;
@@ -519,6 +520,33 @@ public class CloudbedsScraper {
 
         if ( StringUtils.isBlank( jsonResponse ) ) {
             throw new MissingUserDataException( "Missing response from add note request?" );
+        }
+        CloudbedsJsonResponse response = fromJson( jsonResponse, CloudbedsJsonResponse.class );
+
+        // throw a wobbly if response not successful
+        if ( response.isFailure() ) {
+            throw new IOException( response.getMessage() );
+        }
+    }
+
+    /**
+     * Sets the status of the reservation to "canceled".
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId unique reservation ID
+     * @throws IOException on page load failure
+     */
+    public void cancelBooking( WebClient webClient, String reservationId ) throws IOException {
+
+        WebRequest requestSettings = jsonRequestFactory.createCancelReservationRequest( reservationId );
+        LOGGER.info( "Canceling reservation " + reservationId );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
+        LOGGER.debug( jsonResponse );
+
+        if ( StringUtils.isBlank( jsonResponse ) ) {
+            throw new MissingUserDataException( "Missing response from set reservation state request" );
         }
         CloudbedsJsonResponse response = fromJson( jsonResponse, CloudbedsJsonResponse.class );
 
