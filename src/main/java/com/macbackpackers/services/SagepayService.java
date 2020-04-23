@@ -95,7 +95,7 @@ public class SagepayService {
             String rfVendorTxCode = wordpressDAO.getMandatoryOption( "hbo_sagepay_vendor_prefix" )
                     + res.getIdentifier() + "-RF-" + jobId;
             Page redirectPage = webClient.getPage( createRefundSagepayRequest( rfVendorTxCode,
-                    authTxn.getVpsTxId(), refund.getAmountInBaseUnits(), refund.getDescription() ) );
+                    authTxn.getVpsTxId(), refund.getAmountInBaseUnits(), "Refund requested" ) );
             String responseJson = redirectPage.getWebResponse().getContentAsString();
             LOGGER.info( responseJson );
 
