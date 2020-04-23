@@ -25,11 +25,14 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
+import com.macbackpackers.beans.SagepayRefund;
 import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
+import com.macbackpackers.beans.StripeRefund;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
+import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
 
@@ -461,6 +464,15 @@ public interface WordPressDAO {
     public String getOption( String property );
 
     /**
+     * Returns the wordpress option for the given property.
+     * 
+     * @param property name of key to get
+     * @return non-null option value
+     * @throws MissingUserDataException if property doesn't exist or is null
+     */
+    public String getMandatoryOption( String property ) throws MissingUserDataException;
+
+    /**
      * Returns the minimum number of people considered a group.
      *  
      * @return group booking size
@@ -506,11 +518,57 @@ public interface WordPressDAO {
     public SagepayTransaction fetchSagepayTransaction( int id );
 
     /**
+     * Fetch Sagepay transaction record by vendorTxCode with auth status of OK.
+     * 
+     * @param vendorTxCode
+     * @return non-null transaction
+     */
+    public SagepayTransaction fetchSagepayTransaction( String vendorTxCode );
+
+    /**
      * Sets the processed/last updated date on the transaction record to now.
      * 
      * @param id unique PK on wp_sagepay_tx_auth
      */
     public void updateSagepayTransactionProcessedDate( int id );
+
+    /**
+     * Reads a record to the sagepay refund table.
+     * 
+     * @return refund object
+     */
+    public SagepayRefund fetchSagepayRefund( int id );
+
+    /**
+     * Updates the sagepay refund table after attempting a refund.
+     * 
+     * @param id primary key on stripe refund table
+     * @param refVendorTxCode vendor tx code for this refund
+     * @param response sagepay refund response (JSON)
+     * @param status sagepay status
+     * @param statusDetail status detail
+     * @param transactionId sagepay txn id
+     * @param status sagepay status of refund
+     */
+    public void updateSagepayRefund( int id, String refVendorTxCode, String response, String status, String statusDetail, String transactionId );
+
+    /**
+     * Reads a record from the stripe refund table.
+     * 
+     * @param id primary key on stripe refund table
+     * @return refund object to persist
+     */
+    public StripeRefund fetchStripeRefund( int id );
+
+    /**
+     * Updates the stripe refund table after attempting a refund.
+     * 
+     * @param id primary key on stripe refund table
+     * @param chargeId stripe charge id being refunded
+     * @param response stripe refund response (JSON)
+     * @param status stripe status of refund
+     */
+    public void updateStripeRefund( int id, String chargeId, String response, String status );
 
     /**
      * Inserts a record into the wp_booking_lookup_key table.

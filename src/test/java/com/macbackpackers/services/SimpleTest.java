@@ -19,6 +19,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -249,5 +250,45 @@ public class SimpleTest {
         
         Assert.assertEquals( true, emailTemplate.isPresent() );
         Assert.assertEquals( "131832", emailTemplate.get().getAsJsonObject().get( "email_template_id" ).getAsString() );
+    }
+    
+    @Test
+    public void testJsonParse() throws Exception {
+        JsonObject rootElem = gson.fromJson( "{\"status\":1,\"request\":\"61928409390\"}", JsonObject.class );
+        Assert.assertEquals( 1, rootElem.get( "status" ).getAsInt() );
+        Assert.assertEquals( "61928409390", rootElem.get( "request" ).getAsString() );
+
+        FastDateFormat DATETIME_STANDARD = FastDateFormat.getInstance( "MMM dd, yyyy h:mm:ss a" );
+        JsonArray cookies = gson.fromJson( StreamUtils.copyToString( getClass().getClassLoader().getResourceAsStream(
+                "cookies.json" ), StandardCharsets.UTF_8 ), JsonArray.class );
+        Assert.assertEquals( 15, cookies.size() );
+        Assert.assertEquals( "ux", cookies.get( 0 ).getAsJsonObject().get( "name" ).getAsString() );
+        Assert.assertEquals( "Mar 11, 2021 2:26:16 PM", cookies.get( 1 ).getAsJsonObject().get( "expiry" ).getAsString() );
+        LOGGER.info( DATETIME_STANDARD.parse( "Mar 11, 2021 2:26:16 PM" ).toString() );
+        
+        cookies.spliterator().forEachRemaining( c -> LOGGER.info( c.getAsJsonObject().get( "name" ).getAsString() ) );
+    }
+    
+    @Test
+    public void patternMatching() throws Exception {
+        String html = StreamUtils.copyToString( getClass().getClassLoader().getResourceAsStream(
+                "ipaddress_details.html" ), StandardCharsets.UTF_8 );
+        Properties props = new Properties();
+        props.load( getClass().getClassLoader().getResourceAsStream( "ipaddress_details.properties" ) );
+
+        Pattern p = Pattern.compile( props.getProperty( "monitor.ip.regex" ) , Pattern.DOTALL );
+        Matcher m = p.matcher( html );
+        if ( m.find() ) {
+            LOGGER.debug( "MATCHING GROUP: " + m.group( 1 ) );
+            if ( m.group( 1 ).matches( props.getProperty( "monitor.ip.regex.match" ) ) ) {
+                LOGGER.info( "MATCHED: " + m.group(1) );
+            }
+            else {
+                LOGGER.info( "NOT MATCHED" );
+            }
+        }
+        else {
+            LOGGER.info( "NOT FOUND" );
+        }
     }
 }

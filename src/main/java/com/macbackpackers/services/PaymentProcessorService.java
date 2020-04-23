@@ -6,8 +6,6 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
-import java.text.NumberFormat;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.Instant;
@@ -15,7 +13,6 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,7 +21,6 @@ import javax.mail.MessagingException;
 
 import org.apache.commons.collections.ListUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.commons.pool2.impl.GenericObjectPool;
@@ -55,9 +51,10 @@ import com.macbackpackers.beans.GuestDetails;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.Payment;
 import com.macbackpackers.beans.PxPostTransaction;
-import com.macbackpackers.beans.SagepayTransaction;
-import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
+import com.macbackpackers.beans.StripeRefund;
+import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.beans.xml.TxnResponse;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
@@ -70,7 +67,7 @@ import com.macbackpackers.jobs.SendDepositChargeSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendHostelworldLateCancellationEmailJob;
 import com.macbackpackers.jobs.SendNonRefundableDeclinedEmailJob;
 import com.macbackpackers.jobs.SendNonRefundableSuccessfulEmailJob;
-import com.macbackpackers.jobs.SendSagepayPaymentConfirmationEmailJob;
+import com.macbackpackers.jobs.SendRefundSuccessfulEmailJob;
 import com.macbackpackers.scrapers.AgodaScraper;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingComScraper;
@@ -79,6 +76,11 @@ import com.macbackpackers.scrapers.ChromeScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.HostelworldScraper;
 import com.macbackpackers.scrapers.ReservationPageScraper;
+import com.stripe.Stripe;
+import com.stripe.exception.StripeException;
+import com.stripe.model.Refund;
+import com.stripe.net.RequestOptions.RequestOptionsBuilder;
+import com.stripe.param.RefundCreateParams;
 
 /**
  * Service for checking payments in LH, sending (deposit) payments through the payment gateway and
@@ -96,6 +98,9 @@ public class PaymentProcessorService {
     // all allowable characters for lookup key
     private static String LOOKUPKEY_CHARSET = "2345678ABCDEFGHJKLMNPQRSTUVWXYZ";
     private static int LOOKUPKEY_LENGTH = 7;
+
+    @Value( "${stripe.apikey}" )
+    private String STRIPE_API_KEY;
 
     @Autowired
     @Qualifier( "gsonForCloudbeds" )
@@ -295,9 +300,8 @@ public class PaymentProcessorService {
         }
 
         try {
-            // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
-            cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                    cbReservation.getCreditCardId(), depositAmount );
+            // should have credit card details at this point; attempt autocharge
+            cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, depositAmount );
             cloudbedsScraper.addNote( webClient, reservationId,
                     "Successfully charged deposit of £" + cloudbedsScraper.getCurrencyFormat().format( depositAmount ) );
 
@@ -451,134 +455,6 @@ public class PaymentProcessorService {
         }
     }
 
-    /**
-     * Record a completed Sagepay transaction in Cloudbeds. Either add payment info or add a note
-     * (in case of a decline).
-     * 
-     * @param id PK of wp_sagepay_tx_auth
-     * @throws RecordPaymentFailedException on record payment failure
-     * @throws IOException on i/o error
-     * @throws MessagingException 
-     */
-    public synchronized void processSagepayTransaction( int id ) throws IOException, RecordPaymentFailedException, MessagingException {
-
-        try (WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class )) {
-            SagepayTransaction txn = wordpressDAO.fetchSagepayTransaction( id );
-            
-            // INVOICE transaction
-            if ( txn.getBookingReference() == null ) {
-                try {
-                    LOGGER.info( "No booking reference. Processing as invoice payment..." );
-                    if ( "OK".equals( txn.getAuthStatus() ) ) {
-                        LOGGER.info( "Successful payment. Sending email to " + txn.getEmail() );
-                        sendSagepayPaymentConfirmationEmail( webClient, txn );
-                    }
-                    else {
-                        LOGGER.info( "Transaction status is " + txn.getAuthStatus() + ". Nothing to do..." );
-                    }
-                }
-                finally {
-                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
-                }
-                return;
-            }
-
-            LOGGER.info( "Processing transaction with status " + txn.getAuthStatus() + " for booking ref " + txn.getBookingReference() );
-            // otherwise BOOKING transaction
-            switch ( txn.getAuthStatus() ) {
-                case "OK":
-                    // check if payment already exists
-                    Reservation res = cloudbedsScraper.getReservationRetry( webClient, txn.getReservationId() );
-                    if( cloudbedsScraper.isExistsSagepayPaymentWithVendorTxCode( webClient, res, txn.getVendorTxCode() ) ) {
-                        LOGGER.info( "Transaction " + txn.getVendorTxCode() + " has already been processed. Nothing to do." );
-                    }
-                    else {
-                        cloudbedsScraper.addPayment( webClient, res, txn.getMappedCardType(), txn.getPaymentAmount(),
-                                String.format( "VendorTxCode: %s, Status: %s, Detail: %s, VPS Auth Code: %s, "
-                                        + "Card Type: %s, Card Number: ************%s, Auth Code: %s",
-                                        txn.getVendorTxCode(), txn.getAuthStatus(), txn.getAuthStatusDetail(), txn.getVpsAuthCode(),
-                                        txn.getCardType(), txn.getLastFourDigits(), txn.getBankAuthCode() ) );
-                        LOGGER.info( "Creating SendSagepayPaymentConfirmationEmailJob for " + res.getIdentifier() );
-                        SendSagepayPaymentConfirmationEmailJob j = new SendSagepayPaymentConfirmationEmailJob();
-                        j.setStatus( JobStatus.submitted );
-                        j.setReservationId( txn.getReservationId() );
-                        j.setSagepayTxnId( id );
-                        wordpressDAO.insertJob( j );
-                    }
-                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
-                    break;
-
-                case "NOTAUTHED":
-                    cloudbedsScraper.addNote( webClient, txn.getReservationId(),
-                            String.format( "The Sage Pay gateway could not authorise the transaction because "
-                                    + "the details provided by the customer were incorrect, or "
-                                    + "insufficient funds were available.\n"
-                                    + "VendorTxCode: %s\nStatus: %s\nDetail: %s\nCard Type: %s\nCard Number: ************%s\nDecline Code: %s",
-                                    txn.getVendorTxCode(), txn.getAuthStatus(), txn.getAuthStatusDetail(),
-                                    txn.getCardType(), txn.getLastFourDigits(), txn.getBankDeclineCode() ) );
-                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
-                    break;
-
-                case "PENDING":
-                    cloudbedsScraper.addNote( webClient, txn.getReservationId(),
-                            String.format( "Pending Sagepay transaction %s: This will be updated "
-                                    + "by Sage Pay when we receive a notification from PPRO.",
-                                    txn.getVendorTxCode() ) );
-                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
-                    break;
-
-                case "ABORT":
-                    cloudbedsScraper.addNote( webClient, txn.getReservationId(),
-                            String.format( "Aborted Sagepay transaction %s for %s",
-                                    txn.getVendorTxCode(),
-                                    NumberFormat.getCurrencyInstance(Locale.UK).format( txn.getPaymentAmount() ) ) );
-                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
-                    break;
-
-                case "REJECTED":
-                    cloudbedsScraper.addNote( webClient, txn.getReservationId(),
-                            String.format( "The Sage Pay System rejected transaction %s because of the fraud "
-                                    + "screening rules (e.g. AVS/CV2 or 3D Secure) you have set on your account.",
-                                    txn.getVendorTxCode() ) );
-                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
-                    break;
-
-                case "ERROR":
-                    cloudbedsScraper.addNote( webClient, txn.getReservationId(),
-                            String.format( "A problem occurred at Sage Pay which prevented transaction %s registration. This is not normal! Contact SagePay!",
-                                    txn.getVendorTxCode() ) );
-                    LOGGER.error( "Unexpected SagePay error for transaction " + txn.getVendorTxCode() );
-                    wordpressDAO.updateSagepayTransactionProcessedDate( id );
-                    break;
-
-                default:
-                    throw new UnrecoverableFault( String.format( "Unsupported AUTH status %s for transaction %s", txn.getAuthStatus(), txn.getVendorTxCode() ) );
-            }
-        }
-    }
-
-    /**
-     * Sends a payment confirmation email using the given template and transaction.
-     * This differs from the other method in that it is not tied to a current booking.
-     * 
-     * @param webClient web client instance to use
-     * @param txn successful sagepay transaction
-     * @throws IOException 
-     * @throws MessagingException 
-     */
-    public void sendSagepayPaymentConfirmationEmail( WebClient webClient, SagepayTransaction txn ) throws IOException, MessagingException {
-        EmailTemplateInfo template = cloudbedsScraper.getSagepayPaymentConfirmationEmailTemplate( webClient );
-        gmailService.sendEmailCcSelf( txn.getEmail(), txn.getFirstName() + " " + txn.getLastName(), template.getSubject(),
-                IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                    .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
-                    .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
-                    .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
-                        .replaceAll( "\\[vendor tx code\\]", txn.getVendorTxCode() )
-                        .replaceAll( "\\[payment total\\]", cloudbedsScraper.getCurrencyFormat().format( txn.getPaymentAmount() ) )
-                        .replaceAll( "\\[card type\\]", txn.getCardType() )
-                        .replaceAll( "\\[last 4 digits\\]", txn.getLastFourDigits() ) ) );
-    }
-    
     /**
      * Copies the card details from LH (or HWL/AGO/EXP) to CB if it doesn't already exist.
      * 
@@ -786,9 +662,8 @@ public class PaymentProcessorService {
         }
 
         try {
-            // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
-            cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                    cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
+            // should have credit card details at this point; attempt autocharge
+            cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
             cloudbedsScraper.addNote( webClient, reservationId, "Outstanding balance of "
                     + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) + " successfully charged." );
     
@@ -911,8 +786,7 @@ public class PaymentProcessorService {
                 final String MODIFIED_OUTSIDE_OF_BDC = "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL.";
                 LOGGER.info( "VCC balance is " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
                 if( amountToCharge.compareTo( MINIMUM_CHARGE_AMOUNT ) > 0 ) {
-                    cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                            cbReservation.getCreditCardId(), amountToCharge );
+                    cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, amountToCharge );
     
                     if ( 0 != cbReservation.getBalanceDue().compareTo( amountToCharge )
                             && false == "canceled".equals( cbReservation.getStatus() ) ) {
@@ -938,8 +812,7 @@ public class PaymentProcessorService {
             }
         }
         else {
-            cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                    cbReservation.getCreditCardId(), cbReservation.getBalanceDue() );
+            cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
         }
     }
 
@@ -980,8 +853,7 @@ public class PaymentProcessorService {
 
         // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
         BigDecimal amountToCharge = getLateCancellationAmountToCharge( cbReservation );
-        cloudbedsScraper.chargeCardForBooking( webClient, reservationId,
-                cbReservation.getCreditCardId(), amountToCharge );
+        cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, amountToCharge );
         cloudbedsScraper.addNote( webClient, reservationId, "Late cancellation. Successfully charged £"
                 + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) );
 
@@ -1435,5 +1307,82 @@ public class PaymentProcessorService {
             }
         }
         return false;
+    }
+
+    /**
+     * Processes a refund (on Cloudbeds) if card is still active. Otherwise, process refund on
+     * Stripe and records it against the given Cloudbeds booking.
+     * 
+     * @param jobId job id (for idempotency)
+     * @param refundTxnId primary key on StripeRefund
+     * @throws IOException
+     * @throws StripeException
+     * @throws RecordPaymentFailedException
+     */
+    public void processStripeRefund( int jobId, int refundTxnId ) throws IOException, StripeException, RecordPaymentFailedException {
+        try (WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class )) {
+            StripeRefund refund = wordpressDAO.fetchStripeRefund( refundTxnId );
+            String refundAmount = cloudbedsScraper.getCurrencyFormat().format( refund.getAmount() );
+            LOGGER.info( "Attempting to process refund for reservation " + refund.getReservationId() + " and txn " + refundTxnId + " for £" + refundAmount );
+            Reservation res = cloudbedsScraper.getReservationRetry( webClient, refund.getReservationId() );
+            TransactionRecord authTxn = cloudbedsScraper.getStripeTransaction( webClient, res, refund.getCloudbedsTxId() );
+
+            // if the transaction we are refunding matches the *active* CC we have on file on Cloudbeds
+            // then process the refund via Cloudbeds
+            if ( res.getCreditCardId() != null && res.getCreditCardId().equals( authTxn.getCreditCardId() ) ) {
+                LOGGER.info( "Attempting to process refund for transaction " + authTxn.getId() );
+                String jsonResponse = cloudbedsScraper.processRefund( webClient, res, authTxn, refund.getAmount(), refund.getDescription() );
+                if( StringUtils.isNotBlank( jsonResponse ) ) {
+                    CloudbedsJsonResponse response = cloudbedsScraper.fromJson( jsonResponse, CloudbedsJsonResponse.class );
+                    wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), jsonResponse, response.isSuccess() ? "succeeded" : "failed" );
+                }
+                else {
+                    throw new RecordPaymentFailedException( "Blank response from Cloudbeds?" );
+                }
+            }
+            else if ( StringUtils.isBlank( authTxn.getGatewayAuthorization() ) ) {
+                cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
+                        " for £" + refundAmount + ". See logs for details." );
+                throw new MissingUserDataException( "Unable to find original transaction to refund." );
+            }
+
+            else {  // we don't have the card available in Cloudbeds; call Stripe server and record result manually
+                String idempotentKey = wordpressDAO.getMandatoryOption( "hbo_sagepay_vendor_prefix" ) 
+                        + res.getIdentifier() + "-RF-" + jobId;
+                LOGGER.info( "Attempting to process refund for charge " + authTxn.getGatewayAuthorization() );
+                Stripe.apiKey = STRIPE_API_KEY;
+                Refund stripRefund = Refund.create( RefundCreateParams.builder()
+                        .setCharge( authTxn.getGatewayAuthorization() )
+                        .setAmount( refund.getAmountInBaseUnits() ).build(),
+                        // set idempotency key so we can re-run safely in case of previous failure
+                        new RequestOptionsBuilder().setIdempotencyKey( idempotentKey ).build() );
+                LOGGER.info( "Response: " + stripRefund.toJson() );
+                wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), stripRefund.toJson(), stripRefund.getStatus() );
+
+                // record refund in Cloudbeds so we're in sync
+                if ( "succeeded".equals( stripRefund.getStatus() ) ) {
+                    cloudbedsScraper.addRefund( webClient, res, refund.getAmount(), refundTxnId + " (" 
+                            + authTxn.getGatewayAuthorization() + "): " + authTxn.getOriginalDescription() + " x" 
+                            + authTxn.getCardNumber() + " refunded on Stripe. -RONBOT" );
+                }
+                else {
+                    cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
+                            " for £" + refundAmount + ". See logs for details." );
+                    throw new PaymentNotAuthorizedException( "Failed to process refund " + refundTxnId );
+                }
+            }
+            cloudbedsScraper.addNote( webClient, refund.getReservationId(),
+                    "Refund completed for £" + refundAmount + "."
+                            + (refund.getDescription() == null ? "" : " " + refund.getDescription()) );
+
+            // send email if successful
+            LOGGER.info( "Creating SendRefundSuccessfulEmailJob for " + res.getIdentifier() );
+            SendRefundSuccessfulEmailJob job = new SendRefundSuccessfulEmailJob();
+            job.setReservationId( refund.getReservationId() );
+            job.setAmount( refund.getAmount() );
+            job.setTxnId( refundTxnId );
+            job.setStatus( JobStatus.submitted );
+            wordpressDAO.insertJob( job );
+        }
     }
 }

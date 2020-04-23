@@ -908,6 +908,39 @@ public class CloudbedsService {
     }
 
     /**
+     * Sends an email to the guest for the given reservation when the refund has been processed
+     * successfully.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param txnId primary key on refund table
+     * @param amount amount being refunded
+     * @throws IOException
+     * @throws MessagingException
+     */
+    public void sendRefundSuccessfulGmail( WebClient webClient, String reservationId, int txnId, BigDecimal amount ) throws IOException, MessagingException {
+
+        EmailTemplateInfo template = scraper.getRefundSuccessfulEmailTemplate( webClient );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " txn " + txnId + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
+                    template.getSubject().replaceAll( "\\[conf number\\]", res.getIdentifier() ),
+                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
+                            .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
+                            .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
+                            .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
+                                    .replaceAll( "\\[first name\\]", res.getFirstName() )
+                                    .replaceAll( "\\[charge amount\\]", "£" + scraper.getCurrencyFormat().format( amount ) ) ) );
+            scraper.addNote( webClient, reservationId, note );
+        }
+    }
+
+    /**
      * Sends an email to the guest for the given reservation to ignore the previous email we sent.
      * 
      * @param webClient web client instance to use

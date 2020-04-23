@@ -46,6 +46,9 @@ public class SagepayTransaction {
     @Column( name = "auth_status_detail" )
     private String authStatusDetail;
 
+    @Column( name = "vps_tx_id" )
+    private String vpsTxId;
+
     @Column( name = "tx_auth_no" )
     private String vpsAuthCode; // sent to bank to identify txn during settlement
 
@@ -139,6 +142,14 @@ public class SagepayTransaction {
 
     public void setAuthStatusDetail( String authStatusDetail ) {
         this.authStatusDetail = authStatusDetail;
+    }
+
+    public String getVpsTxId() {
+        return vpsTxId;
+    }
+
+    public void setVpsTxId( String vpsTxId ) {
+        this.vpsTxId = vpsTxId;
     }
 
     public String getVpsAuthCode() {

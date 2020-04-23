@@ -9,7 +9,11 @@ import com.gargoylesoftware.htmlunit.WebResponse;
  */
 public class PaymentNotAuthorizedException extends WebResponseException {
 
-    private static final long serialVersionUID = 7516538818949097030L;
+    private static final long serialVersionUID = 1029988078912415808L;
+
+    public PaymentNotAuthorizedException( String message ) {
+        super( message, null );
+    }
 
     public PaymentNotAuthorizedException( String message, WebResponse webResponse ) {
         super( message, webResponse );

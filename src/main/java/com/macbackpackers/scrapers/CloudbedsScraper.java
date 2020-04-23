@@ -48,6 +48,7 @@ import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentCardNotAcceptedException;
 import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
@@ -68,6 +69,7 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL = "Retract Deposit Charge Successful";
     public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_DECLINED = "Retract Deposit Charge Declined";
     public static final String TEMPLATE_COVID19_CLOSING = "Coronavirus- Doors Closing";
+    public static final String TEMPLATE_REFUND_PROCESSED = "Refund Processed";
 
     // the last result of getPropertyContent() as it's an expensive operation
     private static String propertyContent;
@@ -393,10 +395,11 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Get all transactions by reservation.
+     * Checks if there are any transactions with the given vendorTxCode (SagePay) for the given reservation.
      * 
      * @param webClient web client instance to use
-     * @param reservation cloudbeds reservation
+     * @param res cloudbeds reservation
+     * @param vendorTxCode unique merchant identifier
      * @return non-null list of transactions
      * @throws IOException
      */
@@ -426,6 +429,41 @@ public class CloudbedsScraper {
                 } )
                 .findFirst();
         return txnNote.isPresent();
+    }
+
+    /**
+     * Returns the (Stripe) transaction charge identifier for the given reservation.
+     * 
+     * @param webClient
+     * @param res cloudbeds reservation
+     * @param id unique transaction id
+     * @return (Stripe) charge identifier
+     * @throws IOException
+     */
+    public TransactionRecord getStripeTransaction( WebClient webClient, Reservation res, String id ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res );
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
+        if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
+            if ( rpt.isPresent() ) {
+                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+            }
+            throw new MissingUserDataException( "Failed response." );
+        }
+
+        // look for a charge id for the matching transaction
+        Optional<TransactionRecord> txnRecord = StreamSupport.stream(
+                rpt.get().get( "records" ).getAsJsonArray().spliterator(), false )
+                .filter( r -> id.equals( r.getAsJsonObject().get( "id" ).getAsString() ) )
+                .map( r -> gson.fromJson( r, TransactionRecord.class ) )
+                .findFirst();
+
+        if ( false == txnRecord.isPresent() ) {
+            throw new MissingUserDataException( "Unable to find transaction " + id );
+        }
+        return txnRecord.get();
     }
 
     /**
@@ -499,6 +537,79 @@ public class CloudbedsScraper {
         if ( response.isFailure() ) {
             throw new RecordPaymentFailedException( response.getMessage() );
         }
+    }
+
+    /**
+     * Registers an existing refund to the given reservation.
+     * 
+     * @param webClient web client instance to use
+     * @param res cloudbeds reservation
+     * @param amount amount to add
+     * @param description description of payment
+     * @throws IOException on page load failure
+     * @throws RecordPaymentFailedException payment record failure
+     */
+    public void addRefund( WebClient webClient, Reservation res, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
+
+        // first we need to find a "room" we're booking to
+        // it doesn't actually map to a room, just an assigned guest
+        // it doesn't even have to be an allocated room
+        if ( res.getBookingRooms() == null || res.getBookingRooms().isEmpty() ) {
+            throw new MissingUserDataException( "Unable to find allocation to assign payment to!" );
+        }
+
+        // just take the first one
+        String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
+
+        WebRequest requestSettings = jsonRequestFactory.createAddRefundRequest(
+                res.getReservationId(), bookingRoomId, amount, description );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
+        LOGGER.debug( jsonResponse );
+        
+        if( StringUtils.isBlank( jsonResponse ) ) {
+            throw new MissingUserDataException( "Missing response from add payment request?" );
+        }
+        CloudbedsJsonResponse response = fromJson( jsonResponse, CloudbedsJsonResponse.class );
+
+        // throw a wobbly if response not successful
+        if ( response.isFailure() ) {
+            throw new RecordPaymentFailedException( response.getMessage() );
+        }
+    }
+
+    /**
+     * Processes (charges) a refund for the given reservation.
+     * 
+     * @param webClient web client instance to use
+     * @param res cloudbeds reservation
+     * @param authTxn original transaction
+     * @param amount amount to add
+     * @param description description of payment
+     * @return JSON response from Cloudbeds
+     * @throws IOException on page load failure
+     * @throws RecordPaymentFailedException payment record failure
+     */
+    public String processRefund( WebClient webClient, Reservation res, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
+
+        // first we need to find a "room" we're booking to
+        // it doesn't actually map to a room, just an assigned guest
+        // it doesn't even have to be an allocated room
+        if ( res.getBookingRooms() == null || res.getBookingRooms().isEmpty() ) {
+            throw new MissingUserDataException( "Unable to find allocation to assign payment to!" );
+        }
+
+        // just take the first one
+        String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
+        WebRequest requestSettings = jsonRequestFactory.createAddNewProcessRefundRequest(
+                res.getReservationId(), authTxn.getPaymentId(), bookingRoomId, authTxn.getCreditCardId(),
+                authTxn.getCreditCardType(), amount, description );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
+        LOGGER.debug( jsonResponse );
+        return jsonResponse;
     }
 
     /**
@@ -676,6 +787,7 @@ public class CloudbedsScraper {
      * @param amount how much
      * @throws IOException
      */
+    @Deprecated // use 1-step process rather than 2-step auth/capture
     public void chargeCardForBooking( WebClient webClient, String reservationId, String cardId, BigDecimal amount ) throws IOException {
 
         // AUTHORIZE
@@ -708,6 +820,31 @@ public class CloudbedsScraper {
             addNote( webClient, reservationId, "Failed to CAPTURE booking: " +
                     jelement.getAsJsonObject().get( "message" ).getAsString() );
             throw new PaymentNotAuthorizedException( "Failed to CAPTURE booking.", redirectPage.getWebResponse() );
+        }
+    }
+    
+    /**
+     * Attempts to charge using the most recent card on the given booking.
+     * 
+     * @param webClient web client instance to use
+     * @param res CB reservation
+     * @param amount how much
+     * @throws IOException
+     */
+    public void chargeCardForBooking( WebClient webClient, Reservation res, BigDecimal amount ) throws IOException {
+        LOGGER.info( "Begin PROCESS CHARGE for reservation " + res.getReservationId()  + " for " + getCurrencyFormat().format( amount ) );
+        WebRequest requestSettings = jsonRequestFactory.createAddNewProcessPaymentRequest( res.getReservationId(), 
+                res.getBookingRooms().get( 0 ).getId(), res.getCreditCardId(), amount, "Autocharging -RONBOT" );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
+            addNote( webClient, res.getReservationId(), "Failed to charge booking: " +
+                    jelement.getAsJsonObject().get( "message" ).getAsString() );
+            throw new PaymentNotAuthorizedException( "Failed to charge booking.", redirectPage.getWebResponse() );
         }
     }
 
@@ -909,6 +1046,17 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Retrieves the refund successfully charged email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getRefundSuccessfulEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_REFUND_PROCESSED );
+    }
+
+    /**
      * Retrieves the deposit charge declined email template.
      * 
      * @param webClient web client instance to use
@@ -1038,7 +1186,7 @@ public class CloudbedsScraper {
      * @param clazz
      * @return deserialized object (nullable)
      */
-    private <T> T fromJson( String json, Class<T> clazz ) {
+    public <T> T fromJson( String json, Class<T> clazz ) {
         try {
             return gson.fromJson( json, clazz );
         }

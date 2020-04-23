@@ -25,11 +25,14 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.jobs.CancelBookingJob;
+import com.macbackpackers.jobs.SendTemplatedEmailJob;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = LittleHotelierConfig.class)
@@ -68,7 +71,7 @@ public class CloudbedsScraperTest {
     
     @Test
     public void testGetReservation() throws Exception {
-        Reservation r = cloudbedsScraper.getReservation( webClient, "10569063" );
+        Reservation r = cloudbedsScraper.getReservation( webClient, "32811776" );
         LOGGER.info( ToStringBuilder.reflectionToString( r ) );
     }
     
@@ -125,6 +128,13 @@ public class CloudbedsScraperTest {
         cloudbedsScraper.addPayment( webClient,
                 cloudbedsScraper.getReservation( webClient, "9814194" ),
                 "visa", new BigDecimal( "0.15" ), "Test payment XYZ" );
+    }
+    
+    @Test
+    public void testAddRefund() throws Exception {
+        cloudbedsScraper.addRefund( webClient,
+                cloudbedsScraper.getReservation( webClient, "11968561" ),
+                new BigDecimal( "0.14" ), "Refund payment XYZ" );
     }
     
     @Test
@@ -248,4 +258,28 @@ public class CloudbedsScraperTest {
                 } );
     }
 
+
+    @Test
+    public void createCovid19CancelBookingJobsMay() throws Exception {
+        cloudbedsScraper.getReservations( webClient, 
+                null, // stay date start
+                null, // stay date end
+                LocalDate.parse("2020-04-30"), // checkin date start
+                LocalDate.parse("2020-05-30"), // checkin date end end
+                "confirmed" ).stream()
+                .forEach( res -> { 
+                    LOGGER.info( "Creating job for reservation " + res.getId() + " " + res.getCheckinDate() + " " + res.getFirstName() + " " + res.getLastName() ); 
+                    CancelBookingJob j = new CancelBookingJob();
+                    j.setStatus( JobStatus.aborted ); // enable manually
+                    j.setReservationId( res.getId() );
+                    j.setNote( "Covid-19 - forced cancellation." );
+                    dao.insertJob( j );
+
+                    SendTemplatedEmailJob j2 = new SendTemplatedEmailJob();
+                    j2.setStatus( JobStatus.aborted ); // enable manually
+                    j2.setEmailTemplate( "Coronavirus- Doors Closing" );
+                    j2.setReservationId( res.getId() );
+                    dao.insertJob( j2 );
+                } );
+    }
 }

@@ -7,23 +7,23 @@ import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
-import com.macbackpackers.services.SagepayService;
+import com.macbackpackers.services.PaymentProcessorService;
 
 /**
- * Register a Sagepay transaction by recording against Cloudbeds. 
+ * Process a refund and record it against an existing Cloudbeds booking.
  *
  */
 @Entity
-@DiscriminatorValue( value = "com.macbackpackers.jobs.ProcessSagepayTransactionJob" )
-public class ProcessSagepayTransactionJob extends AbstractJob {
+@DiscriminatorValue( value = "com.macbackpackers.jobs.ProcessStripeRefundTransactionJob" )
+public class ProcessStripeRefundTransactionJob extends AbstractJob {
 
     @Autowired
     @Transient
-    private SagepayService paymentProcessor;
+    private PaymentProcessorService paymentProcessor;
 
     @Override
     public void processJob() throws Exception {
-        paymentProcessor.processSagepayTransaction( getTxnId() );
+        paymentProcessor.processStripeRefund( getId(), getTxnId() );
     }
 
     public int getTxnId() {
@@ -32,10 +32,5 @@ public class ProcessSagepayTransactionJob extends AbstractJob {
 
     public void setTxnId( int txnId ) {
         setParameter( "txn_id", String.valueOf( txnId ) );
-    }
-
-    @Override
-    public int getRetryCount() {
-        return 1; // only try once - if we error out; manually correct
     }
 }

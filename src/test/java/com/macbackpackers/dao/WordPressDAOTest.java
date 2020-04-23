@@ -35,6 +35,8 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
+import com.macbackpackers.beans.SagepayRefund;
+import com.macbackpackers.beans.StripeRefund;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.jobs.AllocationScraperJob;
@@ -655,5 +657,17 @@ public class WordPressDAOTest {
         List<String> ids = dao.getReservationIdsForDepositChargeJobs( 469807, 469929 );
         LOGGER.info( "Found " + ids.size() + " entries." );
         ids.forEach( id -> LOGGER.info( id ) );
+    }
+
+    @Test
+    public void testFetchStripeRefund() throws Exception {
+        StripeRefund refund = dao.fetchStripeRefund( 1 );
+        LOGGER.info( ToStringBuilder.reflectionToString( refund ) );
+    }
+
+    @Test
+    public void testFetchSagepayRefund() throws Exception {
+        SagepayRefund refund = dao.fetchSagepayRefund( 3 );
+        LOGGER.info( ToStringBuilder.reflectionToString( refund ) );
     }
 }

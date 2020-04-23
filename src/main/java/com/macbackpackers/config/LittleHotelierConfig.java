@@ -135,6 +135,14 @@ public class LittleHotelierConfig {
                 .create();
     }
 
+    @Bean( name = "gsonForSagepay" )
+    public Gson getGsonForSagepay() {
+        // these are thread safe
+        return new GsonBuilder()
+                .setPrettyPrinting()
+                .create();
+    }
+
     @Bean
     public RoomBedMatcher getRoomBedMatcher()
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {

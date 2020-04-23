@@ -22,6 +22,14 @@ import com.macbackpackers.beans.Payment;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.BookingsPageScraper;
+import com.stripe.Stripe;
+import com.stripe.model.Charge;
+import com.stripe.model.Refund;
+import com.stripe.model.Token;
+import com.stripe.net.RequestOptions.RequestOptionsBuilder;
+import com.stripe.param.ChargeCreateParams;
+import com.stripe.param.RefundCreateParams;
+import com.stripe.param.TokenCreateParams;
 
 @RunWith( SpringJUnit4ClassRunner.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
@@ -140,12 +148,39 @@ public class PaymentProcessorServiceTest {
     }
     
     @Test
-    public void testSendSagepayEmail() throws Exception {
-        paymentService.sendSagepayPaymentConfirmationEmail( cbWebClient, dao.fetchSagepayTransaction( 34 ) );
-    }
-
-    @Test
     public void testProcessPrepaidBooking() throws Exception {
         paymentService.processPrepaidBooking( cbWebClient, "22970476" );
     }
+
+    @Test
+    public void testProcessStripeRefund() throws Exception {
+
+        Stripe.apiKey = "sk_test_4eC39HqLyjWDarjtT1zdp7dc";
+
+        Token token = Token.create( TokenCreateParams.builder()
+                .setCard( TokenCreateParams.Card.builder()
+                        .setNumber( "4242424242424242" )
+                        .setCvc( "314" )
+                        .setExpMonth( "4" )
+                        .setExpYear( "2021" )
+                        .build() )
+                .build() );
+
+        Charge charge = Charge.create( ChargeCreateParams.builder()
+                .setSource( token.getId() )
+                .setCurrency( "usd" )
+                .setAmount( 1099L ).build() );
+        LOGGER.info( "Charge: " + charge.toJson() );
+
+        Refund refund = Refund.create( RefundCreateParams.builder().setCharge( charge.getId() ).build(),
+                // set idempotency key so we can re-run safely in case of previous failure
+                new RequestOptionsBuilder().setIdempotencyKey( token.getId() ).build() );
+        LOGGER.info( "Refund: " + refund.toJson() );
+    }
+
+    @Test
+    public void testProcessStripeRefund2() throws Exception {
+        paymentService.processStripeRefund( 3, 2 );
+    }
+
 }

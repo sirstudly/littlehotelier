@@ -45,11 +45,14 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
+import com.macbackpackers.beans.SagepayRefund;
 import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
+import com.macbackpackers.beans.StripeRefund;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
+import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
@@ -935,6 +938,15 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public String getMandatoryOption( String property ) {
+        String result = getOption( property );
+        if ( result == null ) {
+            throw new MissingUserDataException( "Missing property " + property );
+        }
+        return result;
+    }
+
+    @Override
     @Transactional( readOnly = true )
     public int getGroupBookingSize() {
         return Integer.parseInt( getOption( "hbo_group_booking_size" ) );
@@ -997,12 +1009,58 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public SagepayTransaction fetchSagepayTransaction( String vendorTxCode ) {
+        return em.createQuery(
+                "FROM SagepayTransaction WHERE vendorTxCode = :vendorTxCode AND authStatus = 'OK'", SagepayTransaction.class )
+                .setParameter( "vendorTxCode", vendorTxCode )
+                .getSingleResult();
+    }
+
+    @Override
     public void updateSagepayTransactionProcessedDate( int id ) {
         em.createNativeQuery( "UPDATE wp_sagepay_tx_auth "
                 + "SET processed_date = NOW(), last_updated_date = NOW() "
                 + "WHERE id = :id" )
                 .setParameter( "id", id )
                 .executeUpdate();
+    }
+
+    @Override
+    public SagepayRefund fetchSagepayRefund( int id ) {
+        SagepayRefund txn = em.find( SagepayRefund.class, id );
+        if ( txn == null ) {
+            throw new EmptyResultDataAccessException( "Unable to find SagepayRefund with ID " + id, 1 );
+        }
+        return txn;
+    }
+
+    @Override
+    public void updateSagepayRefund( int id, String refVendorTxCode, String response, String status, String statusDetail, String transactionId ) {
+        SagepayRefund refund = fetchSagepayRefund( id );
+        refund.setVendorTxCode( refVendorTxCode );
+        refund.setResponse( response );
+        refund.setStatus( status );
+        refund.setStatusDetail( statusDetail );
+        refund.setTransactionId( transactionId );
+        refund.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
+    }
+
+    @Override
+    public StripeRefund fetchStripeRefund( int id ) {
+        StripeRefund txn = em.find( StripeRefund.class, id );
+        if ( txn == null ) {
+            throw new EmptyResultDataAccessException( "Unable to find StripeRefund with ID " + id, 1 );
+        }
+        return txn;
+    }
+
+    @Override
+    public void updateStripeRefund( int id, String chargeId, String response, String status ) {
+        StripeRefund refund = fetchStripeRefund( id );
+        refund.setChargeId( chargeId );
+        refund.setResponse( response );
+        refund.setStatus( status );
+        refund.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
     }
 
     @Override
