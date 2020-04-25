@@ -1335,6 +1335,11 @@ public class PaymentProcessorService {
                 if( StringUtils.isNotBlank( jsonResponse ) ) {
                     CloudbedsJsonResponse response = cloudbedsScraper.fromJson( jsonResponse, CloudbedsJsonResponse.class );
                     wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), jsonResponse, response.isSuccess() ? "succeeded" : "failed" );
+                    if ( response.isFailure() ) {
+                        cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
+                                " for £" + refundAmount + ". See logs for details." );
+                        throw new PaymentNotAuthorizedException( "Failed to process refund " + refundTxnId );
+                    }
                 }
                 else {
                     throw new RecordPaymentFailedException( "Blank response from Cloudbeds?" );
