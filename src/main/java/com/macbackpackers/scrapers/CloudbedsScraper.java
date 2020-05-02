@@ -613,6 +613,26 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Performs a refund (against the gateway) for the given payment.
+     * 
+     * @param webClient web client instance to use
+     * @param payment initial charge we're refunding against
+     * @param amount amount to add
+     * @return JSON response
+     * @throws IOException on page load failure
+     */
+    public String performRefund( WebClient webClient, TransactionRecord payment, BigDecimal amount ) throws IOException {
+
+        WebRequest requestSettings = jsonRequestFactory.createRefundPaymentRequest( 
+                payment.getPaymentId(), payment.getCreditCardId(), amount );
+
+        Page redirectPage = webClient.getPage( requestSettings );
+        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
+        LOGGER.info( jsonResponse );
+        return jsonResponse;
+    }
+
+    /**
      * Adds a note to an existing reservation.
      * 
      * @param webClient web client instance to use

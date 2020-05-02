@@ -1331,9 +1331,33 @@ public class PaymentProcessorService {
             Reservation res = cloudbedsScraper.getReservationRetry( webClient, refund.getReservationId() );
             TransactionRecord authTxn = cloudbedsScraper.getStripeTransaction( webClient, res, refund.getCloudbedsTxId() );
 
+            // temporarily adding a optional flag to test how "pending" refunds work
+            // (whether they get automatically moved on in cloudbeds or not)
+            // "pending" refunds don't get a record in the folio page (will this get updated??)
+            // BDC examples where refunds are pending done thru cloudbeds: 3243495048, 3854720449
+            if ( "true".equals( wordpressDAO.getOption( "force_stripe_refund_via_cloudbeds" ) ) ) {
+                LOGGER.info( "Attempting to process refund for transaction " + authTxn.getId() );
+                String jsonResponse = cloudbedsScraper.performRefund( webClient, authTxn, refund.getAmount() );
+                if ( StringUtils.isNotBlank( jsonResponse ) ) {
+                    CloudbedsJsonResponse response = cloudbedsScraper.fromJson( jsonResponse, CloudbedsJsonResponse.class );
+                    wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), jsonResponse, response.isSuccess() ? "succeeded" : "failed" );
+                    if ( response.isFailure() ) {
+                        cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
+                                " for £" + refundAmount + ". See logs for details." );
+                    }
+                    else {
+                        cloudbedsScraper.addNote( webClient, refund.getReservationId(),
+                                "Refund completed for £" + refundAmount + "."
+                                        + (refund.getDescription() == null ? "" : " " + refund.getDescription()) );
+    
+                        // send email if successful
+                        createSendRefundSuccessfulEmailJob( refund );
+                    }
+                }
+            }
             // if the transaction we are refunding matches the *active* CC we have on file on Cloudbeds
             // then process the refund via Cloudbeds
-            if ( res.getCreditCardId() != null && res.getCreditCardId().equals( authTxn.getCreditCardId() ) ) {
+            else if ( res.getCreditCardId() != null && res.getCreditCardId().equals( authTxn.getCreditCardId() ) ) {
                 LOGGER.info( "Attempting to process refund for transaction " + authTxn.getId() );
                 String jsonResponse = cloudbedsScraper.processRefund( webClient, res, authTxn, refund.getAmount(), refund.getDescription() );
                 if ( StringUtils.isNotBlank( jsonResponse ) ) {
@@ -1342,7 +1366,14 @@ public class PaymentProcessorService {
                     if ( response.isFailure() ) {
                         cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
                                 " for £" + refundAmount + ". See logs for details." );
-                        throw new PaymentNotAuthorizedException( "Failed to process refund " + refundTxnId );
+                    }
+                    else {
+                        cloudbedsScraper.addNote( webClient, refund.getReservationId(),
+                                "Refund completed for £" + refundAmount + "."
+                                        + (refund.getDescription() == null ? "" : " " + refund.getDescription()) );
+    
+                        // send email if successful
+                        createSendRefundSuccessfulEmailJob( refund );
                     }
                 }
                 else {
@@ -1351,7 +1382,7 @@ public class PaymentProcessorService {
             }
             else if ( StringUtils.isBlank( authTxn.getGatewayAuthorization() ) ) {
                 cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
-                        " for £" + refundAmount + ". See logs for details." );
+                        " for £" + refundAmount + ". Unable to find original transaction to refund." );
                 throw new MissingUserDataException( "Unable to find original transaction to refund." );
             }
 
@@ -1380,13 +1411,7 @@ public class PaymentProcessorService {
                                         + (refund.getDescription() == null ? "" : " " + refund.getDescription()) );
 
                         // send email if successful
-                        LOGGER.info( "Creating SendRefundSuccessfulEmailJob for " + res.getIdentifier() );
-                        SendRefundSuccessfulEmailJob job = new SendRefundSuccessfulEmailJob();
-                        job.setReservationId( refund.getReservationId() );
-                        job.setAmount( refund.getAmount() );
-                        job.setTxnId( refundTxnId );
-                        job.setStatus( JobStatus.submitted );
-                        wordpressDAO.insertJob( job );
+                        createSendRefundSuccessfulEmailJob( refund );
                     }
                     else if ( "pending".equals( stripRefund.getStatus() ) ) {
                         LOGGER.info( "Refund pending" );
@@ -1408,10 +1433,25 @@ public class PaymentProcessorService {
                     LOGGER.error( ex.getMessage() );
                     wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), ex.getMessage(), "failed" );
                     cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
-                            " for £" + refundAmount + ". See logs for details." );
+                            " for £" + refundAmount + ". " + ex.getMessage() );
                 }
             }
         }
+    }
+
+    /**
+     * Send email on successful refund.
+     * 
+     * @param refund refund that has been processed
+     */
+    private void createSendRefundSuccessfulEmailJob( StripeRefund refund ) {
+        LOGGER.info( "Creating SendRefundSuccessfulEmailJob for " + refund.getReservationId() );
+        SendRefundSuccessfulEmailJob job = new SendRefundSuccessfulEmailJob();
+        job.setReservationId( refund.getReservationId() );
+        job.setAmount( refund.getAmount() );
+        job.setTxnId( refund.getId() );
+        job.setStatus( JobStatus.submitted );
+        wordpressDAO.insertJob( job );
     }
 
     /**

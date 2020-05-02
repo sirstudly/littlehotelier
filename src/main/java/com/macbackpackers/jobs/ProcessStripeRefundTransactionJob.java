@@ -33,4 +33,9 @@ public class ProcessStripeRefundTransactionJob extends AbstractJob {
     public void setTxnId( int txnId ) {
         setParameter( "txn_id", String.valueOf( txnId ) );
     }
+
+    @Override
+    public int getRetryCount() {
+        return 1;
+    }
 }

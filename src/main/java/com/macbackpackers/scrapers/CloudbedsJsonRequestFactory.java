@@ -747,6 +747,30 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Processes a refund against the given payment.
+     * 
+     * @param paymentId ID of payment in "transactions by reservation" to refund against
+     * @param cardId card to charge
+     * @param amount amount to record
+     * @param description description
+     * @return web request
+     * @throws IOException on creation failure
+     */
+    public WebRequest createRefundPaymentRequest( String paymentId, String cardId, BigDecimal amount ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/refund_payment" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "payment_type", "exist_credit_card" ),
+                new NameValuePair( "paid", CURRENCY_FORMAT.format( amount ) ),
+                new NameValuePair( "payment_id", paymentId ),
+                new NameValuePair( "credit_card_id", cardId ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersion() ) ) );
+        return webRequest;
+    }
+    
+    /**
      * Process payment (AUTH and CAPTURE) onto an existing reservation.
      * 
      * @param reservationId ID of reservation (as it appears in the URL)
