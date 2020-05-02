@@ -1375,6 +1375,12 @@ public class PaymentProcessorService {
                     }
                     else if ( "pending".equals( stripRefund.getStatus() ) ) {
                         LOGGER.info( "Refund pending" );
+                        cloudbedsScraper.addRefund( webClient, res, refund.getAmount(), refundTxnId + " (" 
+                                + authTxn.getGatewayAuthorization() + "): " + authTxn.getOriginalDescription() + " x" 
+                                + authTxn.getCardNumber() + " refund PENDING on Stripe. -RONBOT" );
+                        cloudbedsScraper.addNote( webClient, refund.getReservationId(),
+                                "Refund PENDING (should usually be ok) for £" + refundAmount + "."
+                                        + (refund.getDescription() == null ? "" : " " + refund.getDescription()) );
                         return;
                     }
                     else {
