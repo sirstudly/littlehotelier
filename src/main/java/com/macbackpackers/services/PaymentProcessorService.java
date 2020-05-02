@@ -46,6 +46,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlSpan;
 import com.gargoylesoftware.htmlunit.html.HtmlTextArea;
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.GuestDetails;
 import com.macbackpackers.beans.JobStatus;
@@ -77,6 +78,7 @@ import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.HostelworldScraper;
 import com.macbackpackers.scrapers.ReservationPageScraper;
 import com.stripe.Stripe;
+import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Refund;
 import com.stripe.net.RequestOptions.RequestOptionsBuilder;
@@ -1356,24 +1358,37 @@ public class PaymentProcessorService {
                         + res.getIdentifier() + "-RF-" + jobId;
                 LOGGER.info( "Attempting to process refund for charge " + authTxn.getGatewayAuthorization() );
                 Stripe.apiKey = STRIPE_API_KEY;
-                Refund stripRefund = Refund.create( RefundCreateParams.builder()
-                        .setCharge( authTxn.getGatewayAuthorization() )
-                        .setAmount( refund.getAmountInBaseUnits() ).build(),
-                        // set idempotency key so we can re-run safely in case of previous failure
-                        new RequestOptionsBuilder().setIdempotencyKey( idempotentKey ).build() );
-                LOGGER.info( "Response: " + stripRefund.toJson() );
-                wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), stripRefund.toJson(), stripRefund.getStatus() );
+                try {
+                    Refund stripRefund = Refund.create( RefundCreateParams.builder()
+                            .setCharge( authTxn.getGatewayAuthorization() )
+                            .setAmount( refund.getAmountInBaseUnits() ).build(),
+                            // set idempotency key so we can re-run safely in case of previous failure
+                            new RequestOptionsBuilder().setIdempotencyKey( idempotentKey ).build() );
+                    LOGGER.info( "Response: " + stripRefund.toJson() );
+                    wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), stripRefund.toJson(), stripRefund.getStatus() );
 
-                // record refund in Cloudbeds so we're in sync
-                if ( "succeeded".equals( stripRefund.getStatus() ) ) {
-                    cloudbedsScraper.addRefund( webClient, res, refund.getAmount(), refundTxnId + " (" 
-                            + authTxn.getGatewayAuthorization() + "): " + authTxn.getOriginalDescription() + " x" 
-                            + authTxn.getCardNumber() + " refunded on Stripe. -RONBOT" );
+                    // record refund in Cloudbeds so we're in sync
+                    if ( "succeeded".equals( stripRefund.getStatus() ) ) {
+                        cloudbedsScraper.addRefund( webClient, res, refund.getAmount(), refundTxnId + " (" 
+                                + authTxn.getGatewayAuthorization() + "): " + authTxn.getOriginalDescription() + " x" 
+                                + authTxn.getCardNumber() + " refunded on Stripe. -RONBOT" );
+                    }
+                    else if ( "pending".equals( stripRefund.getStatus() ) ) {
+                        LOGGER.info( "Refund pending" );
+                        return;
+                    }
+                    else {
+                        cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
+                                " for £" + refundAmount + ". See logs for details." );
+                        throw new PaymentNotAuthorizedException( "Failed to process refund " + refundTxnId );
+                    }
                 }
-                else {
+                catch ( InvalidRequestException ex ) {
+                    LOGGER.error( ex.getMessage() );
+                    wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), ex.getMessage(), "failed" );
                     cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
                             " for £" + refundAmount + ". See logs for details." );
-                    throw new PaymentNotAuthorizedException( "Failed to process refund " + refundTxnId );
+                    return;
                 }
             }
             cloudbedsScraper.addNote( webClient, refund.getReservationId(),
@@ -1389,5 +1404,22 @@ public class PaymentProcessorService {
             job.setStatus( JobStatus.submitted );
             wordpressDAO.insertJob( job );
         }
+    }
+
+    /**
+     * Queries Stripe for refund details.
+     * @param refundTxnId PK of Refund table
+     * @return non-null refund object
+     * @throws StripeException
+     */
+    public Refund retrieveStripeRefund( int refundTxnId ) throws StripeException {
+        Stripe.apiKey = STRIPE_API_KEY;
+        StripeRefund refund = wordpressDAO.fetchStripeRefund( refundTxnId );
+        JsonElement refundElem = gson.fromJson( refund.getResponse(), JsonElement.class );
+        String refundId = refundElem.getAsJsonObject().get( "id" ).getAsString();
+        if ( refundId != null ) {
+            return Refund.retrieve( refundId );
+        }
+        throw new MissingUserDataException( "Refund ID not found for txn " + refundTxnId );
     }
 }
