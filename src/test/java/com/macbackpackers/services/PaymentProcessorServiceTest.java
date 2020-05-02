@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.Calendar;
 import java.util.List;
 
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -181,6 +182,12 @@ public class PaymentProcessorServiceTest {
     @Test
     public void testProcessStripeRefund2() throws Exception {
         paymentService.processStripeRefund( 3, 2 );
+    }
+
+    @Test
+    public void testRetrieveStripeRefund() throws Exception {
+        Refund r = paymentService.retrieveStripeRefund( 15 );
+        LOGGER.info( ToStringBuilder.reflectionToString( r ) );
     }
 
 }

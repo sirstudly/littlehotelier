@@ -6,7 +6,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.StreamSupport;
 
@@ -160,12 +162,20 @@ public class Reservation extends CloudbedsJsonResponse {
         return checkinDate;
     }
 
+    public Date getCheckinDateAsDate() {
+        return parseISODate( getCheckinDate() );        
+    }
+
     public void setCheckinDate( String checkinDate ) {
         this.checkinDate = checkinDate;
     }
 
     public String getCheckoutDate() {
         return checkoutDate;
+    }
+
+    public Date getCheckoutDateAsDate() {
+        return parseISODate( getCheckoutDate() );
     }
 
     public void setCheckoutDate( String checkoutDate ) {
@@ -184,8 +194,24 @@ public class Reservation extends CloudbedsJsonResponse {
         return cancellationDate;
     }
 
+    public Date getCancellationDateAsDate() {
+        return parseISODateTime( getCancellationDate() );        
+    }
+
     public void setCancellationDate( String cancellationDate ) {
         this.cancellationDate = cancellationDate;
+    }
+
+    private static Date parseISODate( String dateValue ) {
+        return dateValue == null ? null
+                : Date.from( LocalDate.from( DateTimeFormatter.ISO_LOCAL_DATE.parse( dateValue ) )
+                        .atStartOfDay().toInstant( ZoneOffset.UTC ) );
+    }
+
+    private static Date parseISODateTime( String dateValue ) {
+        return dateValue == null ? null
+                : Date.from( LocalDate.from( DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").parse( dateValue ) )
+                        .atStartOfDay().toInstant( ZoneOffset.UTC ) );
     }
 
     /**

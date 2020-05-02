@@ -1,13 +1,22 @@
 package com.macbackpackers.scrapers;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.hamcrest.Matchers;
 import org.junit.Assert;
 import org.junit.Test;
@@ -281,5 +290,128 @@ public class CloudbedsScraperTest {
                     j2.setReservationId( res.getId() );
                     dao.insertJob( j2 );
                 } );
+    }
+
+    @Test
+    public void createCancellationRefundsSheetApri2020() throws Exception {
+        
+        Workbook workbook = new XSSFWorkbook();
+        
+        Sheet sheet = workbook.createSheet("Sheet 1");
+        Row header = sheet.createRow(0);
+         
+        final CellStyle HEADER_STYLE = workbook.createCellStyle();
+        HEADER_STYLE.setLocked( true );
+         
+        final Font HEADER_FONT = workbook.createFont();
+        HEADER_FONT.setFontName("Arial");
+        HEADER_FONT.setFontHeightInPoints((short) 10);
+        HEADER_FONT.setBold(true);
+        HEADER_STYLE.setFont(HEADER_FONT);
+
+        final Font DEFAULT_BODY_FONT = workbook.createFont();
+        DEFAULT_BODY_FONT.setFontName("Arial");
+        DEFAULT_BODY_FONT.setFontHeightInPoints((short) 10);
+        
+        final String[] HEADERS = {
+                "Name", "Email", "Reservation", "3rd Party Reservation", "Booking Source", "Channel Collect", "Non-Refundable", 
+                "Checkin Date", "Checkout Date", "Grand Total", "Deposit", "Amount Paid", "Balance Due", "Cancellation Date"
+        };
+        final int[] HEADER_WIDTH = {
+                6000, 8000, 3500, 5000, 7000, 5000, 5000,
+                3500, 3500, 3000, 3000, 3000, 3000, 4000
+        };
+        for ( int i = 0 ; i < HEADERS.length ; i++ ) {
+            Cell headerCell = header.createCell( i );
+            headerCell.setCellValue( HEADERS[i] );
+            headerCell.setCellStyle( HEADER_STYLE );
+            sheet.setColumnWidth( i, HEADER_WIDTH[i] );
+        }
+        
+        final CellStyle DEFAULT_STYLE = workbook.createCellStyle();
+        DEFAULT_STYLE.setFont( DEFAULT_BODY_FONT );
+
+        final CellStyle DATE_STYLE = workbook.createCellStyle();
+        DATE_STYLE.setDataFormat(workbook.createDataFormat().getFormat( "yyyy-mm-dd" ));
+        DATE_STYLE.setFont( DEFAULT_BODY_FONT );
+        
+        final CellStyle CURRENCY_STYLE = workbook.createCellStyle();
+        CURRENCY_STYLE.setDataFormat(workbook.createDataFormat().getFormat( "#,##0.00" ));
+        CURRENCY_STYLE.setFont( DEFAULT_BODY_FONT );
+
+        AtomicInteger rowNum = new AtomicInteger( 1 );
+        cloudbedsScraper.getReservations( webClient,
+                null, // stay date start
+                null, // stay date end
+                LocalDate.parse( "2020-03-23" ), // checkin date start
+                LocalDate.parse( "2020-04-30" ), // checkin date end end
+                "canceled" ).stream()
+                .map( c -> cloudbedsScraper.getReservationRetry( webClient, c.getId() ) )
+                .forEach( res -> {
+                    Row row = sheet.createRow( rowNum.getAndIncrement() );
+                    Cell cell = row.createCell( 0 );
+                    cell.setCellValue( res.getFirstName() + " " + res.getLastName() );
+                    cell.setCellStyle( DEFAULT_STYLE );
+
+                    cell = row.createCell( 1 );
+                    cell.setCellValue( res.getEmail() );
+                    cell.setCellStyle( DEFAULT_STYLE );
+
+                    cell = row.createCell( 2 );
+                    cell.setCellValue( res.getIdentifier() );
+                    cell.setCellStyle( DEFAULT_STYLE );
+
+                    cell = row.createCell( 3 );
+                    cell.setCellValue( res.getThirdPartyIdentifier() );
+                    cell.setCellStyle( DEFAULT_STYLE );
+
+                    cell = row.createCell( 4 );
+                    cell.setCellValue( res.getSourceName() );
+                    cell.setCellStyle( DEFAULT_STYLE );
+
+                    cell = row.createCell( 5 );
+                    cell.setCellValue( res.getChannelPaymentType() );
+                    cell.setCellStyle( DEFAULT_STYLE );
+
+                    cell = row.createCell( 6 );
+                    cell.setCellValue( res.isNonRefundable() );
+                    cell.setCellStyle( DEFAULT_STYLE );
+
+                    cell = row.createCell( 7 );
+                    cell.setCellValue( res.getCheckinDateAsDate() );
+                    cell.setCellStyle( DATE_STYLE );
+
+                    cell = row.createCell( 8 );
+                    cell.setCellValue( res.getCheckoutDateAsDate() );
+                    cell.setCellStyle( DATE_STYLE );
+
+                    cell = row.createCell( 9 );
+                    cell.setCellValue( res.getGrandTotal().floatValue() );
+                    cell.setCellStyle( CURRENCY_STYLE );
+
+                    cell = row.createCell( 10 );
+                    cell.setCellValue( Float.parseFloat( res.getBookingDeposit() ) );
+                    cell.setCellStyle( CURRENCY_STYLE );
+
+                    cell = row.createCell( 11 );
+                    cell.setCellValue( res.getPaidValue().floatValue() );
+                    cell.setCellStyle( CURRENCY_STYLE );
+
+                    cell = row.createCell( 12 );
+                    cell.setCellValue( res.getBalanceDue().floatValue() );
+                    cell.setCellStyle( CURRENCY_STYLE );
+
+                    cell = row.createCell( 13 );
+                    cell.setCellValue( res.getCancellationDateAsDate() );
+                    cell.setCellStyle( DATE_STYLE );
+                } );
+
+        File currDir = new File( "." );
+        String path = currDir.getAbsolutePath();
+        String fileLocation = path.substring( 0, path.length() - 1 ) + "src\\test\\resources\\apr2020-refunds.xlsx";
+
+        FileOutputStream outputStream = new FileOutputStream( fileLocation );
+        workbook.write( outputStream );
+        workbook.close();
     }
 }
