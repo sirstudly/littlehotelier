@@ -1,3 +1,4 @@
+
 package com.macbackpackers.services;
 
 import static com.macbackpackers.scrapers.AllocationsPageScraper.POUND;
@@ -90,9 +91,9 @@ import com.stripe.param.RefundCreateParams;
  */
 @Service
 public class PaymentProcessorService {
-    
+
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
-    
+
     private static final FastDateFormat DATETIME_FORMAT = FastDateFormat.getInstance( "dd/MM/yyyy HH:mm:ss" );
     private static final FastDateFormat DATETIME_STANDARD = FastDateFormat.getInstance( "yyyy-MM-dd HH:mm:ss" );
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
@@ -138,10 +139,10 @@ public class PaymentProcessorService {
 
     @Autowired
     private GmailService gmailService;
-    
+
     @Autowired
     private CloudbedsScraper cloudbedsScraper;
-    
+
     @Autowired
     private ChromeScraper chromeScraper;
 
@@ -152,11 +153,11 @@ public class PaymentProcessorService {
     private GenericObjectPool<WebDriver> driverFactory;
 
     /**
-     * Attempt to charge the deposit payment for the given reservation. This method
-     * does nothing if the payment outstanding != payment total. It also checks whether
-     * there was already a previous attempt to charge the booking and updates LH payment
-     * details if it was previously successful. To avoid multiple failed transactions, this 
-     * method should only be called again if new card details have been updated.
+     * Attempt to charge the deposit payment for the given reservation. This method does nothing if
+     * the payment outstanding != payment total. It also checks whether there was already a previous
+     * attempt to charge the booking and updates LH payment details if it was previously successful.
+     * To avoid multiple failed transactions, this method should only be called again if new card
+     * details have been updated.
      * 
      * @param webClient web client to use
      * @param jobId current job id
@@ -173,10 +174,10 @@ public class PaymentProcessorService {
 
         // check if we've already received any payment on the payments tab
         HtmlSpan totalRecieved = reservationPage.getFirstByXPath( "//span[contains(@class,'total_received')]" );
-        if( false == "£0".equals( totalRecieved.getTextContent() )) {
+        if ( false == "£0".equals( totalRecieved.getTextContent() ) ) {
             LOGGER.info( "Payment of " + totalRecieved.getTextContent() + " already received for booking " + bookingRef + "." );
             return; // nothing to do
-        } 
+        }
 
         // only process bookings at "Confirmed" or "Checked-in"
         HtmlSpan statusSpan = reservationPage.getFirstByXPath( "//td[@class='status']/span" );
@@ -189,7 +190,7 @@ public class PaymentProcessorService {
 
         // group bookings must be approved/charged manually
         int numberGuests = countNumberOfGuests( reservationPage );
-        if( numberGuests >= wordpressDAO.getGroupBookingSize() ) {
+        if ( numberGuests >= wordpressDAO.getGroupBookingSize() ) {
             LOGGER.info( "Booking " + bookingRef + " has " + numberGuests + " guests. Payment must be done manually for groups." );
             return;
         }
@@ -247,7 +248,7 @@ public class PaymentProcessorService {
      * @param webClient web client to use
      * @param reservationId unique CB reservation
      * @throws IOException on I/O error
-     * @throws MessagingException 
+     * @throws MessagingException
      */
     public synchronized void processDepositPayment( WebClient webClient, String reservationId ) throws IOException, MessagingException {
         LOGGER.info( "Processing deposit payment for reservation " + reservationId );
@@ -374,10 +375,9 @@ public class PaymentProcessorService {
     }
 
     /**
-     * Attempt to charge the no-show amount for the given reservation. This method
-     * fails fast if the payment already received &gt= amount to charge . If
-     * there was already a previous attempt to charge the booking, this will update LH payment
-     * details so it is synced. 
+     * Attempt to charge the no-show amount for the given reservation. This method fails fast if the
+     * payment already received &gt= amount to charge . If there was already a previous attempt to
+     * charge the booking, this will update LH payment details so it is synced.
      * 
      * @param lhWebClient web client to use for little hotelier
      * @param jobId current job id
@@ -388,7 +388,7 @@ public class PaymentProcessorService {
      * @throws IOException on I/O error
      * @throws ParseException on parse error
      */
-    public synchronized void processManualPayment( WebClient lhWebClient, int jobId, 
+    public synchronized void processManualPayment( WebClient lhWebClient, int jobId,
             String bookingRef, BigDecimal amountToCharge, String message, boolean useCardDetailsFromLH ) throws IOException, ParseException {
         LOGGER.info( "Processing manual payment for booking " + bookingRef + " for " + amountToCharge );
         LOGGER.info( message );
@@ -412,7 +412,7 @@ public class PaymentProcessorService {
         if ( amountToCharge.compareTo( outstandingTotal ) > 0 ) {
             throw new UnrecoverableFault( "Request to charge " + amountToCharge + " exceeds LH total outstanding (" + outstandingTotal + ")." );
         }
-        
+
         // check if we've already received any payment on the payments tab
         for ( Object paymentDiv : reservationPage.getByXPath( "//div[contains(@class,'payment-row')]//div[contains(@class,'payment-label-bottom')]" ) ) {
             if ( HtmlDivision.class.cast( paymentDiv ).getTextContent().contains( "PxPost transaction" ) ) {
@@ -423,7 +423,7 @@ public class PaymentProcessorService {
         try {
             // get the full card details
             CardDetails ccDetails = null;
-            if( bookingRef.startsWith( "HWL-" ) && false == useCardDetailsFromLH ) {
+            if ( bookingRef.startsWith( "HWL-" ) && false == useCardDetailsFromLH ) {
                 LOGGER.info( "Retrieving HWL customer card details" );
                 ccDetails = retrieveHWCardDetails( bookingRef );
             }
@@ -449,7 +449,7 @@ public class PaymentProcessorService {
             Payment payment = new Payment( amountToCharge, ccDetails );
             processPxPostTransaction( jobId, bookingRef, payment, false, reservationPage );
             reservationPageScraper.appendNote( reservationPage,
-                    message + " --"  + DATETIME_FORMAT.format( new Date() ) + "\n" );
+                    message + " --" + DATETIME_FORMAT.format( new Date() ) + "\n" );
         }
         catch ( MissingUserDataException ex ) {
             reservationPageScraper.appendNote( reservationPage,
@@ -530,7 +530,7 @@ public class PaymentProcessorService {
      * @throws Exception on failure
      */
     public Reservation copyCardDetailsToCloudbeds( WebClient webClient, String reservationId ) throws Exception {
-        return copyCardDetailsToCloudbeds(webClient, cloudbedsScraper.getReservationRetry( webClient, reservationId ) );
+        return copyCardDetailsToCloudbeds( webClient, cloudbedsScraper.getReservationRetry( webClient, reservationId ) );
     }
 
     /**
@@ -565,11 +565,11 @@ public class PaymentProcessorService {
             LOGGER.info( "Retrieving BDC customer card details for BDC#" + cbReservation.getThirdPartyIdentifier() );
             ccDetails = retrieveCardDetailsFromBDC( cbReservation );
         }
-//        else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
-//            LOGGER.info( "Retrieving AGO customer card details" );
-//            // I don't think this actually works anymore but give it a go anyways
-//            ccDetails = retrieveAgodaCardDetails( reservationPage, bookingRef );
-//        }
+        //        else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
+        //            LOGGER.info( "Retrieving AGO customer card details" );
+        //            // I don't think this actually works anymore but give it a go anyways
+        //            ccDetails = retrieveAgodaCardDetails( reservationPage, bookingRef );
+        //        }
         else {
             throw new UnsupportedOperationException( "Unsupported source " + cbReservation.getSourceName() );
         }
@@ -613,8 +613,8 @@ public class PaymentProcessorService {
     }
 
     /**
-     * Does a AUTHORIZE/CAPTURE on the card details on the booking for the balance remaining 
-     * if the Rate Plan is "Non-refundable".
+     * Does a AUTHORIZE/CAPTURE on the card details on the booking for the balance remaining if the
+     * Rate Plan is "Non-refundable".
      * 
      * @param webClient web client for cloudbeds
      * @param reservationId the unique cloudbeds reservation ID
@@ -650,8 +650,8 @@ public class PaymentProcessorService {
         // check if card details exist in CB; copy over if req'd
         if ( false == cbReservation.isCardDetailsPresent() ) {
             final String NOTE = "Missing card details found for reservation " + cbReservation.getReservationId();
-            
-            if( false == cbReservation.containsNote( NOTE ) ) {
+
+            if ( false == cbReservation.containsNote( NOTE ) ) {
                 cloudbedsScraper.addNote( webClient, reservationId, NOTE );
             }
 
@@ -668,7 +668,7 @@ public class PaymentProcessorService {
             cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
             cloudbedsScraper.addNote( webClient, reservationId, "Outstanding balance of "
                     + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) + " successfully charged." );
-    
+
             // mark booking as fully paid in Hostelworld
             if ( "Hostelworld & Hostelbookers".equals( cbReservation.getSourceName() ) ) {
                 try (WebClient hwlWebClient = context.getBean( "webClientForHostelworld", WebClient.class )) {
@@ -787,9 +787,9 @@ public class PaymentProcessorService {
                 final BigDecimal MINIMUM_CHARGE_AMOUNT = new BigDecimal( "0.3" );
                 final String MODIFIED_OUTSIDE_OF_BDC = "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL.";
                 LOGGER.info( "VCC balance is " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
-                if( amountToCharge.compareTo( MINIMUM_CHARGE_AMOUNT ) > 0 ) {
+                if ( amountToCharge.compareTo( MINIMUM_CHARGE_AMOUNT ) > 0 ) {
                     cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, amountToCharge );
-    
+
                     if ( 0 != cbReservation.getBalanceDue().compareTo( amountToCharge )
                             && false == "canceled".equals( cbReservation.getStatus() ) ) {
                         cloudbedsScraper.addNote( webClient, reservationId, MODIFIED_OUTSIDE_OF_BDC );
@@ -819,7 +819,8 @@ public class PaymentProcessorService {
     }
 
     /**
-     * Does a AUTHORIZE/CAPTURE on the card details on the booking for the amount of the first night.
+     * Does a AUTHORIZE/CAPTURE on the card details on the booking for the amount of the first
+     * night.
      * 
      * @param webClient web client for cloudbeds
      * @param reservationId the unique cloudbeds reservation ID
@@ -866,9 +867,10 @@ public class PaymentProcessorService {
         job.setStatus( JobStatus.submitted );
         wordpressDAO.insertJob( job );
     }
-    
+
     /**
      * Returns the late cancellation amount to charge for a booking.
+     * 
      * @param cbReservation reservation being checked
      * @return value greater than 0
      */
@@ -897,8 +899,8 @@ public class PaymentProcessorService {
     /**
      * Does the nitty-gritty of posting the transaction, or recovering if we've already attempted to
      * do a post, updates the payment details in LH or leaves a note on the booking if the
-     * transaction was not approved. If we've already successfully charged this {@code bookingRef}, 
-     * then this method won't do anything. 
+     * transaction was not approved. If we've already successfully charged this {@code bookingRef},
+     * then this method won't do anything.
      * 
      * @param jobId current job id
      * @param bookingRef booking ref
@@ -917,11 +919,11 @@ public class PaymentProcessorService {
         PxPostTransaction pxpost = wordpressDAO.getLastPxPost( bookingRef );
 
         // if this is the first time we're charging this booking or last attempt failed...
-        if ( pxpost == null || Boolean.FALSE.equals( pxpost.getSuccessful() )) {
-            
+        if ( pxpost == null || Boolean.FALSE.equals( pxpost.getSuccessful() ) ) {
+
             if ( pxpost == null ) {
                 LOGGER.info( "We haven't charged this booking yet" );
-            } 
+            }
             else {
                 // abort if we have reached the maximum number of attempts
                 // unless checkin date is today/tomorrow (in which case, try again)
@@ -939,8 +941,8 @@ public class PaymentProcessorService {
             }
 
             int txnId = wordpressDAO.insertNewPxPostTransaction( jobId, bookingRef, payment.getAmount() );
-            processTransaction( reservationPageScraper, reservationPage, txnId, bookingRef, 
-                    payment.getCardDetails(), payment.getAmount(), isDeposit ); 
+            processTransaction( reservationPageScraper, reservationPage, txnId, bookingRef,
+                    payment.getCardDetails(), payment.getAmount(), isDeposit );
         }
         // we actually did get a successful payment thru
         else if ( Boolean.TRUE.equals( pxpost.getSuccessful() ) ) {
@@ -1021,7 +1023,7 @@ public class PaymentProcessorService {
             }
         }
         else { // pxpost.isSuccessful() == null
-            // not sure if the last payment went through...
+               // not sure if the last payment went through...
             LOGGER.info( "Not sure if the last payment went through; requesting status of txn" );
 
             // first get px status (just in case we timed-out last time); verify not yet paid
@@ -1029,18 +1031,18 @@ public class PaymentProcessorService {
             TxnResponse postStatus = pxPostService.getStatus( bookingRef, statusResponse );
 
             // update the pxpost record
-            wordpressDAO.updatePxPostStatus( pxpost.getId(), 
-                    postStatus.getTransaction() == null ? null : postStatus.getTransaction().getCardNumber(), 
+            wordpressDAO.updatePxPostStatus( pxpost.getId(),
+                    postStatus.getTransaction() == null ? null : postStatus.getTransaction().getCardNumber(),
                     postStatus.isSuccessful(), statusResponse.getBody() );
 
-            if( postStatus.isSuccessful() ) {
+            if ( postStatus.isSuccessful() ) {
                 LOGGER.info( "Last transaction was successful, updating payment details in LH" );
                 reservationPageScraper.addPayment( reservationPage,
-                        new BigDecimal( postStatus.getTransaction().getAmount() ), 
-                        postStatus.getTransaction().getCardName(), isDeposit, 
+                        new BigDecimal( postStatus.getTransaction().getAmount() ),
+                        postStatus.getTransaction().getCardName(), isDeposit,
                         "PxPost transaction " + pxpost.getId() + " successful. - " + DATETIME_FORMAT.format( new Date() ) );
             }
-            else { 
+            else {
                 LOGGER.info( "Last transaction wasn't successful; not updating payment info in LH." );
             }
         }
@@ -1051,14 +1053,14 @@ public class PaymentProcessorService {
      * 
      * @param bookingRef booking ref, e.g. BDC-12345678
      * @param reservationId LH id for this reservation
-     * @param reservationPage the HtmlPage of the current reservation 
+     * @param reservationPage the HtmlPage of the current reservation
      * @return full card details (not-null)
      * @throws IOException on page load error
      * @throws MissingUserDataException if unable to retrieve card details
      */
-    private Payment retrieveCardDetails( String bookingRef, int reservationId, 
+    private Payment retrieveCardDetails( String bookingRef, int reservationId,
             HtmlPage reservationPage ) throws IOException, MissingUserDataException {
-        
+
         // Booking.com
         if ( bookingRef.startsWith( "BDC-" ) ) {
 
@@ -1095,7 +1097,7 @@ public class PaymentProcessorService {
                 depositCharge.getCardDetails().setCvv( null );
             }
             return depositCharge;
-            
+
         }
         // Expedia
         else if ( bookingRef.startsWith( "EXP-" ) ) {
@@ -1109,21 +1111,21 @@ public class PaymentProcessorService {
     /**
      * Retrieve card details for the given HW booking.
      * 
-     * @param bookingRef e.g. HWL-555-123485758 
+     * @param bookingRef e.g. HWL-555-123485758
      * @return full card details (not-null); amount is null
      * @throws IOException on page load error
      * @throws ParseException on parse error
      * @throws MissingUserDataException if card details not found
      */
     private CardDetails retrieveHWCardDetails( String bookingRef ) throws ParseException, IOException {
-        try( WebClient hwlWebClient = context.getBean( "webClientForHostelworld", WebClient.class ) ) {
+        try (WebClient hwlWebClient = context.getBean( "webClientForHostelworld", WebClient.class )) {
             return hostelworldScraper.getCardDetails( hwlWebClient, bookingRef );
         }
     }
 
     /**
-     * Send through a PX Post transaction for this booking. Update LH payment details on success
-     * or add note to notes section on failure.
+     * Send through a PX Post transaction for this booking. Update LH payment details on success or
+     * add note to notes section on failure.
      * 
      * @param reservationPageScraper scraper for reservations page
      * @param reservationPage the current reservation
@@ -1134,45 +1136,45 @@ public class PaymentProcessorService {
      * @param isDeposit tick the deposit checkbox on LH if this is true
      * @throws IOException on I/O error
      */
-    private void processTransaction( ReservationPageScraper reservationPageScraper, HtmlPage reservationPage, 
+    private void processTransaction( ReservationPageScraper reservationPageScraper, HtmlPage reservationPage,
             int txnId, String bookingRef, CardDetails ccDetails, BigDecimal amountToPay, boolean isDeposit ) throws IOException {
         LOGGER.info( "Processing transaction " + bookingRef + " for £" + amountToPay );
 
         // send through the payment
         CaptureHttpRequest paymentRequest = new CaptureHttpRequest();
         CaptureHttpResponse paymentResponse = new CaptureHttpResponse();
-        TxnResponse paymentTxn = pxPostService.processPayment( String.valueOf( txnId ), 
+        TxnResponse paymentTxn = pxPostService.processPayment( String.valueOf( txnId ),
                 bookingRef, ccDetails, amountToPay, paymentRequest, paymentResponse );
-        
+
         // update our records
         LOGGER.info( "PX Post complete; updating our records." );
-        wordpressDAO.updatePxPostTransaction( txnId, 
+        wordpressDAO.updatePxPostTransaction( txnId,
                 paymentTxn.getTransaction().getCardNumber(),
                 paymentRequest.getBody(),
                 paymentResponse.getStatus().value(),
                 paymentResponse.getBody(),
                 paymentTxn.isSuccessful(),
-                paymentTxn.getHelpText());
-        
-        if(paymentTxn.isSuccessful()) {
+                paymentTxn.getHelpText() );
+
+        if ( paymentTxn.isSuccessful() ) {
             LOGGER.info( "PX Post was successful, updating LH payment details" );
-            reservationPageScraper.addPayment( reservationPage, amountToPay, 
-                    paymentTxn.getTransaction().getCardName(), isDeposit, 
+            reservationPageScraper.addPayment( reservationPage, amountToPay,
+                    paymentTxn.getTransaction().getCardName(), isDeposit,
                     "PxPost transaction " + txnId + " successful. "
-                    + "DpsTxnRef: " + paymentTxn.getTransaction().getDpsTxnRef() 
-                    + " - " + DATETIME_FORMAT.format( new Date() ) );
-        } 
+                            + "DpsTxnRef: " + paymentTxn.getTransaction().getDpsTxnRef()
+                            + " - " + DATETIME_FORMAT.format( new Date() ) );
+        }
         else {
             LOGGER.info( "PX Post was NOT successful; updating LH notes" );
-            reservationPageScraper.appendNote( reservationPage, 
-                "~~~ " + DATETIME_FORMAT.format( new Date() ) + "\n" 
-                + "Transaction ID: " + txnId + "\n"
-                + "DpsTxnRef: " + paymentTxn.getTransaction().getDpsTxnRef() + "\n" 
-                + "Card: " + paymentTxn.getTransaction().getCardNumber() + "\n"
-                + "Response Code (" + paymentTxn.getResponseCode() + "): " 
-                + StringUtils.trimToEmpty( paymentTxn.getResponseCodeText() ) + "\n"
-                + "Details: " + paymentTxn.getHelpText() + "\n"
-                + "~~~\n" );
+            reservationPageScraper.appendNote( reservationPage,
+                    "~~~ " + DATETIME_FORMAT.format( new Date() ) + "\n"
+                            + "Transaction ID: " + txnId + "\n"
+                            + "DpsTxnRef: " + paymentTxn.getTransaction().getDpsTxnRef() + "\n"
+                            + "Card: " + paymentTxn.getTransaction().getCardNumber() + "\n"
+                            + "Response Code (" + paymentTxn.getResponseCode() + "): "
+                            + StringUtils.trimToEmpty( paymentTxn.getResponseCodeText() ) + "\n"
+                            + "Details: " + paymentTxn.getHelpText() + "\n"
+                            + "~~~\n" );
         }
 
     }
@@ -1186,17 +1188,17 @@ public class PaymentProcessorService {
     private int countNumberOfGuests( HtmlPage reservationPage ) {
         List<?> guests = reservationPage.getByXPath( "//input[@id='number_adults']" );
         int numberGuests = 0;
-        for(Object elem : guests) {
+        for ( Object elem : guests ) {
             HtmlInput guestInput = HtmlInput.class.cast( elem );
-            numberGuests += Integer.parseInt( guestInput.getAttribute( "value" ));
+            numberGuests += Integer.parseInt( guestInput.getAttribute( "value" ) );
         }
-        LOGGER.info("found " + numberGuests + " guests");
+        LOGGER.info( "found " + numberGuests + " guests" );
         return numberGuests;
     }
 
     /**
-     * Retrieves the deposit amount to charge for the given BDC reservation
-     * and updates the amount on the given Payment object.
+     * Retrieves the deposit amount to charge for the given BDC reservation and updates the amount
+     * on the given Payment object.
      * 
      * @param reservationPage the HtmlPage of the current reservation
      * @return deposit amount to charge reservation
@@ -1211,8 +1213,8 @@ public class PaymentProcessorService {
         // guest can pay for everything up-front; in which case we charge that amount
         if ( StringUtils.trimToEmpty( guestComments.getText() ).contains(
                 "You have received a virtual credit card for this reservation" ) ||
-             StringUtils.trimToEmpty( guestComments.getText() ).contains(
-                "THIS RESERVATION HAS BEEN PRE-PAID" ) ) {
+                StringUtils.trimToEmpty( guestComments.getText() ).contains(
+                        "THIS RESERVATION HAS BEEN PRE-PAID" ) ) {
             Pattern p = Pattern.compile( "The amount the guest prepaid to Booking\\.com is GBP ([0-9]+\\.[0-9]{2})" );
             Matcher m = p.matcher( guestComments.getText() );
             if ( m.find() ) {
@@ -1274,7 +1276,7 @@ public class PaymentProcessorService {
 
         return BigDecimal.ZERO;
     }
-    
+
     /**
      * Retrieves the card details for the given Agoda reservation.
      * 
@@ -1283,7 +1285,7 @@ public class PaymentProcessorService {
      * @throws IOException on I/O error processing webpage
      */
     public CardDetails retrieveAgodaCardDetails( HtmlPage reservationPage, String bookingRef ) throws IOException {
-        try( WebClient agodaWebClient = context.getBean( "webClient", WebClient.class ) ) {
+        try (WebClient agodaWebClient = context.getBean( "webClient", WebClient.class )) {
             return agodaScraper.getAgodaCardDetails( agodaWebClient, bookingRef.substring( "AGO-".length() ) );
         }
     }
@@ -1334,7 +1336,7 @@ public class PaymentProcessorService {
             if ( res.getCreditCardId() != null && res.getCreditCardId().equals( authTxn.getCreditCardId() ) ) {
                 LOGGER.info( "Attempting to process refund for transaction " + authTxn.getId() );
                 String jsonResponse = cloudbedsScraper.processRefund( webClient, res, authTxn, refund.getAmount(), refund.getDescription() );
-                if( StringUtils.isNotBlank( jsonResponse ) ) {
+                if ( StringUtils.isNotBlank( jsonResponse ) ) {
                     CloudbedsJsonResponse response = cloudbedsScraper.fromJson( jsonResponse, CloudbedsJsonResponse.class );
                     wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), jsonResponse, response.isSuccess() ? "succeeded" : "failed" );
                     if ( response.isFailure() ) {
@@ -1353,8 +1355,8 @@ public class PaymentProcessorService {
                 throw new MissingUserDataException( "Unable to find original transaction to refund." );
             }
 
-            else {  // we don't have the card available in Cloudbeds; call Stripe server and record result manually
-                String idempotentKey = wordpressDAO.getMandatoryOption( "hbo_sagepay_vendor_prefix" ) 
+            else { // we don't have the card available in Cloudbeds; call Stripe server and record result manually
+                String idempotentKey = wordpressDAO.getMandatoryOption( "hbo_sagepay_vendor_prefix" )
                         + res.getIdentifier() + "-RF-" + jobId;
                 LOGGER.info( "Attempting to process refund for charge " + authTxn.getGatewayAuthorization() );
                 Stripe.apiKey = STRIPE_API_KEY;
@@ -1369,24 +1371,37 @@ public class PaymentProcessorService {
 
                     // record refund in Cloudbeds so we're in sync
                     if ( "succeeded".equals( stripRefund.getStatus() ) ) {
-                        cloudbedsScraper.addRefund( webClient, res, refund.getAmount(), refundTxnId + " (" 
-                                + authTxn.getGatewayAuthorization() + "): " + authTxn.getOriginalDescription() + " x" 
+                        cloudbedsScraper.addRefund( webClient, res, refund.getAmount(), refundTxnId + " ("
+                                + authTxn.getGatewayAuthorization() + "): " + authTxn.getOriginalDescription() + " x"
                                 + authTxn.getCardNumber() + " refunded on Stripe. -RONBOT" );
+
+                        cloudbedsScraper.addNote( webClient, refund.getReservationId(),
+                                "Refund completed for £" + refundAmount + "."
+                                        + (refund.getDescription() == null ? "" : " " + refund.getDescription()) );
+
+                        // send email if successful
+                        LOGGER.info( "Creating SendRefundSuccessfulEmailJob for " + res.getIdentifier() );
+                        SendRefundSuccessfulEmailJob job = new SendRefundSuccessfulEmailJob();
+                        job.setReservationId( refund.getReservationId() );
+                        job.setAmount( refund.getAmount() );
+                        job.setTxnId( refundTxnId );
+                        job.setStatus( JobStatus.submitted );
+                        wordpressDAO.insertJob( job );
                     }
                     else if ( "pending".equals( stripRefund.getStatus() ) ) {
                         LOGGER.info( "Refund pending" );
-                        cloudbedsScraper.addRefund( webClient, res, refund.getAmount(), refundTxnId + " (" 
-                                + authTxn.getGatewayAuthorization() + "): " + authTxn.getOriginalDescription() + " x" 
+                        cloudbedsScraper.addRefund( webClient, res, refund.getAmount(), refundTxnId + " ("
+                                + authTxn.getGatewayAuthorization() + "): " + authTxn.getOriginalDescription() + " x"
                                 + authTxn.getCardNumber() + " refund PENDING on Stripe. -RONBOT" );
                         cloudbedsScraper.addNote( webClient, refund.getReservationId(),
                                 "Refund PENDING (should usually be ok) for £" + refundAmount + "."
                                         + (refund.getDescription() == null ? "" : " " + refund.getDescription()) );
-                        return;
                     }
                     else {
+                        LOGGER.error( "Unexpected response during refund: " + stripRefund.toJson() );
+                        wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), stripRefund.toJson(), "failed" );
                         cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
                                 " for £" + refundAmount + ". See logs for details." );
-                        throw new PaymentNotAuthorizedException( "Failed to process refund " + refundTxnId );
                     }
                 }
                 catch ( InvalidRequestException ex ) {
@@ -1394,26 +1409,14 @@ public class PaymentProcessorService {
                     wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), ex.getMessage(), "failed" );
                     cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
                             " for £" + refundAmount + ". See logs for details." );
-                    return;
                 }
             }
-            cloudbedsScraper.addNote( webClient, refund.getReservationId(),
-                    "Refund completed for £" + refundAmount + "."
-                            + (refund.getDescription() == null ? "" : " " + refund.getDescription()) );
-
-            // send email if successful
-            LOGGER.info( "Creating SendRefundSuccessfulEmailJob for " + res.getIdentifier() );
-            SendRefundSuccessfulEmailJob job = new SendRefundSuccessfulEmailJob();
-            job.setReservationId( refund.getReservationId() );
-            job.setAmount( refund.getAmount() );
-            job.setTxnId( refundTxnId );
-            job.setStatus( JobStatus.submitted );
-            wordpressDAO.insertJob( job );
         }
     }
 
     /**
      * Queries Stripe for refund details.
+     * 
      * @param refundTxnId PK of Refund table
      * @return non-null refund object
      * @throws StripeException
