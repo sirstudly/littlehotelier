@@ -793,13 +793,9 @@ public class CloudbedsJsonRequestFactory {
      */
     public WebRequest createGetTransactionsByReservationRequest( Reservation res ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reports/transactions_by_reservation" );
-        String roomIdentifiers = res.getBookingRooms().stream()
-                .map( br -> "\"" + br.getRoomIdentifier() + "\"" )
-                .collect( Collectors.joining( "," ) );
-                
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "booking_id", res.getReservationId() ),
-                new NameValuePair( "options", "{\"filters\":{\"from\":\"\",\"to\":\"\",\"filter\":\"\",\"res_room_identifier\":[" + roomIdentifiers + "],\"user\":\"all\",\"posted\":[\"1\"],\"description\":[]},\"group\":{\"main\":\"\",\"sub\":\"\"},\"sort\":{\"column\":\"datetime_transaction\",\"order\":\"desc\"},\"loaded_filter\":1}" ),
+                new NameValuePair( "options", "{\"filters\":{\"from\":\"\",\"to\":\"\",\"filter\":\"\",\"user\":\"all\",\"posted\":[\"1\"],\"description\":[]},\"group\":{\"main\":\"\",\"sub\":\"\"},\"sort\":{\"column\":\"datetime_transaction\",\"order\":\"desc\"},\"loaded_filter\":1}" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
                 new NameValuePair( "version", getVersion() ) ) );
