@@ -1421,6 +1421,7 @@ public class PaymentProcessorService {
                         cloudbedsScraper.addNote( webClient, refund.getReservationId(),
                                 "Refund PENDING (should usually be ok) for £" + refundAmount + "."
                                         + (refund.getDescription() == null ? "" : " " + refund.getDescription()) );
+                        createSendRefundSuccessfulEmailJob( refund );
                     }
                     else {
                         LOGGER.error( "Unexpected response during refund: " + stripRefund.toJson() );
