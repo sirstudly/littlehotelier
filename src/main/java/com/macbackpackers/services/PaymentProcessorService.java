@@ -1414,8 +1414,10 @@ public class PaymentProcessorService {
                     status[0] = r.getStatus();
                 }
             } );
-            wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(),
-                    charge.getRefunds().getData().stream().map( r -> r.toJson() ).collect( Collectors.joining( ",\n" ) ), status[0] );
+            String jsonResponse = charge.getRefunds().getData().stream()
+                    .map( r -> r.toJson() ).collect( Collectors.joining( ",\n" ) );
+            LOGGER.info( jsonResponse );
+            wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), jsonResponse, status[0] );
         }
     }
 
