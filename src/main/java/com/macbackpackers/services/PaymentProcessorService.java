@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.mail.MessagingException;
 
@@ -81,6 +82,7 @@ import com.macbackpackers.scrapers.ReservationPageScraper;
 import com.stripe.Stripe;
 import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.StripeException;
+import com.stripe.model.Charge;
 import com.stripe.model.Refund;
 import com.stripe.net.RequestOptions.RequestOptionsBuilder;
 import com.stripe.param.RefundCreateParams;
@@ -1437,6 +1439,36 @@ public class PaymentProcessorService {
                             " for £" + refundAmount + ". " + ex.getMessage() );
                 }
             }
+        }
+    }
+
+    /**
+     * Reloads the Stripe refund status and response by looking up from the original auth
+     * transaction.
+     * 
+     * @param refundTxnId PK of Refund table
+     * @throws IOException
+     * @throws StripeException
+     */
+    public void refreshStripeRefundStatus( int refundTxnId ) throws IOException, StripeException {
+        try (WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class )) {
+            Stripe.apiKey = STRIPE_API_KEY;
+            StripeRefund refund = wordpressDAO.fetchStripeRefund( refundTxnId );
+            LOGGER.info( "Updating refund status for reservation " + refund.getReservationId() + " and txn " + refundTxnId );
+            Reservation res = cloudbedsScraper.getReservationRetry( webClient, refund.getReservationId() );
+            TransactionRecord authTxn = cloudbedsScraper.getStripeTransaction( webClient, res, refund.getCloudbedsTxId() );
+            Charge charge = Charge.retrieve( authTxn.getGatewayAuthorization() );
+            if ( charge.getRefunds().getData().size() == 0 ) {
+                throw new MissingUserDataException( "Unable to find refund transaction." );
+            }
+            String[] status = new String[1];
+            charge.getRefunds().getData().forEach( r -> {
+                if ( "succeeded".equals( r.getStatus() ) || status[0] == null ) {
+                    status[0] = r.getStatus();
+                }
+            } );
+            wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(),
+                    charge.getRefunds().getData().stream().map( r -> r.toJson() ).collect( Collectors.joining( ",\n" ) ), status[0] );
         }
     }
 

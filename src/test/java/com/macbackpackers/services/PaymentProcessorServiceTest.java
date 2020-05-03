@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
@@ -54,6 +55,9 @@ public class PaymentProcessorServiceTest {
 
     @Autowired
     BookingsPageScraper bookingScraper;
+
+    @Value( "${stripe.apikey}" )
+    String STRIPE_API_KEY;
 
     @Test
     public void testPayment() throws Exception {
@@ -185,9 +189,25 @@ public class PaymentProcessorServiceTest {
     }
 
     @Test
+    public void testFetchStripeRefund() throws Exception {
+        Refund r = paymentService.retrieveStripeRefund( 15 );
+        LOGGER.info( ToStringBuilder.reflectionToString( r ) );
+    }
+
+    @Test
     public void testRetrieveStripeRefund() throws Exception {
         Refund r = paymentService.retrieveStripeRefund( 15 );
         LOGGER.info( ToStringBuilder.reflectionToString( r ) );
     }
 
+    @Test
+    public void refreshStripeRefundStatus() throws Exception {
+        paymentService.refreshStripeRefundStatus( 1 );
+        paymentService.refreshStripeRefundStatus( 2 );
+        paymentService.refreshStripeRefundStatus( 3 );
+        paymentService.refreshStripeRefundStatus( 5 );
+        paymentService.refreshStripeRefundStatus( 6 );
+        paymentService.refreshStripeRefundStatus( 7 );
+        paymentService.refreshStripeRefundStatus( 9 );
+    }
 }

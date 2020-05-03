@@ -1055,12 +1055,32 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public List<StripeRefund> fetchStripeRefundsAtStatus( String status ) {
+        return em.createQuery(
+                "FROM StripeRefund WHERE status = :status", StripeRefund.class )
+                .setParameter( "status", status )
+                .getResultList();
+    }
+
+    @Override
     public void updateStripeRefund( int id, String chargeId, String response, String status ) {
         StripeRefund refund = fetchStripeRefund( id );
-        refund.setChargeId( chargeId );
-        refund.setResponse( response );
-        refund.setStatus( status );
-        refund.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
+        boolean changed = false;
+        if ( false == StringUtils.equals( refund.getChargeId(), chargeId ) ) {
+            refund.setChargeId( chargeId );
+            changed = true;
+        }
+        if ( false == StringUtils.equals( refund.getResponse(), response ) ) {
+            refund.setResponse( response );
+            changed = true;
+        }
+        if ( false == StringUtils.equals( refund.getStatus(), status ) ) {
+            refund.setStatus( status );
+            changed = true;
+        }
+        if ( changed ) {
+            refund.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
+        }
     }
 
     @Override

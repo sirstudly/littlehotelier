@@ -561,6 +561,13 @@ public interface WordPressDAO {
     public StripeRefund fetchStripeRefund( int id );
 
     /**
+     * Returns all stripe refunds at a particular status.
+     * 
+     * @return non-null list of refunds
+     */
+    public List<StripeRefund> fetchStripeRefundsAtStatus( String status );
+
+    /**
      * Updates the stripe refund table after attempting a refund.
      * 
      * @param id primary key on stripe refund table

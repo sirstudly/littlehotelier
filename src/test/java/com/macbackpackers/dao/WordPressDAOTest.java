@@ -670,4 +670,10 @@ public class WordPressDAOTest {
         SagepayRefund refund = dao.fetchSagepayRefund( 3 );
         LOGGER.info( ToStringBuilder.reflectionToString( refund ) );
     }
+
+    @Test
+    public void fetchStripeRefundsAtStatus() throws Exception {
+        List<StripeRefund> refunds = dao.fetchStripeRefundsAtStatus( "pending" );
+        LOGGER.info( "Found " + refunds.size() + " records" );
+    }
 }
