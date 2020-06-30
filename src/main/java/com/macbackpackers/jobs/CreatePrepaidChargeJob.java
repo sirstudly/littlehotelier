@@ -44,7 +44,7 @@ public class CreatePrepaidChargeJob extends AbstractJob {
 
         // also, login to BDC and check for any prepaid bookings we haven't charged yet
         try {
-            cloudbedsService.createBDCPrepaidChargeJobs( LocalDate.now().minusDays( 7 ), LocalDate.now().minusDays( 1 ) );
+            cloudbedsService.createBDCPrepaidChargeJobs();
         }
         catch ( Exception ex ) {
             setRetryCount( 1 ); // don't retry if we fail at this point

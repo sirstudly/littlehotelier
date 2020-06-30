@@ -1,7 +1,6 @@
 
 package com.macbackpackers.scrapers;
 
-import java.time.LocalDate;
 import java.util.List;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
@@ -75,8 +74,7 @@ public class BookingComScraperTest {
 
     @Test
     public void testGetAllVCCBookingsThatCanBeCharged() throws Exception {
-        List<String> bookingRefs = scraper.getAllVCCBookingsThatCanBeCharged( driver, wait,
-                LocalDate.parse( "2020-01-01" ), LocalDate.parse( "2020-01-10" ) );
+        List<String> bookingRefs = scraper.getAllVCCBookingsThatCanBeCharged( driver, wait );
         LOGGER.info( "Found {} bookings", bookingRefs.size() );
         bookingRefs.stream().forEach( b -> LOGGER.info( b ) );
     }

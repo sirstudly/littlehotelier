@@ -345,20 +345,17 @@ public class CloudbedsService {
     }
 
     /**
-     * Searches for all bookings between the given dates and creates a PrepaidChargeJob for all
-     * virtual card bookings that can be charged immediately.
+     * Creates a PrepaidChargeJob for all virtual card bookings that can be charged immediately.
      * 
      * @param driver
      * @param wait
-     * @param checkinDateStart checkin date (inclusive)
-     * @param checkinDateEnd checkin date (inclusive)
      * @throws Exception
      */
-    public void createBDCPrepaidChargeJobs( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws Exception {
+    public void createBDCPrepaidChargeJobs() throws Exception {
         WebDriver driver = driverFactory.borrowObject();
         try {
             WebDriverWait wait = new WebDriverWait( driver, maxWaitSeconds );
-            bdcScraper.getAllVCCBookingsThatCanBeCharged( driver, wait, checkinDateStart, checkinDateEnd )
+            bdcScraper.getAllVCCBookingsThatCanBeCharged( driver, wait )
                 .stream().forEach( this::createPrepaidChargeJob );
         }
         finally {

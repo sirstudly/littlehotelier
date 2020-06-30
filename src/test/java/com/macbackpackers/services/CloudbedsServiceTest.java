@@ -131,8 +131,7 @@ public class CloudbedsServiceTest {
 
     @Test
     public void testCreatePrepaidChargeJobs() throws Exception {
-        cloudbedsService.createBDCPrepaidChargeJobs( 
-                LocalDate.now().minusDays( 7 ), LocalDate.now().minusDays( 1 ) );
+        cloudbedsService.createBDCPrepaidChargeJobs();
     }
 
     @Test
