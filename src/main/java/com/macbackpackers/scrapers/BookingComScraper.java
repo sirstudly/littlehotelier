@@ -25,6 +25,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -430,8 +431,17 @@ public class BookingComScraper {
         final String CC_DETAILS_PATH = "//th[contains(text(),'Credit Card Details')] | //th[contains(text(),'Credit card details')]";
         final String CC_DETAILS_NOT_AVAIL_PATH = "//h2[contains(text(),\"credit card details aren't available\")]";
         final String CONTINUE_WITH_CC_DETAILS = "//p[normalize-space(text())='Continue to view the credit card details.']";
-        final WebElement locator = wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( 
-                SIGN_IN_LOCATOR_PATH + " | " + CC_DETAILS_PATH + " | " + CC_DETAILS_NOT_AVAIL_PATH + " | " + CONTINUE_WITH_CC_DETAILS ) ) );
+        WebElement locator;
+        try {
+            locator = wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath(
+                    SIGN_IN_LOCATOR_PATH + " | " + CC_DETAILS_PATH + " | " + CC_DETAILS_NOT_AVAIL_PATH + " | " + CONTINUE_WITH_CC_DETAILS ) ) );
+        }
+        catch ( TimeoutException ex ) {
+            LOGGER.info( "Timeout. Trying to click on view CC details again." );
+            headerViewCCDetails.get( 0 ).click();
+            locator = wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath(
+                    SIGN_IN_LOCATOR_PATH + " | " + CC_DETAILS_PATH + " | " + CC_DETAILS_NOT_AVAIL_PATH + " | " + CONTINUE_WITH_CC_DETAILS ) ) );
+        }
 
         Optional<Runnable> CLOSE_WINDOW_TASK = Optional.empty();
         if ( "h2".equals( locator.getTagName() ) ) {
