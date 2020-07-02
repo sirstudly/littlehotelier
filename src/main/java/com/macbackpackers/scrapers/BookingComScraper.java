@@ -509,11 +509,11 @@ public class BookingComScraper {
         viewUnchargedVirtualCards.click();
 
         // either we get a span with "Oops, no results." or we get a table of results
-        By SEARCH_RESULTS_XPATH = By.xpath( "//span[contains(text(),'No results')] "
+        By SEARCH_RESULTS_XPATH = By.xpath( "//span[contains(text(),'No virtual cards to charge')] "
                 + "| //th/a[contains(@class, 'bui-link')]" );
         wait.until( ExpectedConditions.visibilityOfElementLocated( SEARCH_RESULTS_XPATH ) );
         WebElement searchResult = driver.findElement( SEARCH_RESULTS_XPATH );
-        if ( searchResult.getText().contains( "No results" ) ) {
+        if ( searchResult.getText().contains( "No virtual cards to charge" ) ) {
             LOGGER.info( "No results.. nothing to do." );
             return Collections.emptyList();
         }
