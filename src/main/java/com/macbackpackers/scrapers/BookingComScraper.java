@@ -25,7 +25,6 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
-import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -209,22 +208,7 @@ public class BookingComScraper {
     public void lookupReservation( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException {
         doLogin( driver, wait );
         LOGGER.info( "Looking up reservation " + reservationId );
-
-        WebElement searchInput = driver.findElement( By.xpath( "//input[@placeholder='Search for reservations']" ) );
-        searchInput.sendKeys( reservationId + "\n" );
-
-        try {
-            LOGGER.info( "Entering reservation ID into search bar." );
-            final By BY_RESERVATION_ANCHOR = By.xpath( "//a[@data-id='" + reservationId + "']" );
-            wait.until( ExpectedConditions.visibilityOfElementLocated( BY_RESERVATION_ANCHOR ) );
-            WebElement searchAnchor = driver.findElement( BY_RESERVATION_ANCHOR );
-            LOGGER.info( "Redirecting to " + searchAnchor.getAttribute( "href" ) );
-            driver.get( searchAnchor.getAttribute( "href" ) );
-        }
-        catch ( TimeoutException ex ) {
-            LOGGER.info( "Unable to find reservation from search box; attempting from reservation search" );
-            loadReservationFromSearchTab( driver, wait, reservationId );
-        }
+        loadReservationFromSearchTab( driver, wait, reservationId );
 
         wait.until( ExpectedConditions.or(
                 ExpectedConditions.titleContains( "Reservation Details" ),
@@ -430,6 +414,7 @@ public class BookingComScraper {
             throw new MissingUserDataException( "No card details link available." );
         }
 
+        LOGGER.info( "Found {} view CC details elements.", headerViewCCDetails.size() );
         String nextLink = headerViewCCDetails.get( 0 ).getAttribute( "href" );
         if ( StringUtils.isNotBlank( nextLink ) ) {
             LOGGER.info( "Link found, going to " + nextLink );
