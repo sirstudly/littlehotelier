@@ -249,11 +249,15 @@ public class BookingComScraper {
         LOGGER.info( "Loading Reservations tab" );
         WebElement reservationsAnchor = driver.findElement( By.xpath( "//nav//a/span[normalize-space(text())='Reservations']/.." ) );
         driver.get( reservationsAnchor.getAttribute( "href" ) );
-        LOGGER.info( "Entering checkin date to 6 months prior" );
+        LOGGER.info( "Entering checkin date to 11 months prior" );
         WebElement dateFrom = driver.findElement( By.id( "date_from" ) );
         dateFrom.click();
         dateFrom.clear();
-        dateFrom.sendKeys( LocalDate.now().minusMonths( 12 ).format( DateTimeFormatter.ISO_DATE ) );
+        dateFrom.sendKeys( LocalDate.now().minusMonths( 11 ).format( DateTimeFormatter.ISO_DATE ) );
+        if ( driver.findElements( By.xpath( "//span[span[text()='More filters']]/*[local-name() = 'svg' and contains(@class, 'keyboard_arrow_down')]" ) ).size() > 0 ) {
+            LOGGER.info( "Clicking on More filters..." );
+            driver.findElement( By.xpath( "//button/*/span[contains(text(),'More filters')]" ) ).click();
+        }
         LOGGER.info( "Setting keyword(s) to reservation ID" );
         WebElement keywords = driver.findElement( By.xpath( "//input[@name='term']" ) );
         keywords.click();
@@ -285,6 +289,12 @@ public class BookingComScraper {
      */
     public BigDecimal getVirtualCardBalance( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException, NoSuchElementException {
         lookupReservation( driver, wait, reservationId );
+
+        // Click on VCC confirmation dialog "VCC changes for Covid 19"
+        By OKAY_GOT_IT_BUTTON = By.xpath( "//button/span/span[text()='Okay, got it']" );
+        if ( driver.findElements( OKAY_GOT_IT_BUTTON ).size() > 0 ) {
+            driver.findElement( OKAY_GOT_IT_BUTTON ).click();
+        }
 
         // payment details loaded by javascript
         final By PAYMENT_DETAILS_BLOCK = By.xpath( "//span[normalize-space(text())='Virtual credit card'] | //span[contains(text(),'successfully charged')]" );
@@ -522,7 +532,9 @@ public class BookingComScraper {
 
         List<String> reservationIds = new ArrayList<>();
         reservationIds.addAll( driver.findElements( By.xpath( "//div[@role='dialog']//tr/td[@data-heading='Booking number']" ) )
-                .stream().map( a -> a.getText() ).collect( Collectors.toList() ) );
+                .stream()
+                .filter( p -> false == "2472326441".equals( p.getText() ) ) // fucked up HSH booking
+                .map( a -> a.getText() ).collect( Collectors.toList() ) );
         List<String> checkinDates = new ArrayList<>();
         checkinDates.addAll( driver.findElements( By.xpath( "//div[@role='dialog']//tr/td[@data-heading='Check-in']" ) )
                 .stream().map( a -> a.getText() ).collect( Collectors.toList() ) );
