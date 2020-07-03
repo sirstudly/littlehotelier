@@ -76,7 +76,7 @@ public class LittleHotelierConfig {
     @Bean( name = "webClientForHostelworld" )
     @Scope( "prototype" )
     public WebClient getWebClientForHostelworld() {
-        WebClient webClient = new WebClient( BrowserVersion.FIREFOX_52 );
+        WebClient webClient = new WebClient( BrowserVersion.FIREFOX_68 );
         webClient.getOptions().setTimeout( 120000 );
         webClient.getOptions().setRedirectEnabled( true );
         webClient.getOptions().setJavaScriptEnabled( false );
