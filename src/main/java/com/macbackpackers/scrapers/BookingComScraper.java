@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -45,6 +46,7 @@ import com.macbackpackers.services.BasicCardMask;
 public class BookingComScraper {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+    private final DateTimeFormatter MMM_DD_YYYY = DateTimeFormatter.ofPattern( "MMM dd, yyyy" );
 
     @Autowired
     private WordPressDAO wordPressDAO;
@@ -251,7 +253,7 @@ public class BookingComScraper {
         WebElement dateFrom = driver.findElement( By.id( "date_from" ) );
         dateFrom.click();
         dateFrom.clear();
-        dateFrom.sendKeys( LocalDate.now().minusMonths( 6 ).format( DateTimeFormatter.ISO_DATE ) );
+        dateFrom.sendKeys( LocalDate.now().minusMonths( 12 ).format( DateTimeFormatter.ISO_DATE ) );
         LOGGER.info( "Setting keyword(s) to reservation ID" );
         WebElement keywords = driver.findElement( By.xpath( "//input[@name='term']" ) );
         keywords.click();
@@ -510,7 +512,7 @@ public class BookingComScraper {
 
         // either we get a span with "Oops, no results." or we get a table of results
         By SEARCH_RESULTS_XPATH = By.xpath( "//span[contains(text(),'No virtual cards to charge')] "
-                + "| //th/a[contains(@class, 'bui-link')]" );
+                + "| //div[@role='dialog']//th/a[contains(@class, 'bui-link')]" );
         wait.until( ExpectedConditions.visibilityOfElementLocated( SEARCH_RESULTS_XPATH ) );
         WebElement searchResult = driver.findElement( SEARCH_RESULTS_XPATH );
         if ( searchResult.getText().contains( "No virtual cards to charge" ) ) {
@@ -519,8 +521,26 @@ public class BookingComScraper {
         }
 
         List<String> reservationIds = new ArrayList<>();
-        reservationIds.addAll( driver.findElements( By.xpath( "//td[@data-heading='Booking number']" ) )
+        reservationIds.addAll( driver.findElements( By.xpath( "//div[@role='dialog']//tr/td[@data-heading='Booking number']" ) )
                 .stream().map( a -> a.getText() ).collect( Collectors.toList() ) );
+        List<String> checkinDates = new ArrayList<>();
+        checkinDates.addAll( driver.findElements( By.xpath( "//div[@role='dialog']//tr/td[@data-heading='Check-in']" ) )
+                .stream().map( a -> a.getText() ).collect( Collectors.toList() ) );
+        if ( reservationIds.size() != checkinDates.size() ) {
+            throw new RuntimeException( "Mismatch on reservation IDs and checkin dates?!?" );
+        }
+
+        // remove any where today < checkin date + 1 (as per BDC policy)
+        // not sure why they'd even show up in the VCCs available to charge
+        Iterator<String> it = reservationIds.iterator();
+        for ( int i = 0 ; it.hasNext() ; i++ ) {
+            String reservationId = it.next();
+            LOGGER.info( "Found uncharged VCC for reservation {} with checkin date of {}", reservationId, checkinDates.get( i ) );
+            if ( LocalDate.now().isBefore( LocalDate.parse( checkinDates.get( i ), MMM_DD_YYYY ).plusDays( 1 ) ) ) {
+                LOGGER.info( "Reservation {} is in the future, ignoring...", reservationId );
+                it.remove();
+            }
+        }
         return reservationIds;
     }
 
