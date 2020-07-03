@@ -532,9 +532,7 @@ public class BookingComScraper {
 
         List<String> reservationIds = new ArrayList<>();
         reservationIds.addAll( driver.findElements( By.xpath( "//div[@role='dialog']//tr/td[@data-heading='Booking number']" ) )
-                .stream()
-                .filter( p -> false == "2472326441".equals( p.getText() ) ) // fucked up HSH booking
-                .map( a -> a.getText() ).collect( Collectors.toList() ) );
+                .stream().map( a -> a.getText() ).collect( Collectors.toList() ) );
         List<String> checkinDates = new ArrayList<>();
         checkinDates.addAll( driver.findElements( By.xpath( "//div[@role='dialog']//tr/td[@data-heading='Check-in']" ) )
                 .stream().map( a -> a.getText() ).collect( Collectors.toList() ) );
@@ -547,6 +545,11 @@ public class BookingComScraper {
         Iterator<String> it = reservationIds.iterator();
         for ( int i = 0 ; it.hasNext() ; i++ ) {
             String reservationId = it.next();
+            if ( "2472326441".equals( reservationId ) ) {
+                LOGGER.info( "Skipping fucked up HSH reservation" );
+                it.remove();
+                continue;
+            }
             LOGGER.info( "Found uncharged VCC for reservation {} with checkin date of {}", reservationId, checkinDates.get( i ) );
             if ( LocalDate.now().isBefore( LocalDate.parse( checkinDates.get( i ), MMM_DD_YYYY ).plusDays( 1 ) ) ) {
                 LOGGER.info( "Reservation {} is in the future, ignoring...", reservationId );
