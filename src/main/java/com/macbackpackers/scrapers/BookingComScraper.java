@@ -249,11 +249,15 @@ public class BookingComScraper {
         LOGGER.info( "Loading Reservations tab" );
         WebElement reservationsAnchor = driver.findElement( By.xpath( "//nav//a/span[normalize-space(text())='Reservations']/.." ) );
         driver.get( reservationsAnchor.getAttribute( "href" ) );
-        LOGGER.info( "Entering checkin date to 11 months prior" );
+        LOGGER.info( "Entering checkin window as +/- 11 months" );
         WebElement dateFrom = driver.findElement( By.id( "date_from" ) );
         dateFrom.click();
         dateFrom.clear();
         dateFrom.sendKeys( LocalDate.now().minusMonths( 11 ).format( DateTimeFormatter.ISO_DATE ) );
+        WebElement dateTo = driver.findElement( By.id( "date_to" ) );
+        dateTo.click();
+        dateTo.clear();
+        dateTo.sendKeys( LocalDate.now().plusMonths( 11 ).format( DateTimeFormatter.ISO_DATE ) );
         if ( driver.findElements( By.xpath( "//span[span[text()='More filters']]/*[local-name() = 'svg' and contains(@class, 'keyboard_arrow_down')]" ) ).size() > 0 ) {
             LOGGER.info( "Clicking on More filters..." );
             driver.findElement( By.xpath( "//button/*/span[contains(text(),'More filters')]" ) ).click();
@@ -369,28 +373,25 @@ public class BookingComScraper {
         lookupReservation( driver, wait, reservationId );
         LOGGER.info( "Marking card ending in " + last4Digits + " as invalid for reservation " + reservationId );
 
-        List<WebElement> headerMarkInvalid = driver.findElements( By.id( "mark_invalid_new_icc" ) );
+        List<WebElement> headerMarkInvalid = driver.findElements( By.xpath( "//button[span/span[text()='Mark credit card as invalid']]" ) );
         if ( headerMarkInvalid.isEmpty() ) {
             LOGGER.info( "Link not available (or already marked invalid). Nothing to do..." );
             return;
         }
-        driver.findElement( By.id( "mark_invalid_new_icc" ) ).click();
-        wait.until( ExpectedConditions.visibilityOfElementLocated( By.name( "ccnumber" ) ) );
+        headerMarkInvalid.get( 0 ).click();
+        wait.until( ExpectedConditions.visibilityOfElementLocated( By.id( "last-digits" ) ) );
 
-        WebElement last4DigitsInput = driver.findElement( By.name( "ccnumber" ) );
+        WebElement last4DigitsInput = driver.findElement( By.id( "last-digits" ) );
         last4DigitsInput.sendKeys( last4Digits );
 
-        Select cardInvalidSelect = new Select( driver.findElement( By.name( "cc_invalid_reason" ) ) );
+        Select cardInvalidSelect = new Select( driver.findElement( By.id( "reason" ) ) );
         cardInvalidSelect.selectByValue( "declined" );
 
-        WebElement depositRadio = driver.findElement( By.xpath( "//input[@type='radio' and @name='preprocess_type' and @value='deposit']/following-sibling::span" ) );
-        depositRadio.click();
-
-        Select amountTypeSelect = new Select( driver.findElement( By.name( "amount_type" ) ) );
-        amountTypeSelect.selectByValue( "first" );
-
-        WebElement confirmBtn = driver.findElement( By.xpath( "//button/span[contains(text(), 'Confirm')]" ) );
+        WebElement confirmBtn = driver.findElement( By.xpath( "//button[span/span[text()='Confirm']]" ) );
         confirmBtn.click();
+
+        By CLOSE_MODAL_BTN = By.xpath( "//aside[header/h1/span[text()='Mark credit card as invalid']]/footer/button[span/span[text()='Close']]" );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( CLOSE_MODAL_BTN ) ).click();
         LOGGER.info( "Card marked as invalid." );
     }
 
