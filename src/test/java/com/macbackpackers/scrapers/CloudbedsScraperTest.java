@@ -267,15 +267,20 @@ public class CloudbedsScraperTest {
                 } );
     }
 
+    @Test
+    public void testGetCalendarWSSURI() throws Exception {
+        LOGGER.info( cloudbedsScraper.getCalendarWSSURI( webClient ).toString() );
+    }
 
     @Test
-    public void createCovid19CancelBookingJobsMay() throws Exception {
+    public void createCovid19CancelBookingJobsAug() throws Exception {
         cloudbedsScraper.getReservations( webClient, 
                 null, // stay date start
                 null, // stay date end
-                LocalDate.parse("2020-04-30"), // checkin date start
-                LocalDate.parse("2020-05-30"), // checkin date end end
+                LocalDate.parse("2020-08-01"), // checkin date start
+                LocalDate.parse("2020-08-14"), // checkin date end
                 "confirmed" ).stream()
+                .filter( res -> false == "34541998".equals( res.getId() ) ) // maintenance
                 .forEach( res -> { 
                     LOGGER.info( "Creating job for reservation " + res.getId() + " " + res.getCheckinDate() + " " + res.getFirstName() + " " + res.getLastName() ); 
                     CancelBookingJob j = new CancelBookingJob();

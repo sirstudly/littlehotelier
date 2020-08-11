@@ -1003,4 +1003,13 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "token", token ) ) );
         return requestSettings;
     }
+
+    public WebRequest createCalendarPrepareWSSRequest() throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://calendar.cloudbeds.com/connect/ws/ws_prepare" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersion() ) ) );
+        return webRequest;
+    }
 }

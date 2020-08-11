@@ -2,6 +2,8 @@ package com.macbackpackers.scrapers;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -879,6 +881,31 @@ public class CloudbedsScraper {
 
         Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+    }
+
+    /**
+     * Gets the WSS URI for the calendar page.
+     * 
+     * @param webClient web client instance to use
+     * @throws IOException
+     * @throws URISyntaxException 
+     */
+    public URI getCalendarWSSURI( WebClient webClient ) throws IOException, URISyntaxException {
+        WebRequest requestSettings = jsonRequestFactory.createCalendarPrepareWSSRequest();
+        Page redirectPage = webClient.getPage( requestSettings );
+        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
+        LOGGER.debug( jsonResponse );
+
+        // throw a wobbly if response not successful
+        JsonElement jelement = fromJson( jsonResponse, JsonElement.class );
+        if( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() 
+                || false == jelement.getAsJsonObject().has( "address" ) ) {
+            throw new MissingUserDataException( "Failed to retrieve WSS URI." );
+        }
+        
+        URI uri = new URI( jelement.getAsJsonObject().get("address").getAsString() + "calendar" );
+        LOGGER.info( "Found WSS endpoint: " + uri );
+        return uri;
     }
 
     /**
