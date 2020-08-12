@@ -1198,6 +1198,7 @@ public class CloudbedsService {
         // we need to navigate first before loading the cookies for that domain
         driver.get( "https://hotels.cloudbeds.com/auth/login" );
 
+        wait.until( presenceOfElementLocated( By.id( "email" ) ) );
         WebElement usernameField = driver.findElement( By.id( "email" ) );
         usernameField.sendKeys( username );
 
@@ -1230,10 +1231,6 @@ public class CloudbedsService {
         wait.until( titleContains( "Dashboard" ) );
         LOGGER.info( "Logged in title? is: " + driver.getTitle() );
 
-        // load the calendar page so we can get cookies needed for WSS support
-        driver.get( "https://hotels.cloudbeds.com/connect/" + scraper.getPropertyId() + "#/calendar" );
-        wait.until( presenceOfElementLocated( By.id( "calendar-app" ) ) );
-
         // save credentials to disk so we don't need to do this again
         dao.setOption( "hbo_cloudbeds_cookies",
                 driver.manage().getCookies().stream()
@@ -1241,6 +1238,38 @@ public class CloudbedsService {
                         .collect( Collectors.joining( ";" ) ) );
         dao.setOption( "hbo_cloudbeds_useragent",
                 jse.executeScript( "return navigator.userAgent;" ).toString() );
+    }
+
+    /**
+     * Updates cookies after loading the calendar page.
+     * 
+     * @param webClient 
+     * @throws Exception 
+     */
+    public void updateCookiesOnCalendarPage( WebClient webClient ) throws Exception {
+        final int MAX_WAIT_SECONDS = 60;
+        WebDriver driver = driverFactory.borrowObject();
+        try {
+            WebDriverWait wait = new WebDriverWait( driver, MAX_WAIT_SECONDS );
+
+            // load the calendar page so we can get cookies needed for WSS support
+            driver.get( "https://hotels.cloudbeds.com/connect/" + scraper.getPropertyId() + "#/calendar" );
+            wait.until( presenceOfElementLocated( By.id( "calendar-app" ) ) );
+
+            dao.setOption( "hbo_cloudbeds_cookies",
+                    driver.manage().getCookies().stream()
+                            .map( c -> c.getName() + "=" + c.getValue() )
+                            .collect( Collectors.joining( ";" ) ) );
+            LOGGER.info( "Cookies have been updated" );
+        }
+        catch ( Exception ex ) {
+            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
+            FileUtils.copyFile( scrFile, new File( "logs/cloudbeds_failed_calendar.png" ) );
+            LOGGER.info( "Error attempting to login. Screenshot saved as cloudbeds_failed_calendar.png", ex );
+        }
+        finally {
+            driverFactory.returnObject( driver );
+        }
     }
 
     /**
