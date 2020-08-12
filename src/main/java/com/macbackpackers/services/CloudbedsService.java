@@ -41,6 +41,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
+import org.springframework.web.socket.WebSocketSession;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.google.gson.Gson;
@@ -83,6 +84,9 @@ public class CloudbedsService {
     @Autowired
     private CloudbedsScraper scraper;
     
+    @Autowired
+    private CloudbedsWebsocketService wssService;
+
     @Autowired
     private BookingComScraper bdcScraper;
 
@@ -1246,7 +1250,7 @@ public class CloudbedsService {
      * @param webClient 
      * @throws Exception 
      */
-    public void updateCookiesOnCalendarPage( WebClient webClient ) throws Exception {
+    public void initiateWssOnCalendarPage( WebClient webClient ) throws Exception {
         final int MAX_WAIT_SECONDS = 60;
         WebDriver driver = driverFactory.borrowObject();
         try {
@@ -1256,11 +1260,19 @@ public class CloudbedsService {
             driver.get( "https://hotels.cloudbeds.com/connect/" + scraper.getPropertyId() + "#/calendar" );
             wait.until( presenceOfElementLocated( By.id( "calendar-app" ) ) );
 
+            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
+            FileUtils.copyFile( scrFile, new File( "logs/cloudbeds_calendar.png" ) );
+            LOGGER.info( "Screenshot saved as cloudbeds_calendar.png" );
+
             dao.setOption( "hbo_cloudbeds_cookies",
                     driver.manage().getCookies().stream()
                             .map( c -> c.getName() + "=" + c.getValue() )
                             .collect( Collectors.joining( ";" ) ) );
             LOGGER.info( "Cookies have been updated" );
+            
+            WebSocketSession wss = wssService.connect();
+            LOGGER.info( "WSS session created " + wss );
+            Thread.sleep( 15000 );
         }
         catch ( Exception ex ) {
             File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );

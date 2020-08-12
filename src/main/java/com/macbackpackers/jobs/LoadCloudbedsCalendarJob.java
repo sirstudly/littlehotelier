@@ -29,7 +29,7 @@ public class LoadCloudbedsCalendarJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            service.updateCookiesOnCalendarPage( webClient );
+            service.initiateWssOnCalendarPage( webClient );
         }
     }
 
