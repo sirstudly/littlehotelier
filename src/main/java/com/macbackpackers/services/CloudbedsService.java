@@ -1171,7 +1171,7 @@ public class CloudbedsService {
         catch ( Exception ex ) {
             File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
             FileUtils.copyFile( scrFile, new File( "logs/cloudbeds_login_failed.png" ) );
-            LOGGER.info( "Error attempting to login. Screenshot saved as cloudbeds_login_failed.png" );
+            LOGGER.info( "Error attempting to login. Screenshot saved as cloudbeds_login_failed.png", ex );
         }
         finally {
             driverFactory.returnObject( driver );
