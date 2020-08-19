@@ -36,14 +36,15 @@ public class CreateChargeHostelworldLateCancellationJob extends AbstractJob {
     @Override
     @Transactional
     public void processJob() throws Exception {
-        if ( dao.getOption( "siteurl" ).contains( "castlerock" ) && LocalDate.now().getMonth() == Month.AUGUST ) {
-            cbService.createChargeHostelworldLateCancellationJobsForAugust( cbWebClient,
-                    LocalDate.now().minusDays( 5 ), LocalDate.now() );
-        }
-        else {
+        // temporarily disabled due to covid-19
+//        if ( dao.getOption( "siteurl" ).contains( "castlerock" ) && LocalDate.now().getMonth() == Month.AUGUST ) {
+//            cbService.createChargeHostelworldLateCancellationJobsForAugust( cbWebClient,
+//                    LocalDate.now().minusDays( 5 ), LocalDate.now() );
+//        }
+//        else {
             cbService.createChargeHostelworldLateCancellationJobs( cbWebClient,
                     LocalDate.now().minusDays( 5 ), LocalDate.now() );
-        }
+//        }
     }
 
     @Override

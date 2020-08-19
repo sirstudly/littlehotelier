@@ -92,6 +92,12 @@ public class CloudbedsScraperTest {
     }
 
     @Test
+    public void testIsExistsRefund() throws Exception {
+        Reservation r = cloudbedsScraper.getReservation( webClient, "34321814" );
+        LOGGER.info( "" + cloudbedsScraper.isExistsRefund( webClient, r ) );
+    }
+    
+    @Test
     public void testGetCustomers() throws Exception {
         List<Customer> results = cloudbedsScraper.getCustomers( webClient, 
                 LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 2 ) );
@@ -269,13 +275,14 @@ public class CloudbedsScraperTest {
 
 
     @Test
-    public void createCovid19CancelBookingJobsMay() throws Exception {
+    public void createCovid19CancelBookingJobsAug() throws Exception {
         cloudbedsScraper.getReservations( webClient, 
                 null, // stay date start
                 null, // stay date end
-                LocalDate.parse("2020-04-30"), // checkin date start
-                LocalDate.parse("2020-05-30"), // checkin date end end
+                LocalDate.parse("2020-08-01"), // checkin date start
+                LocalDate.parse("2020-08-14"), // checkin date end
                 "confirmed" ).stream()
+                .filter( res -> false == "34541998".equals( res.getId() ) ) // maintenance
                 .forEach( res -> { 
                     LOGGER.info( "Creating job for reservation " + res.getId() + " " + res.getCheckinDate() + " " + res.getFirstName() + " " + res.getLastName() ); 
                     CancelBookingJob j = new CancelBookingJob();

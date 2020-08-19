@@ -287,6 +287,7 @@ public class CloudbedsService {
             .filter( r -> BigDecimal.ZERO.equals( r.getPaidValue() ) ) // nothing paid yet
             .filter( r -> r.isLateCancellation( HWL_LATE_CANCEL_HOURS ) )
             .filter( r -> isCancellationDoneBySystem( webClient, r.getIdentifier() ) )
+            .filter( r -> false == isExistsRefund( webClient, r ) )
             .forEach( r -> {
                 LOGGER.info( "Creating ChargeHostelworldLateCancellationJob for " + r.getReservationId() );
                 ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();
@@ -335,6 +336,7 @@ public class CloudbedsService {
             .filter( r -> r.isCheckinDateInAugust() )
             .filter( r -> r.isLateCancellation( 24 * CANCEL_PERIOD_DAYS - 9 ) ) // (from midnight the following day) : 13:00 to 00:00 = 9 hrs
             .filter( r -> isCancellationDoneBySystem( webClient, r.getIdentifier() ) )
+            .filter( r -> false == isExistsRefund( webClient, r ) )
             .forEach( r -> {
                 LOGGER.info( "Creating ChargeHostelworldLateCancellationJob (August) for " + r.getReservationId() );
                 ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();
@@ -523,6 +525,21 @@ public class CloudbedsService {
                     .filter( p -> pattern.matcher( p.getContents() ).find() )
                     .findFirst();
             return statusChange.isPresent() && "System".equals( statusChange.get().getCreatedBy() );
+        }
+        catch ( IOException ex ) {
+            throw new RuntimeException( ex );
+        }
+    }
+
+    /**
+     * Checks if refund exists.
+     * @param webClient
+     * @param res
+     * @return true if refund exists.
+     */
+    public boolean isExistsRefund( WebClient webClient, Reservation res ) {
+        try {
+            return scraper.isExistsRefund( webClient, res );
         }
         catch ( IOException ex ) {
             throw new RuntimeException( ex );

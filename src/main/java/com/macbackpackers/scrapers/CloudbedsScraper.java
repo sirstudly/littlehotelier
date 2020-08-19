@@ -467,6 +467,36 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Checks if there are any refund transactions for the given reservation.
+     * 
+     * @param webClient web client instance to use
+     * @param res cloudbeds reservation
+     * @return refunds found
+     * @throws IOException
+     */
+    public boolean isExistsRefund( WebClient webClient, Reservation res ) throws IOException {
+        
+        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res );
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+
+        Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
+        if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
+            if ( rpt.isPresent() ) {
+                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+            }
+            throw new MissingUserDataException( "Failed response." );
+        }
+
+        // look for the existence of a refund payment record
+        Optional<JsonElement> refundTxn = StreamSupport.stream(
+                rpt.get().get( "records" ).getAsJsonArray().spliterator(), false )
+                .filter( r -> "1".equals( r.getAsJsonObject().get( "is_refund" ).getAsString() ) )
+                .findFirst();
+        return refundTxn.isPresent();
+    }
+
+    /**
      * Finds all staff allocations for the given date (and the day after):
      * <ul>
      * <li>If stayDate is staff bed, stayDate + 1 is staff bed -&gt; allocation for 2 days
