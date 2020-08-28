@@ -46,7 +46,7 @@ import com.macbackpackers.services.BasicCardMask;
 public class BookingComScraper {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
-    private final DateTimeFormatter MMM_DD_YYYY = DateTimeFormatter.ofPattern( "MMM dd, yyyy" );
+    private final DateTimeFormatter MMM_DD_YYYY = DateTimeFormatter.ofPattern( "MMM d, yyyy" );
 
     @Autowired
     private WordPressDAO wordPressDAO;
@@ -551,8 +551,11 @@ public class BookingComScraper {
                 it.remove();
                 continue;
             }
-            LOGGER.info( "Found uncharged VCC for reservation {} with checkin date of {}", reservationId, checkinDates.get( i ) );
-            if ( LocalDate.now().isBefore( LocalDate.parse( checkinDates.get( i ), MMM_DD_YYYY ).plusDays( 1 ) ) ) {
+
+            // expecting a 3 character month... are there other exceptions?
+            String checkinDate = checkinDates.get( i ).replace( "Sept", "Sep" );
+            LOGGER.info( "Found uncharged VCC for reservation {} with checkin date of {}", reservationId, checkinDate );
+            if ( LocalDate.now().isBefore( LocalDate.parse( checkinDate, MMM_DD_YYYY ).plusDays( 1 ) ) ) {
                 LOGGER.info( "Reservation {} is in the future, ignoring...", reservationId );
                 it.remove();
             }
