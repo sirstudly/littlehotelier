@@ -1199,6 +1199,11 @@ public class WordPressDAOImpl implements WordPressDAO {
         return getNotNullOption( "hbo_booking_payments_url" );
     }
 
+    @Override
+    public String getBookingsURL() {
+        return getNotNullOption( "hbo_bookings_url" );
+    }
+
     /**
      * Returns the option for the given key.
      * 

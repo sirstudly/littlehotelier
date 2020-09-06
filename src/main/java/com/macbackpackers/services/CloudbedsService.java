@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -60,6 +61,7 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
 import com.macbackpackers.jobs.PrepaidChargeJob;
+import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
 import com.macbackpackers.jobs.SendDepositChargeRetractionEmailJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
@@ -105,6 +107,10 @@ public class CloudbedsService {
 
     @Value( "${hostelworld.latecancellation.hours:48}" )
     private int HWL_LATE_CANCEL_HOURS;
+
+    // all allowable characters for lookup key
+    private static String LOOKUPKEY_CHARSET = "2345678ABCDEFGHJKLMNPQRSTUVWXYZ";
+    private static int LOOKUPKEY_LENGTH = 7;
 
     /**
      * Dumps the allocations starting on the given date (inclusive).
@@ -502,6 +508,28 @@ public class CloudbedsService {
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
                             + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
                     PrepaidChargeJob j = new PrepaidChargeJob();
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( r.getReservationId() );
+                    dao.insertJob( j );
+                } );
+    }
+
+    /**
+     * Creates send email jobs for all checkins on the given date.
+     * 
+     * @param webClient
+     * @param checkinDate
+     * @throws IOException
+     */
+    public void createSendCovidPrestayEmailJobs( WebClient webClient, LocalDate checkinDate ) throws IOException {
+
+        scraper.getReservations( webClient, null, null, checkinDate, checkinDate, "confirmed,not_confirmed" ).stream()
+                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .forEach( r -> {
+                    LOGGER.info( "Creating SendCovidPrestayEmailJob for Res #" + r.getReservationId()
+                            + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
+                    SendCovidPrestayEmailJob j = new SendCovidPrestayEmailJob();
                     j.setStatus( JobStatus.submitted );
                     j.setReservationId( r.getReservationId() );
                     dao.insertJob( j );
@@ -953,6 +981,36 @@ public class CloudbedsService {
             scraper.addNote( webClient, reservationId, note );
         }
     }
+    
+    /**
+     * Sends an email to the guest prior to checkin.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @throws IOException
+     * @throws MessagingException
+     */
+    public void sendCovidPrestayGmail( WebClient webClient, String reservationId ) throws IOException, MessagingException {
+        EmailTemplateInfo template = scraper.getCovidPrestayEmailTemplate( webClient );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            String bookingURL = generateUniqueBookingURL( reservationId );
+            gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
+                    template.getSubject().replaceAll( "\\[conf number\\]", res.getIdentifier() ),
+                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
+                            .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
+                            .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
+                            .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
+                                    .replaceAll( "\\[first name\\]", res.getFirstName() )
+                                    .replaceAll( "\\[booking URL\\]", "<a href='" + bookingURL + "'>" + bookingURL + "</a>" ) ) );
+            scraper.addNote( webClient, reservationId, note );
+        }
+    }
 
     /**
      * Sends an email to the guest for the given reservation to ignore the previous email we sent.
@@ -1277,6 +1335,48 @@ public class CloudbedsService {
             sleep( 10 );
         }
         throw new MissingUserDataException( "2FA code timeout waiting for Cloudbeds verification." );
+    }
+
+    /**
+     * Creates a new payment URL for the given reservation.
+     * 
+     * @param reservationId unique Cloudbeds reservation ID
+     * @param paymentRequested (optional) payment requested
+     * @return payment URL
+     */
+    public String generateUniquePaymentURL( String reservationId, BigDecimal paymentRequested ) {
+        String lookupKey = generateRandomLookupKey( LOOKUPKEY_LENGTH );
+        String paymentURL = dao.getBookingPaymentsURL() + lookupKey;
+        dao.insertBookingLookupKey( reservationId, lookupKey, paymentRequested );
+        return paymentURL;
+    }
+
+    /**
+     * Creates a new booking URL for the given reservation.
+     * 
+     * @param reservationId unique Cloudbeds reservation ID
+     * @return booking URL
+     */
+    public String generateUniqueBookingURL( String reservationId ) {
+        String lookupKey = generateRandomLookupKey( LOOKUPKEY_LENGTH );
+        String bookingURL = dao.getBookingsURL() + lookupKey;
+        dao.insertBookingLookupKey( reservationId, lookupKey, null );
+        return bookingURL;
+    }
+
+    /**
+     * Returns a random lookup key with the given length.
+     * 
+     * @param keyLength length of lookup key
+     * @return string generated key
+     */
+    private String generateRandomLookupKey( int keyLength ) {
+        StringBuffer result = new StringBuffer();
+        Random r = new Random();
+        for ( int i = 0 ; i < keyLength ; i++ ) {
+            result.append( LOOKUPKEY_CHARSET.charAt( r.nextInt( LOOKUPKEY_CHARSET.length() ) ) );
+        }
+        return result.toString();
     }
 
     private void sleep( int seconds ) {

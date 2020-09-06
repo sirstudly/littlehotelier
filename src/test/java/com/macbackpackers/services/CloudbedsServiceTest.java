@@ -138,4 +138,14 @@ public class CloudbedsServiceTest {
     public void testSendDepositChargeJobRetractionEmails() {
         cloudbedsService.sendDepositChargeJobRetractionEmails( webClient, 469807, 469929 );
     }
+
+    @Test
+    public void testCreateSendCovidPrestayEmailJobs() throws Exception {
+        cloudbedsService.createSendCovidPrestayEmailJobs( webClient, LocalDate.now().plusDays( 1 ) );
+    }
+    
+    @Test
+    public void testSendCovidPrestayGmail() throws Exception {
+        cloudbedsService.sendCovidPrestayGmail( webClient, "10568950" );
+    }
 }

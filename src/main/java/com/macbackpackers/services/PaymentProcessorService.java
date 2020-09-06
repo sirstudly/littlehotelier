@@ -14,7 +14,6 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -99,10 +98,6 @@ public class PaymentProcessorService {
     private static final FastDateFormat DATETIME_STANDARD = FastDateFormat.getInstance( "yyyy-MM-dd HH:mm:ss" );
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
 
-    // all allowable characters for lookup key
-    private static String LOOKUPKEY_CHARSET = "2345678ABCDEFGHJKLMNPQRSTUVWXYZ";
-    private static int LOOKUPKEY_LENGTH = 7;
-
     @Value( "${stripe.apikey}" )
     private String STRIPE_API_KEY;
 
@@ -143,6 +138,9 @@ public class PaymentProcessorService {
 
     @Autowired
     private CloudbedsScraper cloudbedsScraper;
+
+    @Autowired
+    private CloudbedsService cloudbedsService;
 
     @Autowired
     private ChromeScraper chromeScraper;
@@ -325,7 +323,7 @@ public class PaymentProcessorService {
             }
             else {
                 LOGGER.info( "Creating declined deposit charge email job" );
-                String paymentURL = generateUniquePaymentURL( reservationId, depositAmount );
+                String paymentURL = cloudbedsService.generateUniquePaymentURL( reservationId, depositAmount );
                 SendDepositChargeDeclinedEmailJob job = new SendDepositChargeDeclinedEmailJob();
                 job.setReservationId( reservationId );
                 job.setAmount( depositAmount );
@@ -697,7 +695,7 @@ public class PaymentProcessorService {
             }
             else {
                 LOGGER.info( "Sending declined payment email" );
-                String paymentURL = generateUniquePaymentURL( reservationId, null );
+                String paymentURL = cloudbedsService.generateUniquePaymentURL( reservationId, null );
 
                 SendNonRefundableDeclinedEmailJob job = new SendNonRefundableDeclinedEmailJob();
                 job.setReservationId( reservationId );
@@ -707,35 +705,6 @@ public class PaymentProcessorService {
                 wordpressDAO.insertJob( job );
             }
         }
-    }
-
-    /**
-     * Creates a new payment URL for the given reservation.
-     * 
-     * @param reservationId unique Cloudbeds reservation ID
-     * @param paymentRequested (optional) payment requested
-     * @return payment URL
-     */
-    private String generateUniquePaymentURL( String reservationId, BigDecimal paymentRequested ) {
-        String lookupKey = generateRandomLookupKey( LOOKUPKEY_LENGTH );
-        String paymentURL = wordpressDAO.getBookingPaymentsURL() + lookupKey;
-        wordpressDAO.insertBookingLookupKey( reservationId, lookupKey, paymentRequested );
-        return paymentURL;
-    }
-
-    /**
-     * Returns a random lookup key with the given length.
-     * 
-     * @param keyLength length of lookup key
-     * @return string generated key
-     */
-    private String generateRandomLookupKey( int keyLength ) {
-        StringBuffer result = new StringBuffer();
-        Random r = new Random();
-        for ( int i = 0 ; i < keyLength ; i++ ) {
-            result.append( LOOKUPKEY_CHARSET.charAt( r.nextInt( LOOKUPKEY_CHARSET.length() ) ) );
-        }
-        return result.toString();
     }
 
     /**

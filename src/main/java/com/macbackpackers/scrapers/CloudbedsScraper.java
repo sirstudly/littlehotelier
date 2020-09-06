@@ -70,6 +70,7 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_DECLINED = "Retract Deposit Charge Declined";
     public static final String TEMPLATE_COVID19_CLOSING = "Coronavirus- Doors Closing";
     public static final String TEMPLATE_REFUND_PROCESSED = "Refund Processed";
+    public static final String TEMPLATE_COVID_PRESTAY = "COVID Pre-Stay Email";
 
     // the last result of getPropertyContent() as it's an expensive operation
     private static String propertyContent;
@@ -1104,6 +1105,17 @@ public class CloudbedsScraper {
      */
     public EmailTemplateInfo getRefundSuccessfulEmailTemplate( WebClient webClient ) throws IOException {
         return fetchEmailTemplate( webClient, TEMPLATE_REFUND_PROCESSED );
+    }
+
+    /**
+     * Retrieves the covid prestay email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getCovidPrestayEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_COVID_PRESTAY );
     }
 
     /**

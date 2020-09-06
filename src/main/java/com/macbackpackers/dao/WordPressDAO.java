@@ -686,4 +686,11 @@ public interface WordPressDAO {
      * @return non-null URL
      */
     public String getBookingPaymentsURL();
+
+    /**
+     * Returns the base URL for the bookings portal.
+     * 
+     * @return non-null URL
+     */
+    public String getBookingsURL();
 }
