@@ -523,7 +523,7 @@ public class CloudbedsService {
      */
     public void createSendCovidPrestayEmailJobs( WebClient webClient, LocalDate checkinDate ) throws IOException {
 
-        scraper.getReservations( webClient, null, null, checkinDate, checkinDate, "confirmed,not_confirmed" ).stream()
+        scraper.getReservations( webClient, null, null, LocalDate.now(), checkinDate, "confirmed,not_confirmed" ).stream()
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .forEach( r -> {
                     LOGGER.info( "Creating SendCovidPrestayEmailJob for Res #" + r.getReservationId()
