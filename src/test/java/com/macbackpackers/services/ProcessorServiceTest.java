@@ -60,6 +60,7 @@ import com.macbackpackers.jobs.PrepaidChargeJob;
 import com.macbackpackers.jobs.ProcessSagepayTransactionJob;
 import com.macbackpackers.jobs.ScrapeReservationsBookedOnJob;
 import com.macbackpackers.jobs.SendAllUnsentEmailJob;
+import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
 import com.macbackpackers.jobs.SendDepositChargeDeclinedEmailJob;
 import com.macbackpackers.jobs.SendDepositChargeSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendHostelworldLateCancellationEmailJob;
@@ -646,4 +647,27 @@ public class ProcessorServiceTest {
                     dao.insertJob( j );
                 } );
     }
+
+    @Test
+    public void testSendCovidPrestayEmailJob() throws Exception {
+        SendCovidPrestayEmailJob j = new SendCovidPrestayEmailJob();
+        j.setStatus( JobStatus.submitted );
+        j.setReservationId( "10568950" );
+        dao.insertJob( j );
+    }
+
+//    @Test
+//    public void testCreateConnectToCalendarWSSJob() throws Exception {
+//        ConnectToCalendarWSSJob j = new ConnectToCalendarWSSJob();
+//        j.setStatus( JobStatus.submitted );
+//        dao.insertJob( j );
+//    }
+//
+//    @Test
+//    public void testLoadCloudbedsCalendarJob() throws Exception {
+//        LoadCloudbedsCalendarJob j = new LoadCloudbedsCalendarJob();
+//        j.setStatus( JobStatus.submitted );
+//        dao.insertJob( j );
+//    }
+//
 }
