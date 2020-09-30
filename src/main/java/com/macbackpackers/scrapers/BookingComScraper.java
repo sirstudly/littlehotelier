@@ -6,12 +6,9 @@ import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.text.ParseException;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -46,7 +43,6 @@ import com.macbackpackers.services.BasicCardMask;
 public class BookingComScraper {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
-    private final DateTimeFormatter MMM_DD_YYYY = DateTimeFormatter.ofPattern( "MMM d, yyyy" );
 
     @Autowired
     private WordPressDAO wordPressDAO;
@@ -201,6 +197,37 @@ public class BookingComScraper {
     }
 
     /**
+     * Returns the session from the URL.
+     * @param url
+     * @return non-null URL
+     * @throws NoSuchElementException if not found
+     */
+    private String getSessionFromURL( String url ) {
+        Pattern p = Pattern.compile( "ses=([a-f\\d]+)" );
+        Matcher m = p.matcher( url );
+        if ( m.find() ) {
+            return m.group( 1 );
+        }
+        throw new NoSuchElementException( "Couldn't find session from URL: " + url );
+    }
+
+    /**
+     * Returns the hotel id from the URL.
+     * 
+     * @param url
+     * @return non-null hotel id
+     * @throws NoSuchElementException if not found
+     */
+    private String getHotelIdFromURL( String url ) {
+        Pattern p = Pattern.compile( "hotel_id=([\\d]+)" );
+        Matcher m = p.matcher( url );
+        if ( m.find() ) {
+            return m.group( 1 );
+        }
+        throw new NoSuchElementException( "Couldn't find hotel id from URL: " + url );
+    }
+
+    /**
      * Looks up a given reservation in BDC.
      * 
      * @param driver
@@ -210,8 +237,12 @@ public class BookingComScraper {
      */
     public void lookupReservation( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException {
         doLogin( driver, wait );
-        LOGGER.info( "Looking up reservation " + reservationId );
-        loadReservationFromSearchTab( driver, wait, reservationId );
+
+        // load reservation from URL
+        String reservationUrl = MessageFormat.format( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/booking.html?res_id={0}&ses={1}&lang=en&hotel_id={2}",
+                reservationId, getSessionFromURL( driver.getCurrentUrl() ), getHotelIdFromURL( driver.getCurrentUrl() ) );
+        LOGGER.info( "Looking up reservation " + reservationId + " using URL " + reservationUrl );
+        driver.get( reservationUrl );
 
         wait.until( ExpectedConditions.or(
                 ExpectedConditions.titleContains( "Reservation Details" ),
@@ -236,49 +267,6 @@ public class BookingComScraper {
             LOGGER.info( "Screenshot written to " + filename );
             throw new IOException( "Unable to load reservation details. Reservation ID mismatch!" );
         }
-    }
-
-    /**
-     * Goes to the Reservation (search) tab to lookup a reservation (for older bookings).
-     * @param driver
-     * @param wait
-     * @param reservationId BDC reservation
-     * @throws IOException
-     */
-    private void loadReservationFromSearchTab( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException {
-        LOGGER.info( "Loading Reservations tab" );
-        WebElement reservationsAnchor = driver.findElement( By.xpath( "//nav//a/span[normalize-space(text())='Reservations']/.." ) );
-        driver.get( reservationsAnchor.getAttribute( "href" ) );
-        LOGGER.info( "Entering checkin window as +/- 11 months" );
-        WebElement dateFrom = driver.findElement( By.id( "date_from" ) );
-        dateFrom.click();
-        dateFrom.clear();
-        dateFrom.sendKeys( LocalDate.now().minusMonths( 11 ).format( DateTimeFormatter.ISO_DATE ) );
-        WebElement dateTo = driver.findElement( By.id( "date_to" ) );
-        dateTo.click();
-        dateTo.clear();
-        dateTo.sendKeys( LocalDate.now().plusMonths( 11 ).format( DateTimeFormatter.ISO_DATE ) );
-        if ( driver.findElements( By.xpath( "//span[span[text()='More filters']]/*[local-name() = 'svg' and contains(@class, 'keyboard_arrow_down')]" ) ).size() > 0 ) {
-            LOGGER.info( "Clicking on More filters..." );
-            driver.findElement( By.xpath( "//button/*/span[contains(text(),'More filters')]" ) ).click();
-        }
-        LOGGER.info( "Setting keyword(s) to reservation ID" );
-        WebElement keywords = driver.findElement( By.xpath( "//input[@name='term']" ) );
-        keywords.click();
-        keywords.sendKeys( reservationId );
-        LOGGER.info( "Clicking on 'Show'" );
-        driver.findElement( By.xpath( "//button/*/span[normalize-space(text())='Show']/.." ) ).click();
-
-        // either we get a span with "Oops, no results." or we get a table of results
-        By SEARCH_RESULTS_XPATH = By.xpath( "//span[contains(text(),'Oops, no results.')] "
-                + "| //a[contains(@href, 'res_id=" + reservationId + "')]" );
-        wait.until( ExpectedConditions.visibilityOfElementLocated( SEARCH_RESULTS_XPATH ) );
-        WebElement searchResult = driver.findElement( SEARCH_RESULTS_XPATH );
-        if ( "span".equals( searchResult.getTagName() ) ) {
-            throw new IOException( "Reservation " + reservationId + " not found." );
-        }
-        LOGGER.info( "Reservation found. Redirecting to " + searchResult.getAttribute( "href" ) );
-        driver.get( searchResult.getAttribute( "href" ) ); // click would open a new tab
     }
 
     /**
@@ -441,7 +429,7 @@ public class BookingComScraper {
 
         // we may or may not need to login again to view CC details
         final String SIGN_IN_LOCATOR_PATH = "//span[normalize-space(text())='Sign in to view credit card details']";
-        final String CC_DETAILS_PATH = "//th[contains(text(),'Credit Card Details')] | //th[contains(text(),'Credit card details')]";
+        final String CC_DETAILS_PATH = "//th[contains(text(),'Credit Card Details')] | //th[contains(text(),'credit card details')]";
         final String CC_DETAILS_NOT_AVAIL_PATH = "//h2[contains(text(),\"credit card details aren't available\")]";
         final String CONTINUE_WITH_CC_DETAILS = "//p[normalize-space(text())='Continue to view the credit card details.']";
         WebElement locator;
@@ -501,8 +489,7 @@ public class BookingComScraper {
     }
 
     /**
-     * Searches for all prepaid bookings between the given dates with VCC details and can be charged
-     * immediately.
+     * Searches for all VCC bookings that can be charged immediately.
      * 
      * @param driver
      * @param wait
@@ -512,54 +499,24 @@ public class BookingComScraper {
     public List<String> getAllVCCBookingsThatCanBeCharged( WebDriver driver, WebDriverWait wait ) throws IOException {
         doLogin( driver, wait );
         LOGGER.info( "Loading Reservations tab" );
-        WebElement reservationsAnchor = driver.findElement( By.xpath( "//nav//a/span[normalize-space(text())='Reservations']/.." ) );
+        WebElement reservationsAnchor = driver.findElement( By.xpath( "//li[@data-nav-tag='reservations']/a" ) );
         driver.get( reservationsAnchor.getAttribute( "href" ) );
 
-        LOGGER.info( "Show uncharged virtual cards..." ); // BDC goes all wonky if not done in this order
-        By VIEW_UNCHARGED_VCC_BUTTON = By.xpath( "//button[contains(@class, 'uncharged-vccs-button')]" );
-        wait.until( ExpectedConditions.visibilityOfElementLocated( VIEW_UNCHARGED_VCC_BUTTON ) );
-        WebElement viewUnchargedVirtualCards = driver.findElement( VIEW_UNCHARGED_VCC_BUTTON );
-        viewUnchargedVirtualCards.click();
-
-        // either we get a span with "Oops, no results." or we get a table of results
-        By SEARCH_RESULTS_XPATH = By.xpath( "//span[contains(text(),'No virtual cards to charge')] "
-                + "| //div[@role='dialog']//th/a[contains(@class, 'bui-link')]" );
-        wait.until( ExpectedConditions.visibilityOfElementLocated( SEARCH_RESULTS_XPATH ) );
-        WebElement searchResult = driver.findElement( SEARCH_RESULTS_XPATH );
-        if ( searchResult.getText().contains( "No virtual cards to charge" ) ) {
-            LOGGER.info( "No results.. nothing to do." );
-            return Collections.emptyList();
-        }
+        LOGGER.info( "Manage virtual cards..." );
+        By MANAGE_VCC_ANCHOR = By.xpath( "//a[contains(@class, 'uncharged-vccs-button')]" );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( MANAGE_VCC_ANCHOR ) );
+        WebElement manageVccAnchor = driver.findElement( MANAGE_VCC_ANCHOR );
+        driver.get( manageVccAnchor.getAttribute( "href" ) );
+        
+        LOGGER.info( "Virtual cards to charge..." );
+        By VIEW_ALL_BUTTON = By.xpath( "//div[div/h2/span/text()='Virtual cards to charge']/div/a[span/span[text()='View all']]" );
+        WebElement viewAllButton = driver.findElement( VIEW_ALL_BUTTON );
+        viewAllButton.click();
+        wait.until( ExpectedConditions.stalenessOf( viewAllButton ) );        
 
         List<String> reservationIds = new ArrayList<>();
-        reservationIds.addAll( driver.findElements( By.xpath( "//div[@role='dialog']//tr/td[@data-heading='Booking number']" ) )
+        reservationIds.addAll( driver.findElements( By.xpath( "//div[div/h2/span/text()='Virtual cards to charge']/div/div/table/tbody/tr/th/span/a" ) )
                 .stream().map( a -> a.getText() ).collect( Collectors.toList() ) );
-        List<String> checkinDates = new ArrayList<>();
-        checkinDates.addAll( driver.findElements( By.xpath( "//div[@role='dialog']//tr/td[@data-heading='Check-in']" ) )
-                .stream().map( a -> a.getText() ).collect( Collectors.toList() ) );
-        if ( reservationIds.size() != checkinDates.size() ) {
-            throw new RuntimeException( "Mismatch on reservation IDs and checkin dates?!?" );
-        }
-
-        // remove any where today < checkin date + 1 (as per BDC policy)
-        // not sure why they'd even show up in the VCCs available to charge
-        Iterator<String> it = reservationIds.iterator();
-        for ( int i = 0 ; it.hasNext() ; i++ ) {
-            String reservationId = it.next();
-            if ( "2472326441".equals( reservationId ) ) {
-                LOGGER.info( "Skipping fucked up HSH reservation" );
-                it.remove();
-                continue;
-            }
-
-            // expecting a 3 character month... are there other exceptions?
-            String checkinDate = checkinDates.get( i ).replace( "Sept", "Sep" );
-            LOGGER.info( "Found uncharged VCC for reservation {} with checkin date of {}", reservationId, checkinDate );
-            if ( LocalDate.now().isBefore( LocalDate.parse( checkinDate, MMM_DD_YYYY ).plusDays( 1 ) ) ) {
-                LOGGER.info( "Reservation {} is in the future, ignoring...", reservationId );
-                it.remove();
-            }
-        }
         return reservationIds;
     }
 
