@@ -498,21 +498,16 @@ public class BookingComScraper {
      */
     public List<String> getAllVCCBookingsThatCanBeCharged( WebDriver driver, WebDriverWait wait ) throws IOException {
         doLogin( driver, wait );
-        LOGGER.info( "Loading Reservations tab" );
-        WebElement reservationsAnchor = driver.findElement( By.xpath( "//li[@data-nav-tag='reservations']/a" ) );
-        driver.get( reservationsAnchor.getAttribute( "href" ) );
 
-        LOGGER.info( "Manage virtual cards..." );
-        By MANAGE_VCC_ANCHOR = By.xpath( "//a[contains(@class, 'uncharged-vccs-button')]" );
-        wait.until( ExpectedConditions.visibilityOfElementLocated( MANAGE_VCC_ANCHOR ) );
-        WebElement manageVccAnchor = driver.findElement( MANAGE_VCC_ANCHOR );
-        driver.get( manageVccAnchor.getAttribute( "href" ) );
-        
+        // load Virtual cards to charge page
+        String vccUrl = MessageFormat.format( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/vccs_management.html?lang=en&ses={0}&hotel_id={1}&route=vccs_to_charge",
+                getSessionFromURL( driver.getCurrentUrl() ), getHotelIdFromURL( driver.getCurrentUrl() ) );
+        LOGGER.info( "Looking up VCCs to charge " + vccUrl );
+        driver.get( vccUrl );
+
         LOGGER.info( "Virtual cards to charge..." );
-        By VIEW_ALL_BUTTON = By.xpath( "//div[div/h2/span/text()='Virtual cards to charge']/div/a[span/span[text()='View all']]" );
-        WebElement viewAllButton = driver.findElement( VIEW_ALL_BUTTON );
-        viewAllButton.click();
-        wait.until( ExpectedConditions.stalenessOf( viewAllButton ) );        
+        By LOADING_CELLS = By.xpath( "//span[contains(@class, 'loading-bar--animated')]" );
+        wait.until( ExpectedConditions.numberOfElementsToBe( LOADING_CELLS, 0 ) ); // wait for page load        
 
         List<String> reservationIds = new ArrayList<>();
         reservationIds.addAll( driver.findElements( By.xpath( "//div[div/h2/span/text()='Virtual cards to charge']/div/div/table/tbody/tr/th/span/a" ) )
