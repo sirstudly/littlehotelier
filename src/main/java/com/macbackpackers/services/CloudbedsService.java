@@ -82,6 +82,9 @@ public class CloudbedsService {
     private WordPressDAO dao;
     
     @Autowired
+    private AuthenticationService authService;
+    
+    @Autowired
     private CloudbedsScraper scraper;
     
     @Autowired
@@ -1288,7 +1291,7 @@ public class CloudbedsService {
 
         if ( driver.getCurrentUrl().startsWith( "https://hotels.cloudbeds.com/auth/awaiting_user_verification" ) ) {
             WebElement scaCode = driver.findElement( By.name( "token" ) );
-            scaCode.sendKeys( fetch2FACode() );
+            scaCode.sendKeys( String.valueOf( authService.getTotpPassword( dao.getMandatoryOption( "hbo_cloudbeds_2fa_key" ) ) ) );
             loginButton = driver.findElement( By.xpath( "//button[contains(text(),'Submit')]" ) );
             loginButton.click();
             wait.until( stalenessOf( loginButton ) );
@@ -1311,30 +1314,6 @@ public class CloudbedsService {
                         .collect( Collectors.joining( ";" ) ) );
         dao.setOption( "hbo_cloudbeds_useragent",
                 jse.executeScript( "return navigator.userAgent;" ).toString() );
-    }
-
-    /**
-     * First _blanks out_ the 2FA code from the DB and waits for it to be re-populated. This is done
-     * outside this application.
-     * 
-     * @return non-null 2FA code
-     * @throws MissingUserDataException on timeout (1 + 10 minutes)
-     */
-    private String fetch2FACode() throws MissingUserDataException {
-        // now blank out the code and wait for it to appear
-        LOGGER.info( "waiting for hbo_cloudbeds_2facode to be set..." );
-        dao.setOption( "hbo_cloudbeds_2facode", "" );
-        sleep( 60 );
-        // force timeout after 10 minutes (60x10 seconds)
-        for ( int i = 0 ; i < 60 ; i++ ) {
-            String scaCode = dao.getOption( "hbo_cloudbeds_2facode" );
-            if ( StringUtils.isNotBlank( scaCode ) ) {
-                return scaCode;
-            }
-            LOGGER.info( "waiting for another 10 seconds..." );
-            sleep( 10 );
-        }
-        throw new MissingUserDataException( "2FA code timeout waiting for Cloudbeds verification." );
     }
 
     /**
@@ -1377,14 +1356,5 @@ public class CloudbedsService {
             result.append( LOOKUPKEY_CHARSET.charAt( r.nextInt( LOOKUPKEY_CHARSET.length() ) ) );
         }
         return result.toString();
-    }
-
-    private void sleep( int seconds ) {
-        try {
-            Thread.sleep( seconds * 1000 );
-        }
-        catch ( InterruptedException e ) {
-            // nothing to do
-        }
     }
 }

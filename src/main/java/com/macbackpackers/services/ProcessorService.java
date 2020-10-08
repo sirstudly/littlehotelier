@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AbstractJob;
+import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
 
 @Service
 public class ProcessorService {
@@ -262,5 +263,12 @@ public class ProcessorService {
                     autowireBeanFactory.autowireBean( j );
                     processJob( j );
                 } );
+    }
+
+    public void createAndRunResetCloudbedsLoginJob() {
+        ResetCloudbedsSessionJob j = new ResetCloudbedsSessionJob();
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+        processCloudbedsResetLoginJobs();
     }
 }

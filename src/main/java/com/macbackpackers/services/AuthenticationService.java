@@ -19,6 +19,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.warrenstrange.googleauth.GoogleAuthenticator;
 
 @Service
 public class AuthenticationService {
@@ -119,6 +120,15 @@ public class AuthenticationService {
         fileService.loadCookiesFromFile( webClient );
         fileService.addLittleHotelierSessionCookie( webClient, wordpressDAO.getOption( "hbo_lilho_session" ) );
         fileService.writeCookiesToFile( webClient );
+    }
+
+    /**
+     * Returns the time-based one time password for the given secret key.
+     * @param key secret key
+     * @return 6-digit password
+     */
+    public int getTotpPassword( String key ) {
+        return new GoogleAuthenticator().getTotpPassword( key );
     }
 
     /**

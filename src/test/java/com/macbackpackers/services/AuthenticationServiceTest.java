@@ -160,4 +160,9 @@ public class AuthenticationServiceTest {
     public void testUpdateLittleHotelierSessionKey() throws Exception {
         authService.updateLittleHotelierSessionKey( webClient );
     }
+
+    @Test
+    public void testGetTotpPassword() throws Exception {
+        LOGGER.info( "" + authService.getTotpPassword( "XXXXXXXXXXXXXXXXXXXXXXXX" ) );
+    }
 }
