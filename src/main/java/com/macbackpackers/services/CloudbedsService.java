@@ -111,6 +111,9 @@ public class CloudbedsService {
     @Value( "${hostelworld.latecancellation.hours:48}" )
     private int HWL_LATE_CANCEL_HOURS;
 
+    @Value( "${cloudbeds.2fa.secret:}" )
+    private String CLOUDBEDS_2FA_SECRET;
+
     // all allowable characters for lookup key
     private static String LOOKUPKEY_CHARSET = "2345678ABCDEFGHJKLMNPQRSTUVWXYZ";
     private static int LOOKUPKEY_LENGTH = 7;
@@ -1292,7 +1295,10 @@ public class CloudbedsService {
 
         if ( driver.getCurrentUrl().startsWith( "https://hotels.cloudbeds.com/auth/awaiting_user_verification" ) ) {
             WebElement scaCode = driver.findElement( By.name( "token" ) );
-            scaCode.sendKeys( String.valueOf( authService.getTotpPassword( dao.getMandatoryOption( "hbo_cloudbeds_2fa_key" ) ) ) );
+            if ( StringUtils.isBlank( CLOUDBEDS_2FA_SECRET ) ) {
+                throw new UnrecoverableFault( "Missing Cloudbeds 2FA secret key" );
+            }
+            scaCode.sendKeys( String.valueOf( authService.getTotpPassword( CLOUDBEDS_2FA_SECRET ) ) );
             loginButton = driver.findElement( By.xpath( "//button[contains(text(),'Submit')]" ) );
             loginButton.click();
             wait.until( stalenessOf( loginButton ) );
