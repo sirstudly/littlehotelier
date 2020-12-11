@@ -17,6 +17,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +37,7 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 @Component
 public class CloudbedsJsonRequestFactory {
 
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
     private final DateTimeFormatter YYYY_MM_DD = DateTimeFormatter.ofPattern( "yyyy-MM-dd" );
     private final DateTimeFormatter DD_MM_YYYY = DateTimeFormatter.ofPattern( "dd/MM/yyyy" );
     private final DecimalFormat CURRENCY_FORMAT = new DecimalFormat( "###0.00" );
@@ -83,6 +86,23 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Returns Cloudbeds version for the given endpoint.
+     * 
+     * @param request
+     * @return non-null version
+     */
+    public String getVersionForRequest( WebRequest request ) {
+        String currentVersion = dao.getOption( getVersionOptionName( request ) );
+        return StringUtils.isNotBlank( currentVersion ) ? currentVersion : getVersion();
+    }
+    
+    private String getVersionOptionName( WebRequest request ) {
+        String path = request.getUrl().getPath();
+        String optionName = "hbo_cloudbeds_version_" + path.substring( path.lastIndexOf( '/' ) + 1 );
+        return optionName;
+    }
+
+    /**
      * Retrieves the current Cloudbeds user-agent.
      * 
      * @return non-null user agent
@@ -120,6 +140,18 @@ public class CloudbedsJsonRequestFactory {
     public synchronized void setVersion( String newVersion ) {
         dao.setOption( "hbo_cloudbeds_version", newVersion );
         version = newVersion;
+    }
+
+    /**
+     * Sets the version option value for the request endpoint.
+     * 
+     * @param request
+     * @param newVersion
+     */
+    public void setVersionForRequest( WebRequest request, String newVersion ) {
+        String optionName = getVersionOptionName( request );
+        LOGGER.info( "Setting option " + optionName + " to " + newVersion );
+        dao.setOption( optionName, newVersion );
     }
 
     protected WebRequest createBaseJsonRequest( String url ) throws IOException {
@@ -178,7 +210,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "is_identifier", "0" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 

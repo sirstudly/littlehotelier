@@ -232,9 +232,9 @@ public class CloudbedsScraper {
 
         Reservation r = fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class );
         if ( r != null && false == r.isSuccess() && StringUtils.isNotBlank( r.getVersion() )
-                && false == jsonRequestFactory.getVersion().equals( r.getVersion() ) ) {
+                && false == r.getVersion().equals( requestSettings.getRequestParameters().stream().filter( p -> p.getName().equals( "version" ) ).findFirst().get().getValue() ) ) {
             LOGGER.info( "Looks like we're using an outdated version. Updating our records." );
-            jsonRequestFactory.setVersion( r.getVersion() );
+            jsonRequestFactory.setVersionForRequest( requestSettings, r.getVersion() );
             return getReservation( webClient, reservationId );
         }
         else if ( r == null || false == r.isSuccess() ) {
