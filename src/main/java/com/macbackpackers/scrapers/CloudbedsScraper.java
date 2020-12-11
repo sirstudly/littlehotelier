@@ -68,6 +68,7 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_DEPOSIT_CHARGE_DECLINED = "Deposit Charge Declined";
     public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL = "Retract Deposit Charge Successful";
     public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_DECLINED = "Retract Deposit Charge Declined";
+    public static final String TEMPLATE_PAYMENT_LINK = "Payment Link";
     public static final String TEMPLATE_COVID19_CLOSING = "Coronavirus- Doors Closing";
     public static final String TEMPLATE_REFUND_PROCESSED = "Refund Processed";
     public static final String TEMPLATE_COVID_PRESTAY = "COVID Pre-Stay Email";
@@ -1127,6 +1128,17 @@ public class CloudbedsScraper {
      */
     public EmailTemplateInfo getDepositChargeDeclinedEmailTemplate( WebClient webClient ) throws IOException {
         return fetchEmailTemplate( webClient, TEMPLATE_DEPOSIT_CHARGE_DECLINED );
+    }
+
+    /**
+     * Retrieves the payment link email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getPaymentLinkEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_PAYMENT_LINK );
     }
 
     /**

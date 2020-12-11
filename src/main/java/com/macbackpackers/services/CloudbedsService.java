@@ -207,6 +207,8 @@ public class CloudbedsService {
                     RoomBedLookup lookupKey = new RoomBedLookup( bedAssign.getRoom(), bedAssign.getBedName() );
                     RoomBed rb = roomBedMap.get( lookupKey );
                     if( rb == null ) {
+                        // if you get this error; probably a room/bed name was changed
+                        // dump a call to getReservation() and update wp_lh_rooms with the correct room_id, room_type, bed_name
                         throw new MissingUserDataException( "Missing mapping for " + lookupKey );
                     }
                     Allocation a = createAllocationFromRoomBed( rb );
@@ -1104,6 +1106,30 @@ public class CloudbedsService {
                                     .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) ) );
             scraper.addNote( webClient, reservationId, note + " " + paymentURL );
         }
+    }
+
+    /**
+     * Sends an email to the guest with a payment URL for the booking.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @throws IOException
+     * @throws MessagingException
+     */
+    public void sendPaymentLinkGmail( WebClient webClient, String reservationId ) throws IOException, MessagingException {
+        EmailTemplateInfo template = scraper.getPaymentLinkEmailTemplate( webClient );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        String paymentURL = generateUniquePaymentURL( reservationId, null );
+        gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
+                template.getSubject().replaceAll( "\\[conf number\\]", res.getIdentifier() ),
+                IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
+                        .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
+                        .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
+                        .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
+                                .replaceAll( "\\[first name\\]", res.getFirstName() )
+                                .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) ) );
+        final String note = template.getTemplateName() + " email sent.";
+        scraper.addNote( webClient, reservationId, note + " " + paymentURL );
     }
 
     /**
