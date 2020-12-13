@@ -63,6 +63,7 @@ import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
 import com.macbackpackers.jobs.PrepaidChargeJob;
 import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
 import com.macbackpackers.jobs.SendDepositChargeRetractionEmailJob;
+import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -113,6 +114,8 @@ public class CloudbedsService {
 
     @Value( "${cloudbeds.2fa.secret:}" )
     private String CLOUDBEDS_2FA_SECRET;
+
+    private final DateTimeFormatter DD_MMM_YYYY = DateTimeFormatter.ofPattern( "dd-MMM-yyyy" );
 
     // all allowable characters for lookup key
     private static String LOOKUPKEY_CHARSET = "2345678ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -538,6 +541,31 @@ public class CloudbedsService {
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
                             + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
                     SendCovidPrestayEmailJob j = new SendCovidPrestayEmailJob();
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( r.getReservationId() );
+                    dao.insertJob( j );
+                } );
+    }
+
+    /**
+     * Creates {@link SendPaymentLinkEmailJob}s for all LT bookings with the given stay date.
+     * 
+     * @param webClient
+     * @param stayDate
+     * @throws IOException
+     */
+    public void createSendPaymentLinkEmailJobs(WebClient webClient, LocalDate stayDate ) throws IOException {
+
+        scraper.getReservations( webClient, stayDate, stayDate ).stream()
+                .filter( c -> c.getFirstName().toUpperCase().contains( "LT" ) || c.getLastName().toUpperCase().contains( "LT" ) )
+                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .filter( r -> false == r.isPaid() )
+                .filter( r -> false == "castlerock@macbackpackers.com".equalsIgnoreCase( r.getEmail() ) )
+                .forEach( r -> {
+                    LOGGER.info( "Creating new SendPaymentLinkEmailJob from Res #" + r.getReservationId()
+                            + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
+                    SendPaymentLinkEmailJob j = new SendPaymentLinkEmailJob();
                     j.setStatus( JobStatus.submitted );
                     j.setReservationId( r.getReservationId() );
                     dao.insertJob( j );
@@ -1127,6 +1155,8 @@ public class CloudbedsService {
                         .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
                         .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
                                 .replaceAll( "\\[first name\\]", res.getFirstName() )
+                                .replaceAll( "\\[start date\\]", DD_MMM_YYYY.format( res.getCheckinDateAsLocalDate() ) )
+                                .replaceAll( "\\[nights\\]", res.getNights() )
                                 .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) ) );
         final String note = template.getTemplateName() + " email sent.";
         scraper.addNote( webClient, reservationId, note + " " + paymentURL );

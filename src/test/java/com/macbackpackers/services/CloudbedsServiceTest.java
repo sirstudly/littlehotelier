@@ -148,4 +148,9 @@ public class CloudbedsServiceTest {
     public void testSendCovidPrestayGmail() throws Exception {
         cloudbedsService.sendCovidPrestayGmail( webClient, "10568950" );
     }
+
+    @Test
+    public void testCreateSendPaymentLinkEmailJobs() throws Exception {
+        cloudbedsService.createSendPaymentLinkEmailJobs( webClient, LocalDate.now().plusDays( 1 ) );
+    }
 }

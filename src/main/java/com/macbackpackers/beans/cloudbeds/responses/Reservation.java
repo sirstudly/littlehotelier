@@ -32,6 +32,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String bookingVia;
     private String checkinDate;
     private String checkoutDate;
+    private String nights;
     private String cancellationDate;
     private String sourceName;
     private String identifier;
@@ -166,6 +167,10 @@ public class Reservation extends CloudbedsJsonResponse {
         return parseISODate( getCheckinDate() );        
     }
 
+    public LocalDate getCheckinDateAsLocalDate() {
+        return LocalDate.parse( getCheckinDate() );        
+    }
+
     public void setCheckinDate( String checkinDate ) {
         this.checkinDate = checkinDate;
     }
@@ -178,6 +183,10 @@ public class Reservation extends CloudbedsJsonResponse {
         return parseISODate( getCheckoutDate() );
     }
 
+    public LocalDate getCheckoutDateAsLocalDate() {
+        return LocalDate.parse( getCheckoutDate() );        
+    }
+
     public void setCheckoutDate( String checkoutDate ) {
         this.checkoutDate = checkoutDate;
     }
@@ -188,6 +197,20 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public boolean isCheckinDateInAugust() {
         return LocalDate.parse( getCheckinDate() ).getMonth() == Month.AUGUST;
+    }
+
+    public boolean isCheckoutDateTodayOrTomorrow() {
+        LocalDate localCheckoutDate = LocalDate.parse( getCheckoutDate() );
+        return localCheckoutDate.compareTo( LocalDate.now() ) == 0 ||
+                localCheckoutDate.compareTo( LocalDate.now().plusDays( 1 ) ) == 0;
+    }
+
+    public String getNights() {
+        return nights;
+    }
+
+    public void setNights( String nights ) {
+        this.nights = nights;
     }
 
     public String getCancellationDate() {
