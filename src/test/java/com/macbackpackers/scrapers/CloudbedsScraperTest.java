@@ -195,8 +195,8 @@ public class CloudbedsScraperTest {
     }
 
     @Test
-    public void testGetAllStaffAllocations() throws Exception {
-        JsonObject rpt = cloudbedsScraper.getAllStaffAllocations( webClient, LocalDate.now() );
+    public void testGetRoomAssignmentsReport() throws Exception {
+        JsonObject rpt = cloudbedsScraper.getRoomAssignmentsReport( webClient, LocalDate.now() );
         LOGGER.info( rpt.toString() );
     }
 

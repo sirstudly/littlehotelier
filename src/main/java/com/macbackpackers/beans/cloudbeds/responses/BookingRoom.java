@@ -21,6 +21,7 @@ public class BookingRoom {
     private String roomTypeId;
     private String roomNumber;
     private String detailedRates;
+    private String rateId;
 
     public String getId() {
         return id;
@@ -108,6 +109,14 @@ public class BookingRoom {
 
     public void setDetailedRates( String detailedRates ) {
         this.detailedRates = detailedRates;
+    }
+
+    public String getRateId() {
+        return rateId;
+    }
+
+    public void setRateId( String rateId ) {
+        this.rateId = rateId;
     }
 
     @Override

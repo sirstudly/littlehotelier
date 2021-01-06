@@ -504,24 +504,31 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Finds all staff allocations for the given date (and the day after):
-     * <ul>
-     * <li>If stayDate is staff bed, stayDate + 1 is staff bed -&gt; allocation for 2 days
-     * <li>If stayDate is staff bed, stayDate + 1 is not staff bed -&gt; allocation for 1st day
-     * <li>If stayDate is not staff bed, stayDate +1 is staff bed -&gt; allocation for 2nd day
-     * </ul>
+     * Runs Room Assignments report and returns the raw response.
      * 
      * @param webClient web client instance to use
      * @param stayDate the date we're searching on
      * @return non-null raw JSON object holding all bed assignments
      * @throws IOException on failure
      */
-    public JsonObject getAllStaffAllocations( WebClient webClient, LocalDate stayDate ) throws IOException {
+    public JsonObject getRoomAssignmentsReport( WebClient webClient, LocalDate stayDate ) throws IOException {
+        return getRoomAssignmentsReport( webClient, stayDate, stayDate.plusDays( 1 ) );
+    }
 
-        WebRequest requestSettings = jsonRequestFactory.createGetRoomAssignmentsReport( stayDate, stayDate.plusDays( 1 ) );
-
+    /**
+     * Runs Room Assignments report and returns the raw response.
+     * 
+     * @param webClient
+     * @param stayDateFrom
+     * @param stayDateTo
+     * @return non-null JSON response
+     * @throws IOException
+     */
+    public JsonObject getRoomAssignmentsReport( WebClient webClient, LocalDate stayDateFrom, LocalDate stayDateTo ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createGetRoomAssignmentsReport( stayDateFrom, stayDateTo );
         Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( "Fetching staff allocations for " + stayDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) );
+        LOGGER.info( "Fetching staff allocations for " + stayDateFrom.format( DateTimeFormatter.ISO_LOCAL_DATE )
+                + " to " + stayDateTo.format( DateTimeFormatter.ISO_LOCAL_DATE ) );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 
         Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );

@@ -1,1487 +1,827 @@
 {
-    "success": true,
-    "rooms": 
-    {
-        "2018-06-17": 
-        {
-            "Basic Twin Room": 
-            {
-                "rooms": 
-                {
-                    "7Will&Kate ": 
-                    [
-                        {
-                            "booking_id": "10370529",
-                            "guest_first_name": "Charlene",
-                            "guest_last_name": "Kuo"
-                        }
-                    ],
-
-                    "7Batman&Robin ": 
-                    [
-                        {
-                            "booking_id": "10370447",
-                            "guest_first_name": "Cipto",
-                            "guest_last_name": "Wijoyo"
-                        }
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 2,
-                    "unassigned": 0,
-                    "blocks": 0
-                }
-            },
-
-            "Basic Double Room": 
-            {
-                "rooms": 
-                {
-                    "7Lady&TheTramp ": 
-                    [
-                        {
-                            "booking_id": "10370483",
-                            "guest_first_name": "Ching-Hsuan",
-                            "guest_last_name": "Ma"
-                        }
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 1,
-                    "unassigned": 0,
-                    "blocks": 0
-                }
-            },
-
-            "4-Bed Female Dorm": 
-            {
-                "rooms": 
-                {
-                    "5A01MushroomT ": 
-                    [
-                        {
-                            "booking_id": "10370505",
-                            "guest_first_name": "Itxaso",
-                            "guest_last_name": "Ortiz De Elguea Flores"
-                        }
-                    ],
-
-                    "5A02BlackOliveB ": 
-                    [
-                        {
-                            "booking_id": "10370507",
-                            "guest_first_name": "Sophie",
-                            "guest_last_name": "Steinbach"
-                        }
-                    ],
-
-                    "5A03PineappleT ": 
-                    [
-                        {
-                            "booking_id": "10370468",
-                            "guest_first_name": "Chui Yiu",
-                            "guest_last_name": "Cheung"
-                        }
-                    ],
-
-                    "5A04HamB ": 
-                    [
-                        {
-                            "booking_id": "10370530",
-                            "guest_first_name": "Jeanne",
-                            "guest_last_name": "Maenhaut"
-                        }
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 4,
-                    "unassigned": 0,
-                    "blocks": 0
-                }
-            },
-
-            "4-Bed Mixed Dorm": 
-            {
-                "rooms": 
-                {
-                    "5C01ChocChipT ": 
-                    [
-                        {
-                            "booking_id": "10370480",
-                            "guest_first_name": "Giselle",
-                            "guest_last_name": "Herrera"
-                        }
-                    ],
-
-                    "5C02RaspberryB ": 
-                    [
-                        {
-                            "booking_id": "10370480",
-                            "guest_first_name": "Giselle",
-                            "guest_last_name": "Herrera"
-                        }
-                    ],
-
-                    "5C03AlmondFudgeT ": 
-                    [
-                        {
-                            "booking_id": "10370480",
-                            "guest_first_name": "Giselle",
-                            "guest_last_name": "Herrera"
-                        }
-                    ],
-
-                    "5C04ButterscotchB ": 
-                    [
-                        {
-                            "booking_id": "10370402",
-                            "guest_first_name": "Barry",
-                            "guest_last_name": "Sheinbaum"
-                        }
-                    ],
-
-                    "6P01JackSparrowT ": 
-                    [
-                        {
-                            "booking_id": "10370532",
-                            "guest_first_name": "Jens",
-                            "guest_last_name": "Stengel"
-                        }
-                    ],
-
-                    "6P02BlackBeardB ": 
-                    [
-                        {
-                            "booking_id": "10370532",
-                            "guest_first_name": "Jens",
-                            "guest_last_name": "Stengel"
-                        }
-                    ],
-
-                    "6P03HookT ": 
-                    [
-                        {
-                            "booking_id": "10924851",
-                            "guest_first_name": "Aaron",
-                            "guest_last_name": "Olson"
-                        }
-                    ],
-
-                    "6P04LongJohnSilverB ": 
-                    [
-                        {
-                            "booking_id": "10592635",
-                            "guest_first_name": "Manuel",
-                            "guest_last_name": "Kupferschmied"
-                        }
-                    ],
-
-                    "7LOTR1FrodoT ": 
-                    [
-                        {
-                            "booking_id": "10370493",
-                            "guest_first_name": "George",
-                            "guest_last_name": "Jones"
-                        }
-                    ],
-
-                    "7LOTR2SamwiseB ": 
-                    [
-                        {
-                            "booking_id": "10370497",
-                            "guest_first_name": "Alyssa",
-                            "guest_last_name": "Terwall"
-                        }
-                    ],
-
-                    "7LOTR3MerryT ": 
-                    [
-                        {
-                            "booking_id": "10370511",
-                            "guest_first_name": "Kirk",
-                            "guest_last_name": "Steinbacher"
-                        }
-                    ],
-
-                    "7LOTR4PippinB ": 
-                    [
-                        {
-                            "booking_id": "10370409",
-                            "guest_first_name": "Tanja",
-                            "guest_last_name": "Krollikowsky"
-                        }
-                    ],
-
-                    "7T3M1AthosT ": 
-                    [
-                        {
-                            "booking_id": "10370487",
-                            "guest_first_name": "Vera",
-                            "guest_last_name": "Shpak"
-                        }
-                    ],
-
-                    "7T3M2PorthosB ": 
-                    [
-                        {
-                            "booking_id": "10370487",
-                            "guest_first_name": "Vera",
-                            "guest_last_name": "Shpak"
-                        }
-                    ],
-
-                    "7T3M3AramisT ": 
-                    [
-                        {
-                            "booking_id": "10370487",
-                            "guest_first_name": "Vera",
-                            "guest_last_name": "Shpak"
-                        }
-                    ],
-
-                    "7T3M4D'ArtagnanB ": 
-                    [
-                        {
-                            "booking_id": "10370485",
-                            "guest_first_name": "Patricia",
-                            "guest_last_name": "Clay"
-                        }
-                    ],
-
-                    "7TMNT1LeonardoT ": 
-                    [
-                        {
-                            "booking_id": "10370503",
-                            "guest_first_name": "Chiang",
-                            "guest_last_name": "Kuan Han"
-                        }
-                    ],
-
-                    "7TMNT2MichelangeloB ": 
-                    [
-                        {
-                            "booking_id": "10370503",
-                            "guest_first_name": "Chiang",
-                            "guest_last_name": "Kuan Han"
-                        }
-                    ],
-
-                    "7TMNT3DonatelloT ": 
-                    [
-                        {
-                            "booking_id": "10370503",
-                            "guest_first_name": "Chiang",
-                            "guest_last_name": "Kuan Han"
-                        }
-                    ],
-
-                    "7TMNT4RaphaelB ": 
-                    [
-                        {
-                            "booking_id": "10370503",
-                            "guest_first_name": "Chiang",
-                            "guest_last_name": "Kuan Han"
-                        }
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 20,
-                    "unassigned": 0,
-                    "blocks": 0
-                }
-            },
-
-            "6-Bed Mixed Dorm": 
-            {
-                "rooms": 
-                {
-                    "3E01AntT ": 
-                    [
-                        {
-                            "booking_id": "10968217",
-                            "guest_first_name": "Brad",
-                            "guest_last_name": "Rooke"
-                        }
-                    ],
-
-                    "3E02BeeB ": 
-                    [
-                        {
-                            "booking_id": "10493354",
-                            "guest_first_name": "NayMyo",
-                            "guest_last_name": "Shwe"
-                        }
-                    ],
-
-                    "3E03CentipedeT ": 
-                    [
-                        {
-                            "booking_id": "10370392",
-                            "guest_first_name": "Elyse",
-                            "guest_last_name": "Lalonde"
-                        }
-                    ],
-
-                    "3E04DragonflyB ": 
-                    [
-                        {
-                            "booking_id": "10370392",
-                            "guest_first_name": "Elyse",
-                            "guest_last_name": "Lalonde"
-                        }
-                    ],
-
-                    "3E05EarwigT ": 
-                    [
-                        {
-                            "booking_id": "10370432",
-                            "guest_first_name": "Henry",
-                            "guest_last_name": "Berns"
-                        }
-                    ],
-
-                    "3E06FireflyB ": 
-                    [
-                        {
-                            "booking_id": "10370432",
-                            "guest_first_name": "Henry",
-                            "guest_last_name": "Berns"
-                        }
-                    ],
-
-                    "5F01MammaCassT ": 
-                    [
-                        {
-                            "booking_id": "10370489",
-                            "guest_first_name": "Ryan",
-                            "guest_last_name": "Olson"
-                        }
-                    ],
-
-                    "5F02BuddyHollyB ": 
-                    [
-                        {
-                            "booking_id": "10370489",
-                            "guest_first_name": "Ryan",
-                            "guest_last_name": "Olson"
-                        }
-                    ],
-
-                    "5F03ElvisPresleyT ": 
-                    [
-                        {
-                            "booking_id": "10370489",
-                            "guest_first_name": "Ryan",
-                            "guest_last_name": "Olson"
-                        }
-                    ],
-
-                    "5F04BarryManilowB ": 
-                    [
-                        {
-                            "booking_id": "10370489",
-                            "guest_first_name": "Ryan",
-                            "guest_last_name": "Olson"
-                        }
-                    ],
-
-                    "5F05JimiHendrixT ": 
-                    [
-                        {
-                            "booking_id": "10370489",
-                            "guest_first_name": "Ryan",
-                            "guest_last_name": "Olson"
-                        }
-                    ],
-
-                    "5F06BobMarleyB ": 
-                    [
-                        {
-                            "booking_id": "10370489",
-                            "guest_first_name": "Ryan",
-                            "guest_last_name": "Olson"
-                        }
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 12,
-                    "unassigned": 0,
-                    "blocks": 0
-                }
-            },
-
-            "8 Bed Female Dorm": 
-            {
-                "rooms": 
-                {
-                    "3A01ClownsT ": 
-                    [
-                        {
-                            "booking_id": "10370536",
-                            "guest_first_name": "Sonia",
-                            "guest_last_name": "Szostok"
-                        }
-                    ],
-
-                    "3A02DeaconBrodiesB ": 
-                    [
-                        {
-                            "booking_id": "10370400",
-                            "guest_first_name": "Julieta",
-                            "guest_last_name": "Gavilanes"
-                        }
-                    ],
-
-                    "3A03EnsignEwartT ": 
-                    [
-                        {
-                            "booking_id": "10945535",
-                            "guest_first_name": "Cecile",
-                            "guest_last_name": "Charles"
-                        }
-                    ],
-
-                    "3A04FiddlersArmsB ": 
-                    [
-                        {
-                            "booking_id": "10945535",
-                            "guest_first_name": "Cecile",
-                            "guest_last_name": "Charles"
-                        }
-                    ],
-
-                    "3A05GreentreeT ": 
-                    [
-                        {
-                            "booking_id": "10370422",
-                            "guest_first_name": "Mathilde",
-                            "guest_last_name": "Forestier"
-                        }
-                    ],
-
-                    "3A06HolyroodTavernB ": 
-                    [
-                        {
-                            "booking_id": "10942419",
-                            "guest_first_name": "Elisabeth",
-                            "guest_last_name": "Reich"
-                        }
-                    ],
-
-                    "3A07AcornLoungeT ": 
-                    [
-                        {
-                            "booking_id": "10370519",
-                            "guest_first_name": "Juli",
-                            "guest_last_name": "Banegas"
-                        }
-                    ],
-
-                    "3A08BannermansB ": 
-                    [
-                        {
-                            "booking_id": "10370476",
-                            "guest_first_name": "Lidia",
-                            "guest_last_name": "Terres"
-                        }
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 8,
-                    "unassigned": 0,
-                    "blocks": 0
-                }
-            },
-
-            "10-Bed Female Dorm": 
-            {
-                "rooms": 
-                {
-                    "3C01CollT ": 
-                    [
-                        {
-                            "booking_id": "10370456",
-                            "guest_first_name": "Mingyeong",
-                            "guest_last_name": "Seo"
-                        }
-                    ],
-
-                    "3C02DonanB ": 
-                    [
-                        {
-                            "booking_id": "10370383",
-                            "guest_first_name": "Kalina Ivanova",
-                            "guest_last_name": "Toteva"
-                        }
-                    ],
-
-                    "3C03GighaT ": 
-                    [
-                        {
-                            "booking_id": "10520986",
-                            "guest_first_name": "Martine",
-                            "guest_last_name": "Cerfontaine"
-                        }
-                    ],
-
-                    "3C04HarrisB ": 
-                    [
-                        {
-                            "booking_id": "10370478",
-                            "guest_first_name": "Cassandre",
-                            "guest_last_name": "Bomare"
-                        }
-                    ],
-
-                    "3C05LewisT ": 
-                    [
-                        {
-                            "booking_id": "10370525",
-                            "guest_first_name": "Chloe",
-                            "guest_last_name": "Seddon"
-                        }
-                    ],
-
-                    "3C06SkyeB ": 
-                    [
-                        {
-                            "booking_id": "10370525",
-                            "guest_first_name": "Chloe",
-                            "guest_last_name": "Seddon"
-                        }
-                    ],
-
-                    "3C07IonaT ": 
-                    [
-                        {
-                            "booking_id": "10370478",
-                            "guest_first_name": "Cassandre",
-                            "guest_last_name": "Bomare"
-                        }
-                    ],
-
-                    "3C08JuraB ": 
-                    [
-                        {
-                            "booking_id": "10370478",
-                            "guest_first_name": "Cassandre",
-                            "guest_last_name": "Bomare"
-                        }
-                    ],
-
-                    "3C09ArranT ": 
-                    [
-                        {
-                            "booking_id": "10370472",
-                            "guest_first_name": "Martina",
-                            "guest_last_name": "Salvucci"
-                        }
-                    ],
-
-                    "3C10BenbeculaB ": 
-                    [
-                        {
-                            "booking_id": "10370363",
-                            "guest_first_name": "Sarah",
-                            "guest_last_name": "Heft"
-                        }
-                    ],
-
-                    "3D01CodT ": 
-                    [
-                        {
-                            "booking_id": "10455847",
-                            "guest_first_name": "Clara",
-                            "guest_last_name": "Bartolozzi"
-                        }
-                    ],
-
-                    "3D02DogfishB ": 
-                    [
-                        {
-                            "booking_id": "10370538",
-                            "guest_first_name": "Ingeborg",
-                            "guest_last_name": "Lobben Gjennestad"
-                        }
-                    ],
-
-                    "3D03EelT ": 
-                    [
-                        {
-                            "booking_id": "10370523",
-                            "guest_first_name": "Hannah",
-                            "guest_last_name": "Mechler"
-                        }
-                    ],
-
-                    "3D04FlounderB ": 
-                    [
-                        {
-                            "booking_id": "10370523",
-                            "guest_first_name": "Hannah",
-                            "guest_last_name": "Mechler"
-                        }
-                    ],
-
-                    "3D05GuppyT ": 
-                    [
-                        {
-                            "booking_id": "10370517",
-                            "guest_first_name": "Betty",
-                            "guest_last_name": "Meli"
-                        }
-                    ],
-
-                    "3D06HalibutB ": 
-                    [
-                        {
-                            "booking_id": "10370517",
-                            "guest_first_name": "Betty",
-                            "guest_last_name": "Meli"
-                        }
-                    ],
-
-                    "3D07InsoleT ": 
-                    [
-                        {
-                            "booking_id": "10370534",
-                            "guest_first_name": "Shunyu",
-                            "guest_last_name": "Shi"
-                        }
-                    ],
-
-                    "3D08JellyfishB ": 
-                    [
-                        {
-                            "booking_id": "10370509",
-                            "guest_first_name": "Emilie",
-                            "guest_last_name": "Kimball"
-                        }
-                    ],
-
-                    "3D09AnchovyT ": 
-                    [
-                        {
-                            "booking_id": "10370513",
-                            "guest_first_name": "Lydia",
-                            "guest_last_name": "Barsalou"
-                        }
-                    ],
-
-                    "3D10BassB ": 
-                    [
-                        {
-                            "booking_id": "10370513",
-                            "guest_first_name": "Lydia",
-                            "guest_last_name": "Barsalou"
-                        }
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 20,
-                    "unassigned": 0,
-                    "blocks": 0
-                }
-            },
-
-            "8 Bed Mixed Dorm": 
-            {
-                "rooms": 
-                {
-                    "5B01ApacheT ": 
-                    [
-                        {
-                            "booking_id": "10396678",
-                            "guest_first_name": "L\u00e9a",
-                            "guest_last_name": "Rang\u00e9"
-                        }
-                    ],
-
-                    "5B02BansheeB ": 
-                    [
-                        {
-                            "booking_id": "10732370",
-                            "guest_first_name": "Tristan",
-                            "guest_last_name": "Revel"
-                        }
-                    ],
-
-                    "5B03CheyenneT ": 
-                    [
-                        {
-                            "booking_id": "10821790",
-                            "guest_first_name": "Brian",
-                            "guest_last_name": "Dowd"
-                        }
-                    ],
-
-                    "5B04DakotaB ": 
-                    [
-                        {
-                            "booking_id": "10801258",
-                            "guest_first_name": "Oreste",
-                            "guest_last_name": "Battezzati"
-                        }
-                    ],
-
-                    "5B05EskimoT ": 
-                    [
-                        {
-                            "booking_id": "10829551",
-                            "guest_first_name": "Scott",
-                            "guest_last_name": "Blok"
-                        }
-                    ],
-
-                    "5B06FlatheadB ": 
-                    [
-                        {
-                            "booking_id": "10788500",
-                            "guest_first_name": "samuel",
-                            "guest_last_name": "barker"
-                        }
-                    ],
-
-                    "5B07GeronimoT ": 
-                    [
-                        {
-                            "booking_id": "10788500",
-                            "guest_first_name": "samuel",
-                            "guest_last_name": "barker"
-                        }
-                    ],
-
-                    "5B08HopiB ": 
-                    [
-                        {
-                            "booking_id": "10847261",
-                            "guest_first_name": "Pedro Remigio",
-                            "guest_last_name": "Montes Marchal"
-                        }
-                    ],
-
-                    "5D01ArgentinaT ": 
-                    [
-                        {
-                            "booking_id": "10943586",
-                            "guest_first_name": "Margot",
-                            "guest_last_name": "Dubois"
-                        }
-                    ],
-
-                    "5D02BrazilB ": 
-                    [
-                        {
-                            "booking_id": "10943586",
-                            "guest_first_name": "Margot",
-                            "guest_last_name": "Dubois"
-                        }
-                    ],
-
-                    "5D03CubaT ": 
-                    [
-                        {
-                            "booking_id": "10846134",
-                            "guest_first_name": "Samuel",
-                            "guest_last_name": "Bordes"
-                        }
-                    ],
-
-                    "5D04DominicaB ": 
-                    [
-                        {
-                            "booking_id": "10803341",
-                            "guest_first_name": "Matthew",
-                            "guest_last_name": "Whipple"
-                        }
-                    ],
-
-                    "5D05EgyptT ": 
-                    [
-                        {
-                            "booking_id": "10370470",
-                            "guest_first_name": "Emmanuel",
-                            "guest_last_name": "Bournique"
-                        }
-                    ],
-
-                    "5D06FijiB ": 
-                    [
-                        {
-                            "booking_id": "10805967",
-                            "guest_first_name": "Adrienne",
-                            "guest_last_name": "Little"
-                        }
-                    ],
-
-                    "5D07GreeceT ": 
-                    [
-                        {
-                            "booking_id": "10805971",
-                            "guest_first_name": "Rolf",
-                            "guest_last_name": "Vieten"
-                        }
-                    ],
-
-                    "5D08HaitiB ": 
-                    [
-                        {
-                            "booking_id": "10695626",
-                            "guest_first_name": "Tim",
-                            "guest_last_name": "Vermeulen"
-                        }
-                    ],
-
-                    "5E01ClassicalT ": 
-                    [
-                        {
-                            "booking_id": "10712254",
-                            "guest_first_name": "rachel",
-                            "guest_last_name": "sheard"
-                        }
-                    ],
-
-                    "5E02DiscoB ": 
-                    [
-                        {
-                            "booking_id": "10712254",
-                            "guest_first_name": "rachel",
-                            "guest_last_name": "sheard"
-                        }
-                    ],
-
-                    "5E03ElevatorT ": 
-                    [
-                        {
-                            "booking_id": "10712254",
-                            "guest_first_name": "rachel",
-                            "guest_last_name": "sheard"
-                        }
-                    ],
-
-                    "5E04FunkB ": 
-                    [
-                        {
-                            "booking_id": "10728576",
-                            "guest_first_name": "Celinr",
-                            "guest_last_name": "BURLOT"
-                        }
-                    ],
-
-                    "5E05GlamRockT ": 
-                    [
-                        {
-                            "booking_id": "10765174",
-                            "guest_first_name": "Jansen",
-                            "guest_last_name": "Haneline"
-                        }
-                    ],
-
-                    "5E06HeavyMetalB ": 
-                    [
-                        {
-                            "booking_id": "10765174",
-                            "guest_first_name": "Jansen",
-                            "guest_last_name": "Haneline"
-                        }
-                    ],
-
-                    "5E07AcidRockT ": 
-                    [
-                        {
-                            "booking_id": "10417251",
-                            "guest_first_name": "Mariana",
-                            "guest_last_name": "Cerca"
-                        }
-                    ],
-
-                    "5E08BluesB ": 
-                    [
-                        {
-                            "booking_id": "10398502",
-                            "guest_first_name": "Ana Paula",
-                            "guest_last_name": "Salles da Silva"
-                        }
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 24,
-                    "unassigned": 0,
-                    "blocks": 0
-                }
-            },
-
-            "10-Bed Mixed Dorm": 
-            {
-                "rooms": 
-                {
-                    "3B01EdinburghT ": 
-                    [
-                        {
-                            "booking_id": "10370406",
-                            "guest_first_name": "Melody Boyer Siva",
-                            "guest_last_name": "Ismael Flores Juan"
-                        }
-                    ],
-
-                    "3B02FalkirkB ": 
-                    [
-                        {
-                            "booking_id": "10370406",
-                            "guest_first_name": "Melody Boyer Siva",
-                            "guest_last_name": "Ismael Flores Juan"
-                        }
-                    ],
-
-                    "3B03IstanbulT ": 
-                    [
-                        {
-                            "booking_id": "10943386",
-                            "guest_first_name": "Sebastian",
-                            "guest_last_name": "Quintana"
-                        }
-                    ],
-
-                    "3B04JerusalemB ": 
-                    [
-                        {
-                            "booking_id": "10370571",
-                            "guest_first_name": "Tyron",
-                            "guest_last_name": "Crowley"
-                        }
-                    ],
-
-                    "3B05MilanT ": 
-                    [
-                        {
-                            "booking_id": "10574203",
-                            "guest_first_name": "BELINA",
-                            "guest_last_name": "BABY"
-                        }
-                    ],
-
-                    "3B06NapierB ": 
-                    [
-                        {
-                            "booking_id": "10574203",
-                            "guest_first_name": "BELINA",
-                            "guest_last_name": "BABY"
-                        }
-                    ],
-
-                    "3B07KievT ": 
-                    [
-                        {
-                            "booking_id": "10370495",
-                            "guest_first_name": "Chi",
-                            "guest_last_name": "Zhang"
-                        }
-                    ],
-
-                    "3B08LIsbonB ": 
-                    [
-                        {
-                            "booking_id": "10370495",
-                            "guest_first_name": "Chi",
-                            "guest_last_name": "Zhang"
-                        }
-                    ],
-
-                    "3B09AmsterdamT ": 
-                    [
-                        {
-                            "booking_id": "10574203",
-                            "guest_first_name": "BELINA",
-                            "guest_last_name": "BABY"
-                        }
-                    ],
-
-                    "3B10BerlinB ": 
-                    [
-                        {
-                            "booking_id": "10370428",
-                            "guest_first_name": "Anna-Lena",
-                            "guest_last_name": "Schade"
-                        }
-                    ],
-
-                    "5G01MarsT ": 
-                    [
-                        {
-                            "booking_id": "10668033",
-                            "guest_first_name": "Sierra",
-                            "guest_last_name": "St Clair"
-                        }
-                    ],
-
-                    "5G02MercuryB ": 
-                    [
-                        {
-                            "booking_id": "10668033",
-                            "guest_first_name": "Sierra",
-                            "guest_last_name": "St Clair"
-                        }
-                    ],
-
-                    "5G03UranusT ": 
-                    [
-                        {
-                            "booking_id": "10668033",
-                            "guest_first_name": "Sierra",
-                            "guest_last_name": "St Clair"
-                        }
-                    ],
-
-                    "5G04VenusB ": 
-                    [
-                        {
-                            "booking_id": "10668033",
-                            "guest_first_name": "Sierra",
-                            "guest_last_name": "St Clair"
-                        }
-                    ],
-
-                    "5G05MoonT ": 
-                    [
-                        {
-                            "booking_id": "10370501",
-                            "guest_first_name": "Eleisha",
-                            "guest_last_name": "Cameron"
-                        }
-                    ],
-
-                    "5G06NeptuneB ": 
-                    [
-                        {
-                            "booking_id": "10907455",
-                            "guest_first_name": "Tu Chun",
-                            "guest_last_name": "HSU"
-                        }
-                    ],
-
-                    "5G07PlutoT ": 
-                    [
-                        {
-                            "booking_id": "10963300",
-                            "guest_first_name": "Zachary",
-                            "guest_last_name": "Hall"
-                        }
-                    ],
-
-                    "5G08SaturnB ": 
-                    [
-                        {
-                            "booking_id": "10835506",
-                            "guest_first_name": "Henry",
-                            "guest_last_name": "Vaughan"
-                        }
-                    ],
-
-                    "5G09EarthT ": 
-                    [
-                        {
-                            "booking_id": "10833672",
-                            "guest_first_name": "Chun Hei Trevis",
-                            "guest_last_name": "So"
-                        }
-                    ],
-
-                    "5G10JupiterB ": 
-                    [
-                        {
-                            "booking_id": "10370499",
-                            "guest_first_name": "Anna",
-                            "guest_last_name": "Sidler"
-                        }
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 20,
-                    "unassigned": 0,
-                    "blocks": 0
-                }
-            },
-
-            "18-Bed Mixed Dorm": 
-            {
-                "rooms": 
-                {
-                    "6R01AmazonT ": 
-                    [
-                        {
-                            "booking_id": "10370527",
-                            "guest_first_name": "Nina",
-                            "guest_last_name": "Plank"
-                        }
-                    ],
-
-                    "6R02BosphorusB ": 
-                    [
-                        {
-                            "booking_id": "10370527",
-                            "guest_first_name": "Nina",
-                            "guest_last_name": "Plank"
-                        }
-                    ],
-
-                    "6R03ClydeT ": 
-                    [
-                        {
-                            "booking_id": "10931936",
-                            "guest_first_name": "Kayla",
-                            "guest_last_name": "Bennett"
-                        }
-                    ],
-
-                    "6R04DanubeB ": 
-                    [
-                        {
-                            "booking_id": "10931936",
-                            "guest_first_name": "Kayla",
-                            "guest_last_name": "Bennett"
-                        }
-                    ],
-
-                    "6R05ElbeT ": 
-                    [
-                        {
-                            "booking_id": "10370515",
-                            "guest_first_name": "Kristina",
-                            "guest_last_name": "Mastelica"
-                        }
-                    ],
-
-                    "6R06FlooseyB ": 
-                    [
-                        {
-                            "booking_id": "10370515",
-                            "guest_first_name": "Kristina",
-                            "guest_last_name": "Mastelica"
-                        }
-                    ],
-
-                    "6R07GangesT ": 
-                    [
-                        {
-                            "booking_id": "10370398",
-                            "guest_first_name": "Chloe",
-                            "guest_last_name": "Bassingthwaighte"
-                        }
-                    ],
-
-                    "6R08HudsonB ": 
-                    [
-                        {
-                            "booking_id": "10370398",
-                            "guest_first_name": "Chloe",
-                            "guest_last_name": "Bassingthwaighte"
-                        }
-                    ],
-
-                    "6R09IndusT ": 
-                    [
-                        {
-                            "booking_id": "10370441",
-                            "guest_first_name": "Victoria",
-                            "guest_last_name": "Kiely"
-                        }
-                    ],
-
-                    "6R10JordanB ": 
-                    [
-                        {
-                            "booking_id": "10370323",
-                            "guest_first_name": "Ephraim",
-                            "guest_last_name": "Nann"
-                        }
-                    ],
-
-                    "6R11KamaT ": 
-                    [
-                        {
-                            "booking_id": "10421851",
-                            "guest_first_name": "Marthe",
-                            "guest_last_name": "hoffmann"
-                        }
-                    ],
-
-                    "6R12LoireB ": 
-                    [
-                        {
-                            "booking_id": "10421851",
-                            "guest_first_name": "Marthe",
-                            "guest_last_name": "hoffmann"
-                        }
-                    ],
-
-                    "6R13MagpieT ": 
-                    [
-                        {
-                            "booking_id": "10421851",
-                            "guest_first_name": "Marthe",
-                            "guest_last_name": "hoffmann"
-                        }
-                    ],
-
-                    "6R14NonniB ": 
-                    [
-                        {
-                            "booking_id": "10421851",
-                            "guest_first_name": "Marthe",
-                            "guest_last_name": "hoffmann"
-                        }
-                    ],
-
-                    "6R15ObT ": 
-                    [
-                        {
-                            "booking_id": "10421851",
-                            "guest_first_name": "Marthe",
-                            "guest_last_name": "hoffmann"
-                        }
-                    ],
-
-                    "6R16PittB ": 
-                    [
-                        {
-                            "booking_id": "10370462",
-                            "guest_first_name": "Emmanuelle",
-                            "guest_last_name": "Schade-Weskott"
-                        }
-                    ],
-
-                    "6R17QueezyT ": 
-                    [
-                        {
-                            "booking_id": "10421851",
-                            "guest_first_name": "Marthe",
-                            "guest_last_name": "hoffmann"
-                        }
-                    ],
-
-                    "6R18RangtikiB ": 
-                    [
-                        {
-                            "booking_id": "10421851",
-                            "guest_first_name": "Marthe",
-                            "guest_last_name": "hoffmann"
-                        }
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 18,
-                    "unassigned": 0,
-                    "blocks": 0
-                }
-            },
-
-            "STAFF ROOM F&V": 
-            {
-                "rooms": 
-                {
-                    "4FV01ApricotT ": 
-                    [
-                        
-                    ],
-
-                    "4FV02BroccoliB ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4FV03CoconutT ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4FV04DamsonB ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4FV05EggplantT ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4FV06FigB ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4FV07GherkinT ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4FV08HaggisB ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 0,
-                    "unassigned": 1,
-                    "blocks": 7
-                }
-            },
-
-            "STAFF ROOM Zoo ": 
-            {
-                "rooms": 
-                {
-                    "4Z01AnteaterT ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4Z02BoaB ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4Z03CheetahT ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4Z04DingoB ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4Z05ElephantT ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4Z06FerretB ": 
-                    [
-                        
-                    ],
-
-                    "4Z07GiraffeT ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4Z08HippoB ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4Z09IguanaT ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4Z10JackalB ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4Z11KraitT ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4Z12LionB ": 
-                    [
-                        
-                    ],
-
-                    "4Z13MonkeyT ": 
-                    [
-                        {
-                            "type": "Blocked Dates"
-                        }
-                    ],
-
-                    "4Z14OrangutanB ": 
-                    [
-                        
-                    ],
-
-                    "4Z15PeackockT ": 
-                    [
-                        
-                    ],
-
-                    "4Z16QuokkaB ": 
-                    [
-                        
-                    ]
-                },
-
-                "rooms_info": 
-                {
-                    "assigned": 0,
-                    "unassigned": 5,
-                    "blocks": 11
-                }
-            }
+  "success" : true,
+  "rooms" : {
+    "2021-01-06" : {
+      "10 Bed Mixed Dormitory" : {
+        "rooms" : {
+          "21-01- VW " : [ ],
+          "21-02- Horned " : [ ],
+          "21-03- Spotted " : [ ],
+          "21-04- Stag " : [ {
+            "booking_id" : "38059804",
+            "guest_first_name" : "Mercedes",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:25:44",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "21-05- Bailey " : [ ],
+          "21-06- John Lennon " : [ ],
+          "21-07- Christmas " : [ ],
+          "21-08- Let It Be " : [ {
+            "booking_id" : "38059811",
+            "guest_first_name" : "Kshitee",
+            "guest_last_name" : "Mane LT",
+            "assignment_date" : "2021-01-03 03:26:08",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "21-09- Stink " : [ ],
+          "21-10- Dung " : [ {
+            "booking_id" : "38059818",
+            "guest_first_name" : "Amelia",
+            "guest_last_name" : "Obambi LT",
+            "assignment_date" : "2021-01-03 03:26:34",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "22-01- Urqhuart " : [ ],
+          "22-02- Edinburgh " : [ {
+            "booking_id" : "38059823",
+            "guest_first_name" : "Ryan",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:26:47",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "22-03- Dunvegan " : [ ],
+          "22-04- Hermitage " : [ {
+            "booking_id" : "38059827",
+            "guest_first_name" : "Matthieu",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:27:05",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "22-05- Moil " : [ ],
+          "22-06- Rock " : [ ],
+          "22-07- Eilean Donan " : [ ],
+          "22-08- Dunollie " : [ {
+            "booking_id" : "38059830",
+            "guest_first_name" : "Djiby",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:27:15",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "22-09- Stalker " : [ ],
+          "22-10- Dunottar " : [ {
+            "booking_id" : "38059835",
+            "guest_first_name" : "Jorge",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:27:29",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "44-01- Coll " : [ ],
+          "44-02- Tiree " : [ ],
+          "44-03- Jura " : [ ],
+          "44-04- Islay " : [ ],
+          "44-05- Lewis " : [ ],
+          "44-06- Harris " : [ {
+            "booking_id" : "37975761",
+            "guest_first_name" : "Paolo",
+            "guest_last_name" : "Marvasi LT",
+            "assignment_date" : "2020-12-29 18:20:43",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "44-07- Skye " : [ ],
+          "44-08- Raasay " : [ ],
+          "44-09- Shetlands " : [ ],
+          "44-10- Orkney " : [ ],
+          "45-01- MacGregor " : [ ],
+          "45-02- Campbell " : [ ],
+          "45-03- Wallace " : [ ],
+          "45-04- Macleod " : [ ],
+          "45-05- Stewart " : [ ],
+          "45-06- MacDonald " : [ ],
+          "45-07- Hamilton " : [ ],
+          "45-08- Murray " : [ ],
+          "45-09- Graham " : [ ],
+          "45-10-MacMillan " : [ ],
+          "47-01- Braveheart " : [ ],
+          "47-02- Rob Roy " : [ ],
+          "47-03- Trainspotting " : [ ],
+          "47-04- 39 Steps " : [ ],
+          "47-05- Brigadoon " : [ ],
+          "47-06- Whisky Galore " : [ ],
+          "47-07- Burke & Hare " : [ ],
+          "47-08- Wickerman " : [ ],
+          "47-09- Highlander " : [ ],
+          "47-10- Young Adam " : [ ]
+        },
+        "rooms_info" : {
+          "assigned" : 8,
+          "unassigned" : 42,
+          "blocks" : 0
         }
+      },
+      "12 Bed Female Dormitory" : {
+        "rooms" : {
+          "42-01-Mr. Tickle " : [ ],
+          "42-02- Mr. Grumpy " : [ ],
+          "42-03- Mr. Fussy " : [ ],
+          "42-04- Mr. Tall " : [ ],
+          "42-05- Mr. Small " : [ ],
+          "42-06- Mr. Messy " : [ ],
+          "42-07- Mr. Bounce " : [ ],
+          "42-08- Mr. Skinny " : [ ],
+          "42-09- Mr. Chatterbox " : [ ],
+          "42-10- Mr. Strong " : [ ],
+          "42-11- Mr. Happy " : [ ],
+          "42-12- Mr. Jelly " : [ ],
+          "43-01- Franc " : [ {
+            "type" : "Out of Service"
+          } ],
+          "43-02- Amex " : [ {
+            "type" : "Out of Service"
+          } ],
+          "43-03- Kroner " : [ {
+            "type" : "Out of Service"
+          } ],
+          "43-04- Rupee " : [ {
+            "type" : "Out of Service"
+          } ],
+          "43-05- Peseta " : [ {
+            "type" : "Out of Service"
+          } ],
+          "43-06- Escudo " : [ {
+            "type" : "Out of Service"
+          } ],
+          "43-07- Pound " : [ {
+            "type" : "Out of Service"
+          } ],
+          "43-08- Dollar " : [ {
+            "type" : "Out of Service"
+          } ],
+          "43-09- Yen " : [ {
+            "type" : "Out of Service"
+          } ],
+          "43-10- Mark " : [ {
+            "type" : "Out of Service"
+          } ],
+          "43-11- Lira " : [ {
+            "type" : "Out of Service"
+          } ],
+          "43-12- Guilder " : [ {
+            "type" : "Out of Service"
+          } ]
+        },
+        "rooms_info" : {
+          "assigned" : 0,
+          "unassigned" : 12,
+          "blocks" : 12
+        }
+      },
+      "12 Bed Mixed Dormitory" : {
+        "rooms" : {
+          "20-01- Laphroaig " : [ ],
+          "20-02- Talisker " : [ {
+            "booking_id" : "38059787",
+            "guest_first_name" : "Ann",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:24:41",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "20-03- Bells " : [ ],
+          "20-04- Grants " : [ ],
+          "20-05- Glayva " : [ ],
+          "20-06- Oban " : [ {
+            "booking_id" : "38059795",
+            "guest_first_name" : "Aida",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:25:01",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "20-07- Edradour " : [ ],
+          "20-08- Old Inverness " : [ {
+            "booking_id" : "38059799",
+            "guest_first_name" : "Carla",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:25:19",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "20-09- Spring Bank " : [ ],
+          "20-10- Dalwhinnie " : [ ],
+          "20-11- Glenmorangie " : [ ],
+          "20-12- Highland Park " : [ ],
+          "41-01- Boxers " : [ {
+            "type" : "Out of Service"
+          } ],
+          "41-02- Pounch " : [ {
+            "type" : "Out of Service"
+          } ],
+          "41-03- Thong " : [ {
+            "type" : "Out of Service"
+          } ],
+          "41-04- Panties " : [ {
+            "type" : "Out of Service"
+          } ],
+          "41-05- Knickers " : [ {
+            "type" : "Out of Service"
+          } ],
+          "41-06- Drawers " : [ {
+            "type" : "Out of Service"
+          } ],
+          "41-07- Crotchless " : [ {
+            "type" : "Out of Service"
+          } ],
+          "41-08- Edible " : [ {
+            "type" : "Out of Service"
+          } ],
+          "41-09- G-String " : [ {
+            "type" : "Out of Service"
+          } ],
+          "41-10- Apple Catchers " : [ {
+            "type" : "Out of Service"
+          } ],
+          "41-11- Jocks " : [ {
+            "type" : "Out of Service"
+          } ],
+          "41-12- Bloomers " : [ {
+            "type" : "Out of Service"
+          } ],
+          "46-01- Nice Pear " : [ {
+            "booking_id" : "37799826",
+            "guest_first_name" : "Boxian",
+            "guest_last_name" : "Zheng",
+            "assignment_date" : "2020-12-22 11:34:00",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "46-02- Root " : [ {
+            "type" : "Blocked Dates"
+          } ],
+          "46-03- Woody " : [ {
+            "type" : "Blocked Dates"
+          } ],
+          "46-04- Coconuts " : [ {
+            "type" : "Blocked Dates"
+          } ],
+          "46-05- Rubber " : [ {
+            "type" : "Blocked Dates"
+          } ],
+          "46-06- Cherry " : [ {
+            "type" : "Blocked Dates"
+          } ],
+          "46-07- Cocoa " : [ {
+            "type" : "Blocked Dates"
+          } ],
+          "46-08- Hemp " : [ {
+            "type" : "Blocked Dates"
+          } ],
+          "46-09- Bush " : [ {
+            "type" : "Blocked Dates"
+          } ],
+          "46-10- Melons " : [ {
+            "type" : "Blocked Dates"
+          } ],
+          "46-11- Wild Oats " : [ {
+            "type" : "Blocked Dates"
+          } ],
+          "46-12- Kumquat " : [ {
+            "type" : "Blocked Dates"
+          } ],
+          "51-01- Harry " : [ {
+            "type" : "Out of Service"
+          } ],
+          "51-02- Dumbledore " : [ {
+            "type" : "Out of Service"
+          } ],
+          "51-03- Snapes on a Plane " : [ {
+            "type" : "Out of Service"
+          } ],
+          "51-04- Hagrid " : [ {
+            "type" : "Out of Service"
+          } ],
+          "51-05- Hermione " : [ {
+            "type" : "Out of Service"
+          } ],
+          "51-06- Ron " : [ {
+            "type" : "Out of Service"
+          } ],
+          "51-07- Gryffindor " : [ {
+            "type" : "Out of Service"
+          } ],
+          "51-08- Slither-In " : [ {
+            "type" : "Out of Service"
+          } ],
+          "51-09- Dobby " : [ {
+            "type" : "Out of Service"
+          } ],
+          "51-10- Leviosaaa " : [ {
+            "type" : "Out of Service"
+          } ],
+          "51-11- Moaning Myrtle " : [ {
+            "type" : "Out of Service"
+          } ],
+          "51-12- The Whomping Pillow " : [ {
+            "type" : "Out of Service"
+          } ]
+        },
+        "rooms_info" : {
+          "assigned" : 4,
+          "unassigned" : 9,
+          "blocks" : 35
+        }
+      },
+      "14 Bed Mixed Dormitory" : {
+        "rooms" : {
+          "25-01- Steak n' Ale " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-02- Baked Potato " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-03- Haggis " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-04- Deep Fried Mars " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-05- Blood Pudding " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-06- Scotch Egg " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-07- Highland Toffee " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-08- Nessie Burger " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-09- Fish n' Chips " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-10- Venison " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-11- Neeps " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-12- Tatties " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-13- Porridge " : [ {
+            "type" : "Out of Service"
+          } ],
+          "25-14- Smoked Salmon " : [ {
+            "type" : "Out of Service"
+          } ]
+        },
+        "rooms_info" : {
+          "assigned" : 0,
+          "unassigned" : 0,
+          "blocks" : 14
+        }
+      },
+      "16 Bed Mixed Dormitory" : {
+        "rooms" : {
+          "23-01- Rangers " : [ ],
+          "23-02- Celtic " : [ ],
+          "23-03- Allow " : [ ],
+          "23-04- Fort Willam " : [ {
+            "booking_id" : "38059744",
+            "guest_first_name" : "Javier",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:22:13",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "23-05- Partick Thistle " : [ ],
+          "23-06- Hamilton Acts " : [ ],
+          "23-07- Dundee United " : [ ],
+          "23-08- Motherwell " : [ {
+            "booking_id" : "38059747",
+            "guest_first_name" : "Fabian",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:22:25",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "23-09- Kilmarnock " : [ ],
+          "23-10- Aberdeen " : [ {
+            "booking_id" : "38059753",
+            "guest_first_name" : "Patxi",
+            "guest_last_name" : "Mendialdua LT",
+            "assignment_date" : "2021-01-03 03:22:39",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "23-11- Hibs " : [ ],
+          "23-12- Hearts " : [ ],
+          "23-13- Falkirk " : [ ],
+          "23-14- Cowanbeath " : [ {
+            "booking_id" : "38059757",
+            "guest_first_name" : "Alejandro",
+            "guest_last_name" : "Cano LT",
+            "assignment_date" : "2021-01-03 03:22:58",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "23-15- St. Johnston " : [ ],
+          "23-16- Dunfermline " : [ {
+            "booking_id" : "38052527",
+            "guest_first_name" : "Ramon",
+            "guest_last_name" : "Expósito LT",
+            "assignment_date" : "2021-01-02 18:49:08",
+            "assignment_type" : "Assignment was made manually."
+          } ]
+        },
+        "rooms_info" : {
+          "assigned" : 5,
+          "unassigned" : 11,
+          "blocks" : 0
+        }
+      },
+      "4 Bed Female Dormitory" : {
+        "rooms" : {
+          "75-01- Indiana Jones " : [ {
+            "type" : "Out of Service"
+          } ],
+          "75-02- James Bond " : [ {
+            "type" : "Out of Service"
+          } ],
+          "75-03- Superman " : [ {
+            "type" : "Out of Service"
+          } ],
+          "75-04- Batman " : [ {
+            "type" : "Out of Service"
+          } ],
+          "76-01- Captain America " : [ {
+            "type" : "Out of Service"
+          } ],
+          "76-02- Thor " : [ {
+            "type" : "Out of Service"
+          } ],
+          "76-03- Iron Man " : [ {
+            "type" : "Out of Service"
+          } ],
+          "76-04- Hulk " : [ {
+            "type" : "Out of Service"
+          } ]
+        },
+        "rooms_info" : {
+          "assigned" : 0,
+          "unassigned" : 0,
+          "blocks" : 8
+        }
+      },
+      "4 Bed Mixed Dormitory" : {
+        "rooms" : {
+          "61-01-Rabbie Burns " : [ {
+            "booking_id" : "38120365",
+            "guest_first_name" : "Lyudmila",
+            "guest_last_name" : "Krasilnikova",
+            "assignment_date" : "2021-01-05 23:48:42",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "61-02-Walter Scott " : [ ],
+          "61-03-Ian Rankin " : [ ],
+          "61-04-Irvine Welsh " : [ ],
+          "62-01-John " : [ ],
+          "63-02-Paul " : [ ],
+          "63-03-George " : [ ],
+          "63-04-Ringo " : [ ],
+          "63-01-Shinty " : [ ],
+          "63-02-Golf " : [ ],
+          "63-03-Curling " : [ ],
+          "63-04-Fitba " : [ ],
+          "64-01-Nae Bother " : [ ],
+          "64-02-Och Aye! " : [ ],
+          "64-03-Dinnae Ken " : [ ],
+          "64-04-Slainte Mhath " : [ ]
+        },
+        "rooms_info" : {
+          "assigned" : 1,
+          "unassigned" : 15,
+          "blocks" : 0
+        }
+      },
+      "6 Bed Mixed Dormitory" : {
+        "rooms" : {
+          "48-01- Topus Bunkus " : [ ],
+          "48-02- Bottomus Bunkus " : [ ],
+          "48-03- Gluteus Maximus " : [ ],
+          "48-04- Pontius Pilot " : [ ],
+          "48-05- Caesar Saladus " : [ ],
+          "48-06- Bigus Dickus " : [ ]
+        },
+        "rooms_info" : {
+          "assigned" : 0,
+          "unassigned" : 6,
+          "blocks" : 0
+        }
+      },
+      "8 Bed Mixed Dormitory" : {
+        "rooms" : {
+          "24-01- Brainy Smurf " : [ ],
+          "24-02- Lame Brain " : [ ],
+          "24-03- Brain Dead " : [ ],
+          "24-04-Brain Strain " : [ {
+            "booking_id" : "38059766",
+            "guest_first_name" : "Alok",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:23:24",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "24-05- Brainiac " : [ ],
+          "24-06- Brainless " : [ {
+            "booking_id" : "38059769",
+            "guest_first_name" : "Santiago",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:23:46",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "24-07- Pea Brain " : [ ],
+          "24-08- Brain Surgeon " : [ ],
+          "49-01- Records " : [ {
+            "type" : "Out of Service"
+          } ],
+          "49-02- Madonna " : [ {
+            "type" : "Out of Service"
+          } ],
+          "49-03- Cliff Richards " : [ {
+            "type" : "Out of Service"
+          } ],
+          "49-04- Immaculate Conception " : [ {
+            "type" : "Out of Service"
+          } ],
+          "49-05- Brooke Shields " : [ {
+            "type" : "Out of Service"
+          } ],
+          "49-06- Jesus " : [ {
+            "type" : "Out of Service"
+          } ],
+          "49-07- Airlines " : [ {
+            "type" : "Out of Service"
+          } ],
+          "49-08- Sandra Dee " : [ {
+            "type" : "Out of Service"
+          } ]
+        },
+        "rooms_info" : {
+          "assigned" : 2,
+          "unassigned" : 6,
+          "blocks" : 8
+        }
+      },
+      "Basic Double Room" : {
+        "rooms" : {
+          "53 " : [ {
+            "type" : "Out of Service"
+          } ],
+          "54 " : [ {
+            "type" : "Out of Service"
+          } ],
+          "55 " : [ ],
+          "71 " : [ {
+            "booking_id" : "37995183",
+            "guest_first_name" : "james",
+            "guest_last_name" : "clegg",
+            "assignment_date" : "2020-12-30 17:04:34",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "72 " : [ {
+            "booking_id" : "37867733",
+            "guest_first_name" : "Karim",
+            "guest_last_name" : "Mohammedi",
+            "assignment_date" : "2020-12-25 10:23:29",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "73 " : [ {
+            "booking_id" : "38008794",
+            "guest_first_name" : "Skye Rose",
+            "guest_last_name" : "Malik",
+            "assignment_date" : "2020-12-31 10:38:00",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "78 " : [ ],
+          "79 " : [ ]
+        },
+        "rooms_info" : {
+          "assigned" : 3,
+          "unassigned" : 3,
+          "blocks" : 2
+        }
+      },
+      "Basic Quad Room" : {
+        "rooms" : {
+          "56 " : [ {
+            "type" : "Out of Service"
+          } ],
+          "57 " : [ {
+            "type" : "Out of Service"
+          } ],
+          "74 " : [ {
+            "type" : "Out of Service"
+          } ]
+        },
+        "rooms_info" : {
+          "assigned" : 0,
+          "unassigned" : 0,
+          "blocks" : 3
+        }
+      },
+      "Basic Triple Room" : {
+        "rooms" : {
+          "58 " : [ {
+            "type" : "Out of Service"
+          } ],
+          "65 " : [ {
+            "type" : "Out of Service"
+          } ],
+          "77 " : [ ]
+        },
+        "rooms_info" : {
+          "assigned" : 0,
+          "unassigned" : 1,
+          "blocks" : 2
+        }
+      },
+      "xLT Female Dorm" : {
+        "rooms" : {
+          "11-01- Night & Day " : [ ],
+          "11-02- Tall & Short " : [ {
+            "type" : "Out of Service"
+          } ],
+          "11-03-Up & Down " : [ ],
+          "11-04- Ebony & Ivory " : [ ],
+          "11-05- Love & Hate " : [ {
+            "type" : "Out of Service"
+          } ],
+          "11-06- Sex & Chastity " : [ ],
+          "11-07- Porsche & Lada " : [ ],
+          "11-08- Lust & Rage " : [ {
+            "type" : "Out of Service"
+          } ],
+          "11-09- SYHA & Backpacker " : [ ],
+          "11-10- Drunk & Sober " : [ {
+            "booking_id" : "38068369",
+            "guest_first_name" : "Briar",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 17:20:02",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "12-01- Pumpy " : [ ],
+          "12-02- Pukie " : [ ],
+          "12-03- Spanky " : [ {
+            "booking_id" : "37813646",
+            "guest_first_name" : "Alison",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2020-12-22 18:24:01",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "12-04- Burpy " : [ {
+            "booking_id" : "38059779",
+            "guest_first_name" : "Danielle",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:24:29",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "12-05- Snow White " : [ ],
+          "12-06- Touchy Feely " : [ {
+            "type" : "Out of Service"
+          } ],
+          "12-07- Pished " : [ ],
+          "12-08- Poopy " : [ ],
+          "12-09- Pervy " : [ ],
+          "12-10- Pimp " : [ {
+            "booking_id" : "38059774",
+            "guest_first_name" : "Beatrice",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:24:07",
+            "assignment_type" : "Assignment was made manually."
+          } ]
+        },
+        "rooms_info" : {
+          "assigned" : 4,
+          "unassigned" : 12,
+          "blocks" : 4
+        }
+      },
+      "xLT Male Dorm - Rm. 10" : {
+        "rooms" : {
+          "10-01- Rubik's Cube " : [ ],
+          "10-02- Jigsaw " : [ {
+            "type" : "Out of Service"
+          } ],
+          "10-03- Riddle " : [ ],
+          "10-04- Maze " : [ {
+            "type" : "Out of Service"
+          } ],
+          "10-05- Life " : [ ],
+          "10-06- Relationships " : [ {
+            "type" : "Out of Service"
+          } ],
+          "10-07- Bermuda Triangle " : [ ],
+          "10-08- Should I Stay? " : [ {
+            "booking_id" : "38059840",
+            "guest_first_name" : "Stephane",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:27:46",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "10-09- Labryinth " : [ ],
+          "10-10- Missing Sock " : [ {
+            "type" : "Out of Service"
+          } ]
+        },
+        "rooms_info" : {
+          "assigned" : 1,
+          "unassigned" : 5,
+          "blocks" : 4
+        }
+      },
+      "xLT Female Dorm- Rm. 13" : {
+        "rooms" : {
+          "13-01- Coconut " : [ ],
+          "13-02- Peanut " : [ ],
+          "13-03- Walnut " : [ ],
+          "13-04- Michael Jackson " : [ {
+            "type" : "Out of Service"
+          } ],
+          "13-05- Cashew " : [ ],
+          "13-06- Hazelnut " : [ ],
+          "13-07- Brazil Nut " : [ ],
+          "13-08- Pecan " : [ {
+            "type" : "Out of Service"
+          } ]
+        },
+        "rooms_info" : {
+          "assigned" : 0,
+          "unassigned" : 6,
+          "blocks" : 2
+        }
+      },
+      "xLT Male Dorm- Rm. 14" : {
+        "rooms" : {
+          "14-01- Last Drop " : [ ],
+          "14-02- Maggie Dickson's " : [ ],
+          "14-03- Biddy Mulligans " : [ ],
+          "14-04- Green Tree " : [ {
+            "booking_id" : "38059842",
+            "guest_first_name" : "Isaac",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:27:57",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "14-05- Whistle Binkie's " : [ ],
+          "14-06- Bannermans " : [ {
+            "booking_id" : "38059845",
+            "guest_first_name" : "Nacho",
+            "guest_last_name" : "Lt",
+            "assignment_date" : "2021-01-03 03:28:11",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "14-07- Jocks " : [ ],
+          "14-08- Deacon Brodie's  " : [ {
+            "booking_id" : "38059854",
+            "guest_first_name" : "Carlos",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:28:34",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "14-09- Mitre " : [ ],
+          "14-10- Scotsman " : [ {
+            "type" : "Out of Service"
+          } ],
+          "14-11- Sneaky Pete's  " : [ ],
+          "14-12- Royal Mile " : [ {
+            "booking_id" : "38059859",
+            "guest_first_name" : "Adam",
+            "guest_last_name" : "LT",
+            "assignment_date" : "2021-01-03 03:28:48",
+            "assignment_type" : "Assignment was made manually."
+          } ],
+          "14-13- World's End " : [ ],
+          "14-14- Aulde Hoose " : [ ]
+        },
+        "rooms_info" : {
+          "assigned" : 4,
+          "unassigned" : 9,
+          "blocks" : 1
+        }
+      },
+      "PAID BED" : {
+        "rooms" : {
+          "PB((1) " : [ ],
+          "PB((2) " : [ ],
+          "PB((3) " : [ ],
+          "PB((4) " : [ ],
+          "PB((5) " : [ ],
+          "PB((6) " : [ ],
+          "PB((7) " : [ ],
+          "PB((8) " : [ ]
+        },
+        "rooms_info" : {
+          "assigned" : 0,
+          "unassigned" : 8,
+          "blocks" : 0
+        }
+      }
+    }
+  },
+  "trialLeft" : null,
+  "accountStatus" : {
+    "billing" : {
+      "billing_portal_id" : "36165",
+      "is_bp_setup_completed" : "1",
+      "billing_offers" : [ ]
     },
-
-    "trialLeft": null,
-    "accountStatus": false,
-    "isAcceptedTosAgreement": true,
-    "announcementsNew": null,
-    "pie_new_sys_events_num": 0
+    "hide_overdue_notice" : false
+  },
+  "isAcceptedTosAgreement" : true,
+  "isAcceptedApiTosAgreement" : true,
+  "announcementsNew" : null,
+  "pie_new_sys_events_num" : 0
 }

@@ -15,10 +15,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -65,6 +67,7 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
+import com.macbackpackers.jobs.CreateFixedRateReservationJob;
 import com.macbackpackers.jobs.PrepaidChargeJob;
 import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
 import com.macbackpackers.jobs.SendDepositChargeRetractionEmailJob;
@@ -121,7 +124,6 @@ public class CloudbedsService {
     private String CLOUDBEDS_2FA_SECRET;
 
     private final DateTimeFormatter DD_MMM_YYYY = DateTimeFormatter.ofPattern( "dd-MMM-yyyy" );
-    private final DateTimeFormatter YYYY_MM_DD = DateTimeFormatter.ofPattern( "yyyy-MM-dd" );
 
     // all allowable characters for lookup key
     private static String LOOKUPKEY_CHARSET = "2345678ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -196,7 +198,7 @@ public class CloudbedsService {
 
         LocalDate stayDatePlus1 = stayDate.plusDays( 1 );
         LocalDate stayDatePlus2 = stayDate.plusDays( 2 );
-        JsonObject rpt = scraper.getAllStaffAllocations( webClient, stayDate );
+        JsonObject rpt = scraper.getRoomAssignmentsReport( webClient, stayDate );
 
         List<String> staffBedsBefore = extractStaffBedsFromRoomAssignmentReport( rpt, stayDate );
         List<String> staffBedsAfter = extractStaffBedsFromRoomAssignmentReport( rpt, stayDatePlus1 );
@@ -254,7 +256,7 @@ public class CloudbedsService {
      */
     public List<Allocation> getAllStaffAllocationsDaily( WebClient webClient, LocalDate stayDate ) throws IOException {
 
-        JsonObject rpt = scraper.getAllStaffAllocations( webClient, stayDate );
+        JsonObject rpt = scraper.getRoomAssignmentsReport( webClient, stayDate );
         List<String> staffBeds = extractStaffBedsFromRoomAssignmentReport( rpt, stayDate );
 
         Map<RoomBedLookup, RoomBed> roomBedMap = dao.fetchAllRoomBeds();
@@ -554,29 +556,52 @@ public class CloudbedsService {
     }
 
     /**
-     * Creates new week-long bookings for any existing bookings for LT guests due to checkout
-     * the following day.
+     * Creates new bookings for any existing bookings for LT guests due to checkout on the given
+     * day.
      * 
      * @param webClient
-     * @param forDate (if booking exists and checkout date is this date or the next day, create new 7-day booking in the same room)
+     * @param forDate (if booking exists with a checkout on this date, create new 7-day booking in
+     *            the same room if an existing booking isn't blocking it)
+     * @param days number of days the new booking is for
+     * @param dailyRate fixed price per day
      * @throws IOException
      */
-    public void createNextLongTermBookings(WebClient webClient, LocalDate forDate ) throws IOException {
+    public void createFixedRateLongTermReservations(WebClient webClient, LocalDate forDate, int days, BigDecimal dailyRate ) throws IOException {
 
-        scraper.getReservations( webClient, forDate, forDate ).stream()
+        // first find out the room assignments from forDate for the next week so we know of any clashes
+        JsonObject rpt = scraper.getRoomAssignmentsReport( webClient, forDate, forDate.plusDays( days ) );
+        Set<String> conflictBeds = new HashSet<>();
+        for(LocalDate d = forDate; d.isBefore( forDate.plusDays( days ) ); d = d.plusDays( 1 )) {
+            conflictBeds.addAll(rpt.get( "rooms" ).getAsJsonObject()
+                .get( d.format( DateTimeFormatter.ISO_LOCAL_DATE ) ).getAsJsonObject()
+                .entrySet().stream() // now streaming room types...
+                .flatMap( e -> e.getValue().getAsJsonObject()
+                        .get( "rooms" ).getAsJsonObject()
+                        .entrySet().stream() ) // now streaming beds
+                // only match beds where there has been an assignment
+                .filter( e -> e.getValue().getAsJsonArray().iterator().hasNext() )
+                .map( e -> e.getKey().trim() )
+                .collect( Collectors.toList() ));
+        }
+
+        scraper.getReservations( webClient, forDate.minusDays( 1 ), forDate.minusDays( 1 ) ).stream()
                 .filter( c -> c.getFirstName().toUpperCase().contains("LT") || c.getLastName().toUpperCase().contains("LT") )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
-                .filter( r -> r.isCheckoutDateTodayOrTomorrow() )
-                .filter( r -> false == r.isPaid() )
-                .filter( r -> false == "castlerock@macbackpackers.com".equalsIgnoreCase( r.getEmail() ) )
+                .filter( r -> r.getCheckoutDateAsLocalDate().equals( forDate ) )
+                .filter( r -> false == "checked_out".equals( r.getStatus() ) )
+                .filter( r -> r.getBookingRooms().size() == 1 )
+                .filter( r -> false == conflictBeds.contains( r.getBookingRooms().get( 0 ).getRoomNumber().trim() ) )
                 .forEach( r -> {
-                    LOGGER.info( "Creating new booking from Res #" + r.getReservationId()
+                    LOGGER.info( "Creating CreateFixedRateReservationJob from Res #" + r.getReservationId()
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
                             + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
-//                    PrepaidChargeJob j = new PrepaidChargeJob();
-//                    j.setStatus( JobStatus.submitted );
-//                    j.setReservationId( r.getReservationId() );
-//                    dao.insertJob( j );
+                    CreateFixedRateReservationJob j = new CreateFixedRateReservationJob();
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( r.getReservationId() );
+                    j.setCheckinDate( forDate );
+                    j.setCheckoutDate( forDate.plusDays( days ) );
+                    j.setRatePerDay( dailyRate );
+                    dao.insertJob( j );
                 } );
     }
 
@@ -1454,29 +1479,45 @@ public class CloudbedsService {
         return result.toString();
     }
 
-    public void addReservation( String guestId, LocalDate startDate, LocalDate endDate, BigDecimal ratePerDay,
-            String roomTypeName, String roomTypeNameLong, int maxGuests, int rateId, String roomId ) throws IOException {
+    /**
+     * Create a booking for the following dates and daily rate using the given reservation as a
+     * template (for customer, room assignment, etc).
+     * 
+     * @param reservationId reservation to clone
+     * @param startDate booking start date (inclusive)
+     * @param endDate booking end date (exclusive)
+     * @param ratePerDay amount to charge per diem
+     * @throws IOException 
+     */
+    public void createFixedRateReservation( String reservationId, LocalDate checkinDate, LocalDate checkoutDate, BigDecimal ratePerDay ) throws IOException {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            Guest guest = scraper.getGuestById( webClient, guestId );
-            long nights = ChronoUnit.DAYS.between( startDate, endDate );
+            Reservation r = scraper.getReservationRetry( webClient, reservationId );
+            Guest guest = scraper.getGuestById( webClient, r.getCustomerId() );
+            long nights = ChronoUnit.DAYS.between( checkinDate, checkoutDate );
             BigDecimal total = ratePerDay.multiply( new BigDecimal( nights ) );
             final DecimalFormat NUMBER_FORMAT = new DecimalFormat( "###0.##" );
+            if ( false == r.getSelectedSource().isActive() ) {
+                throw new MissingUserDataException( "Booking source " + r.getSelectedSource().getSubSource() + " is not active!" );
+            }
+            if ( r.getBookingRooms().size() != 1 ) {
+                throw new MissingUserDataException( "Duplicating bookings with more than 1 bed assignment is not supported!" );
+            }
             String newReservationData = IOUtils.toString( CloudbedsService.class.getClassLoader()
                     .getResourceAsStream( "add_reservation_data.json" ), StandardCharsets.UTF_8 )
-                    .replaceAll( "__SOURCE_ID__", "80045" ) // hard-coded for CRH
-                    .replaceAll( "__ROOM_TYPE_NAME__", roomTypeName )
-                    .replaceAll( "__ROOM_TYPE_NAME_LONG__", roomTypeNameLong )
-                    .replaceAll( "__START_DATE__", startDate.format( YYYY_MM_DD ) )
-                    .replaceAll( "__END_DATE__", endDate.format( YYYY_MM_DD ) )
-                    .replaceAll( "__MAX_GUESTS__", String.valueOf( maxGuests ) )
-                    .replaceAll( "__RATE_ID__", String.valueOf( rateId ) )
-                    .replaceAll( "__ROOM_TYPE_ID__", roomId.split( "-" )[0] )
-                    .replaceAll( "__ROOM_ID__", roomId )
-                    .replaceAll( "__DETAILED_RATES__", gson.toJson( getDetailedRates( startDate, endDate, ratePerDay ) ) )
+                    .replaceAll( "__SOURCE_ID__", r.getSelectedSource().getId() )
+                    .replaceAll( "__ROOM_TYPE_NAME__", r.getBookingRooms().get( 0 ).getRoomTypeNameShort() )
+                    .replaceAll( "__ROOM_TYPE_NAME_LONG__", r.getBookingRooms().get( 0 ).getRoomTypeName() )
+                    .replaceAll( "__START_DATE__", checkinDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) )
+                    .replaceAll( "__END_DATE__", checkoutDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) )
+                    .replaceAll( "__MAX_GUESTS__", "1" )
+                    .replaceAll( "__RATE_ID__", r.getBookingRooms().get( 0 ).getRateId() )
+                    .replaceAll( "__ROOM_TYPE_ID__", r.getBookingRooms().get( 0 ).getRoomTypeId() )
+                    .replaceAll( "__ROOM_ID__", r.getBookingRooms().get( 0 ).getRoomId() )
+                    .replaceAll( "__DETAILED_RATES__", gson.toJson( getDetailedRates( checkinDate, checkoutDate, ratePerDay ) ) )
                     .replaceAll( "__TOTAL__", NUMBER_FORMAT.format( total ) )
                     .replaceAll( "__NIGHTS__", String.valueOf( nights ) )
                     .replaceAll( "__RATE_PER_DAY__", NUMBER_FORMAT.format( ratePerDay ) )
-                    .replaceAll( "__ROOM_TYPE_ABBREV__", roomTypeName )
+                    .replaceAll( "__ROOM_TYPE_ABBREV__", r.getBookingRooms().get( 0 ).getRoomTypeNameShort() )
                     .replaceAll( "__PROPERTY_ID__", scraper.getPropertyId() )
                     .replaceAll( "__CUSTOMER_INFO__", gson.toJson( new CustomerInfo( guest ) ) );
             LOGGER.info( "creating new reservation: " + newReservationData );
@@ -1488,7 +1529,7 @@ public class CloudbedsService {
         List<JsonObject> result = new ArrayList<>();
         for ( LocalDate cursor = startDate; cursor.isBefore( endDate ); cursor = cursor.plusDays( 1 ) ) {
             JsonObject e = new JsonObject();
-            e.addProperty( "date", cursor.format( YYYY_MM_DD ) );
+            e.addProperty( "date", cursor.format( DateTimeFormatter.ISO_LOCAL_DATE ) );
             e.addProperty( "rate", ratePerDay.floatValue() );
             e.addProperty( "adults", 0 );
             e.addProperty( "kids", 0 );

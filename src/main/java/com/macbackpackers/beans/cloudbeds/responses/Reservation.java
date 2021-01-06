@@ -51,6 +51,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String creditCardId;
     private String creditCardType;
     private String creditCardLast4Digits;
+    private BookingSource selectedSource;
 
     public String getReservationId() {
         return reservationId;
@@ -197,12 +198,6 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public boolean isCheckinDateInAugust() {
         return LocalDate.parse( getCheckinDate() ).getMonth() == Month.AUGUST;
-    }
-
-    public boolean isCheckoutDateTodayOrTomorrow() {
-        LocalDate localCheckoutDate = LocalDate.parse( getCheckoutDate() );
-        return localCheckoutDate.compareTo( LocalDate.now() ) == 0 ||
-                localCheckoutDate.compareTo( LocalDate.now().plusDays( 1 ) ) == 0;
     }
 
     public String getNights() {
@@ -419,6 +414,14 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setCreditCardLast4Digits( String creditCardLast4Digits ) {
         this.creditCardLast4Digits = creditCardLast4Digits;
+    }
+
+    public BookingSource getSelectedSource() {
+        return selectedSource;
+    }
+
+    public void setSelectedSource( BookingSource selectedSource ) {
+        this.selectedSource = selectedSource;
     }
 
     /**
