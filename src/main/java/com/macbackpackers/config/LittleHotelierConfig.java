@@ -127,6 +127,14 @@ public class LittleHotelierConfig {
                 .create();
     }
 
+    @Bean( name = "gsonForCloudbedsIdentity" )
+    public Gson getGsonForCloudbedsIdentity() {
+        return new GsonBuilder()
+                .setFieldNamingPolicy( FieldNamingPolicy.IDENTITY )
+                .setPrettyPrinting()
+                .create();
+    }
+
     @Bean( name = "gsonForHostelworld" )
     public Gson getGsonForHostelworld() {
         // these are thread safe

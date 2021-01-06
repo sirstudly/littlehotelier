@@ -153,4 +153,120 @@ public class CloudbedsServiceTest {
     public void testCreateSendPaymentLinkEmailJobs() throws Exception {
         cloudbedsService.createSendPaymentLinkEmailJobs( webClient, LocalDate.now().plusDays( 1 ) );
     }
+
+    @Test
+    public void testAddReservation() throws Exception {
+        final LocalDate START_DATE = LocalDate.parse( "2021-01-04" );
+        final LocalDate END_DATE = LocalDate.parse( "2021-01-11" );
+        final BigDecimal DAILY_RATE = new BigDecimal( "10" );
+
+        // room 23 - javier
+        cloudbedsService.addReservation( "35723699", START_DATE, END_DATE,
+                DAILY_RATE, "16x", "16 Bed Mixed Dormitory", 1, 200707, "112559-3" );
+
+        // fabian
+        cloudbedsService.addReservation( "35723625", START_DATE, END_DATE,
+                DAILY_RATE, "16x", "16 Bed Mixed Dormitory", 1, 200707, "112559-7" );
+
+        // patxi
+        cloudbedsService.addReservation( "36065694", START_DATE, END_DATE,
+                DAILY_RATE, "16x", "16 Bed Mixed Dormitory", 1, 200707, "112559-9" );
+
+        // alejandro cano
+        cloudbedsService.addReservation( "35723764", START_DATE, END_DATE,
+                DAILY_RATE, "16x", "16 Bed Mixed Dormitory", 1, 200707, "112559-13" );
+
+        // ramon
+        cloudbedsService.addReservation( "35723785", START_DATE, END_DATE,
+                DAILY_RATE, "16x", "16 Bed Mixed Dormitory", 1, 200707, "112559-15" );
+
+        // room 24 - alok
+        cloudbedsService.addReservation( "35836043", START_DATE, END_DATE,
+                DAILY_RATE, "8x", "8 Bed Mixed Dormitory", 1, 200779, "112591-3" );
+
+        // santiago
+        cloudbedsService.addReservation( "35885166", START_DATE, END_DATE,
+                DAILY_RATE, "8x", "8 Bed Mixed Dormitory", 1, 200779, "112591-5" );
+
+        // room 12 - alison
+      cloudbedsService.addReservation( "35554090", START_DATE, END_DATE,
+              DAILY_RATE, "LTf", "xLT Female Dorm", 1, 200802, "112612-12" );
+
+        // beatrice
+        cloudbedsService.addReservation( "35554068", START_DATE, END_DATE,
+                DAILY_RATE, "LTf", "xLT Female Dorm", 1, 200802, "112612-19" );
+
+        // dan
+        cloudbedsService.addReservation( "35445451", START_DATE, END_DATE,
+                DAILY_RATE, "LTf", "xLT Female Dorm", 1, 200802, "112612-13" );
+
+        // room 20 - ann
+        cloudbedsService.addReservation( "10466732", START_DATE, END_DATE,
+                DAILY_RATE, "12X", "12 Bed Mixed Dormitory", 1, 199831, "112188-1" );
+
+        // aida
+        cloudbedsService.addReservation( "24870746", START_DATE, END_DATE,
+                DAILY_RATE, "12X", "12 Bed Mixed Dormitory", 1, 199831, "112188-3" );
+
+        // somer
+        cloudbedsService.addReservation( "34991482", START_DATE, END_DATE,
+                DAILY_RATE, "12X", "12 Bed Mixed Dormitory", 1, 199831, "112188-5" );
+
+        // carla
+        cloudbedsService.addReservation( "35178547", START_DATE, END_DATE,
+                DAILY_RATE, "12X", "12 Bed Mixed Dormitory", 1, 199831, "112188-7" );
+
+        // room 21 - mercedes
+        cloudbedsService.addReservation( "35380453", START_DATE, END_DATE,
+                DAILY_RATE, "10x", "10 Bed Mixed Dormitory", 1, 199406, "112014-3" );
+
+        // montse
+        cloudbedsService.addReservation( "35455596", START_DATE, END_DATE,
+                DAILY_RATE, "10x", "10 Bed Mixed Dormitory", 1, 199406, "112014-5" );
+
+        // kshitee
+        cloudbedsService.addReservation( "35697697", START_DATE, END_DATE,
+                DAILY_RATE, "10x", "10 Bed Mixed Dormitory", 1, 199406, "112014-7" );
+
+        // amelia
+        cloudbedsService.addReservation( "36047352", START_DATE, END_DATE,
+                DAILY_RATE, "10x", "10 Bed Mixed Dormitory", 1, 199406, "112014-9" );
+
+        // ryan
+        cloudbedsService.addReservation( "35749319", START_DATE, END_DATE,
+                DAILY_RATE, "10x", "10 Bed Mixed Dormitory", 1, 199406, "112014-11" );
+
+        // matthieu
+        cloudbedsService.addReservation( "34865244", START_DATE, END_DATE,
+                DAILY_RATE, "10x", "10 Bed Mixed Dormitory", 1, 199406, "112014-13" );
+
+        // room 22 - djiby
+        cloudbedsService.addReservation( "35275113", START_DATE, END_DATE,
+                DAILY_RATE, "10x", "10 Bed Mixed Dormitory", 1, 199406, "112014-17" );
+
+        // jorge
+        cloudbedsService.addReservation( "35221003", START_DATE, END_DATE,
+                DAILY_RATE, "10x", "10 Bed Mixed Dormitory", 1, 199406, "112014-19" );
+
+        // room 10 - stephane
+        cloudbedsService.addReservation( "16105225", START_DATE, END_DATE,
+                DAILY_RATE, "LTM", "xLT Male Dorm - Rm. 10", 1, 200809, "112619-7" );
+
+        // room 14 - isaac
+        cloudbedsService.addReservation( "35445442", START_DATE, END_DATE,
+                DAILY_RATE, "LTM", "xLT Male Dorm- Rm. 14", 1, 200814, "112621-3" );
+
+        // nacho
+        cloudbedsService.addReservation( "11377358", START_DATE, END_DATE,
+                DAILY_RATE, "LTM", "xLT Male Dorm- Rm. 14", 1, 200814, "112621-5" );
+
+        // carlos
+        cloudbedsService.addReservation( "35554194", START_DATE, END_DATE,
+                DAILY_RATE, "LTM", "xLT Male Dorm- Rm. 14", 1, 200814, "112621-7" );
+
+        // adam
+        cloudbedsService.addReservation( "23530168", START_DATE, END_DATE,
+                DAILY_RATE, "LTM", "xLT Male Dorm- Rm. 14", 1, 200814, "112621-11" );
+
+    }
 }

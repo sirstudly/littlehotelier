@@ -8,8 +8,11 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -53,8 +56,10 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
 import com.macbackpackers.beans.SagepayTransaction;
+import com.macbackpackers.beans.cloudbeds.requests.CustomerInfo;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
+import com.macbackpackers.beans.cloudbeds.responses.Guest;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
@@ -116,6 +121,7 @@ public class CloudbedsService {
     private String CLOUDBEDS_2FA_SECRET;
 
     private final DateTimeFormatter DD_MMM_YYYY = DateTimeFormatter.ofPattern( "dd-MMM-yyyy" );
+    private final DateTimeFormatter YYYY_MM_DD = DateTimeFormatter.ofPattern( "yyyy-MM-dd" );
 
     // all allowable characters for lookup key
     private static String LOOKUPKEY_CHARSET = "2345678ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -544,6 +550,33 @@ public class CloudbedsService {
                     j.setStatus( JobStatus.submitted );
                     j.setReservationId( r.getReservationId() );
                     dao.insertJob( j );
+                } );
+    }
+
+    /**
+     * Creates new week-long bookings for any existing bookings for LT guests due to checkout
+     * the following day.
+     * 
+     * @param webClient
+     * @param forDate (if booking exists and checkout date is this date or the next day, create new 7-day booking in the same room)
+     * @throws IOException
+     */
+    public void createNextLongTermBookings(WebClient webClient, LocalDate forDate ) throws IOException {
+
+        scraper.getReservations( webClient, forDate, forDate ).stream()
+                .filter( c -> c.getFirstName().toUpperCase().contains("LT") || c.getLastName().toUpperCase().contains("LT") )
+                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .filter( r -> r.isCheckoutDateTodayOrTomorrow() )
+                .filter( r -> false == r.isPaid() )
+                .filter( r -> false == "castlerock@macbackpackers.com".equalsIgnoreCase( r.getEmail() ) )
+                .forEach( r -> {
+                    LOGGER.info( "Creating new booking from Res #" + r.getReservationId()
+                            + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
+//                    PrepaidChargeJob j = new PrepaidChargeJob();
+//                    j.setStatus( JobStatus.submitted );
+//                    j.setReservationId( r.getReservationId() );
+//                    dao.insertJob( j );
                 } );
     }
 
@@ -1419,5 +1452,48 @@ public class CloudbedsService {
             result.append( LOOKUPKEY_CHARSET.charAt( r.nextInt( LOOKUPKEY_CHARSET.length() ) ) );
         }
         return result.toString();
+    }
+
+    public void addReservation( String guestId, LocalDate startDate, LocalDate endDate, BigDecimal ratePerDay,
+            String roomTypeName, String roomTypeNameLong, int maxGuests, int rateId, String roomId ) throws IOException {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+            Guest guest = scraper.getGuestById( webClient, guestId );
+            long nights = ChronoUnit.DAYS.between( startDate, endDate );
+            BigDecimal total = ratePerDay.multiply( new BigDecimal( nights ) );
+            final DecimalFormat NUMBER_FORMAT = new DecimalFormat( "###0.##" );
+            String newReservationData = IOUtils.toString( CloudbedsService.class.getClassLoader()
+                    .getResourceAsStream( "add_reservation_data.json" ), StandardCharsets.UTF_8 )
+                    .replaceAll( "__SOURCE_ID__", "80045" ) // hard-coded for CRH
+                    .replaceAll( "__ROOM_TYPE_NAME__", roomTypeName )
+                    .replaceAll( "__ROOM_TYPE_NAME_LONG__", roomTypeNameLong )
+                    .replaceAll( "__START_DATE__", startDate.format( YYYY_MM_DD ) )
+                    .replaceAll( "__END_DATE__", endDate.format( YYYY_MM_DD ) )
+                    .replaceAll( "__MAX_GUESTS__", String.valueOf( maxGuests ) )
+                    .replaceAll( "__RATE_ID__", String.valueOf( rateId ) )
+                    .replaceAll( "__ROOM_TYPE_ID__", roomId.split( "-" )[0] )
+                    .replaceAll( "__ROOM_ID__", roomId )
+                    .replaceAll( "__DETAILED_RATES__", gson.toJson( getDetailedRates( startDate, endDate, ratePerDay ) ) )
+                    .replaceAll( "__TOTAL__", NUMBER_FORMAT.format( total ) )
+                    .replaceAll( "__NIGHTS__", String.valueOf( nights ) )
+                    .replaceAll( "__RATE_PER_DAY__", NUMBER_FORMAT.format( ratePerDay ) )
+                    .replaceAll( "__ROOM_TYPE_ABBREV__", roomTypeName )
+                    .replaceAll( "__PROPERTY_ID__", scraper.getPropertyId() )
+                    .replaceAll( "__CUSTOMER_INFO__", gson.toJson( new CustomerInfo( guest ) ) );
+            LOGGER.info( "creating new reservation: " + newReservationData );
+            scraper.addReservation( webClient, newReservationData );
+        }
+    }
+
+    private JsonObject[] getDetailedRates( LocalDate startDate, LocalDate endDate, BigDecimal ratePerDay ) {
+        List<JsonObject> result = new ArrayList<>();
+        for ( LocalDate cursor = startDate; cursor.isBefore( endDate ); cursor = cursor.plusDays( 1 ) ) {
+            JsonObject e = new JsonObject();
+            e.addProperty( "date", cursor.format( YYYY_MM_DD ) );
+            e.addProperty( "rate", ratePerDay.floatValue() );
+            e.addProperty( "adults", 0 );
+            e.addProperty( "kids", 0 );
+            result.add( e );
+        }
+        return result.toArray( new JsonObject[0] );
     }
 }

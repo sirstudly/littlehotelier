@@ -1017,6 +1017,27 @@ public class CloudbedsJsonRequestFactory {
         return webRequest;
     }
 
+    public WebRequest createAddReservationRequest( String jsonData ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/add_reservation" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "data", jsonData ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    public WebRequest createFindGuestByIdRequest( String guestId ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/guests/findOne" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "guestId", guestId ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
     public WebRequest createVerifyCaptchaRequest(String token) throws IOException {
         WebRequest requestSettings = new WebRequest( new URL( "https://hotels.cloudbeds.com/captcha/verify" ), HttpMethod.POST );
         requestSettings.setAdditionalHeader( "accept", "*/*" );

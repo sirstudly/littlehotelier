@@ -47,6 +47,7 @@ import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
+import com.macbackpackers.beans.cloudbeds.responses.Guest;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.exceptions.MissingUserDataException;
@@ -87,6 +88,10 @@ public class CloudbedsScraper {
     @Autowired
     @Qualifier( "gsonForCloudbeds" )
     private Gson gson;
+
+    @Autowired
+    @Qualifier( "gsonForCloudbedsIdentity" )
+    private Gson gsonIdentity;
 
     @Autowired
     private CloudbedsJsonRequestFactory jsonRequestFactory;
@@ -897,6 +902,39 @@ public class CloudbedsScraper {
             addNote( webClient, res.getReservationId(), "Failed to charge booking: " +
                     jelement.getAsJsonObject().get( "message" ).getAsString() );
             throw new PaymentNotAuthorizedException( "Failed to charge booking.", redirectPage.getWebResponse() );
+        }
+    }
+
+    public Guest getGuestById( WebClient webClient, String guestId ) throws IOException {
+        
+        WebRequest requestSettings = jsonRequestFactory.createFindGuestByIdRequest( guestId );
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+
+        Optional<JsonObject> obj = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
+        if ( false == obj.isPresent() || false == obj.get().get( "success" ).getAsBoolean() ) {
+            if ( obj.isPresent() ) {
+                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+            }
+            throw new MissingUserDataException( "Failed response." );
+        }
+
+        JsonObject guest = obj.get().get( "data" ).getAsJsonObject().get( "guest" ).getAsJsonObject();
+        return gsonIdentity.fromJson( guest, Guest.class );
+    }
+
+    public void addReservation( WebClient webClient, String jsonData ) throws IOException {
+        
+        WebRequest requestSettings = jsonRequestFactory.createAddReservationRequest( jsonData );
+        Page redirectPage = webClient.getPage( requestSettings );
+        LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+
+        Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
+        if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
+            if ( rpt.isPresent() ) {
+                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
+            }
+            throw new MissingUserDataException( "Failed response." );
         }
     }
 

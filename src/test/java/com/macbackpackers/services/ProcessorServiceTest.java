@@ -66,6 +66,7 @@ import com.macbackpackers.jobs.SendDepositChargeSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendHostelworldLateCancellationEmailJob;
 import com.macbackpackers.jobs.SendNonRefundableDeclinedEmailJob;
 import com.macbackpackers.jobs.SendNonRefundableSuccessfulEmailJob;
+import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.jobs.SplitRoomReservationReportJob;
 import com.macbackpackers.jobs.UnpaidDepositReportJob;
@@ -653,6 +654,14 @@ public class ProcessorServiceTest {
         SendCovidPrestayEmailJob j = new SendCovidPrestayEmailJob();
         j.setStatus( JobStatus.submitted );
         j.setReservationId( "10568950" );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void testSendPaymentLinkEmailJob() throws Exception {
+        SendPaymentLinkEmailJob j = new SendPaymentLinkEmailJob();
+        j.setStatus( JobStatus.submitted );
+        j.setReservationId( "11968561" );
         dao.insertJob( j );
     }
 

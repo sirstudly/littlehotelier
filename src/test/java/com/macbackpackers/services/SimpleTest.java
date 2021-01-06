@@ -341,4 +341,23 @@ public class SimpleTest {
             LOGGER.info( "Session is " + m.group( 1 ) );
         }
     }
+
+    @Test
+    public void testJsonGeneration() throws Exception {
+        LOGGER.info( gson.toJson( getDetailedRates( LocalDate.parse( "2020-12-21" ), LocalDate.parse( "2020-12-28" ), 10 ) ) );
+    }
+    
+    private JsonObject[] getDetailedRates( LocalDate startDate, LocalDate endDate, int ratePerDay ) {
+        final DateTimeFormatter YYYY_MM_DD = DateTimeFormatter.ofPattern( "yyyy-MM-dd" );
+        List<JsonObject> result = new ArrayList<>();
+        for ( LocalDate cursor = startDate; cursor.isBefore( endDate ); cursor = cursor.plusDays( 1 ) ) {
+            JsonObject e = new JsonObject();
+            e.addProperty( "date", cursor.format( YYYY_MM_DD ) );
+            e.addProperty( "rate", 10 );
+            e.addProperty( "adults", 0 );
+            e.addProperty( "kids", 0 );
+            result.add( e );
+        }
+        return result.toArray( new JsonObject[0] );
+    }
 }

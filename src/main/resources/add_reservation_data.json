@@ -1,0 +1,67 @@
+{
+  "source" : {
+    "source_name" : "Reception",
+    "source_id" : "__SOURCE_ID__",
+    "original_id" : __SOURCE_ID__,
+    "parent_id" : 9,
+    "is_hotel_collect_booking" : 1,
+    "is_root_source" : 0,
+    "aliases" : ""
+  },
+  "custom_fields" : { },
+  "checkin_after_create" : false,
+  "deposit" : __RATE_PER_DAY__,
+  "payment_amount" : __RATE_PER_DAY__,
+  "grand_total" : "__TOTAL__",
+  "group_profile_id" : null,
+  "allotment_block_id" : null,
+  "allotment_block_name" : null,
+  "allotment_block_code" : null,
+  "payment" : {
+    "keep_credit_card_info" : false,
+    "process" : false
+  },
+  "selected_rooms" : [ {
+    "peoples" : 1,
+    "newGroup" : true,
+    "rooms" : [ {
+      "room_type_name" : "__ROOM_TYPE_NAME__",
+      "room_type_name_long" : "__ROOM_TYPE_NAME_LONG__",
+      "room_total" : __TOTAL__,
+      "extra_price_by_adult" : 0,
+      "extra_price_by_child" : 0,
+      "start_date" : "__START_DATE__",
+      "end_date" : "__END_DATE__",
+      "guests" : {
+        "adult" : [ ],
+        "kid" : [ ]
+      },
+      "max_guests" : "__MAX_GUESTS__",
+      "adults_inBasePrice" : "__MAX_GUESTS__",
+      "children_inBasePrice" : "0",
+      "adults" : 1,
+      "kids" : 0,
+      "nights" : __NIGHTS__,
+      "parent_id" : false,
+      "rate_id" : __RATE_ID__,
+      "room_type_id" : __ROOM_TYPE_ID__,
+      "room_id" : "__ROOM_ID__",
+      "is_derived" : 0,
+      "package_id" : 0,
+      "detailed_rates" : __DETAILED_RATES__,
+      "can_delete" : true,
+      "rate_min" : __RATE_PER_DAY__,
+      "newRoom" : true,
+      "room_type_abbreviation" : "__ROOM_TYPE_ABBREV__",
+      "package_promo_code" : false,
+      "property_id" : __PROPERTY_ID__,
+      "hasAdultsOrKidsSelectors" : false
+    } ],
+    "guests" : [ ]
+  } ],
+  "primary_guest" : {
+    "customer_info" : __CUSTOMER_INFO__,
+    "custom_fields" : [ ]
+  },
+  "send_email" : false
+}

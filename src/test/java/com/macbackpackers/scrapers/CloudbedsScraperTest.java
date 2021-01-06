@@ -4,11 +4,13 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -35,8 +37,10 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.beans.cloudbeds.requests.CustomerInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
+import com.macbackpackers.beans.cloudbeds.responses.Guest;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
@@ -108,6 +112,13 @@ public class CloudbedsScraperTest {
     public void testGetReservations() throws Exception {
         List<Customer> results = cloudbedsScraper.getReservations( webClient, 
                 LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 2 ) );
+        results.stream().forEach( t -> LOGGER.info( t.toString() ) );
+        LOGGER.info( "Found " + results.size() + " entries" );
+    }
+
+    @Test
+    public void testGetReservationsByQuery() throws Exception {
+        List<Customer> results = cloudbedsScraper.getReservations( webClient, "999999999" );
         results.stream().forEach( t -> LOGGER.info( t.toString() ) );
         LOGGER.info( "Found " + results.size() + " entries" );
     }
@@ -421,4 +432,20 @@ public class CloudbedsScraperTest {
         workbook.write( outputStream );
         workbook.close();
     }
+
+    @Test
+    public void testAddReservation() throws Exception {
+        String newReservationData = IOUtils.toString( CloudbedsScraperTest.class.getClassLoader()
+                .getResourceAsStream( "add_reservation_data_carla_new.json" ), StandardCharsets.UTF_8 );
+        LOGGER.info( "data: " + newReservationData );
+        cloudbedsScraper.addReservation( webClient, newReservationData );
+    }
+
+    @Test
+    public void testGetGuestById() throws Exception {
+        Guest g = cloudbedsScraper.getGuestById( webClient, "24870746" );
+        String json = gson.toJson( new CustomerInfo( g ) );
+        LOGGER.info( json );
+    }
+
 }
