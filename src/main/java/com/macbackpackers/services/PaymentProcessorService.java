@@ -60,7 +60,6 @@ import com.macbackpackers.beans.xml.TxnResponse;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
-import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
 import com.macbackpackers.jobs.SendDepositChargeDeclinedEmailJob;
@@ -1291,9 +1290,8 @@ public class PaymentProcessorService {
      * @param refundTxnId primary key on StripeRefund
      * @throws IOException
      * @throws StripeException
-     * @throws RecordPaymentFailedException
      */
-    public void processStripeRefund( int jobId, int refundTxnId ) throws IOException, StripeException, RecordPaymentFailedException {
+    public void processStripeRefund( int jobId, int refundTxnId ) throws IOException, StripeException {
         try (WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class )) {
             StripeRefund refund = wordpressDAO.fetchStripeRefund( refundTxnId );
             String refundAmount = cloudbedsScraper.getCurrencyFormat().format( refund.getAmount() );

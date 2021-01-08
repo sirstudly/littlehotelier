@@ -98,13 +98,13 @@ public class CloudbedsScraperTest {
     @Test
     public void testIsExistsRefund() throws Exception {
         Reservation r = cloudbedsScraper.getReservation( webClient, "34321814" );
-        LOGGER.info( "" + cloudbedsScraper.isExistsRefund( webClient, r ) );
+        Assert.assertThat( cloudbedsScraper.isExistsRefund( webClient, r ), Matchers.is( true ) );
     }
     
     @Test
     public void testGetCustomers() throws Exception {
         List<Customer> results = cloudbedsScraper.getCustomers( webClient, 
-                LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 2 ) );
+                LocalDate.now().withDayOfMonth( 4 ), LocalDate.now().withDayOfMonth( 5 ) );
         results.stream().forEach( t -> LOGGER.info( t.toString() ) );
     }
 
@@ -126,8 +126,8 @@ public class CloudbedsScraperTest {
     @Test
     public void testGetReservationsForBookingSources() throws Exception {
         List<Reservation> results = cloudbedsScraper.getReservationsForBookingSources( webClient, null, null,
-                LocalDate.now().withMonth( 5 ).withDayOfMonth( 30 ),
-                LocalDate.now().withMonth( 5 ).withDayOfMonth( 30 ),
+                LocalDate.parse( "2019-05-30" ),
+                LocalDate.parse( "2019-05-30" ),
                 "Hostelworld & Hostelbookers", "Agoda (Channel Collect Booking)" );
         results.stream().forEach( t -> LOGGER.info( t.getIdentifier() + " (" + t.getStatus() + ") - "
                 + t.isCardDetailsPresent() + "," + t.getThirdPartyIdentifier() + ": " +
@@ -138,10 +138,10 @@ public class CloudbedsScraperTest {
     @Test
     public void testGetCancelledReservationsForBookingSources() throws Exception {
         List<Reservation> results = cloudbedsScraper.getCancelledReservationsForBookingSources( webClient,
-                LocalDate.now().withDayOfMonth( 17 ), // checkin start
-                LocalDate.now().withDayOfMonth( 19 ), // checkin end
-                LocalDate.now().withDayOfMonth( 18 ), // cancel start
-                LocalDate.now().withDayOfMonth( 19 ), // cancel end
+                LocalDate.parse( "2019-01-17" ), // checkin start
+                LocalDate.parse( "2019-01-22" ), // checkin end
+                LocalDate.parse( "2019-01-16" ), // cancel start
+                LocalDate.parse( "2019-01-21" ), // cancel end
                 "Hostelworld & Hostelbookers" );
         results.stream().forEach( t -> LOGGER.info( t.getIdentifier() + " (" + t.getStatus() + ") - "
                 + t.isCardDetailsPresent() + "," + t.getThirdPartyIdentifier() + ": " +

@@ -16,6 +16,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,7 +35,6 @@ import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
-import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -51,7 +51,6 @@ import com.macbackpackers.beans.cloudbeds.responses.Guest;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.exceptions.MissingUserDataException;
-import com.macbackpackers.exceptions.PaymentCardNotAcceptedException;
 import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
@@ -126,26 +125,8 @@ public class CloudbedsScraper {
     public synchronized void validateLoggedIn( WebClient webClient ) throws IOException {
 
         // simple request to see if we're logged in
-        Optional<CloudbedsJsonResponse> response = doGetUserPermissionRequest( webClient );
-
-        // if user not logged in, then response is blank
-        if ( false == response.isPresent() ) {
-            LOGGER.info( "Something's wrong. I don't think we're logged in. Session cookies may need to be updated." );
-            throw new UnrecoverableFault( "Not logged in. Update session data." );
-        }
-
-        // if user is logged in and correct version, response is one of either {"access": true} or {"access": false}
-        // if user is logged in but using an obsolete version, then response is not-blank and {success: false}
-        if ( false == response.get().isSuccess() ) {
-
-            // we may have updated our version; try to validate again
-            response = doGetUserPermissionRequest( webClient );
-
-            // if still nothing, then we fail here
-            if ( false == response.isPresent() || false == response.get().isSuccess() ) {
-                throw new UnrecoverableFault( "Not logged in. Update session data." );
-            }
-        }
+        // if user not logged in, then response is blank and we throw an exception
+        doGetUserPermissionRequest( webClient );
     }
 
     /**
@@ -154,37 +135,13 @@ public class CloudbedsScraper {
      * an empty response is expected.
      * 
      * @param webClient current web client
-     * @return a possibly empty response
+     * @return response
      * @throws IOException on network error
      */
-    private Optional<CloudbedsJsonResponse> doGetUserPermissionRequest( WebClient webClient ) throws IOException {
+    private CloudbedsJsonResponse doGetUserPermissionRequest( WebClient webClient ) throws IOException {
         // we'll just send a sample request; we just want to make sure we get a valid response back
-        WebRequest requestSettings = jsonRequestFactory.createGetUserHasViewCCPermisions();
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        Optional<CloudbedsJsonResponse> response = Optional.ofNullable(
-                fromJson( redirectPage.getWebResponse().getContentAsString(),
-                        CloudbedsJsonResponse.class ) );
-
-        // We get a response back and it's unsuccessful
-        LOGGER.debug( "Response status {}: {}",
-                redirectPage.getWebResponse().getStatusCode(),
-                redirectPage.getWebResponse().getStatusMessage() );
-        if ( response.isPresent() && false == response.get().isSuccess() ) {
-            LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-
-            // check if we're using an outdated version
-            if ( StringUtils.isNotBlank( response.get().getVersion() ) ) {
-                LOGGER.info( "Looks like we're using an outdated version. Updating our records." );
-                if ( false == jsonRequestFactory.getVersion().equals( response.get().getVersion() ) ) {
-                    jsonRequestFactory.setVersion( response.get().getVersion() );
-                }
-            }
-        }
-        else if ( response.isPresent() ) {
-            LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-        }
-        return response;
+        return doRequestErrorOnFailure( webClient, jsonRequestFactory.createGetUserHasViewCCPermisions(),
+                CloudbedsJsonResponse.class, ( resp, json ) -> LOGGER.info( json ) );
     }
 
     /**
@@ -231,44 +188,30 @@ public class CloudbedsScraper {
      */
     public Reservation getReservation( WebClient webClient, String reservationId ) throws IOException {
 
-        WebRequest requestSettings = jsonRequestFactory.createGetReservationRequest( reservationId );
+        Reservation r = doRequestErrorOnFailure( webClient, jsonRequestFactory.createGetReservationRequest( reservationId ), Reservation.class,
+                ( resv, jsonResponse ) -> {
+                    // need to parse the credit_cards object manually to check for presence
+                    JsonObject rootElem = fromJson( jsonResponse, JsonObject.class );
+                    JsonElement creditCardsElem = rootElem.get( "credit_cards" );
+                    if ( creditCardsElem.isJsonObject() && creditCardsElem.getAsJsonObject().entrySet().size() > 0 ) {
+                        String cardId = null;
+                        for ( Iterator<Entry<String, JsonElement>> it = creditCardsElem.getAsJsonObject().entrySet().iterator() ; it.hasNext() ; ) {
+                            cardId = it.next().getKey();
 
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        Reservation r = fromJson( redirectPage.getWebResponse().getContentAsString(), Reservation.class );
-        if ( r != null && false == r.isSuccess() && StringUtils.isNotBlank( r.getVersion() )
-                && false == r.getVersion().equals( requestSettings.getRequestParameters().stream().filter( p -> p.getName().equals( "version" ) ).findFirst().get().getValue() ) ) {
-            LOGGER.info( "Looks like we're using an outdated version. Updating our records." );
-            jsonRequestFactory.setVersionForRequest( requestSettings, r.getVersion() );
-            return getReservation( webClient, reservationId );
-        }
-        else if ( r == null || false == r.isSuccess() ) {
-            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
-            throw new MissingUserDataException( "Reservation not found." );
-        }
-
-        // need to parse the credit_cards object manually to check for presence
-        JsonObject rootElem = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class );
-        JsonElement creditCardsElem = rootElem.get( "credit_cards" );
-        if ( creditCardsElem.isJsonObject() && creditCardsElem.getAsJsonObject().entrySet().size() > 0 ) {
-            String cardId = null;
-            for ( Iterator<Entry<String, JsonElement>> it = creditCardsElem.getAsJsonObject().entrySet().iterator() ; it.hasNext() ; ) {
-                cardId = it.next().getKey();
-
-                // save the last one on the list (if more than one)
-                JsonObject cardObj = creditCardsElem.getAsJsonObject().get( cardId ).getAsJsonObject();
-                if ( false == cardObj.get( "is_cc_data_purged" ).getAsBoolean() &&
-                        cardObj.get( "is_active" ).getAsBoolean() ) {
-                    r.setCreditCardId( cardId );
-                    r.setCreditCardType( cardObj.get( "card_type" ).getAsString() );
-                    r.setCreditCardLast4Digits( cardObj.get( "card_number" ).getAsString() );
-                }
-            }
-        }
+                            // save the last one on the list (if more than one)
+                            JsonObject cardObj = creditCardsElem.getAsJsonObject().get( cardId ).getAsJsonObject();
+                            if ( false == cardObj.get( "is_cc_data_purged" ).getAsBoolean() &&
+                                    cardObj.get( "is_active" ).getAsBoolean() ) {
+                                resv.setCreditCardId( cardId );
+                                resv.setCreditCardType( cardObj.get( "card_type" ).getAsString() );
+                                resv.setCreditCardLast4Digits( cardObj.get( "card_number" ).getAsString() );
+                            }
+                        }
+                    }
+                } );
         return r;
     }
-
+    
     /**
      * Gets reservation but retries {@code MAX_RETRY} number of times before failing.
      * 
@@ -369,36 +312,12 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     private List<Customer> getCustomers( WebClient webClient, WebRequest requestSettings ) throws IOException {
-        
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-        
-        Optional<JsonElement> jelement = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class ) );
-        if( false == jelement.isPresent() ) {
+        JsonObject jobject = doRequest( webClient, requestSettings );
+        JsonArray jarray = jobject.getAsJsonArray( "aaData" );
+        if ( null == jarray ) {
             throw new MissingUserDataException( "Failed to retrieve reservations." );
         }
-
-        Optional<JsonObject> jobject = Optional.ofNullable( jelement.get().getAsJsonObject() );
-        if( false == jobject.isPresent() ) {
-            throw new MissingUserDataException( "Failed to retrieve reservations." );
-        }
-
-        // check if we're using an outdated version
-        if ( false == jobject.get().get( "success" ).getAsBoolean() ) {
-            String version = jobject.get().get("version").getAsString();
-            if ( StringUtils.isNotBlank( version ) && false == jsonRequestFactory.getVersion().equals( version ) ) {
-                LOGGER.info( "Looks like we're using an outdated version. Updating our records." );
-                jsonRequestFactory.setVersion( version );
-                requestSettings.getRequestParameters().add( new NameValuePair( "version", version ) );
-                return getCustomers( webClient, requestSettings );
-            }
-        }
-
-        Optional<JsonArray> jarray = Optional.ofNullable( jobject.get().getAsJsonArray( "aaData" ) );
-        if( false == jarray.isPresent() ) {
-            throw new MissingUserDataException( "Failed to retrieve reservations." );
-        }
-        return Arrays.asList( gson.fromJson( jarray.get(), Customer[].class ) );
+        return Arrays.asList( gson.fromJson( jarray, Customer[].class ) );
     }
 
     /**
@@ -413,21 +332,12 @@ public class CloudbedsScraper {
     public boolean isExistsSagepayPaymentWithVendorTxCode( WebClient webClient, Reservation res, String vendorTxCode ) throws IOException {
         
         WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res );
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
-        if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
-            if ( rpt.isPresent() ) {
-                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-            }
-            throw new MissingUserDataException( "Failed response." );
-        }
+        JsonObject rpt = doRequest( webClient, requestSettings );
 
         // look for the existence of a payment record with matching vendor tx code
         Pattern p = Pattern.compile( "VendorTxCode: (.*?)," );
         Optional<String> txnNote = StreamSupport.stream(
-                rpt.get().get( "records" ).getAsJsonArray().spliterator(), false )
+                rpt.get( "records" ).getAsJsonArray().spliterator(), false )
                 .filter( r -> r.getAsJsonObject().has( "notes" ) )
                 .map( r -> r.getAsJsonObject().get( "notes" ).getAsString() )
                 .filter( n -> {
@@ -449,20 +359,11 @@ public class CloudbedsScraper {
      */
     public TransactionRecord getStripeTransaction( WebClient webClient, Reservation res, String id ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res );
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
-        if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
-            if ( rpt.isPresent() ) {
-                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-            }
-            throw new MissingUserDataException( "Failed response." );
-        }
+        JsonObject rpt = doRequest( webClient, requestSettings );
 
         // look for a charge id for the matching transaction
         Optional<TransactionRecord> txnRecord = StreamSupport.stream(
-                rpt.get().get( "records" ).getAsJsonArray().spliterator(), false )
+                rpt.get( "records" ).getAsJsonArray().spliterator(), false )
                 .filter( r -> id.equals( r.getAsJsonObject().get( "id" ).getAsString() ) )
                 .map( r -> gson.fromJson( r, TransactionRecord.class ) )
                 .findFirst();
@@ -484,20 +385,11 @@ public class CloudbedsScraper {
     public boolean isExistsRefund( WebClient webClient, Reservation res ) throws IOException {
         
         WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res );
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
-        if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
-            if ( rpt.isPresent() ) {
-                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-            }
-            throw new MissingUserDataException( "Failed response." );
-        }
+        JsonObject rpt = doRequest( webClient, requestSettings );
 
         // look for the existence of a refund payment record
         Optional<JsonElement> refundTxn = StreamSupport.stream(
-                rpt.get().get( "records" ).getAsJsonArray().spliterator(), false )
+                rpt.get( "records" ).getAsJsonArray().spliterator(), false )
                 .filter( r -> "1".equals( r.getAsJsonObject().get( "is_refund" ).getAsString() ) )
                 .findFirst();
         return refundTxn.isPresent();
@@ -526,20 +418,9 @@ public class CloudbedsScraper {
      */
     public JsonObject getRoomAssignmentsReport( WebClient webClient, LocalDate stayDateFrom, LocalDate stayDateTo ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createGetRoomAssignmentsReport( stayDateFrom, stayDateTo );
-        Page redirectPage = webClient.getPage( requestSettings );
         LOGGER.info( "Fetching staff allocations for " + stayDateFrom.format( DateTimeFormatter.ISO_LOCAL_DATE )
                 + " to " + stayDateTo.format( DateTimeFormatter.ISO_LOCAL_DATE ) );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
-        if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
-            if ( rpt.isPresent() ) {
-                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-            }
-            throw new MissingUserDataException( "Failed response." );
-        }
-
-        return rpt.get();
+        return doRequest( webClient, requestSettings );
     }
 
     /**
@@ -551,7 +432,6 @@ public class CloudbedsScraper {
      * @param amount amount to add
      * @param description description of payment
      * @throws IOException on page load failure
-     * @throws RecordPaymentFailedException payment record failure
      */
     public void addPayment( WebClient webClient, Reservation res, String cardType, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
 
@@ -564,23 +444,9 @@ public class CloudbedsScraper {
 
         // just take the first one
         String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
-
         WebRequest requestSettings = jsonRequestFactory.createAddNewPaymentRequest(
                 res.getReservationId(), bookingRoomId, cardType, amount, description );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
-        LOGGER.debug( jsonResponse );
-        
-        if( StringUtils.isBlank( jsonResponse ) ) {
-            throw new MissingUserDataException( "Missing response from add payment request?" );
-        }
-        CloudbedsJsonResponse response = fromJson( jsonResponse, CloudbedsJsonResponse.class );
-
-        // throw a wobbly if response not successful
-        if ( response.isFailure() ) {
-            throw new RecordPaymentFailedException( response.getMessage() );
-        }
+        doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
     /**
@@ -591,7 +457,6 @@ public class CloudbedsScraper {
      * @param amount amount to add
      * @param description description of payment
      * @throws IOException on page load failure
-     * @throws RecordPaymentFailedException payment record failure
      */
     public void addRefund( WebClient webClient, Reservation res, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
 
@@ -604,23 +469,9 @@ public class CloudbedsScraper {
 
         // just take the first one
         String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
-
         WebRequest requestSettings = jsonRequestFactory.createAddRefundRequest(
                 res.getReservationId(), bookingRoomId, amount, description );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
-        LOGGER.debug( jsonResponse );
-        
-        if( StringUtils.isBlank( jsonResponse ) ) {
-            throw new MissingUserDataException( "Missing response from add payment request?" );
-        }
-        CloudbedsJsonResponse response = fromJson( jsonResponse, CloudbedsJsonResponse.class );
-
-        // throw a wobbly if response not successful
-        if ( response.isFailure() ) {
-            throw new RecordPaymentFailedException( response.getMessage() );
-        }
+        doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
     /**
@@ -631,11 +482,10 @@ public class CloudbedsScraper {
      * @param authTxn original transaction
      * @param amount amount to add
      * @param description description of payment
-     * @return JSON response from Cloudbeds
+     * @return response from Cloudbeds
      * @throws IOException on page load failure
-     * @throws RecordPaymentFailedException payment record failure
      */
-    public String processRefund( WebClient webClient, Reservation res, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
+    public CloudbedsJsonResponse processRefund( WebClient webClient, Reservation res, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
 
         // first we need to find a "room" we're booking to
         // it doesn't actually map to a room, just an assigned guest
@@ -649,11 +499,7 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessRefundRequest(
                 res.getReservationId(), authTxn.getPaymentId(), bookingRoomId, authTxn.getCreditCardId(),
                 authTxn.getCreditCardType(), amount, description );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
-        LOGGER.debug( jsonResponse );
-        return jsonResponse;
+        return doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
     /**
@@ -665,15 +511,10 @@ public class CloudbedsScraper {
      * @return JSON response
      * @throws IOException on page load failure
      */
-    public String performRefund( WebClient webClient, TransactionRecord payment, BigDecimal amount ) throws IOException {
-
+    public CloudbedsJsonResponse performRefund( WebClient webClient, TransactionRecord payment, BigDecimal amount ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createRefundPaymentRequest( 
                 payment.getPaymentId(), payment.getCreditCardId(), amount );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
-        LOGGER.info( jsonResponse );
-        return jsonResponse;
+        return doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
     /**
@@ -685,23 +526,9 @@ public class CloudbedsScraper {
      * @throws IOException on page load failure
      */
     public void addNote( WebClient webClient, String reservationId, String note ) throws IOException {
-
         WebRequest requestSettings = jsonRequestFactory.createAddNoteRequest( reservationId, note );
         LOGGER.info( "Adding note: " + note + " to reservation " + reservationId );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
-        LOGGER.debug( jsonResponse );
-
-        if ( StringUtils.isBlank( jsonResponse ) ) {
-            throw new MissingUserDataException( "Missing response from add note request?" );
-        }
-        CloudbedsJsonResponse response = fromJson( jsonResponse, CloudbedsJsonResponse.class );
-
-        // throw a wobbly if response not successful
-        if ( response.isFailure() ) {
-            throw new IOException( response.getMessage() );
-        }
+        doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
     /**
@@ -712,23 +539,9 @@ public class CloudbedsScraper {
      * @throws IOException on page load failure
      */
     public void cancelBooking( WebClient webClient, String reservationId ) throws IOException {
-
         WebRequest requestSettings = jsonRequestFactory.createCancelReservationRequest( reservationId );
         LOGGER.info( "Canceling reservation " + reservationId );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
-        LOGGER.debug( jsonResponse );
-
-        if ( StringUtils.isBlank( jsonResponse ) ) {
-            throw new MissingUserDataException( "Missing response from set reservation state request" );
-        }
-        CloudbedsJsonResponse response = fromJson( jsonResponse, CloudbedsJsonResponse.class );
-
-        // throw a wobbly if response not successful
-        if ( response.isFailure() ) {
-            throw new IOException( response.getMessage() );
-        }
+        doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
     /**
@@ -740,22 +553,9 @@ public class CloudbedsScraper {
      * @throws IOException on page load failure
      */
     public void addCardDetails( WebClient webClient, String reservationId, CardDetails cardDetails ) throws IOException {
-
         WebRequest requestSettings = jsonRequestFactory.createAddCreditCardRequest( reservationId, cardDetails );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        String jsonResponse = redirectPage.getWebResponse().getContentAsString();
-        LOGGER.debug( jsonResponse );
-
-        if ( StringUtils.isBlank( jsonResponse ) ) {
-            throw new MissingUserDataException( "Missing response from add card details request?" );
-        }
-        CloudbedsJsonResponse response = fromJson( jsonResponse, CloudbedsJsonResponse.class );
-
-        // throw a wobbly if response not successful
-        if ( response.isFailure() ) {
-            throw new PaymentCardNotAcceptedException( response.getMessage() );
-        }
+        LOGGER.info( "Adding credit card details for reservation " + reservationId );
+        doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
     /**
@@ -768,18 +568,11 @@ public class CloudbedsScraper {
      */
     public String lookupBookingSourceIds( WebClient webClient, String... sourceNames ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createReservationSourceLookupRequest();
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
-        if( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            throw new MissingUserDataException( "Failed to retrieve source lookup." );
-        }
+        JsonObject jobject = doRequest( webClient, requestSettings );
         
         // drill down to each of the 3rd party OTAs matching the given source(s)
-        List<String> sourceIds = StreamSupport.stream( jelement.getAsJsonObject()
-                .get( "result" ).getAsJsonArray().spliterator(), false )
+        List<String> sourceIds = StreamSupport.stream(
+                jobject.get( "result" ).getAsJsonArray().spliterator(), false )
                 .filter( o -> "OTA".equals( o.getAsJsonObject().get( "text" ).getAsString() ) )
                 .flatMap( o -> StreamSupport.stream(
                         o.getAsJsonObject().get( "children" ).getAsJsonArray().spliterator(), false ) )
@@ -899,50 +692,36 @@ public class CloudbedsScraper {
         LOGGER.info( "Begin PROCESS CHARGE for reservation " + res.getReservationId()  + " for " + getCurrencyFormat().format( amount ) );
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessPaymentRequest( res.getReservationId(), 
                 res.getBookingRooms().get( 0 ).getId(), res.getCreditCardId(), amount, "Autocharging -RONBOT" );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
-        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
-            addNote( webClient, res.getReservationId(), "Failed to charge booking: " +
-                    jelement.getAsJsonObject().get( "message" ).getAsString() );
-            throw new PaymentNotAuthorizedException( "Failed to charge booking.", redirectPage.getWebResponse() );
-        }
+        doRequest( webClient, requestSettings, CloudbedsJsonResponse.class, null, 
+                (resp, jsonResp) -> {
+                    LOGGER.error( "Failed to charge booking. " + jsonResp );
+                    try {
+                        addNote( webClient, res.getReservationId(), "Failed to charge booking: " + resp.getMessage() );
+                    }
+                    catch ( IOException e ) {
+                        LOGGER.error( "Failed to add note for failed charge..." );
+                    }
+                    throw new RecordPaymentFailedException( "Failed to charge booking." );
+                } );
     }
 
     public Guest getGuestById( WebClient webClient, String guestId ) throws IOException {
-        
         WebRequest requestSettings = jsonRequestFactory.createFindGuestByIdRequest( guestId );
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-
-        Optional<JsonObject> obj = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
-        if ( false == obj.isPresent() || false == obj.get().get( "success" ).getAsBoolean() ) {
-            if ( obj.isPresent() ) {
-                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-            }
-            throw new MissingUserDataException( "Failed response." );
-        }
-
-        JsonObject guest = obj.get().get( "data" ).getAsJsonObject().get( "guest" ).getAsJsonObject();
+        JsonObject jobject = doRequest( webClient, requestSettings );
+        JsonObject guest = jobject.get( "data" ).getAsJsonObject().get( "guest" ).getAsJsonObject();
         return gsonIdentity.fromJson( guest, Guest.class );
     }
 
+    /**
+     * Adds a reservation. I assume you know what you need to pass in here.
+     * 
+     * @param webClient
+     * @param jsonData reservation data
+     * @throws IOException
+     */
     public void addReservation( WebClient webClient, String jsonData ) throws IOException {
-        
         WebRequest requestSettings = jsonRequestFactory.createAddReservationRequest( jsonData );
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-
-        Optional<JsonObject> rpt = Optional.ofNullable( fromJson( redirectPage.getWebResponse().getContentAsString(), JsonObject.class ) );
-        if ( false == rpt.isPresent() || false == rpt.get().get( "success" ).getAsBoolean() ) {
-            if ( rpt.isPresent() ) {
-                LOGGER.info( redirectPage.getWebResponse().getContentAsString() );
-            }
-            throw new MissingUserDataException( "Failed response." );
-        }
+        doRequest( webClient, requestSettings );
     }
 
     /**
@@ -953,9 +732,7 @@ public class CloudbedsScraper {
      */
     public void ping( WebClient webClient ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createPingRequest();
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+        doRequest( webClient, requestSettings );
     }
 
     /**
@@ -1025,18 +802,11 @@ public class CloudbedsScraper {
      */
     public List<ActivityLogEntry> getActivityLog( WebClient webClient, String identifier ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createGetActivityLog( identifier );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
-        if( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            throw new MissingUserDataException( "Failed to retrieve activity log for identifier " + identifier );
-        }
+        JsonObject jobject = doRequest( webClient, requestSettings );
 
         final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a" );
         List<ActivityLogEntry> logEntries = new ArrayList<ActivityLogEntry>();
-        jelement.getAsJsonObject().get( "aaData" ).getAsJsonArray().forEach( e -> {
+        jobject.get( "aaData" ).getAsJsonArray().forEach( e -> {
             ActivityLogEntry ent = new ActivityLogEntry();
             try {
                 ent.setCreatedDate( LocalDateTime.parse( e.getAsJsonArray().get( 0 ).getAsString(), DD_MM_YYYY_HH_MM ) );
@@ -1060,17 +830,10 @@ public class CloudbedsScraper {
      */
     public EmailTemplateInfo getEmailTemplate( WebClient webClient, String templateId ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createGetEmailTemplate( templateId );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
-        if( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            throw new MissingUserDataException( "Failed to retrieve email template " + templateId );
-        }
+        JsonObject jobject = doRequest( webClient, requestSettings );
 
         EmailTemplateInfo template = new EmailTemplateInfo();
-        JsonObject elem = jelement.getAsJsonObject().get( "email_template" ).getAsJsonObject();
+        JsonObject elem = jobject.get( "email_template" ).getAsJsonObject();
         template.setId( elem.get( "id" ).getAsString() );
         template.setEmailType( elem.get( "email_type" ).getAsString() );
         template.setDesignType( elem.get( "design_type" ).getAsString() );
@@ -1236,15 +999,11 @@ public class CloudbedsScraper {
      */
     public Optional<LocalDateTime> getEmailLastSentDate( WebClient webClient, String reservationId, String templateName ) throws IOException {
 
-        Page redirectPage = webClient.getPage( jsonRequestFactory.createGetEmailDeliveryLogRequest( reservationId ) );
-
-        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
-        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            throw new MissingUserDataException( "Failed to retrieve email log for reservation " + reservationId );
-        }
+        WebRequest requestSettings = jsonRequestFactory.createGetEmailDeliveryLogRequest( reservationId );
+        JsonObject jobject = doRequest( webClient, requestSettings );
 
         final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a" );
-        return StreamSupport.stream( jelement.getAsJsonObject().get( "aaData" )
+        return StreamSupport.stream( jobject.get( "aaData" )
                 .getAsJsonArray().spliterator(), false )
                 .filter( e -> false == e.getAsJsonObject().get( "template" ).isJsonNull() )
                 .filter( e -> templateName.equals( e.getAsJsonObject().get( "template" ).getAsString() ) )
@@ -1269,15 +1028,7 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createSendCustomEmail(
                 template, res.getIdentifier(), res.getCustomerId(), res.getReservationId(),
                 emailTo, transformBodyFn, token );
-
-        Page redirectPage = webClient.getPage( requestSettings );
-        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-
-        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
-        if ( jelement == null || false == jelement.getAsJsonObject().get( "success" ).getAsBoolean() ) {
-            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
-            throw new UnrecoverableFault( "Failed to send " + template.getTemplateName() + " email for reservation " + res.getReservationId() );
-        }
+        doRequest( webClient, requestSettings );
     }
 
     /**
@@ -1315,4 +1066,67 @@ public class CloudbedsScraper {
             throw ex;
         }
     }
+
+    private <T extends CloudbedsJsonResponse> T doRequestErrorOnFailure( WebClient webClient, WebRequest req, Class<T> clazz, BiConsumer<T, String> fnOnSuccess ) throws IOException {
+        return doRequest( webClient, req, clazz, fnOnSuccess, ( resp, jsonResp ) -> {
+            LOGGER.error( "Response: " + jsonResp );
+            throw new UnrecoverableFault( "Failed operation on: " + req.getUrl() );
+        } );
+    }
+
+    private <T extends CloudbedsJsonResponse> T doRequest( WebClient webClient, WebRequest req, Class<T> clazz, BiConsumer<T, String> fnOnSuccess, BiConsumer<T, String> fnOnError ) throws IOException {
+        Page redirectPage = webClient.getPage( req );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+        LOGGER.debug( "Response status {}: {}",
+                redirectPage.getWebResponse().getStatusCode(),
+                redirectPage.getWebResponse().getStatusMessage() );
+
+        T response = fromJson( redirectPage.getWebResponse().getContentAsString(), clazz );
+        if ( response != null && false == response.isSuccess() && StringUtils.isNotBlank( response.getVersion() )
+                && false == response.getVersion().equals( req.getRequestParameters().stream().filter( p -> p.getName().equals( "version" ) ).findFirst().get().getValue() ) ) {
+            LOGGER.info( "Looks like we're using an outdated version. Updating our records." );
+            jsonRequestFactory.setVersionForRequest( req, response.getVersion() );
+            return doRequest( webClient, req, clazz, fnOnSuccess, fnOnError );
+        }
+        else if ( response == null || false == response.isSuccess() ) {
+            if ( fnOnError != null ) {
+                fnOnError.accept( response, redirectPage.getWebResponse().getContentAsString() );
+            }
+        }
+        if ( fnOnSuccess != null ) {
+            fnOnSuccess.accept( response, redirectPage.getWebResponse().getContentAsString() );
+        }
+        return response;
+    }
+
+    private JsonObject doRequest( WebClient webClient, WebRequest req ) throws IOException {
+        Page redirectPage = webClient.getPage( req );
+        LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
+        LOGGER.debug( "Response status {}: {}",
+                redirectPage.getWebResponse().getStatusCode(),
+                redirectPage.getWebResponse().getStatusMessage() );
+
+        JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( null == jelement ) {
+            throw new UnrecoverableFault( "Failed operation on: " + req.getUrl() );
+        }
+
+        JsonObject jobject = jelement.getAsJsonObject();
+        if ( null == jobject ) {
+            throw new UnrecoverableFault( "Failed operation on: " + req.getUrl() );
+        }
+
+        if ( false == jobject.get( "success" ).getAsBoolean() ) {
+            String version = jobject.get( "version" ).getAsString();
+            if ( StringUtils.isNotBlank( version ) && false == jsonRequestFactory.getVersionForRequest( req ).equals( version ) ) {
+                LOGGER.info( "Looks like we're using an outdated version. Updating our records." );
+                jsonRequestFactory.setVersionForRequest( req, version );
+                return doRequest( webClient, req );
+            }
+            LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
+            throw new UnrecoverableFault( "Failed operation on: " + req.getUrl() );
+        }
+        return jobject;
+    }
+
 }

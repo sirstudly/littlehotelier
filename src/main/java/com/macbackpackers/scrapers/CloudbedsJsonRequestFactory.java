@@ -98,8 +98,7 @@ public class CloudbedsJsonRequestFactory {
     
     private String getVersionOptionName( WebRequest request ) {
         String path = request.getUrl().getPath();
-        String optionName = "hbo_cloudbeds_version_" + path.substring( path.lastIndexOf( '/' ) + 1 );
-        return optionName;
+        return "hbo_cloudbeds_version_" + path.substring( path.lastIndexOf( '/' ) + 1 );
     }
 
     /**
@@ -152,6 +151,8 @@ public class CloudbedsJsonRequestFactory {
         String optionName = getVersionOptionName( request );
         LOGGER.info( "Setting option " + optionName + " to " + newVersion );
         dao.setOption( optionName, newVersion );
+        request.getRequestParameters().removeIf( p -> "version".equals( p.getName() ) );
+        request.getRequestParameters().add( new NameValuePair( "version", version ) );
     }
 
     protected WebRequest createBaseJsonRequest( String url ) throws IOException {
@@ -182,7 +183,7 @@ public class CloudbedsJsonRequestFactory {
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -234,7 +235,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "propertyContext", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -278,7 +279,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "guest_status", "all" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -291,7 +292,7 @@ public class CloudbedsJsonRequestFactory {
      */
     public WebRequest createGetReservationsRequest( String query ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+        setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "date_start[0]", "" ),
                 new NameValuePair( "date_start[1]", "" ),
                 new NameValuePair( "date_end[0]", "" ),
@@ -299,7 +300,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "booking_date[0]", "" ),
                 new NameValuePair( "booking_date[1]", "" ),
                 new NameValuePair( "status", "all" ),
-                new NameValuePair( "query", query ) ) );
+                new NameValuePair( "query", query ) );
         return webRequest;
     }
 
@@ -313,13 +314,13 @@ public class CloudbedsJsonRequestFactory {
      */
     public WebRequest createGetReservationsRequestByCheckinDate( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+        setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "date_start[0]", checkinDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_start[1]", checkinDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_end[0]", "" ),
                 new NameValuePair( "date_end[1]", "" ),
                 new NameValuePair( "booking_date[0]", "" ),
-                new NameValuePair( "booking_date[1]", "" ) ) );
+                new NameValuePair( "booking_date[1]", "" ) );
         return webRequest;
     }
 
@@ -333,7 +334,7 @@ public class CloudbedsJsonRequestFactory {
      */
     public WebRequest createGetReservationsRequestByStayDate( LocalDate stayDateStart, LocalDate stayDateEnd ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+        setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "date_start[0]", "" ),
                 new NameValuePair( "date_start[1]", "" ),
                 new NameValuePair( "date_end[0]", "" ),
@@ -341,7 +342,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "date_stay[0]", stayDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_stay[1]", stayDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "booking_date[0]", "" ),
-                new NameValuePair( "booking_date[1]", "" ) ) );
+                new NameValuePair( "booking_date[1]", "" ) );
         return webRequest;
     }
 
@@ -359,7 +360,7 @@ public class CloudbedsJsonRequestFactory {
     public WebRequest createGetReservationsRequest( LocalDate stayDateStart, LocalDate stayDateEnd,
             LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+        setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "status", StringUtils.isBlank(statuses) ? "all" : statuses ),
                 new NameValuePair( "date_start[0]", checkinDateStart == null ? "" : checkinDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_start[1]", checkinDateEnd == null ? "" : checkinDateEnd.format( YYYY_MM_DD ) ),
@@ -368,7 +369,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "date_stay[0]", stayDateStart == null ? "" : stayDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_stay[1]", stayDateEnd == null ? "" : stayDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "booking_date[0]", "" ),
-                new NameValuePair( "booking_date[1]", "" ) ) );
+                new NameValuePair( "booking_date[1]", "" ) );
         return webRequest;
     }
 
@@ -387,7 +388,7 @@ public class CloudbedsJsonRequestFactory {
             LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate bookedDateStart,
             LocalDate bookedDateEnd, String bookingSourceIds ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+        setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "date_start[0]", checkinDateStart == null ? "" : checkinDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_start[1]", checkinDateEnd == null ? "" : checkinDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_end[0]", "" ),
@@ -395,7 +396,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "booking_date[0]", bookedDateStart == null ? "" : bookedDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "booking_date[1]", bookedDateEnd == null ? "" : bookedDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "status", "all" ),
-                new NameValuePair( "source", bookingSourceIds ) ) );
+                new NameValuePair( "source", bookingSourceIds ) );
         return webRequest;
     }
 
@@ -414,7 +415,7 @@ public class CloudbedsJsonRequestFactory {
             LocalDate checkinDateEnd, LocalDate cancelDateStart, LocalDate cancelDateEnd,
             String bookingSourceIds ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+        setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "date_start[0]", checkinDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_start[1]", checkinDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_end[0]", "" ),
@@ -422,7 +423,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "cancellation_date[0]", cancelDateStart == null ? "" : cancelDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "cancellation_date[1]", cancelDateEnd == null ? "" : cancelDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "status", "canceled" ),
-                new NameValuePair( "source", bookingSourceIds ) ) );
+                new NameValuePair( "source", bookingSourceIds ) );
         return webRequest;
     }
 
@@ -436,17 +437,14 @@ public class CloudbedsJsonRequestFactory {
      */
     public WebRequest createGetRoomAssignmentsReport( LocalDate dateStart, LocalDate dateEnd ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reports/get_room_assignments_report" );
-        webRequest.setRequestParameters( getCommonReservationsQueryParameters(
+        setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "booking_date[0]", dateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "booking_date[1]", dateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "room_types", dao.getAllRoomTypeIds().stream()
                         .map( rt -> rt.toString() )
                         .collect( Collectors.joining( "," ) ) ),
                 new NameValuePair( "show_assigned_unassigned", "show_assigned_rooms,show_unassigned_rooms" ),
-                new NameValuePair( "view", "room_assignments_report" ),
-                new NameValuePair( "property_id", getPropertyId() ),
-                new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "view", "room_assignments_report" ) );
         return webRequest;
     }
 
@@ -489,7 +487,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "filter", reservationId ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -506,7 +504,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "id", templateId ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -521,7 +519,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
                 new NameValuePair( "lang", "en" ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
     
@@ -567,17 +565,16 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "group_id", getPropertyId() ),
                 new NameValuePair( "contains_pii", "0" ),
                 new NameValuePair( "suppress_client_errors", "true" ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
     /**
-     * Returns a new modifiable list of common parameters to the {@code get_reservations} request.
+     * Sets common parameters to the {@code get_reservations} request.
      * 
-     * @param additionalParams additional parameters to add to return list
-     * @return new non-null modifiable list
+     * @param additionalParams additional parameters to add to parameter list
      */
-    private List<NameValuePair> getCommonReservationsQueryParameters( NameValuePair ... additionalParams ) {
+    private void setCommonReservationsQueryParameters( WebRequest req, NameValuePair ... additionalParams ) {
         List<NameValuePair> params = Arrays.asList(
                 new NameValuePair( "sEcho", "2" ),
                 new NameValuePair( "iColumns", "8" ),
@@ -622,7 +619,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "status", "confirmed,not_confirmed,checked_in,checked_out,no_show" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) );
+                new NameValuePair( "version", getVersionForRequest( req ) ) );
 
         // copy above into a map so we can remove the ones we are replacing
         Map<String, NameValuePair> paramMap = new HashMap<>();
@@ -636,9 +633,9 @@ public class CloudbedsJsonRequestFactory {
             paramMap.put( nvp.getName(), nvp );
         }
 
-        return paramMap.entrySet().stream()
+        req.setRequestParameters( paramMap.entrySet().stream()
                 .map( es -> es.getValue() )
-                .collect( Collectors.toList() );
+                .collect( Collectors.toList() ) );
     }
 
     /**
@@ -671,7 +668,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "booking_id", reservationId ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
     
@@ -705,7 +702,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "booking_id", reservationId ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
     
@@ -743,7 +740,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "booking_id", reservationId ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
     
@@ -774,7 +771,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "booking_id", reservationId ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -798,7 +795,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "suppress_client_errors", "true" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
     
@@ -836,7 +833,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "booking_id", reservationId ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -854,7 +851,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "options", "{\"filters\":{\"from\":\"\",\"to\":\"\",\"filter\":\"\",\"user\":\"all\",\"posted\":[\"1\"],\"description\":[]},\"group\":{\"main\":\"\",\"sub\":\"\"},\"sort\":{\"column\":\"datetime_transaction\",\"order\":\"desc\"},\"loaded_filter\":1}" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -873,7 +870,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "notes", note ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -898,7 +895,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "is_active", "1" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
 
         // CVV optional
         if ( StringUtils.isNotBlank( cardDetails.getCvv() ) ) {
@@ -919,7 +916,7 @@ public class CloudbedsJsonRequestFactory {
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -963,7 +960,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "email_status", "all" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -1013,7 +1010,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "transaction_type", transactionType ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersion() ) ) );
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
