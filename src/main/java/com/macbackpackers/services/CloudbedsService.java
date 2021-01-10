@@ -1535,6 +1535,7 @@ public class CloudbedsService {
                 .replaceAll( "__IS_ROOT_SOURCE__", r.getIsRootSource() )
                 .replaceAll( "__ORIGINAL_SOURCE_ID__", String.valueOf( r.getSelectedSource().getOriginalId() ) )
                 .replaceAll( "__SOURCE_PARENT_ID__", String.valueOf( r.getSelectedSource().getParentId() ) )
+                .replaceAll( "__IS_HOTEL_COLLECT_BOOKING__", r.getIsHotelCollectBooking() )
                 .replaceAll( "__ROOM_TYPE_NAME__", r.getBookingRooms().get( 0 ).getRoomTypeNameShort() )
                 .replaceAll( "__ROOM_TYPE_NAME_LONG__", r.getBookingRooms().get( 0 ).getRoomTypeName() )
                 .replaceAll( "__START_DATE__", checkinDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) )
