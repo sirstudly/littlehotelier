@@ -1492,11 +1492,13 @@ public class CloudbedsService {
     public void createFixedRateReservationAndEmailPaymentLink( String reservationId, LocalDate checkinDate, LocalDate checkoutDate, BigDecimal ratePerDay ) throws IOException {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
             int bookingId = createFixedRateReservation( webClient, reservationId, checkinDate, checkoutDate, ratePerDay );
+            LOGGER.info( "Successfully added reservation #" + bookingId );
             Reservation r = scraper.getReservationRetry( webClient, String.valueOf( bookingId ) );
             if ( r.getEmail().endsWith( "@macbackpackers.com" ) ) {
                 LOGGER.info( "Email for {} {} set to macbackpackers address. Payment link not sent.", r.getFirstName(), r.getLastName() );
             }
             else {
+                LOGGER.info( "Creating SendPaymentLinkEmailJob for new reservation." );
                 SendPaymentLinkEmailJob j = new SendPaymentLinkEmailJob();
                 j.setReservationId( String.valueOf( bookingId ) );
                 j.setStatus( JobStatus.submitted );
