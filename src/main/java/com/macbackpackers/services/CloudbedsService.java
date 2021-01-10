@@ -1481,50 +1481,78 @@ public class CloudbedsService {
 
     /**
      * Create a booking for the following dates and daily rate using the given reservation as a
+     * template (for customer, room assignment, etc) and create a {SendPaymentLinkEmailJob} for it.
+     * 
+     * @param reservationId reservation to clone
+     * @param startDate booking start date (inclusive)
+     * @param endDate booking end date (exclusive)
+     * @param ratePerDay amount to charge per diem
+     * @throws IOException 
+     */
+    public void createFixedRateReservationAndEmailPaymentLink( String reservationId, LocalDate checkinDate, LocalDate checkoutDate, BigDecimal ratePerDay ) throws IOException {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+            int bookingId = createFixedRateReservation( webClient, reservationId, checkinDate, checkoutDate, ratePerDay );
+            Reservation r = scraper.getReservationRetry( webClient, String.valueOf( bookingId ) );
+            if ( r.getEmail().endsWith( "@macbackpackers.com" ) ) {
+                LOGGER.info( "Email for {} {} set to macbackpackers address. Payment link not sent.", r.getFirstName(), r.getLastName() );
+            }
+            else {
+                SendPaymentLinkEmailJob j = new SendPaymentLinkEmailJob();
+                j.setReservationId( String.valueOf( bookingId ) );
+                j.setStatus( JobStatus.submitted );
+                dao.insertJob( j );
+            }
+        }
+    }
+
+    /**
+     * Create a booking for the following dates and daily rate using the given reservation as a
      * template (for customer, room assignment, etc).
      * 
      * @param reservationId reservation to clone
      * @param startDate booking start date (inclusive)
      * @param endDate booking end date (exclusive)
      * @param ratePerDay amount to charge per diem
-     * @return booking id
+     * @return newly created reservation id
      * @throws IOException 
      */
-    public int createFixedRateReservation( String reservationId, LocalDate checkinDate, LocalDate checkoutDate, BigDecimal ratePerDay ) throws IOException {
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            Reservation r = scraper.getReservationRetry( webClient, reservationId );
-            Guest guest = scraper.getGuestById( webClient, r.getCustomerId() );
-            long nights = ChronoUnit.DAYS.between( checkinDate, checkoutDate );
-            BigDecimal total = ratePerDay.multiply( new BigDecimal( nights ) );
-            final DecimalFormat NUMBER_FORMAT = new DecimalFormat( "###0.##" );
-            if ( false == r.getSelectedSource().isActive() ) {
-                throw new MissingUserDataException( "Booking source " + r.getSelectedSource().getSubSource() + " is not active!" );
-            }
-            if ( r.getBookingRooms().size() != 1 ) {
-                throw new MissingUserDataException( "Duplicating bookings with more than 1 bed assignment is not supported!" );
-            }
-            String newReservationData = IOUtils.toString( CloudbedsService.class.getClassLoader()
-                    .getResourceAsStream( "add_reservation_data.json" ), StandardCharsets.UTF_8 )
-                    .replaceAll( "__SOURCE_ID__", r.getSelectedSource().getId() )
-                    .replaceAll( "__ROOM_TYPE_NAME__", r.getBookingRooms().get( 0 ).getRoomTypeNameShort() )
-                    .replaceAll( "__ROOM_TYPE_NAME_LONG__", r.getBookingRooms().get( 0 ).getRoomTypeName() )
-                    .replaceAll( "__START_DATE__", checkinDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) )
-                    .replaceAll( "__END_DATE__", checkoutDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) )
-                    .replaceAll( "__MAX_GUESTS__", "1" )
-                    .replaceAll( "__RATE_ID__", r.getBookingRooms().get( 0 ).getRateId() )
-                    .replaceAll( "__ROOM_TYPE_ID__", r.getBookingRooms().get( 0 ).getRoomTypeId() )
-                    .replaceAll( "__ROOM_ID__", r.getBookingRooms().get( 0 ).getRoomId() )
-                    .replaceAll( "__DETAILED_RATES__", gson.toJson( getDetailedRates( checkinDate, checkoutDate, ratePerDay ) ) )
-                    .replaceAll( "__TOTAL__", NUMBER_FORMAT.format( total ) )
-                    .replaceAll( "__NIGHTS__", String.valueOf( nights ) )
-                    .replaceAll( "__RATE_PER_DAY__", NUMBER_FORMAT.format( ratePerDay ) )
-                    .replaceAll( "__ROOM_TYPE_ABBREV__", r.getBookingRooms().get( 0 ).getRoomTypeNameShort() )
-                    .replaceAll( "__PROPERTY_ID__", scraper.getPropertyId() )
-                    .replaceAll( "__CUSTOMER_INFO__", gson.toJson( new CustomerInfo( guest ) ) );
-            LOGGER.info( "creating new reservation: " + newReservationData );
-            JsonObject jobject = scraper.addReservation( webClient, newReservationData );
-            return jobject.get( "booking_id" ).getAsInt();
+    public int createFixedRateReservation( WebClient webClient, String reservationId, LocalDate checkinDate, LocalDate checkoutDate, BigDecimal ratePerDay ) throws IOException {
+        Reservation r = scraper.getReservationRetry( webClient, reservationId );
+        Guest guest = scraper.getGuestById( webClient, r.getCustomerId() );
+        long nights = ChronoUnit.DAYS.between( checkinDate, checkoutDate );
+        BigDecimal total = ratePerDay.multiply( new BigDecimal( nights ) );
+        final DecimalFormat NUMBER_FORMAT = new DecimalFormat( "###0.##" );
+        if ( false == r.getSelectedSource().isActive() ) {
+            throw new MissingUserDataException( "Booking source " + r.getSelectedSource().getSubSource() + " is not active!" );
         }
+        if ( r.getBookingRooms().size() != 1 ) {
+            throw new MissingUserDataException( "Duplicating bookings with more than 1 bed assignment is not supported!" );
+        }
+        String newReservationData = IOUtils.toString( CloudbedsService.class.getClassLoader()
+                .getResourceAsStream( "add_reservation_data.json" ), StandardCharsets.UTF_8 )
+                .replaceAll( "__SOURCE_ID__", r.getSelectedSource().getId() )
+                .replaceAll( "__SOURCE_NAME__", r.getSelectedSource().getName() )
+                .replaceAll( "__IS_ROOT_SOURCE__", r.getIsRootSource() )
+                .replaceAll( "__ORIGINAL_SOURCE_ID__", String.valueOf( r.getSelectedSource().getOriginalId() ) )
+                .replaceAll( "__SOURCE_PARENT_ID__", String.valueOf( r.getSelectedSource().getParentId() ) )
+                .replaceAll( "__ROOM_TYPE_NAME__", r.getBookingRooms().get( 0 ).getRoomTypeNameShort() )
+                .replaceAll( "__ROOM_TYPE_NAME_LONG__", r.getBookingRooms().get( 0 ).getRoomTypeName() )
+                .replaceAll( "__START_DATE__", checkinDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) )
+                .replaceAll( "__END_DATE__", checkoutDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) )
+                .replaceAll( "__MAX_GUESTS__", "1" )
+                .replaceAll( "__RATE_ID__", r.getBookingRooms().get( 0 ).getRateId() )
+                .replaceAll( "__ROOM_TYPE_ID__", r.getBookingRooms().get( 0 ).getRoomTypeId() )
+                .replaceAll( "__ROOM_ID__", r.getBookingRooms().get( 0 ).getRoomId() )
+                .replaceAll( "__DETAILED_RATES__", gson.toJson( getDetailedRates( checkinDate, checkoutDate, ratePerDay ) ) )
+                .replaceAll( "__TOTAL__", NUMBER_FORMAT.format( total ) )
+                .replaceAll( "__NIGHTS__", String.valueOf( nights ) )
+                .replaceAll( "__RATE_PER_DAY__", NUMBER_FORMAT.format( ratePerDay ) )
+                .replaceAll( "__ROOM_TYPE_ABBREV__", r.getBookingRooms().get( 0 ).getRoomTypeNameShort() )
+                .replaceAll( "__PROPERTY_ID__", scraper.getPropertyId() )
+                .replaceAll( "__CUSTOMER_INFO__", gson.toJson( new CustomerInfo( guest ) ) );
+        LOGGER.info( "creating new reservation: " + newReservationData );
+        JsonObject jobject = scraper.addReservation( webClient, newReservationData );
+        return jobject.get( "booking_id" ).getAsInt();
     }
 
     private JsonObject[] getDetailedRates( LocalDate startDate, LocalDate endDate, BigDecimal ratePerDay ) {

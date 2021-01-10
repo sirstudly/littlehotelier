@@ -1,11 +1,11 @@
 {
   "source" : {
-    "source_name" : "Reception",
+    "source_name" : "__SOURCE_NAME__",
     "source_id" : "__SOURCE_ID__",
-    "original_id" : __SOURCE_ID__,
-    "parent_id" : 9,
+    "original_id" : __ORIGINAL_SOURCE_ID__,
+    "parent_id" : __SOURCE_PARENT_ID__,
     "is_hotel_collect_booking" : 1,
-    "is_root_source" : 0,
+    "is_root_source" : __IS_ROOT_SOURCE__,
     "aliases" : ""
   },
   "custom_fields" : { },

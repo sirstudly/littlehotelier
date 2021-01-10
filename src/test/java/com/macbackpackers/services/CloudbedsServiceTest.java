@@ -157,7 +157,7 @@ public class CloudbedsServiceTest {
     @Test
     public void testAddReservation() throws Exception {
         // room 10 - stephane
-        cloudbedsService.createFixedRateReservation( "38059840",
+        cloudbedsService.createFixedRateReservation( webClient, "38059840",
                 LocalDate.parse( "2021-01-04" ), LocalDate.parse( "2021-01-11" ), new BigDecimal( "10" ) );
     }
     

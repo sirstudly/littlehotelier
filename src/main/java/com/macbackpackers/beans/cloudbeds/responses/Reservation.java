@@ -35,6 +35,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String nights;
     private String cancellationDate;
     private String sourceName;
+    private String isRootSource;
     private String identifier;
     private String specialRequests;
     private String thirdPartyIdentifier;
@@ -258,6 +259,14 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setSourceName( String sourceName ) {
         this.sourceName = sourceName;
+    }
+
+    public String getIsRootSource() {
+        return isRootSource;
+    }
+
+    public void setIsRootSource( String isRootSource ) {
+        this.isRootSource = isRootSource;
     }
 
     public String getIdentifier() {

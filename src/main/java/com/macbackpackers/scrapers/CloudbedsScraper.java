@@ -1118,8 +1118,11 @@ public class CloudbedsScraper {
         }
 
         if ( false == jobject.get( "success" ).getAsBoolean() ) {
-            String version = jobject.get( "version" ).getAsString();
-            if ( StringUtils.isNotBlank( version ) && false == jsonRequestFactory.getVersionForRequest( req ).equals( version ) ) {
+            String version = jobject.get( "version" ) == null ? null : jobject.get( "version" ).getAsString();
+            if ( version == null ) {
+                LOGGER.error( "Unexpected error." );
+            }
+            else if ( StringUtils.isNotBlank( version ) && false == jsonRequestFactory.getVersionForRequest( req ).equals( version ) ) {
                 LOGGER.info( "Looks like we're using an outdated version. Updating our records." );
                 jsonRequestFactory.setVersionForRequest( req, version );
                 return doRequest( webClient, req );
