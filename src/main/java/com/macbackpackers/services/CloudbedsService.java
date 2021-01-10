@@ -1487,9 +1487,10 @@ public class CloudbedsService {
      * @param startDate booking start date (inclusive)
      * @param endDate booking end date (exclusive)
      * @param ratePerDay amount to charge per diem
+     * @return booking id
      * @throws IOException 
      */
-    public void createFixedRateReservation( String reservationId, LocalDate checkinDate, LocalDate checkoutDate, BigDecimal ratePerDay ) throws IOException {
+    public int createFixedRateReservation( String reservationId, LocalDate checkinDate, LocalDate checkoutDate, BigDecimal ratePerDay ) throws IOException {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
             Reservation r = scraper.getReservationRetry( webClient, reservationId );
             Guest guest = scraper.getGuestById( webClient, r.getCustomerId() );
@@ -1521,7 +1522,8 @@ public class CloudbedsService {
                     .replaceAll( "__PROPERTY_ID__", scraper.getPropertyId() )
                     .replaceAll( "__CUSTOMER_INFO__", gson.toJson( new CustomerInfo( guest ) ) );
             LOGGER.info( "creating new reservation: " + newReservationData );
-            scraper.addReservation( webClient, newReservationData );
+            JsonObject jobject = scraper.addReservation( webClient, newReservationData );
+            return jobject.get( "booking_id" ).getAsInt();
         }
     }
 

@@ -11,6 +11,7 @@ import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.services.CloudbedsService;
 
 @Entity
@@ -23,8 +24,12 @@ public class CreateFixedRateReservationJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        cloudbedsService.createFixedRateReservation(
+        int bookingId = cloudbedsService.createFixedRateReservation(
                 getReservationId(), getCheckinDate(), getCheckoutDate(), getRatePerDay() );
+        SendPaymentLinkEmailJob j = new SendPaymentLinkEmailJob();
+        j.setReservationId( String.valueOf( bookingId ) );
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
     }
 
     public String getReservationId() {

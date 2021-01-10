@@ -46,6 +46,7 @@ import com.macbackpackers.jobs.CreateChargeNonRefundableBookingJob;
 import com.macbackpackers.jobs.CreateConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.CreateCopyCardDetailsToCloudbedsJob;
 import com.macbackpackers.jobs.CreateDepositChargeJob;
+import com.macbackpackers.jobs.CreateFixedRateReservationJob;
 import com.macbackpackers.jobs.CreatePrepaidChargeJob;
 import com.macbackpackers.jobs.CreateScrapeCancelledBookingsJob;
 import com.macbackpackers.jobs.CreateSendGuestCheckoutEmailJob;
@@ -663,6 +664,26 @@ public class ProcessorServiceTest {
         j.setStatus( JobStatus.submitted );
         j.setReservationId( "11968561" );
         dao.insertJob( j );
+    }
+
+    @Test
+    public void testCreateFixedRateReservationJob() throws Exception {
+
+        // setup the job
+        CreateFixedRateReservationJob j = new CreateFixedRateReservationJob();
+        j.setStatus( JobStatus.submitted );
+        j.setReservationId( "38059779" );
+        j.setCheckinDate( LocalDate.parse("2021-01-11") );
+        j.setCheckoutDate( LocalDate.parse("2021-01-18") );
+        j.setRatePerDay( new BigDecimal( 10 ) );
+        int jobId = dao.insertJob( j );
+
+        // this should now run the job
+        processorService.processJobs();
+
+        // verify that the job completed successfully
+        Job jobVerify = dao.fetchJobById( jobId );
+        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
     }
 
 //    @Test

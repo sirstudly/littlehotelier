@@ -717,11 +717,12 @@ public class CloudbedsScraper {
      * 
      * @param webClient
      * @param jsonData reservation data
+     * @returns response
      * @throws IOException
      */
-    public void addReservation( WebClient webClient, String jsonData ) throws IOException {
+    public JsonObject addReservation( WebClient webClient, String jsonData ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createAddReservationRequest( jsonData );
-        doRequest( webClient, requestSettings );
+        return doRequest( webClient, requestSettings );
     }
 
     /**
