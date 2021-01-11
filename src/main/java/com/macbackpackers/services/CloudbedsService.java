@@ -385,6 +385,13 @@ public class CloudbedsService {
             bdcScraper.getAllVCCBookingsThatCanBeCharged( driver, wait )
                 .stream().forEach( this::createPrepaidChargeJob );
         }
+        catch ( Exception ex ) {
+            LOGGER.error( "createBDCPrepaidChargeJobs() failed.", ex );
+            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
+            FileUtils.copyFile( scrFile, new File( "logs/bdc_scraper_failed.png" ) );
+            LOGGER.info( "Error attempting to login. Screenshot saved as bdc_scraper_failed.png" );
+            throw ex;
+        }
         finally {
             driverFactory.returnObject( driver );
         }
