@@ -386,10 +386,10 @@ public class CloudbedsService {
                 .stream().forEach( this::createPrepaidChargeJob );
         }
         catch ( Exception ex ) {
-            LOGGER.error( "createBDCPrepaidChargeJobs() failed.", ex );
+            LOGGER.error( "createBDCPrepaidChargeJobs() failed." );
             File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            FileUtils.copyFile( scrFile, new File( "logs/bdc_scraper_failed.png" ) );
-            LOGGER.info( "Error attempting to login. Screenshot saved as bdc_scraper_failed.png" );
+            FileUtils.copyFile( scrFile, new File( "logs/bdc_prepaid_charge_job.png" ) );
+            LOGGER.error( "Screenshot saved as bdc_prepaid_charge_job.png" );
             throw ex;
         }
         finally {
