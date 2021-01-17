@@ -966,7 +966,7 @@ public class CloudbedsScraper {
                 @Override
                 public EmailTemplateInfo call() throws Exception {
                     Optional<JsonElement> emailTemplate = StreamSupport.stream(
-                            propertyContent.get( "email_templates" ).getAsJsonArray().spliterator(),
+                            getPropertyContent( webClient ).get( "email_templates" ).getAsJsonArray().spliterator(),
                             false )
                             .filter( t -> templateName.equals( t.getAsJsonObject().get( "template_name" ).getAsString() ) )
                             .findFirst();
