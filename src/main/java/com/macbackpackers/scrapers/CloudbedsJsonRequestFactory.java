@@ -151,8 +151,12 @@ public class CloudbedsJsonRequestFactory {
         String optionName = getVersionOptionName( request );
         LOGGER.info( "Setting option " + optionName + " to " + newVersion );
         dao.setOption( optionName, newVersion );
-        request.getRequestParameters().removeIf( p -> "version".equals( p.getName() ) );
-        request.getRequestParameters().add( new NameValuePair( "version", version ) );
+
+        // we need to make a duplicate list with updated version
+        List<NameValuePair> nvp = new ArrayList<>( request.getRequestParameters() );
+        nvp.removeIf( p -> "version".equals( p.getName() ) );
+        nvp.add( new NameValuePair( "version", version ) );
+        request.setRequestParameters( nvp );
     }
 
     protected WebRequest createBaseJsonRequest( String url ) throws IOException {

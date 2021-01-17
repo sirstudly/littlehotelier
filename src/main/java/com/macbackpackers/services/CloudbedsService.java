@@ -1540,7 +1540,7 @@ public class CloudbedsService {
         String newReservationData = IOUtils.toString( CloudbedsService.class.getClassLoader()
                 .getResourceAsStream( "add_reservation_data.json" ), StandardCharsets.UTF_8 )
                 .replaceAll( "__SOURCE_ID__", r.getSelectedSource().getId() )
-                .replaceAll( "__SOURCE_NAME__", r.getSelectedSource().getName() )
+                .replaceAll( "__SOURCE_NAME__", StringUtils.defaultString( r.getSelectedSource().getName(), r.getSelectedSource().getSubSource() ) )
                 .replaceAll( "__IS_ROOT_SOURCE__", r.getIsRootSource() )
                 .replaceAll( "__ORIGINAL_SOURCE_ID__", String.valueOf( r.getSelectedSource().getOriginalId() ) )
                 .replaceAll( "__SOURCE_PARENT_ID__", String.valueOf( r.getSelectedSource().getParentId() ) )

@@ -74,7 +74,7 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_COVID_PRESTAY = "COVID Pre-Stay Email";
 
     // the last result of getPropertyContent() as it's an expensive operation
-    private static String propertyContent;
+    private static JsonObject propertyContent;
 
     private static LoadingCache<String, EmailTemplateInfo> emailTemplateCache = CacheBuilder.newBuilder()
             .build( new CacheLoader<String, EmailTemplateInfo>() {
@@ -966,8 +966,7 @@ public class CloudbedsScraper {
                 @Override
                 public EmailTemplateInfo call() throws Exception {
                     Optional<JsonElement> emailTemplate = StreamSupport.stream(
-                            fromJson( getPropertyContent( webClient ), JsonElement.class ).getAsJsonObject()
-                                    .get( "email_templates" ).getAsJsonArray().spliterator(),
+                            propertyContent.get( "email_templates" ).getAsJsonArray().spliterator(),
                             false )
                             .filter( t -> templateName.equals( t.getAsJsonObject().get( "template_name" ).getAsString() ) )
                             .findFirst();
@@ -1036,16 +1035,12 @@ public class CloudbedsScraper {
      * Retrieves the property info.
      * 
      * @param webClient web client instance to use
-     * @throws non-null email template
+     * @returns parsed JSON response
      * @throws IOException
      */
-    public String getPropertyContent( WebClient webClient ) throws IOException {
+    public JsonObject getPropertyContent( WebClient webClient ) throws IOException {
         if ( propertyContent == null ) {
-            WebRequest requestSettings = jsonRequestFactory.createGetPropertyContent();
-
-            Page redirectPage = webClient.getPage( requestSettings );
-            LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-            propertyContent = redirectPage.getWebResponse().getContentAsString();
+            propertyContent = doRequest( webClient, jsonRequestFactory.createGetPropertyContent() );
         }
         return propertyContent;
     }
@@ -1068,6 +1063,19 @@ public class CloudbedsScraper {
         }
     }
 
+    /**
+     * Same as {@link #doRequest(WebClient, WebRequest, Class, BiConsumer, BiConsumer)} but throws
+     * an exception on failure.
+     * 
+     * @param <T> expected response type
+     * @param webClient
+     * @param req
+     * @param clazz * @param req requested type
+     * @param clazz expected response type
+     * @param fnOnSuccess something to run when response is successful (optional)
+     * @return parsed response
+     * @throws IOException
+     */
     private <T extends CloudbedsJsonResponse> T doRequestErrorOnFailure( WebClient webClient, WebRequest req, Class<T> clazz, BiConsumer<T, String> fnOnSuccess ) throws IOException {
         return doRequest( webClient, req, clazz, fnOnSuccess, ( resp, jsonResp ) -> {
             LOGGER.error( "Response: " + jsonResp );
@@ -1075,6 +1083,18 @@ public class CloudbedsScraper {
         } );
     }
 
+    /**
+     * Perform a web request and return the (parsed) JSON response as the given type.
+     * 
+     * @param <T> expected response type
+     * @param webClient
+     * @param req requested type
+     * @param clazz expected response type
+     * @param fnOnSuccess something to run when response is successful (optional)
+     * @param fnOnError something to run when response fails (optional)
+     * @return parsed response
+     * @throws IOException
+     */
     private <T extends CloudbedsJsonResponse> T doRequest( WebClient webClient, WebRequest req, Class<T> clazz, BiConsumer<T, String> fnOnSuccess, BiConsumer<T, String> fnOnError ) throws IOException {
         Page redirectPage = webClient.getPage( req );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
@@ -1100,12 +1120,18 @@ public class CloudbedsScraper {
         return response;
     }
 
+    /**
+     * Perform a web request and return the result as a JSON object. If the initial request resulted
+     * in a failure due to an incorrect version, the version will be updated and retried.
+     * 
+     * @param webClient
+     * @param req request to submit
+     * @return raw response
+     * @throws IOException
+     */
     private JsonObject doRequest( WebClient webClient, WebRequest req ) throws IOException {
         Page redirectPage = webClient.getPage( req );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
-        LOGGER.debug( "Response status {}: {}",
-                redirectPage.getWebResponse().getStatusCode(),
-                redirectPage.getWebResponse().getStatusMessage() );
 
         JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( null == jelement ) {
@@ -1117,7 +1143,7 @@ public class CloudbedsScraper {
             throw new UnrecoverableFault( "Failed operation on: " + req.getUrl() );
         }
 
-        if ( false == jobject.get( "success" ).getAsBoolean() ) {
+        if ( jobject.get( "success" ) != null && false == jobject.get( "success" ).getAsBoolean() ) {
             String version = jobject.get( "version" ) == null ? null : jobject.get( "version" ).getAsString();
             if ( version == null ) {
                 LOGGER.error( "Unexpected error." );
