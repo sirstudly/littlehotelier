@@ -155,7 +155,7 @@ public class CloudbedsJsonRequestFactory {
         // we need to make a duplicate list with updated version
         List<NameValuePair> nvp = new ArrayList<>( request.getRequestParameters() );
         nvp.removeIf( p -> "version".equals( p.getName() ) );
-        nvp.add( new NameValuePair( "version", version ) );
+        nvp.add( new NameValuePair( "version", newVersion ) );
         request.setRequestParameters( nvp );
     }
 
