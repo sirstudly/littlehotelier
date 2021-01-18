@@ -32,6 +32,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.apache.commons.text.StringEscapeUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.OutputType;
@@ -597,7 +598,7 @@ public class CloudbedsService {
                 .filter( r -> r.getCheckoutDateAsLocalDate().equals( forDate ) )
                 .filter( r -> false == "checked_out".equals( r.getStatus() ) )
                 .filter( r -> r.getBookingRooms().size() == 1 )
-                .filter( r -> false == conflictBeds.contains( r.getBookingRooms().get( 0 ).getRoomNumber().trim() ) )
+                .filter( r -> false == conflictBeds.contains( StringEscapeUtils.unescapeHtml4( r.getBookingRooms().get( 0 ).getRoomNumber() ).trim() ) )
                 .forEach( r -> {
                     LOGGER.info( "Creating CreateFixedRateReservationJob from Res #" + r.getReservationId()
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
