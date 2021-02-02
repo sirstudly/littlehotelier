@@ -54,6 +54,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.Payment;
 import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.StripeRefund;
+import com.macbackpackers.beans.StripeTransaction;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.beans.xml.TxnResponse;
@@ -68,6 +69,7 @@ import com.macbackpackers.jobs.SendHostelworldLateCancellationEmailJob;
 import com.macbackpackers.jobs.SendNonRefundableDeclinedEmailJob;
 import com.macbackpackers.jobs.SendNonRefundableSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendRefundSuccessfulEmailJob;
+import com.macbackpackers.jobs.SendStripePaymentConfirmationEmailJob;
 import com.macbackpackers.scrapers.AgodaScraper;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingComScraper;
@@ -80,6 +82,9 @@ import com.stripe.Stripe;
 import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Charge;
+import com.stripe.model.Charge.Outcome;
+import com.stripe.model.Charge.PaymentMethodDetails;
+import com.stripe.model.PaymentIntent;
 import com.stripe.model.Refund;
 import com.stripe.net.RequestOptions.RequestOptionsBuilder;
 import com.stripe.param.RefundCreateParams;
@@ -1357,6 +1362,81 @@ public class PaymentProcessorService {
     }
 
     /**
+     * Updates Cloudbeds for a booking (if successful) and creates a corresponding confirmation
+     * email job.
+     * 
+     * @param vendorTxCode the unique ID for the transaction
+     * @throws IOException
+     * @throws StripeException
+     */
+    public synchronized void processStripePayment( String vendorTxCode ) throws IOException, StripeException {
+        try (WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class )) {
+            StripeTransaction txn = wordpressDAO.fetchStripeTransaction( vendorTxCode );
+            Stripe.apiKey = STRIPE_API_KEY;
+            if ( txn.getReservationId() == null ) {
+                // process stripe invoice payment
+                PaymentIntent paymentIntent = txn.getPaymentIntent( gson );
+                if ( "succeeded".equals( paymentIntent.getStatus() ) ) {
+                    createSendStripePaymentConfirmationEmailJob( txn.getVendorTxCode() );
+                }
+                updateStripeTransactionWithPayment( txn, paymentIntent );
+            }
+            else {
+                processStripeBookingPayment( webClient, txn );
+            }
+        }
+    }
+
+    /**
+     * Updates Cloudbeds for a booking and creates a corresponding confirmation email job.
+     * 
+     * @param webClient
+     * @param txn
+     * @throws IOException
+     * @throws StripeException
+     */
+    private void processStripeBookingPayment( WebClient webClient, StripeTransaction txn ) throws IOException, StripeException {
+        LOGGER.info( "Attempting to process transaction for reservation " + txn.getReservationId() + " with vendor tx code " + txn.getVendorTxCode() );
+        Reservation res = cloudbedsScraper.getReservationRetry( webClient, txn.getReservationId() );
+
+        if ( cloudbedsScraper.isExistsPaymentWithVendorTxCode( webClient, res, txn.getVendorTxCode() ) ) {
+            LOGGER.info( "We already have a transaction on the folio page with this vendor tx code: " + txn.getVendorTxCode() + ". Not adding it again..." );
+        }
+        else { // call Stripe server and record result manually
+            PaymentIntent paymentIntent = txn.getPaymentIntent( gson );
+            PaymentMethodDetails details = paymentIntent.getCharges().getData().get( 0 ).getPaymentMethodDetails();
+
+            if ( "succeeded".equals( paymentIntent.getStatus() ) ) {
+                cloudbedsScraper.addPayment( webClient, res, details.getCard().getBrand(), txn.getPaymentAmount(),
+                        String.format( "VendorTxCode: %s, Status: %s, Card Type: %s, Card Number: ************%s, Gateway: STRIPE",
+                                txn.getVendorTxCode(), paymentIntent.getStatus(), details.getCard().getBrand(), details.getCard().getLast4() ) );
+                cloudbedsScraper.addNote( webClient, txn.getReservationId(),
+                        "Processed Stripe transaction for £" + txn.getPaymentAmount() + "." );
+                createSendStripePaymentConfirmationEmailJob( txn.getVendorTxCode() );
+            }
+            updateStripeTransactionWithPayment( txn, paymentIntent );
+        }
+    }
+
+    /**
+     * Updates the database entry with payment auth/failure details.
+     * 
+     * @param txn transaction to update
+     * @param paymentIntent updated payment details
+     */
+    private void updateStripeTransactionWithPayment( StripeTransaction txn, PaymentIntent paymentIntent ) {
+        Charge charge = paymentIntent.getCharges().getData().get( 0 );
+        PaymentMethodDetails details = charge.getPaymentMethodDetails();
+        Outcome outcome = charge.getOutcome();
+        String authDetails = outcome.getType() + ": " + outcome.getSellerMessage();
+        if ( charge.getFailureCode() != null || charge.getFailureMessage() != null ) {
+            authDetails += ", " + charge.getFailureCode() + ": " + charge.getFailureMessage();
+        }
+        wordpressDAO.updateStripeTransaction( txn.getId(), paymentIntent.getStatus(), authDetails,
+                details.getCard().getBrand(), details.getCard().getLast4() );
+    }
+
+    /**
      * Reloads the Stripe refund status and response by looking up from the original auth
      * transaction.
      * 
@@ -1401,6 +1481,19 @@ public class PaymentProcessorService {
         job.setTxnId( refund.getId() );
         job.setStatus( JobStatus.submitted );
         wordpressDAO.insertJob( job );
+    }
+
+    /**
+     * Send email on successful payment.
+     * 
+     * @param vendorTxCode
+     */
+    private void createSendStripePaymentConfirmationEmailJob( String vendorTxCode ) {
+        LOGGER.info( "Creating SendStripePaymentConfirmationEmailJob for vendor tx code " + vendorTxCode );
+        SendStripePaymentConfirmationEmailJob j = new SendStripePaymentConfirmationEmailJob();
+        j.setStatus( JobStatus.submitted );
+        j.setVendorTxCode( vendorTxCode );
+        wordpressDAO.insertJob( j );
     }
 
     /**

@@ -165,4 +165,10 @@ public class CloudbedsServiceTest {
     public void testCreateFixedRateLongTermReservations() throws Exception {
         cloudbedsService.createFixedRateLongTermReservations( webClient, LocalDate.parse( "2021-01-04" ), 7, new BigDecimal( 10 ) );
     }
+
+    
+    @Test
+    public void testSendStripePaymentConfirmationGmail() throws Exception {
+        cloudbedsService.sendStripePaymentConfirmationGmail( webClient, "CRH-INV-ABCDEFG-SDQE" );
+    }
 }

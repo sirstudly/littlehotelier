@@ -30,6 +30,7 @@ import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.StripeRefund;
+import com.macbackpackers.beans.StripeTransaction;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.exceptions.MissingUserDataException;
@@ -533,6 +534,17 @@ public interface WordPressDAO {
     public void updateSagepayTransactionProcessedDate( int id );
 
     /**
+     * Sets the auth details on a stripe transaction.
+     * 
+     * @param id unique PK on wp_stripe_transaction
+     * @param paymentStatus status on paymentIntent
+     * @param authDetails human readable auth/failure details
+     * @param cardType e.g. amex, mastercard, visa
+     * @param last4Digits last 4 digits of card used as payment
+     */
+    public void updateStripeTransaction( int id, String paymentStatus, String authDetails, String cardType, String last4Digits );
+
+    /**
      * Reads a record to the sagepay refund table.
      * 
      * @return refund object
@@ -551,6 +563,12 @@ public interface WordPressDAO {
      * @param status sagepay status of refund
      */
     public void updateSagepayRefund( int id, String refVendorTxCode, String response, String status, String statusDetail, String transactionId );
+
+    /**
+     * Reads a record from the stripe transaction table.
+     * @param vendorTxCode primary key
+     */
+    public StripeTransaction fetchStripeTransaction( String vendorTxCode );
 
     /**
      * Reads a record from the stripe refund table.

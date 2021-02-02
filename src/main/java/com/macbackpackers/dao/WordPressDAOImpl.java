@@ -50,6 +50,7 @@ import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.StripeRefund;
+import com.macbackpackers.beans.StripeTransaction;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.exceptions.MissingUserDataException;
@@ -1055,6 +1056,14 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public StripeTransaction fetchStripeTransaction( String vendorTxCode ) {
+        return em.createQuery(
+                "FROM StripeTransaction WHERE vendorTxCode = :vendorTxCode", StripeTransaction.class )
+                .setParameter( "vendorTxCode", vendorTxCode )
+                .getSingleResult();
+    }
+
+    @Override
     public List<StripeRefund> fetchStripeRefundsAtStatus( String status ) {
         return em.createQuery(
                 "FROM StripeRefund WHERE status = :status", StripeRefund.class )
@@ -1081,6 +1090,20 @@ public class WordPressDAOImpl implements WordPressDAO {
         if ( changed ) {
             refund.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
         }
+    }
+
+    @Override
+    public void updateStripeTransaction( int id, String paymentStatus, String authDetails, String cardType, String last4Digits ) {
+        StripeTransaction txn = em.find( StripeTransaction.class, id );
+        if ( txn == null ) {
+            throw new EmptyResultDataAccessException( "Unable to find StripeTransaction with ID " + id, 1 );
+        }
+        txn.setPaymentStatus( paymentStatus );
+        txn.setAuthDetails( authDetails );
+        txn.setCardType( cardType );
+        txn.setLast4Digits( last4Digits );
+        txn.setProcessedDate( new Timestamp( System.currentTimeMillis() ) );
+        txn.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
     }
 
     @Override

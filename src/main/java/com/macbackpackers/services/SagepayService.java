@@ -216,7 +216,7 @@ public class SagepayService {
                 case "OK":
                     // check if payment already exists
                     Reservation res = cloudbedsScraper.getReservationRetry( webClient, txn.getReservationId() );
-                    if( cloudbedsScraper.isExistsSagepayPaymentWithVendorTxCode( webClient, res, txn.getVendorTxCode() ) ) {
+                    if( cloudbedsScraper.isExistsPaymentWithVendorTxCode( webClient, res, txn.getVendorTxCode() ) ) {
                         LOGGER.info( "Transaction " + txn.getVendorTxCode() + " has already been processed. Nothing to do." );
                     }
                     else {

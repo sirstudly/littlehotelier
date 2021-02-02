@@ -91,8 +91,8 @@ public class CloudbedsScraperTest {
     @Test
     public void testGetTransactionsByReservation() throws Exception {
         Reservation r = cloudbedsScraper.getReservation( webClient, "10569063" );
-        Assert.assertThat( cloudbedsScraper.isExistsSagepayPaymentWithVendorTxCode( webClient, r, "x" ), Matchers.is( false ) );
-        Assert.assertThat( cloudbedsScraper.isExistsSagepayPaymentWithVendorTxCode( webClient, r, "CASTLE-ROCK-7878681082-1548474047" ), Matchers.is( true ) );
+        Assert.assertThat( cloudbedsScraper.isExistsPaymentWithVendorTxCode( webClient, r, "x" ), Matchers.is( false ) );
+        Assert.assertThat( cloudbedsScraper.isExistsPaymentWithVendorTxCode( webClient, r, "CASTLE-ROCK-7878681082-1548474047" ), Matchers.is( true ) );
     }
 
     @Test

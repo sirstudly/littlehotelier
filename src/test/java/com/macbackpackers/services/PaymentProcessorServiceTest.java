@@ -210,4 +210,9 @@ public class PaymentProcessorServiceTest {
         paymentService.refreshStripeRefundStatus( 7 );
         paymentService.refreshStripeRefundStatus( 9 );
     }
+
+    @Test
+    public void testProcessStripePayment() throws Exception {
+        paymentService.processStripePayment( "CRH-INV-ABCDEFG-SDQE" );
+    }
 }

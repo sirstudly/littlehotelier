@@ -64,6 +64,7 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_NON_REFUNDABLE_CHARGE_SUCCESSFUL = "Non-Refundable Charge Successful";
     public static final String TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED = "Non-Refundable Charge Declined";
     public static final String TEMPLATE_SAGEPAY_PAYMENT_CONFIRMATION = "Sagepay Payment Confirmation";
+    public static final String TEMPLATE_STRIPE_PAYMENT_CONFIRMATION = "Stripe Payment Confirmation";
     public static final String TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL = "Deposit Charge Successful";
     public static final String TEMPLATE_DEPOSIT_CHARGE_DECLINED = "Deposit Charge Declined";
     public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL = "Retract Deposit Charge Successful";
@@ -321,7 +322,7 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Checks if there are any transactions with the given vendorTxCode (SagePay) for the given reservation.
+     * Checks if there are any transactions with the given vendorTxCode for the given reservation.
      * 
      * @param webClient web client instance to use
      * @param res cloudbeds reservation
@@ -329,7 +330,7 @@ public class CloudbedsScraper {
      * @return non-null list of transactions
      * @throws IOException
      */
-    public boolean isExistsSagepayPaymentWithVendorTxCode( WebClient webClient, Reservation res, String vendorTxCode ) throws IOException {
+    public boolean isExistsPaymentWithVendorTxCode( WebClient webClient, Reservation res, String vendorTxCode ) throws IOException {
         
         WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res );
         JsonObject rpt = doRequest( webClient, requestSettings );
@@ -893,6 +894,17 @@ public class CloudbedsScraper {
      */
     public EmailTemplateInfo getSagepayPaymentConfirmationEmailTemplate( WebClient webClient ) throws IOException {
         return fetchEmailTemplate( webClient, TEMPLATE_SAGEPAY_PAYMENT_CONFIRMATION );
+    }
+    
+    /**
+     * Retrieves the Stripe confirmation email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getStripePaymentConfirmationEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_STRIPE_PAYMENT_CONFIRMATION );
     }
 
     /**

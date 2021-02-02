@@ -59,6 +59,7 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
 import com.macbackpackers.beans.SagepayTransaction;
+import com.macbackpackers.beans.StripeTransaction;
 import com.macbackpackers.beans.cloudbeds.requests.CustomerInfo;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
@@ -816,6 +817,38 @@ public class CloudbedsService {
                                     .replaceAll( "\\[payment total\\]", scraper.getCurrencyFormat().format( txn.getPaymentAmount() ) )
                                     .replaceAll( "\\[card type\\]", txn.getCardType() )
                                     .replaceAll( "\\[last 4 digits\\]", txn.getLastFourDigits() ) ) );
+            scraper.addNote( webClient, res.getReservationId(), note );
+        }
+    }
+
+    /**
+     * Sends a payment confirmation email for the given transaction.
+     * 
+     * @param webClient web client instance to use
+     * @param vendorTxCode
+     * @throws IOException 
+     * @throws MessagingException 
+     */
+    public void sendStripePaymentConfirmationGmail( WebClient webClient, String vendorTxCode ) throws MessagingException, IOException {
+        StripeTransaction txn = dao.fetchStripeTransaction( vendorTxCode );
+        EmailTemplateInfo template = scraper.getStripePaymentConfirmationEmailTemplate( webClient );
+        Reservation res = txn.getReservationId() == null ? null : scraper.getReservationRetry( webClient, txn.getReservationId() );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res != null && res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            String toName = res == null ? null : res.getFirstName() + " " + res.getLastName();
+            gmailService.sendEmail( txn.getEmail(), toName, template.getSubject(),
+                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
+                            .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
+                            .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
+                            .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
+                                    .replaceAll( "\\[vendor tx code\\]", txn.getVendorTxCode() )
+                                    .replaceAll( "\\[payment total\\]", scraper.getCurrencyFormat().format( txn.getPaymentAmount() ) )
+                                    .replaceAll( "\\[card type\\]", StringUtils.upperCase( txn.getCardType() ) )
+                                    .replaceAll( "\\[last 4 digits\\]", txn.getLast4Digits() ) ) );
             scraper.addNote( webClient, res.getReservationId(), note );
         }
     }
