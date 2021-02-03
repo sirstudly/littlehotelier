@@ -1405,6 +1405,7 @@ public class PaymentProcessorService {
         else { // call Stripe server and record result manually
             PaymentIntent paymentIntent = txn.getPaymentIntent( gson );
             PaymentMethodDetails details = paymentIntent.getCharges().getData().get( 0 ).getPaymentMethodDetails();
+            updateStripeTransactionWithPayment( txn, paymentIntent );
 
             if ( "succeeded".equals( paymentIntent.getStatus() ) ) {
                 cloudbedsScraper.addPayment( webClient, res, details.getCard().getBrand(), txn.getPaymentAmount(),
@@ -1414,7 +1415,6 @@ public class PaymentProcessorService {
                         "Processed Stripe transaction for £" + txn.getPaymentAmount() + "." );
                 createSendStripePaymentConfirmationEmailJob( txn.getVendorTxCode() );
             }
-            updateStripeTransactionWithPayment( txn, paymentIntent );
         }
     }
 
