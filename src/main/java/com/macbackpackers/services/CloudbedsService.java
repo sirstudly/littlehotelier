@@ -594,8 +594,8 @@ public class CloudbedsService {
         }
 
         scraper.getReservations( webClient, forDate.minusDays( 1 ), forDate.minusDays( 1 ) ).stream()
-                .filter( c -> Arrays.asList(c.getFirstName().toUpperCase().split(" ")).contains("LT") 
-                        || Arrays.asList( c.getLastName().toUpperCase().split(" ")).contains("LT")
+                .filter( c -> Arrays.asList( c.getFirstName().toUpperCase().split( " " ) ).contains( "LT" )
+                        || Arrays.asList( c.getLastName().toUpperCase().split( " " ) ).contains( "LT" ) )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> r.getCheckoutDateAsLocalDate().equals( forDate ) )
                 .filter( r -> false == "checked_out".equals( r.getStatus() ) )
