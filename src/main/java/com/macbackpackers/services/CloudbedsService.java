@@ -849,7 +849,9 @@ public class CloudbedsService {
                                     .replaceAll( "\\[payment total\\]", scraper.getCurrencyFormat().format( txn.getPaymentAmount() ) )
                                     .replaceAll( "\\[card type\\]", StringUtils.upperCase( txn.getCardType() ) )
                                     .replaceAll( "\\[last 4 digits\\]", txn.getLast4Digits() ) ) );
-            scraper.addNote( webClient, res.getReservationId(), note );
+            if ( res != null ) {
+                scraper.addNote( webClient, res.getReservationId(), note );
+            }
         }
     }
 
