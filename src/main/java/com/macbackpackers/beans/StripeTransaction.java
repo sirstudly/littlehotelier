@@ -35,6 +35,12 @@ public class StripeTransaction {
     @Column( name = "invoice_id" )
     private Integer invoiceId;
 
+    @Column( name = "first_name" )
+    private String firstName;
+
+    @Column( name = "last_name" )
+    private String lastName;
+
     @Column( name = "email", nullable = false )
     private String email;
 
@@ -53,8 +59,14 @@ public class StripeTransaction {
     @Column( name = "payment_status" )
     private String paymentStatus;
 
-    @Column( name = "auth_details" )
-    private String authDetails;
+    @Column( name = "auth_status" )
+    private String authStatus;
+
+    @Column( name = "auth_status_detail" )
+    private String authStatusDetail;
+
+    @Column( name = "charge_id" )
+    private String chargeId;
 
     @Column( name = "card_type" )
     private String cardType;
@@ -101,6 +113,22 @@ public class StripeTransaction {
 
     public void setInvoiceId( Integer invoiceId ) {
         this.invoiceId = invoiceId;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName( String firstName ) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName( String lastName ) {
+        this.lastName = lastName;
     }
 
     public String getEmail() {
@@ -151,12 +179,28 @@ public class StripeTransaction {
         this.paymentStatus = paymentStatus;
     }
 
-    public String getAuthDetails() {
-        return authDetails;
+    public String getAuthStatus() {
+        return authStatus;
     }
 
-    public void setAuthDetails( String authDetails ) {
-        this.authDetails = authDetails;
+    public void setAuthStatus( String authStatus ) {
+        this.authStatus = authStatus;
+    }
+
+    public String getAuthStatusDetail() {
+        return authStatusDetail;
+    }
+
+    public void setAuthStatusDetail( String authStatusDetail ) {
+        this.authStatusDetail = authStatusDetail;
+    }
+
+    public String getChargeId() {
+        return chargeId;
+    }
+
+    public void setChargeId( String chargeId ) {
+        this.chargeId = chargeId;
     }
 
     public String getCardType() {

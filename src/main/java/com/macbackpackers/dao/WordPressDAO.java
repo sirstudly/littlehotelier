@@ -538,11 +538,13 @@ public interface WordPressDAO {
      * 
      * @param id unique PK on wp_stripe_transaction
      * @param paymentStatus status on paymentIntent
-     * @param authDetails human readable auth/failure details
+     * @param authStatus outcome type
+     * @param authStatusDetail outcome seller message
+     * @param chargeId charge identifier
      * @param cardType e.g. amex, mastercard, visa
      * @param last4Digits last 4 digits of card used as payment
      */
-    public void updateStripeTransaction( int id, String paymentStatus, String authDetails, String cardType, String last4Digits );
+    public void updateStripeTransaction( int id, String paymentStatus, String authStatus, String authStatusDetail, String chargeId, String cardType, String last4Digits );
 
     /**
      * Reads a record to the sagepay refund table.

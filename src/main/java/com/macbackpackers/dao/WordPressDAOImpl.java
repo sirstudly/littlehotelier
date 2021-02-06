@@ -1093,13 +1093,15 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    public void updateStripeTransaction( int id, String paymentStatus, String authDetails, String cardType, String last4Digits ) {
+    public void updateStripeTransaction( int id, String paymentStatus, String authStatus, String authStatusDetail, String chargeId, String cardType, String last4Digits ) {
         StripeTransaction txn = em.find( StripeTransaction.class, id );
         if ( txn == null ) {
             throw new EmptyResultDataAccessException( "Unable to find StripeTransaction with ID " + id, 1 );
         }
         txn.setPaymentStatus( paymentStatus );
-        txn.setAuthDetails( authDetails );
+        txn.setAuthStatus( authStatus );
+        txn.setAuthStatusDetail( authStatusDetail );
+        txn.setChargeId( chargeId );
         txn.setCardType( cardType );
         txn.setLast4Digits( last4Digits );
         txn.setProcessedDate( new Timestamp( System.currentTimeMillis() ) );

@@ -594,7 +594,8 @@ public class CloudbedsService {
         }
 
         scraper.getReservations( webClient, forDate.minusDays( 1 ), forDate.minusDays( 1 ) ).stream()
-                .filter( c -> c.getFirstName().toUpperCase().contains("LT") || c.getLastName().toUpperCase().contains("LT") )
+                .filter( c -> Arrays.asList(c.getFirstName().toUpperCase().split(" ")).contains("LT") 
+                        || Arrays.asList( c.getLastName().toUpperCase().split(" ")).contains("LT")
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> r.getCheckoutDateAsLocalDate().equals( forDate ) )
                 .filter( r -> false == "checked_out".equals( r.getStatus() ) )
@@ -839,8 +840,7 @@ public class CloudbedsService {
             LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
         }
         else {
-            String toName = res == null ? null : res.getFirstName() + " " + res.getLastName();
-            gmailService.sendEmail( txn.getEmail(), toName, template.getSubject(),
+            gmailService.sendEmail( txn.getEmail(), txn.getFirstName() + " " + txn.getLastName(), template.getSubject(),
                     IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
                             .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
                             .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )

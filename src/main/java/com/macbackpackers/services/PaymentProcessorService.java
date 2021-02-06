@@ -1303,8 +1303,27 @@ public class PaymentProcessorService {
             LOGGER.info( "Attempting to process refund for reservation " + refund.getReservationId() + " and txn " + refundTxnId + " for £" + refundAmount );
             Reservation res = cloudbedsScraper.getReservationRetry( webClient, refund.getReservationId() );
             TransactionRecord authTxn = cloudbedsScraper.getStripeTransaction( webClient, res, refund.getCloudbedsTxId() );
+            String chargeId, refundDescription;
 
-            if ( StringUtils.isBlank( authTxn.getGatewayAuthorization() ) ) {
+            // Stripe transaction was done through Cloudbeds
+            if( authTxn.getGatewayAuthorization() != null ) {
+                chargeId = authTxn.getGatewayAuthorization();
+                refundDescription = refundTxnId + " (" + authTxn.getGatewayAuthorization() + "): " 
+                        + authTxn.getOriginalDescription() + " x" + authTxn.getCardNumber();
+            }
+            else { // Stripe transaction was done via gateway and manually entered into Cloudbeds
+                Matcher m = Pattern.compile( "VendorTxCode: (.*?)," ).matcher( authTxn.getNotes() );
+                if ( false == m.find() ) {
+                    throw new MissingUserDataException( "Unable to find VendorTxCode for refund " + refundTxnId );
+                }
+                String vendorTxCode = m.group( 1 );
+                StripeTransaction originalTxn = wordpressDAO.fetchStripeTransaction( vendorTxCode );
+                chargeId = originalTxn.getChargeId();
+                refundDescription = refundTxnId + " (" + chargeId + "): " + vendorTxCode + " x"
+                        + originalTxn.getLast4Digits() + " (" + originalTxn.getCardType() + ")";
+            }
+
+            if ( StringUtils.isBlank( chargeId ) ) {
                 cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
                         " for £" + refundAmount + ". Unable to find original transaction to refund." );
                 throw new MissingUserDataException( "Unable to find original transaction to refund." );
@@ -1313,47 +1332,45 @@ public class PaymentProcessorService {
             else { // call Stripe server and record result manually
                 String idempotentKey = wordpressDAO.getMandatoryOption( "hbo_sagepay_vendor_prefix" )
                         + res.getIdentifier() + "-RF-" + jobId;
-                LOGGER.info( "Attempting to process refund for charge " + authTxn.getGatewayAuthorization() );
+                LOGGER.info( "Attempting to process refund for charge " + chargeId );
                 Stripe.apiKey = STRIPE_API_KEY;
                 try {
-                    Refund stripRefund = Refund.create( RefundCreateParams.builder()
-                            .setCharge( authTxn.getGatewayAuthorization() )
+                    Refund stripeRefund = Refund.create( RefundCreateParams.builder()
+                            .setCharge( chargeId )
                             .setAmount( refund.getAmountInBaseUnits() ).build(),
                             // set idempotency key so we can re-run safely in case of previous failure
                             new RequestOptionsBuilder().setIdempotencyKey( idempotentKey ).build() );
-                    LOGGER.info( "Response: " + stripRefund.toJson() );
-                    wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), stripRefund.toJson(), stripRefund.getStatus() );
+                    LOGGER.info( "Response: " + stripeRefund.toJson() );
+                    wordpressDAO.updateStripeRefund( refundTxnId, chargeId, stripeRefund.toJson(), stripeRefund.getStatus() );
 
                     // record refund in Cloudbeds so we're in sync
-                    if ( "succeeded".equals( stripRefund.getStatus() ) ) {
-                        cloudbedsScraper.addRefund( webClient, res, refund.getAmount(), refundTxnId + " ("
-                                + authTxn.getGatewayAuthorization() + "): " + authTxn.getOriginalDescription() + " x"
-                                + authTxn.getCardNumber() + " refunded on Stripe. -RONBOT" );
+                    if ( "succeeded".equals( stripeRefund.getStatus() ) ) {
+                        cloudbedsScraper.addRefund( webClient, res, refund.getAmount(),
+                                refundDescription + " refunded on Stripe. -RONBOT" );
                         cloudbedsScraper.addNote( webClient, refund.getReservationId(),
                                 "Refund completed for £" + refundAmount + "."
                                         + (refund.getDescription() == null ? "" : " " + refund.getDescription()) );
                         createSendRefundSuccessfulEmailJob( refund );
                     }
-                    else if ( "pending".equals( stripRefund.getStatus() ) ) {
+                    else if ( "pending".equals( stripeRefund.getStatus() ) ) {
                         LOGGER.info( "Refund pending" );
-                        cloudbedsScraper.addRefund( webClient, res, refund.getAmount(), refundTxnId + " ("
-                                + authTxn.getGatewayAuthorization() + "): " + authTxn.getOriginalDescription() + " x"
-                                + authTxn.getCardNumber() + " refund PENDING on Stripe. -RONBOT" );
+                        cloudbedsScraper.addRefund( webClient, res, refund.getAmount(),
+                                refundDescription + " refund PENDING on Stripe. -RONBOT" );
                         cloudbedsScraper.addNote( webClient, refund.getReservationId(),
                                 "Refund PENDING (should usually be ok) for £" + refundAmount + "."
                                         + (refund.getDescription() == null ? "" : " " + refund.getDescription()) );
                         createSendRefundSuccessfulEmailJob( refund );
                     }
                     else {
-                        LOGGER.error( "Unexpected response during refund: " + stripRefund.toJson() );
-                        wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), stripRefund.toJson(), "failed" );
+                        LOGGER.error( "Unexpected response during refund: " + stripeRefund.toJson() );
+                        wordpressDAO.updateStripeRefund( refundTxnId, chargeId, stripeRefund.toJson(), "failed" );
                         cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
                                 " for £" + refundAmount + ". See logs for details." );
                     }
                 }
                 catch ( InvalidRequestException ex ) {
                     LOGGER.error( ex.getMessage() );
-                    wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), ex.getMessage(), "failed" );
+                    wordpressDAO.updateStripeRefund( refundTxnId, chargeId, ex.getMessage(), "failed" );
                     cloudbedsScraper.addNote( webClient, refund.getReservationId(), "Failed to refund transaction " +
                             " for £" + refundAmount + ". " + ex.getMessage() );
                 }
@@ -1432,8 +1449,8 @@ public class PaymentProcessorService {
         if ( charge.getFailureCode() != null || charge.getFailureMessage() != null ) {
             authDetails += ", " + charge.getFailureCode() + ": " + charge.getFailureMessage();
         }
-        wordpressDAO.updateStripeTransaction( txn.getId(), paymentIntent.getStatus(), authDetails,
-                details.getCard().getBrand(), details.getCard().getLast4() );
+        wordpressDAO.updateStripeTransaction( txn.getId(), paymentIntent.getStatus(), outcome.getType(),
+                authDetails, charge.getId(), details.getCard().getBrand(), details.getCard().getLast4() );
     }
 
     /**
@@ -1449,22 +1466,22 @@ public class PaymentProcessorService {
             Stripe.apiKey = STRIPE_API_KEY;
             StripeRefund refund = wordpressDAO.fetchStripeRefund( refundTxnId );
             LOGGER.info( "Updating refund status for reservation " + refund.getReservationId() + " and txn " + refundTxnId );
-            Reservation res = cloudbedsScraper.getReservationRetry( webClient, refund.getReservationId() );
-            TransactionRecord authTxn = cloudbedsScraper.getStripeTransaction( webClient, res, refund.getCloudbedsTxId() );
-            Charge charge = Charge.retrieve( authTxn.getGatewayAuthorization() );
+            Charge charge = Charge.retrieve( refund.getChargeId() );
             if ( charge.getRefunds().getData().size() == 0 ) {
                 throw new MissingUserDataException( "Unable to find refund transaction." );
             }
+
+            // if any refunds are not at succeeded, that status has precedence
             String[] status = new String[1];
             charge.getRefunds().getData().forEach( r -> {
-                if ( "succeeded".equals( r.getStatus() ) || status[0] == null ) {
+                if ( false == "succeeded".equals( r.getStatus() ) || status[0] == null ) {
                     status[0] = r.getStatus();
                 }
             } );
             String jsonResponse = charge.getRefunds().getData().stream()
                     .map( r -> r.toJson() ).collect( Collectors.joining( ",\n" ) );
             LOGGER.info( jsonResponse );
-            wordpressDAO.updateStripeRefund( refundTxnId, authTxn.getGatewayAuthorization(), jsonResponse, status[0] );
+            wordpressDAO.updateStripeRefund( refundTxnId, charge.getId(), jsonResponse, status[0] );
         }
     }
 
