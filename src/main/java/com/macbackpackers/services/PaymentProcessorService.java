@@ -1445,7 +1445,7 @@ public class PaymentProcessorService {
         Charge charge = paymentIntent.getCharges().getData().get( 0 );
         PaymentMethodDetails details = charge.getPaymentMethodDetails();
         Outcome outcome = charge.getOutcome();
-        String authDetails = outcome.getType() + ": " + outcome.getSellerMessage();
+        String authDetails = outcome.getSellerMessage();
         if ( charge.getFailureCode() != null || charge.getFailureMessage() != null ) {
             authDetails += ", " + charge.getFailureCode() + ": " + charge.getFailureMessage();
         }
