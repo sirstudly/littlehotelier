@@ -834,7 +834,7 @@ public class CloudbedsService {
         StripeTransaction txn = dao.fetchStripeTransaction( vendorTxCode );
         EmailTemplateInfo template = scraper.getStripePaymentConfirmationEmailTemplate( webClient );
         Reservation res = txn.getReservationId() == null ? null : scraper.getReservationRetry( webClient, txn.getReservationId() );
-        final String note = template.getTemplateName() + " email sent.";
+        final String note = template.getTemplateName() + " " + txn.getId() + " email sent.";
 
         if ( res != null && res.containsNote( note ) ) {
             LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
