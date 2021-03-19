@@ -52,6 +52,7 @@ import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
+import com.macbackpackers.exceptions.PaymentPendingException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 
@@ -688,8 +689,11 @@ public class CloudbedsScraper {
      * @param res CB reservation
      * @param amount how much
      * @throws IOException
+     * @throws PaymentPendingException in card requires 3DS authorization
+     * @throws RecordPaymentFailedException if card declined
      */
-    public void chargeCardForBooking( WebClient webClient, Reservation res, BigDecimal amount ) throws IOException {
+    public void chargeCardForBooking( WebClient webClient, Reservation res, BigDecimal amount )
+            throws IOException, PaymentPendingException, RecordPaymentFailedException {
         LOGGER.info( "Begin PROCESS CHARGE for reservation " + res.getReservationId()  + " for " + getCurrencyFormat().format( amount ) );
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessPaymentRequest( res.getReservationId(), 
                 res.getBookingRooms().get( 0 ).getId(), res.getCreditCardId(), amount, "Autocharging -RONBOT" );
@@ -700,8 +704,8 @@ public class CloudbedsScraper {
                     LOGGER.info( "Confirming reservation balance to see if anything has changed..." );
                     Reservation updatedRes = getReservationRetry( webClient, res.getReservationId() );
                     if ( updatedRes.getPaidValue().equals( res.getPaidValue() ) ) {
-                        LOGGER.info( "LIES!! Balance hasn't changed!" );
-                        throw new RecordPaymentFailedException( "It doesn't look like we charged the booking." );
+                        LOGGER.info( "Balance hasn't changed.. Assuming pending payment." );
+                        throw new PaymentPendingException( "Attempt to charge but paid amount remains the same. Is this payment pending?" );
                     }
                 }, 
                 (resp, jsonResp) -> {

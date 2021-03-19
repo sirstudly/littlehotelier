@@ -60,6 +60,7 @@ import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.beans.xml.TxnResponse;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.PaymentPendingException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
@@ -317,6 +318,12 @@ public class PaymentProcessorService {
             job.setAmount( depositAmount );
             job.setStatus( JobStatus.submitted );
             wordpressDAO.insertJob( job );
+        }
+        catch ( PaymentPendingException ex ) {
+            LOGGER.info( ex.getMessage() );
+            cloudbedsScraper.addNote( webClient, reservationId,
+                    "Pending deposit of £" + cloudbedsScraper.getCurrencyFormat().format( depositAmount )
+                            + " will post automatically when customer confirms via email." );
         }
         catch ( RecordPaymentFailedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
@@ -688,6 +695,12 @@ public class PaymentProcessorService {
             job.setAmount( cbReservation.getBalanceDue() );
             job.setStatus( JobStatus.submitted );
             wordpressDAO.insertJob( job );
+        }
+        catch ( PaymentPendingException ex ) {
+            LOGGER.info( ex.getMessage() );
+            cloudbedsScraper.addNote( webClient, reservationId,
+                    "Non-refundable amount of £" + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() )
+                            + " will post automatically when customer confirms via email." );
         }
         catch ( RecordPaymentFailedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
