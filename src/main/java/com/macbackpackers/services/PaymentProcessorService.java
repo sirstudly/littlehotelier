@@ -60,7 +60,7 @@ import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.beans.xml.TxnResponse;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
-import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
+import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
 import com.macbackpackers.jobs.SendDepositChargeDeclinedEmailJob;
@@ -318,7 +318,7 @@ public class PaymentProcessorService {
             job.setStatus( JobStatus.submitted );
             wordpressDAO.insertJob( job );
         }
-        catch ( PaymentNotAuthorizedException payEx ) {
+        catch ( RecordPaymentFailedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
 
             if ( cloudbedsScraper.getEmailLastSentDate( webClient, reservationId,
@@ -689,7 +689,7 @@ public class PaymentProcessorService {
             job.setStatus( JobStatus.submitted );
             wordpressDAO.insertJob( job );
         }
-        catch ( PaymentNotAuthorizedException payEx ) {
+        catch ( RecordPaymentFailedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
 
             if ( cloudbedsScraper.getEmailLastSentDate( webClient, reservationId,

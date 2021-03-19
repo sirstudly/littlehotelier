@@ -434,7 +434,7 @@ public class CloudbedsScraper {
      * @param description description of payment
      * @throws IOException on page load failure
      */
-    public void addPayment( WebClient webClient, Reservation res, String cardType, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
+    public void addPayment( WebClient webClient, Reservation res, String cardType, BigDecimal amount, String description ) throws IOException {
 
         // first we need to find a "room" we're booking to
         // it doesn't actually map to a room, just an assigned guest
@@ -459,7 +459,7 @@ public class CloudbedsScraper {
      * @param description description of payment
      * @throws IOException on page load failure
      */
-    public void addRefund( WebClient webClient, Reservation res, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
+    public void addRefund( WebClient webClient, Reservation res, BigDecimal amount, String description ) throws IOException {
 
         // first we need to find a "room" we're booking to
         // it doesn't actually map to a room, just an assigned guest
@@ -486,7 +486,7 @@ public class CloudbedsScraper {
      * @return response from Cloudbeds
      * @throws IOException on page load failure
      */
-    public CloudbedsJsonResponse processRefund( WebClient webClient, Reservation res, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException, RecordPaymentFailedException {
+    public CloudbedsJsonResponse processRefund( WebClient webClient, Reservation res, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException {
 
         // first we need to find a "room" we're booking to
         // it doesn't actually map to a room, just an assigned guest
@@ -693,7 +693,17 @@ public class CloudbedsScraper {
         LOGGER.info( "Begin PROCESS CHARGE for reservation " + res.getReservationId()  + " for " + getCurrencyFormat().format( amount ) );
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessPaymentRequest( res.getReservationId(), 
                 res.getBookingRooms().get( 0 ).getId(), res.getCreditCardId(), amount, "Autocharging -RONBOT" );
-        doRequest( webClient, requestSettings, CloudbedsJsonResponse.class, null, 
+        doRequest( webClient, requestSettings, CloudbedsJsonResponse.class, 
+                (resp, jsonResp) -> {
+                    // 2021-03-19: success when charge from Stripe is incomplete??
+                    LOGGER.info( "Cloudbeds says successfully charged booking. " + jsonResp );
+                    LOGGER.info( "Confirming reservation balance to see if anything has changed..." );
+                    Reservation updatedRes = getReservationRetry( webClient, res.getReservationId() );
+                    if ( updatedRes.getPaidValue().equals( res.getPaidValue() ) ) {
+                        LOGGER.info( "LIES!! Balance hasn't changed!" );
+                        throw new RecordPaymentFailedException( "It doesn't look like we charged the booking." );
+                    }
+                }, 
                 (resp, jsonResp) -> {
                     LOGGER.error( "Failed to charge booking. " + jsonResp );
                     try {

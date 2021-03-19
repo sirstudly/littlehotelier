@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import com.gargoylesoftware.htmlunit.WebClient;
-import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
+import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.services.PaymentProcessorService;
 
 /**
@@ -43,7 +43,7 @@ public class ChargeHostelworldLateCancellationJob extends AbstractJob {
         try {
             paymentProcessor.processHostelworldLateCancellationCharge( cbWebClient, getReservationId() );
         }
-        catch ( PaymentNotAuthorizedException ex ) {
+        catch ( RecordPaymentFailedException ex ) {
             LOGGER.info( "Payment not authorized. Lowering retry count on job to 1 to avoid spamming card" );
             numRetriesOverride = 1;
             throw ex;
