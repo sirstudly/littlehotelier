@@ -97,7 +97,7 @@ public class CreateDepositChargeJob extends AbstractJob {
         List<DepositChargeJob> jobs = new ArrayList<>();
         CloudbedsScraper cbScraper = appContext.getBean( CloudbedsScraper.class );
         cbScraper.getReservationsForBookingSources( webClient,
-                LocalDate.now(), LocalDate.now().plusDays( 7 ),
+                LocalDate.now(), LocalDate.now().plusDays( 3 ),
                 null, null, "Booking.com (Hotel Collect Booking)" )
                 .stream()
                 .filter( p -> p.getPaidValue().equals( BigDecimal.ZERO ) )
@@ -106,6 +106,7 @@ public class CreateDepositChargeJob extends AbstractJob {
                 .filter( p -> false == p.isPrepaid() )
                 .filter( p -> false == p.isNonRefundable() ) // non-refundables are processed by CreateChargeNonRefundableBookingJob
                 .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
+                .filter( p -> false == p.containsNote( "will post automatically when customer confirms via email" ) ) // we haven't already tried to charge
                 .forEach( p -> {
                     LOGGER.info( "Creating a DepositChargeJob for " + p.getSourceName() + " #"
                             + p.getThirdPartyIdentifier() + " (" + p.getStatus() + ")" );
