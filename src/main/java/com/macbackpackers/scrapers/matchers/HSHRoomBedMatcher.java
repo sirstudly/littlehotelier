@@ -36,6 +36,14 @@ public class HSHRoomBedMatcher implements RoomBedMatcher {
         FRUIT_VEG ("4F&V", "F&V"),
         FRUIT_VEG2 ("4F&amp;V", "F&V"),
         ZOO ("4Zoo", "Zoo"),
+        PRIVATE_1 ("Private 1", "Private 1"),
+        PRIVATE_2 ("Private 2", "Private 2"),
+        HOGWARTS ("Hogwarts", "Hogwarts"),
+        STARWARS ("Starwars", "Starwars"),
+        TRAINSPOTTING ("Trainspotting", "Trainspotting"),
+        LITTLE_MISS ("Little Miss", "Little Miss"),
+        GOTHAM_CITY ("Gotham City", "Gotham City"),
+        MIDDLE_EARTH ("Middle Earth", "Middle Earth"),
         UNALLOCATED ("N/A", "Unallocated");
 
         final String room;
