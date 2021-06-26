@@ -72,6 +72,8 @@ import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.jobs.SplitRoomReservationReportJob;
 import com.macbackpackers.jobs.UnpaidDepositReportJob;
 import com.macbackpackers.jobs.UpdateLittleHotelierSettingsJob;
+import com.macbackpackers.jobs.VerifyAlexaLoggedInJob;
+import com.macbackpackers.jobs.VerifyGoogleAssistantLoggedInJob;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 
@@ -684,6 +686,20 @@ public class ProcessorServiceTest {
         // verify that the job completed successfully
         Job jobVerify = dao.fetchJobById( jobId );
         Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+    }
+
+    @Test
+    public void testVerifyGoogleAssistantLoggedInJob() throws Exception {
+        VerifyGoogleAssistantLoggedInJob job = new VerifyGoogleAssistantLoggedInJob();
+        autowireBeanFactory.autowireBean( job );
+        job.processJob();
+    }
+
+    @Test
+    public void testVerifyAlexaLoggedInJob() throws Exception {
+        VerifyAlexaLoggedInJob job = new VerifyAlexaLoggedInJob();
+        autowireBeanFactory.autowireBean( job );
+        job.processJob();
     }
 
 //    @Test
