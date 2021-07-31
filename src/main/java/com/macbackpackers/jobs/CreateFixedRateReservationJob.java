@@ -1,8 +1,10 @@
+
 package com.macbackpackers.jobs;
 
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.format.DateTimeFormatter;
 
 import javax.persistence.DiscriminatorValue;
@@ -23,8 +25,20 @@ public class CreateFixedRateReservationJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        cloudbedsService.createFixedRateReservationAndEmailPaymentLink(
-                getReservationId(), getCheckinDate(), getCheckoutDate(), getRatePerDay() );
+        if ( getCheckinDate().getMonth() == Month.AUGUST ) {
+            cloudbedsService.createFixedRateReservationAndEmailPaymentLink(
+                    // assumes start of week is monday with friday/saturday at higher rate
+                    // 14*5 + 15*2 = 100pw
+                    getReservationId(), getCheckinDate(), getCheckoutDate(), new BigDecimal[]{
+                            new BigDecimal( "14" ), new BigDecimal( "14" ), new BigDecimal( "14" ),
+                            new BigDecimal( "14" ), new BigDecimal( "15" ),
+                            new BigDecimal( "15" ), new BigDecimal( "14" ),
+                    } );
+        }
+        else {
+            cloudbedsService.createFixedRateReservationAndEmailPaymentLink(
+                    getReservationId(), getCheckinDate(), getCheckoutDate(), getRatePerDay() );
+        }
     }
 
     public String getReservationId() {
