@@ -130,8 +130,10 @@ public class CloudbedsServiceTest {
     }
 
     @Test
-    public void testCreatePrepaidChargeJobs() throws Exception {
-        cloudbedsService.createBDCPrepaidChargeJobs();
+    public void testGetAllVCCBookingsThatCanBeCharged() throws Exception {
+        cloudbedsService.getAllVCCBookingsThatCanBeCharged()
+                .stream()
+                .forEach( r -> LOGGER.info( "Found reservation {}", r ) );
     }
 
     @Test

@@ -11,8 +11,8 @@ import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.services.CloudbedsService;
 
 /**
- * Job that creates {@link PrepaidChargeJob}s for all prepaid bookings
- * with virtual CCs that are currently chargeable.
+ * Job that creates {@link PrepaidChargeJob}s for all prepaid bookings with virtual CCs that are
+ * currently chargeable.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.CreatePrepaidChargeJob" )
@@ -25,28 +25,20 @@ public class CreatePrepaidChargeJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
 
-        // find all BDC bookings with unpaid deposits that use a virtual CC
-        // and create a job for each of them if they're currently chargeable
-        dao.fetchPrepaidBDCBookingsWithOutstandingBalance()
+        // login to BDC and check for any prepaid bookings we haven't charged yet
+        cloudbedsService.getAllVCCBookingsThatCanBeCharged()
                 .stream()
-                .filter( p -> p.isChargeableDateInPast() )
-                .forEach( a -> {
-                    LOGGER.info( "Creating a PrepaidChargeJob for booking " + a.getBookingReference() 
-                            + " chargeable on " + a.getEarliestChargeDate() );
+                .forEach( r -> {
+                    LOGGER.info( "Creating a PrepaidChargeJob for booking " + r );
                     PrepaidChargeJob chargeJob = new PrepaidChargeJob();
                     chargeJob.setStatus( JobStatus.submitted );
-                    chargeJob.setReservationId( String.valueOf( a.getReservationId() ) );
+                    chargeJob.setReservationId( r );
                     dao.insertJob( chargeJob );
                 } );
-
-        // also, login to BDC and check for any prepaid bookings we haven't charged yet
-        try {
-            cloudbedsService.createBDCPrepaidChargeJobs();
-        }
-        catch ( Exception ex ) {
-            setRetryCount( 1 ); // don't retry if we fail at this point
-            throw ex;
-        }
     }
 
+    @Override
+    public int getRetryCount() {
+        return 1;
+    }
 }

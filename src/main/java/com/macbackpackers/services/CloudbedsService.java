@@ -375,24 +375,30 @@ public class CloudbedsService {
     }
 
     /**
-     * Creates a PrepaidChargeJob for all virtual card bookings that can be charged immediately.
+     * Returns all reservations for BDC with virtual cards that can be charged immediately.
      * 
-     * @param driver
-     * @param wait
+     * @return List<String> cloudbeds reservation ids
      * @throws Exception
      */
-    public void createBDCPrepaidChargeJobs() throws Exception {
+    public List<String> getAllVCCBookingsThatCanBeCharged() throws Exception {
         WebDriver driver = driverFactory.borrowObject();
         try {
             WebDriverWait wait = new WebDriverWait( driver, maxWaitSeconds );
-            bdcScraper.getAllVCCBookingsThatCanBeCharged( driver, wait )
-                .stream().forEach( this::createPrepaidChargeJob );
+            return bdcScraper.getAllVCCBookingsThatCanBeCharged( driver, wait )
+                    .stream()
+                    .map( bdc -> getReservationForBDC( bdc ) )
+                    .filter( r -> r.isPresent() )
+                    .map( r -> r.get() )
+                    .peek( r -> LOGGER.info( "Found BDC reservation {} - {} with VCC for {} {}",
+                            r.getThirdPartyIdentifier(), r.getReservationId(), r.getFirstName(), r.getLastName() ) )
+                    .map( r -> r.getReservationId() )
+                    .collect( Collectors.toList() );
         }
         catch ( Exception ex ) {
-            LOGGER.error( "createBDCPrepaidChargeJobs() failed." );
+            LOGGER.error( "getAllVCCBookingsThatCanBeCharged() failed." );
             File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            FileUtils.copyFile( scrFile, new File( "logs/bdc_prepaid_charge_job.png" ) );
-            LOGGER.error( "Screenshot saved as bdc_prepaid_charge_job.png" );
+            FileUtils.copyFile( scrFile, new File( "logs/get_all_vcc_bookings.png" ) );
+            LOGGER.error( "Screenshot saved as get_all_vcc_bookings.png" );
             throw ex;
         }
         finally {
@@ -401,25 +407,18 @@ public class CloudbedsService {
     }
 
     /**
-     * Searches Cloudbeds for the given BDC reservation and creates a PrepaidChargeJob for it.
+     * Searches Cloudbeds for the given BDC reservation.
      * 
      * @param bdcReference Booking.com reference
+     * @return matched cloudbeds reservation if found
      */
-    private void createPrepaidChargeJob( String bdcReference ) {
+    private Optional<Reservation> getReservationForBDC( String bdcReference ) {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            scraper.getReservations( webClient, bdcReference ).stream()
+            return scraper.getReservations( webClient, bdcReference ).stream()
                     .filter( p -> p.getSourceName().contains( "Booking.com" ) ) // just in case
                     .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                     .filter( r -> r.getThirdPartyIdentifier().equals( bdcReference ) )
-                    .forEach( r -> {
-                        LOGGER.info( "Creating a PrepaidChargeJob for BDC-{} ({}) - {}, {} ({} to {})",
-                                bdcReference, r.getReservationId(), r.getLastName(), r.getFirstName(),
-                                r.getCheckinDate(), r.getCheckoutDate() );
-                        PrepaidChargeJob j = new PrepaidChargeJob();
-                        j.setStatus( JobStatus.submitted );
-                        j.setReservationId( r.getReservationId() );
-                        dao.insertJob( j );
-                    } );
+                    .findFirst();
         }
         catch ( IOException ex ) {
             throw new RuntimeException( ex );
