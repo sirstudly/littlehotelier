@@ -394,13 +394,13 @@ public class CloudbedsService {
                     .map( r -> r.getReservationId() )
                     .collect( Collectors.toList() );
         }
-        catch ( Exception ex ) {
-            LOGGER.error( "getAllVCCBookingsThatCanBeCharged() failed." );
-            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            FileUtils.copyFile( scrFile, new File( "logs/get_all_vcc_bookings.png" ) );
-            LOGGER.error( "Screenshot saved as get_all_vcc_bookings.png" );
-            throw ex;
-        }
+//        catch ( Exception ex ) {
+//            LOGGER.error( "getAllVCCBookingsThatCanBeCharged() failed." );
+//            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
+//            FileUtils.copyFile( scrFile, new File( "logs/get_all_vcc_bookings.png" ) );
+//            LOGGER.error( "Screenshot saved as get_all_vcc_bookings.png" );
+//            throw ex;
+//        }
         finally {
             driverFactory.returnObject( driver );
         }
