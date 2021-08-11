@@ -117,6 +117,7 @@ public class BookingComScraper {
      */
     private void doLoginForm( String username, String password ) throws IOException {
 
+        webClient.getPage( getCurrentPage().getBaseURL().toString() ); // need to reload page for some reason
         HtmlPage page = getCurrentPage();
         HtmlTextInput usernameField = page.getHtmlElementById( "loginname" );
         usernameField.type( wordPressDAO.getOption( "hbo_bdc_username" ) );
@@ -456,7 +457,6 @@ public class BookingComScraper {
             }
 
             // login again
-            webClient.getPage( getCurrentPage().getBaseURL().toString() ); // need to reload page for some reason
             doLoginForm( wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
 
             CLOSE_WINDOW_TASK = Optional.of( () -> {
