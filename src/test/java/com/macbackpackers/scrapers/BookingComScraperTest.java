@@ -8,9 +8,11 @@ import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.config.LittleHotelierConfig;
 
 @RunWith( SpringJUnit4ClassRunner.class )
@@ -22,34 +24,38 @@ public class BookingComScraperTest {
     @Autowired
     BookingComScraper scraper;
 
+    @Autowired
+    @Qualifier( "webClientForBDC" )
+    private WebClient webClient;
+
     @Test
     public void testLoginSuccessful() throws Exception {
-        scraper.doLogin();
+        scraper.doLogin( webClient );
     }
 
     @Test
     public void testLoadReservation() throws Exception {
-        scraper.lookupReservation( "2316646060" );
+        scraper.lookupReservation( webClient, "2316646060" );
     }
 
     @Test
     public void testMarkCardInvalid() throws Exception {
-        scraper.markCreditCardAsInvalid( "3913632669", "7916" );
+        scraper.markCreditCardAsInvalid( webClient, "3913632669", "7916" );
     }
 
     @Test
     public void testGetVirtualCardBalance() throws Exception {
-        scraper.getVirtualCardBalance( "3349847478" );
+        scraper.getVirtualCardBalance( webClient, "3349847478" );
     }
 
     @Test
     public void testReturnCardDetailsForBooking() throws Exception {
-        scraper.returnCardDetailsForBooking( "2955126491" );
+        scraper.returnCardDetailsForBooking( webClient, "2955126491" );
     }
 
     @Test
     public void testGetAllVCCBookingsThatCanBeCharged() throws Exception {
-        List<String> bookingRefs = scraper.getAllVCCBookingsThatCanBeCharged();
+        List<String> bookingRefs = scraper.getAllVCCBookingsThatCanBeCharged( webClient );
         LOGGER.info( "Found {} bookings", bookingRefs.size() );
         bookingRefs.stream().forEach( b -> LOGGER.info( b ) );
     }

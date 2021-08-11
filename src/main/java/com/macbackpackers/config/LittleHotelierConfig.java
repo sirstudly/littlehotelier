@@ -68,8 +68,14 @@ public class LittleHotelierConfig {
     @Scope( "prototype" )
     public WebClient getWebClientForBDC() {
         // return the default web client (with JS enabled)
-        WebClient webClient = getWebClientForHostelworld();
+        WebClient webClient = new WebClient( BrowserVersion.FIREFOX );
+        webClient.getOptions().setTimeout( 120000 );
+        webClient.getOptions().setRedirectEnabled( true );
         webClient.getOptions().setJavaScriptEnabled( true );
+        webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
+        webClient.getOptions().setThrowExceptionOnScriptError( false );
+        webClient.getOptions().setCssEnabled( false );
+        webClient.getOptions().setUseInsecureSSL( true );
         webClient.setAjaxController( new NicelyResynchronizingAjaxController() );
         webClient.waitForBackgroundJavaScript(60000); 
         return webClient;

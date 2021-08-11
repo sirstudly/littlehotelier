@@ -18,7 +18,6 @@ import org.openqa.selenium.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import com.gargoylesoftware.htmlunit.WebClient;
@@ -47,10 +46,6 @@ public class BookingComScraper {
     private WordPressDAO wordPressDAO;
 
     @Autowired
-    @Qualifier( "webClientForBDC" )
-    private WebClient webClient;
-
-    @Autowired
     private FileService fileService;
 
     /** for saving login credentials */
@@ -59,23 +54,25 @@ public class BookingComScraper {
     /**
      * Logs into BDC providing the necessary credentials.
      * 
+     * @param webClient
      * @throws IOException
      */
-    public synchronized void doLogin() throws IOException {
+    public void doLogin( WebClient webClient ) throws IOException {
         fileService.loadCookiesFromFile( webClient, COOKIE_FILE );
-        doLogin( wordPressDAO.getOption( "hbo_bdc_username" ),
+        doLogin( webClient, wordPressDAO.getOption( "hbo_bdc_username" ),
                 wordPressDAO.getOption( "hbo_bdc_password" ) );
     }
 
     /**
      * Logs into BDC with the necessary credentials.
      * 
+     * @param webClient
      * @param username user credentials
      * @param password user credentials
      * @param lasturl previous home URL (optional) - contains previous session
      * @throws IOException
      */
-    public synchronized void doLogin( String username, String password ) throws IOException {
+    public void doLogin( WebClient webClient, String username, String password ) throws IOException {
 
         if ( username == null || password == null ) {
             throw new MissingUserDataException( "Missing BDC username/password" );
@@ -88,11 +85,11 @@ public class BookingComScraper {
 
         if ( currentPage.getBaseURL().getPath().startsWith( "/sign-in" ) ) {
             LOGGER.info( "Doesn't look like we're logged in. Logging into Booking.com" );
-            doLoginForm( username, password );
+            doLoginForm( webClient, username, password );
         }
 
         // if we're actually logged in, we should get the hostel name identified here...
-        currentPage = getCurrentPage();
+        currentPage = getCurrentPage( webClient );
         LOGGER.info( "Current URL: " + currentPage.getBaseURL() );
         LOGGER.info( "Property name identified as: " + currentPage.getTitleText() );
 
@@ -111,14 +108,15 @@ public class BookingComScraper {
     /**
      * Performs sign-in from the sign-in screen.
      * 
+     * @param webClient
      * @param username user credentials
      * @param password user credentials
      * @throws IOException
      */
-    private void doLoginForm( String username, String password ) throws IOException {
+    private void doLoginForm( WebClient webClient, String username, String password ) throws IOException {
 
-        webClient.getPage( getCurrentPage().getBaseURL().toString() ); // need to reload page for some reason
-        HtmlPage page = getCurrentPage();
+        webClient.getPage( getCurrentPage( webClient ).getBaseURL().toString() ); // need to reload page for some reason
+        HtmlPage page = getCurrentPage( webClient );
         HtmlTextInput usernameField = page.getHtmlElementById( "loginname" );
         usernameField.type( wordPressDAO.getOption( "hbo_bdc_username" ) );
         HtmlButton nextButton = page.getFirstByXPath( "//span[text()='Next']/.." );
@@ -174,7 +172,7 @@ public class BookingComScraper {
             }
         }
 
-        if ( getCurrentPage().getBaseURL().getPath().startsWith( "/sign-in" ) ) {
+        if ( getCurrentPage( webClient ).getBaseURL().getPath().startsWith( "/sign-in" ) ) {
             throw new MissingUserDataException( "Failed to login to BDC" );
         }
         
@@ -239,14 +237,15 @@ public class BookingComScraper {
     /**
      * Looks up a given reservation in BDC.
      * 
+     * @param webClient
      * @param reservationId the BDC reference
      * @throws IOException
      */
-    public synchronized void lookupReservation( String reservationId ) throws IOException {
-        doLogin();
+    public void lookupReservation( WebClient webClient, String reservationId ) throws IOException {
+        doLogin( webClient );
 
         // load reservation from URL
-        String currentUrl = getCurrentPage().getBaseURL().toString();
+        String currentUrl = getCurrentPage( webClient ).getBaseURL().toString();
         String reservationUrl = MessageFormat.format( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/booking.html?res_id={0}&ses={1}&lang=en&hotel_id={2}",
                 reservationId, getSessionFromURL( currentUrl ), getHotelIdFromURL( currentUrl ) );
         LOGGER.info( "Looking up reservation " + reservationId + " using URL " + reservationUrl );
@@ -258,7 +257,7 @@ public class BookingComScraper {
         String BOOKING_NUMBER_XPATH = "//input[@type='hidden' and @name='res_id'] "
                 + "| //p/span[text()='Booking number:']/../following-sibling::p "
                 + "| //div[not(contains(@class, 'hidden-print'))]/span[normalize-space(text())='Booking number:']/following-sibling::span";
-        HtmlElement bookingNumberField = getElementByXPath( BOOKING_NUMBER_XPATH );
+        HtmlElement bookingNumberField = getElementByXPath( webClient, BOOKING_NUMBER_XPATH );
         String resIdFromPage = "input".equals( bookingNumberField.getTagName() ) ? bookingNumberField.getAttribute( "value" ) : bookingNumberField.getVisibleText();
 
         if ( false == reservationId.equals( resIdFromPage ) ) {
@@ -271,16 +270,17 @@ public class BookingComScraper {
     /**
      * Looks up a given reservation in BDC and returns the virtual card balance on the booking.
      * 
+     * @param webClient
      * @param reservationId the BDC reference
      * @return the amount available on the VCC
      * @throws IOException if unable to login
      * @throws NoSuchElementException if VCC details not found
      */
-    public synchronized BigDecimal getVirtualCardBalance( String reservationId ) throws IOException, NoSuchElementException {
-        lookupReservation( reservationId );
+    public BigDecimal getVirtualCardBalance( WebClient webClient, String reservationId ) throws IOException, NoSuchElementException {
+        lookupReservation( webClient, reservationId );
 
         // Click on VCC confirmation dialog "VCC changes for Covid 19"
-        HtmlPage currentPage = getCurrentPage();
+        HtmlPage currentPage = getCurrentPage( webClient );
         List<HtmlButton> okayGotItButtons = currentPage.getByXPath( "//button/span/span[text()='Okay, got it']/../.." );
         if ( okayGotItButtons.size() > 0 ) {
             okayGotItButtons.get( 0 ).click();
@@ -289,7 +289,7 @@ public class BookingComScraper {
         try {
             // two different views of a booking? this one is from CRH
             LOGGER.info( "Looking up VCC balance (attempt 1)" );
-            return fetchVccBalanceFromPage(
+            return fetchVccBalanceFromPage( webClient,
                     "//p[@class='reservation_bvc--balance']",
                     Pattern.compile( "Virtual card balance: £(\\d+\\.?\\d*)" ),
                     e -> e.getVisibleText() );
@@ -297,7 +297,7 @@ public class BookingComScraper {
         catch ( NoSuchElementException ex ) {
             try { // this view is from HSH
                 LOGGER.info( "Looking up VCC balance (attempt 2)" );
-                return fetchVccBalanceFromPage( 
+                return fetchVccBalanceFromPage( webClient,
                         "//div/span[normalize-space(text())='Virtual card balance:']/../following-sibling::div",
                         Pattern.compile( "£(\\d+\\.?\\d*)" ),
                         e -> getTextNode( e ) ); // remove any subelements in case of a partial charge
@@ -315,8 +315,8 @@ public class BookingComScraper {
         }
     }
 
-    private BigDecimal fetchVccBalanceFromPage( String xpath, Pattern p, Function<HtmlElement, String> fn ) {
-        List<HtmlElement> elem = getCurrentPage().getByXPath( xpath );
+    private BigDecimal fetchVccBalanceFromPage( WebClient webClient, String xpath, Pattern p, Function<HtmlElement, String> fn ) {
+        List<HtmlElement> elem = getCurrentPage( webClient ).getByXPath( xpath );
         if ( elem.isEmpty() ) {
             throw new NoSuchElementException( "Couldn't find virtual card balance from '" + xpath );
         }
@@ -351,15 +351,16 @@ public class BookingComScraper {
     /**
      * Mark credit card for the given reservation as invalid.
      * 
+     * @param webClient
      * @param reservationId BDC reservation
      * @param last4Digits last 4 digits of CC
      * @throws IOException
      */
-    public synchronized void markCreditCardAsInvalid( String reservationId, String last4Digits ) throws IOException {
-        lookupReservation( reservationId );
+    public void markCreditCardAsInvalid( WebClient webClient, String reservationId, String last4Digits ) throws IOException {
+        lookupReservation( webClient, reservationId );
         LOGGER.info( "Marking card ending in " + last4Digits + " as invalid for reservation " + reservationId );
 
-        HtmlPage currentPage = getCurrentPage();
+        HtmlPage currentPage = getCurrentPage( webClient );
         List<HtmlElement> headerMarkInvalid = currentPage.getByXPath( "//button[span/span[text()='Mark credit card as invalid']]" );
         if ( headerMarkInvalid.isEmpty() ) {
             LOGGER.info( "Link not available (or already marked invalid). Nothing to do..." );
@@ -374,7 +375,7 @@ public class BookingComScraper {
         HtmlOption option = select.getOptionByValue("declined");
         select.setSelectedAttribute(option, true);
 
-        HtmlElement confirmBtn = getElementByXPath( "//button[span/span[text()='Confirm']]" );
+        HtmlElement confirmBtn = getElementByXPath( webClient, "//button[span/span[text()='Confirm']]" );
         currentPage = confirmBtn.click();
 
         String CLOSE_MODAL_BTN = "//aside[header/h1/span[text()='Mark credit card as invalid']]/footer/button[span/span[text()='Close']]";
@@ -386,15 +387,16 @@ public class BookingComScraper {
     /**
      * Retrieves the card details for the given booking.
      * 
+     * @param webClient
      * @param bdcReservation BDC reservation
      * @return credit card details
      * @throws IOException
      * @throws ParseException on parse error during retrieval
      * @throws MissingUserDataException if card details are missing
      */
-    public synchronized CardDetails returnCardDetailsForBooking( String bdcReservation ) throws IOException, ParseException {
-        lookupReservation( bdcReservation );
-        HtmlPage currentPage = getCurrentPage();
+    public CardDetails returnCardDetailsForBooking( WebClient webClient, String bdcReservation ) throws IOException, ParseException {
+        lookupReservation( webClient, bdcReservation );
+        HtmlPage currentPage = getCurrentPage( webClient );
 
         // payment details loaded by javascript
         final String PAYMENT_DETAILS_BLOCK = "//span[normalize-space(text())='Virtual credit card'] "
@@ -406,7 +408,7 @@ public class BookingComScraper {
         List<HtmlElement> headerViewCCDetails = currentPage.getByXPath( "//*[self::button or self::a]/span/span[normalize-space(text())='View credit card details']/../.." );
         LOGGER.info( "Matched " + headerViewCCDetails.size() + " sign-in elements" );
         if ( headerViewCCDetails.isEmpty() ) {
-            HtmlElement paymentDetails = getElementByXPath( PAYMENT_DETAILS_BLOCK );
+            HtmlElement paymentDetails = getElementByXPath( webClient, PAYMENT_DETAILS_BLOCK );
             if ( paymentDetails.getVisibleText().contains( "This virtual card is no longer active." )
                     || paymentDetails.getVisibleText().contains( "This virtual card isn't active anymore" ) ) {
                 throw new MissingUserDataException( "This virtual card is no longer active." );
@@ -436,7 +438,7 @@ public class BookingComScraper {
             throw new MissingUserDataException( "Credit card details aren't available." );
         }
         else if ( currentPage.getFirstByXPath( CONTINUE_WITH_CC_DETAILS ) != null ) {
-             doLoginForm( wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
+             doLoginForm( webClient, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
         }
         else if ( currentPage.getFirstByXPath( SIGN_IN_LOCATOR_PATH ) != null ) {
             // the following should open a new window; switch to new window
@@ -457,10 +459,10 @@ public class BookingComScraper {
             }
 
             // login again
-            doLoginForm( wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
+            doLoginForm( webClient, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
 
             CLOSE_WINDOW_TASK = Optional.of( () -> {
-                HtmlElement btn = getElementByXPath( "//div[contains(@class,'sbm')]/button[normalize-space(text())='Close']" );
+                HtmlElement btn = getElementByXPath( webClient, "//div[contains(@class,'sbm')]/button[normalize-space(text())='Close']" );
                 try {
                     btn.click(); // this should close the window
                 }
@@ -470,17 +472,17 @@ public class BookingComScraper {
                 webClient.setCurrentWindow( CURRENT_WINDOW ); // switch back to main tab
             } );
         }
-        else if ( getElementByXPath( CC_DETAILS_PATH ) == null ) {
-            LOGGER.info( getCurrentPage().getWebResponse().getContentAsString() );
+        else if ( getElementByXPath( webClient, CC_DETAILS_PATH ) == null ) {
+            LOGGER.info( getCurrentPage( webClient ).getWebResponse().getContentAsString() );
             throw new MissingUserDataException( "Expecting credit card details page but not found?" );
         }
 
         CardDetails cardDetails = new CardDetails();
-        cardDetails.setName( getElementByXPath( "//td[text()=\"Card holder's name:\"]/following-sibling::td" ).getVisibleText().trim() );
-        cardDetails.setCardNumber( getElementByXPath( "//td[text()='Card number:']/following-sibling::td").getVisibleText().replaceAll("\\s", "") );
-        cardDetails.setCardType( getElementByXPath( "//td[text()='Card type:']/following-sibling::td" ).getVisibleText().trim() );
-        cardDetails.setExpiry( parseExpiryDate( getElementByXPath( "//td[contains(text(),'Expiration')]/following-sibling::td" ).getVisibleText().trim() ) );
-        cardDetails.setCvv( StringUtils.trimToNull( getElementByXPath( "//td[contains(text(),'CVC')]/following-sibling::td" ).getVisibleText() ) );
+        cardDetails.setName( getElementByXPath( webClient, "//td[text()=\"Card holder's name:\"]/following-sibling::td" ).getVisibleText().trim() );
+        cardDetails.setCardNumber( getElementByXPath( webClient, "//td[text()='Card number:']/following-sibling::td" ).getVisibleText().replaceAll( "\\s", "" ) );
+        cardDetails.setCardType( getElementByXPath( webClient, "//td[text()='Card type:']/following-sibling::td" ).getVisibleText().trim() );
+        cardDetails.setExpiry( parseExpiryDate( getElementByXPath( webClient, "//td[contains(text(),'Expiration')]/following-sibling::td" ).getVisibleText().trim() ) );
+        cardDetails.setCvv( StringUtils.trimToNull( getElementByXPath( webClient, "//td[contains(text(),'CVC')]/following-sibling::td" ).getVisibleText() ) );
         LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( cardDetails.getCardNumber() ) + " for " + cardDetails.getName() );
 
         // we're done here; close the newly opened window
@@ -491,14 +493,15 @@ public class BookingComScraper {
     /**
      * Searches for all VCC bookings that can be charged immediately.
      * 
+     * @param webClient
      * @return non-null list of BDC booking refs
      * @throws IOException
      */
-    public synchronized List<String> getAllVCCBookingsThatCanBeCharged() throws IOException {
-        doLogin();
+    public List<String> getAllVCCBookingsThatCanBeCharged( WebClient webClient ) throws IOException {
+        doLogin( webClient );
 
         // load Virtual cards to charge page
-        String currentUrl = getCurrentPage().getBaseURL().toString();
+        String currentUrl = getCurrentPage( webClient ).getBaseURL().toString();
         String vccUrl = MessageFormat.format( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/vccs_management.html?lang=en&ses={0}&hotel_id={1}&route=vccs_to_charge",
                 getSessionFromURL( currentUrl ), getHotelIdFromURL( currentUrl ) );
         LOGGER.info( "Looking up VCCs to charge " + vccUrl );
@@ -534,11 +537,11 @@ public class BookingComScraper {
         }
     }
 
-    private HtmlPage getCurrentPage() {
+    private HtmlPage getCurrentPage( WebClient webClient ) {
         return HtmlPage.class.cast( webClient.getCurrentWindow().getEnclosedPage() );
     }
 
-    private HtmlElement getElementByXPath( String xpath ) {
-        return getCurrentPage().getFirstByXPath( xpath );
+    private HtmlElement getElementByXPath( WebClient webClient, String xpath ) {
+        return getCurrentPage( webClient ).getFirstByXPath( xpath );
     }
 }

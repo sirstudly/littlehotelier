@@ -6,7 +6,9 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.BookingComScraper;
 
 /**
@@ -21,9 +23,14 @@ public class BDCVerifyLoginJob extends AbstractJob {
     @Transient
     private BookingComScraper scraper;
 
+    @Autowired
+    @Transient
+    @Qualifier( "webClientForBDC" )
+    private WebClient webClient;
+
     @Override
     public void processJob() throws Exception {
-        scraper.doLogin();
+        scraper.doLogin( webClient );
     }
 
     public int getRetryCount() {

@@ -563,7 +563,9 @@ public class PaymentProcessorService {
         }
         else if ( "Booking.com".equals( cbReservation.getSourceName() ) ) {
             LOGGER.info( "Retrieving BDC customer card details for BDC#" + cbReservation.getThirdPartyIdentifier() );
-            ccDetails = bdcScraper.returnCardDetailsForBooking( cbReservation.getThirdPartyIdentifier() );
+            try (WebClient webClientForBDC = context.getBean( "webClientForBDC", WebClient.class )) {
+                ccDetails = bdcScraper.returnCardDetailsForBooking( webClientForBDC, cbReservation.getThirdPartyIdentifier() );
+            }
         }
         //        else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
         //            LOGGER.info( "Retrieving AGO customer card details" );
@@ -729,7 +731,10 @@ public class PaymentProcessorService {
                 return;
             }
             LOGGER.info( "Looks like a prepaid card... Looking up actual value to charge on BDC" );
-            final BigDecimal amountToCharge = bdcScraper.getVirtualCardBalance( cbReservation.getThirdPartyIdentifier() );
+            final BigDecimal amountToCharge;
+            try (WebClient webClientForBDC = context.getBean( "webClientForBDC", WebClient.class )) {
+                amountToCharge = bdcScraper.getVirtualCardBalance( webClientForBDC, cbReservation.getThirdPartyIdentifier() );
+            }
             final BigDecimal MINIMUM_CHARGE_AMOUNT = new BigDecimal( "0.3" );
             final String MODIFIED_OUTSIDE_OF_BDC = "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL.";
             LOGGER.info( "VCC balance is " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );

@@ -33,7 +33,7 @@ public class CreatePrepaidChargeJob extends AbstractJob {
                     PrepaidChargeJob chargeJob = new PrepaidChargeJob();
                     chargeJob.setStatus( JobStatus.submitted );
                     chargeJob.setReservationId( r );
-                    dao.insertJob( chargeJob );
+//                    dao.insertJob( chargeJob );
                 } );
     }
 

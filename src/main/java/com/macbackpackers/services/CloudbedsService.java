@@ -381,16 +381,18 @@ public class CloudbedsService {
      * @throws Exception
      */
     public List<String> getAllVCCBookingsThatCanBeCharged() throws Exception {
-        return bdcScraper.getAllVCCBookingsThatCanBeCharged()
-                .stream()
-                .filter( r -> false == "2129535783".equals( r ) ) // TEMPORARY!: refund currently in progress!
-                .map( bdc -> getReservationForBDC( bdc ) )
-                .filter( r -> r.isPresent() )
-                .map( r -> r.get() )
-                .peek( r -> LOGGER.info( "Found BDC reservation {} - {} with VCC for {} {}",
-                        r.getThirdPartyIdentifier(), r.getReservationId(), r.getFirstName(), r.getLastName() ) )
-                .map( r -> r.getReservationId() )
-                .collect( Collectors.toList() );
+        try (WebClient webClient = appContext.getBean( "webClientForBDC", WebClient.class )) {
+            return bdcScraper.getAllVCCBookingsThatCanBeCharged( webClient )
+                    .stream()
+                    .filter( r -> false == "2129535783".equals( r ) ) // TEMPORARY!: refund currently in progress!
+                    .map( bdc -> getReservationForBDC( bdc ) )
+                    .filter( r -> r.isPresent() )
+                    .map( r -> r.get() )
+                    .peek( r -> LOGGER.info( "Found BDC reservation {} - {} with VCC for {} {}",
+                            r.getThirdPartyIdentifier(), r.getReservationId(), r.getFirstName(), r.getLastName() ) )
+                    .map( r -> r.getReservationId() )
+                    .collect( Collectors.toList() );
+        }
     }
 
     /**
@@ -1361,7 +1363,10 @@ public class CloudbedsService {
                 LOGGER.info( "Looks like we've already done this." );
                 return;
             }
-            bdcScraper.markCreditCardAsInvalid( r.getThirdPartyIdentifier(), r.getCreditCardLast4Digits() );
+
+            try (WebClient webClientForBDC = appContext.getBean( "webClientForBDC", WebClient.class )) {
+                bdcScraper.markCreditCardAsInvalid( webClientForBDC, r.getThirdPartyIdentifier(), r.getCreditCardLast4Digits() );
+            }
 
             // if we got this far, then we've updated BDC. leave a note as well...
             final String INVALID_CC_NOTE = "Marked card ending in " + r.getCreditCardLast4Digits() + " invalid on BDC.";
