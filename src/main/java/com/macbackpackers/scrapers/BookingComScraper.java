@@ -61,7 +61,7 @@ public class BookingComScraper {
      * 
      * @throws IOException
      */
-    public void doLogin() throws IOException {
+    public synchronized void doLogin() throws IOException {
         fileService.loadCookiesFromFile( webClient, COOKIE_FILE );
         doLogin( wordPressDAO.getOption( "hbo_bdc_username" ),
                 wordPressDAO.getOption( "hbo_bdc_password" ) );
@@ -241,7 +241,7 @@ public class BookingComScraper {
      * @param reservationId the BDC reference
      * @throws IOException
      */
-    public void lookupReservation( String reservationId ) throws IOException {
+    public synchronized void lookupReservation( String reservationId ) throws IOException {
         doLogin();
 
         // load reservation from URL
@@ -275,7 +275,7 @@ public class BookingComScraper {
      * @throws IOException if unable to login
      * @throws NoSuchElementException if VCC details not found
      */
-    public BigDecimal getVirtualCardBalance( String reservationId ) throws IOException, NoSuchElementException {
+    public synchronized BigDecimal getVirtualCardBalance( String reservationId ) throws IOException, NoSuchElementException {
         lookupReservation( reservationId );
 
         // Click on VCC confirmation dialog "VCC changes for Covid 19"
@@ -354,7 +354,7 @@ public class BookingComScraper {
      * @param last4Digits last 4 digits of CC
      * @throws IOException
      */
-    public void markCreditCardAsInvalid( String reservationId, String last4Digits ) throws IOException {
+    public synchronized void markCreditCardAsInvalid( String reservationId, String last4Digits ) throws IOException {
         lookupReservation( reservationId );
         LOGGER.info( "Marking card ending in " + last4Digits + " as invalid for reservation " + reservationId );
 
@@ -391,7 +391,7 @@ public class BookingComScraper {
      * @throws ParseException on parse error during retrieval
      * @throws MissingUserDataException if card details are missing
      */
-    public CardDetails returnCardDetailsForBooking( String bdcReservation ) throws IOException, ParseException {
+    public synchronized CardDetails returnCardDetailsForBooking( String bdcReservation ) throws IOException, ParseException {
         lookupReservation( bdcReservation );
         HtmlPage currentPage = getCurrentPage();
 
@@ -494,7 +494,7 @@ public class BookingComScraper {
      * @return non-null list of BDC booking refs
      * @throws IOException
      */
-    public List<String> getAllVCCBookingsThatCanBeCharged() throws IOException {
+    public synchronized List<String> getAllVCCBookingsThatCanBeCharged() throws IOException {
         doLogin();
 
         // load Virtual cards to charge page
