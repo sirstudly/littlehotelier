@@ -381,29 +381,16 @@ public class CloudbedsService {
      * @throws Exception
      */
     public List<String> getAllVCCBookingsThatCanBeCharged() throws Exception {
-        WebDriver driver = driverFactory.borrowObject();
-        try {
-            WebDriverWait wait = new WebDriverWait( driver, maxWaitSeconds );
-            return bdcScraper.getAllVCCBookingsThatCanBeCharged( driver, wait )
-                    .stream()
-                    .map( bdc -> getReservationForBDC( bdc ) )
-                    .filter( r -> r.isPresent() )
-                    .map( r -> r.get() )
-                    .peek( r -> LOGGER.info( "Found BDC reservation {} - {} with VCC for {} {}",
-                            r.getThirdPartyIdentifier(), r.getReservationId(), r.getFirstName(), r.getLastName() ) )
-                    .map( r -> r.getReservationId() )
-                    .collect( Collectors.toList() );
-        }
-//        catch ( Exception ex ) {
-//            LOGGER.error( "getAllVCCBookingsThatCanBeCharged() failed." );
-//            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-//            FileUtils.copyFile( scrFile, new File( "logs/get_all_vcc_bookings.png" ) );
-//            LOGGER.error( "Screenshot saved as get_all_vcc_bookings.png" );
-//            throw ex;
-//        }
-        finally {
-            driverFactory.returnObject( driver );
-        }
+        return bdcScraper.getAllVCCBookingsThatCanBeCharged()
+                .stream()
+                .filter( r -> false == "2129535783".equals( r ) ) // TEMPORARY!: refund currently in progress!
+                .map( bdc -> getReservationForBDC( bdc ) )
+                .filter( r -> r.isPresent() )
+                .map( r -> r.get() )
+                .peek( r -> LOGGER.info( "Found BDC reservation {} - {} with VCC for {} {}",
+                        r.getThirdPartyIdentifier(), r.getReservationId(), r.getFirstName(), r.getLastName() ) )
+                .map( r -> r.getReservationId() )
+                .collect( Collectors.toList() );
     }
 
     /**
@@ -1353,9 +1340,7 @@ public class CloudbedsService {
      * @throws Exception
      */
     public void markCreditCardInvalidOnBDC( String reservationId ) throws Exception {
-        WebDriver driver = driverFactory.borrowObject();
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            WebDriverWait wait = new WebDriverWait( driver, maxWaitSeconds );
             Reservation r = scraper.getReservationRetry( webClient, reservationId );
 
             LOGGER.info( r.getThirdPartyIdentifier() + ": " + r.getFirstName() + " " + r.getLastName() );
@@ -1376,16 +1361,13 @@ public class CloudbedsService {
                 LOGGER.info( "Looks like we've already done this." );
                 return;
             }
-            bdcScraper.markCreditCardAsInvalid( driver, wait, r.getThirdPartyIdentifier(), r.getCreditCardLast4Digits() );
+            bdcScraper.markCreditCardAsInvalid( r.getThirdPartyIdentifier(), r.getCreditCardLast4Digits() );
 
             // if we got this far, then we've updated BDC. leave a note as well...
             final String INVALID_CC_NOTE = "Marked card ending in " + r.getCreditCardLast4Digits() + " invalid on BDC.";
             if ( false == r.containsNote( INVALID_CC_NOTE ) ) {
                 scraper.addNote( webClient, reservationId, INVALID_CC_NOTE );
             }
-        }
-        finally {
-            driverFactory.returnObject( driver );
         }
     }
 

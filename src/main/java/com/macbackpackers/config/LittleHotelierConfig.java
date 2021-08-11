@@ -64,6 +64,17 @@ public class LittleHotelierConfig {
         return webClient;
     }
 
+    @Bean( name = "webClientForBDC" )
+    @Scope( "prototype" )
+    public WebClient getWebClientForBDC() {
+        // return the default web client (with JS enabled)
+        WebClient webClient = getWebClientForHostelworld();
+        webClient.getOptions().setJavaScriptEnabled( true );
+        webClient.setAjaxController( new NicelyResynchronizingAjaxController() );
+        webClient.waitForBackgroundJavaScript(60000); 
+        return webClient;
+    }
+
     @Bean( name = "webClientForHostelworldLogin" )
     @Scope( "prototype" )
     public WebClient getWebClientForHostelworldLogin() {
@@ -76,7 +87,7 @@ public class LittleHotelierConfig {
     @Bean( name = "webClientForHostelworld" )
     @Scope( "prototype" )
     public WebClient getWebClientForHostelworld() {
-        WebClient webClient = new WebClient( BrowserVersion.FIREFOX_68 );
+        WebClient webClient = new WebClient( BrowserVersion.FIREFOX );
         webClient.getOptions().setTimeout( 120000 );
         webClient.getOptions().setRedirectEnabled( true );
         webClient.getOptions().setJavaScriptEnabled( false );

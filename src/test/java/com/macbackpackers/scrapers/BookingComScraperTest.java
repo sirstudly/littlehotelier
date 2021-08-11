@@ -3,13 +3,8 @@ package com.macbackpackers.scrapers;
 
 import java.util.List;
 
-import org.apache.commons.pool2.impl.GenericObjectPool;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,57 +19,37 @@ public class BookingComScraperTest {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
-    /** maximum time to wait when navigating web requests */
-    private static final int MAX_WAIT_SECONDS = 60;
-
     @Autowired
     BookingComScraper scraper;
 
-    @Autowired
-    private GenericObjectPool<WebDriver> driverFactory;
-
-    private WebDriver driver;
-    private WebDriverWait wait;
-
-    @Before
-    public void setup() throws Exception {
-        driver = driverFactory.borrowObject();
-        wait = new WebDriverWait( driver, MAX_WAIT_SECONDS );
-    }
-
-    @After
-    public void teardown() throws Exception {
-        driverFactory.returnObject( driver );
-    }
-
     @Test
     public void testLoginSuccessful() throws Exception {
-        scraper.doLogin( driver, wait );
+        scraper.doLogin();
     }
 
     @Test
     public void testLoadReservation() throws Exception {
-        scraper.lookupReservation( driver, wait, "2316646060" );
+        scraper.lookupReservation( "2316646060" );
     }
 
     @Test
     public void testMarkCardInvalid() throws Exception {
-        scraper.markCreditCardAsInvalid( driver, wait, "3913632669", "7916" );
+        scraper.markCreditCardAsInvalid( "3913632669", "7916" );
     }
 
     @Test
     public void testGetVirtualCardBalance() throws Exception {
-        scraper.getVirtualCardBalance( driver, wait, "3804638594" );
+        scraper.getVirtualCardBalance( "3349847478" );
     }
 
     @Test
     public void testReturnCardDetailsForBooking() throws Exception {
-        scraper.returnCardDetailsForBooking( driver, wait, "3218755671" );
+        scraper.returnCardDetailsForBooking( "2955126491" );
     }
 
     @Test
     public void testGetAllVCCBookingsThatCanBeCharged() throws Exception {
-        List<String> bookingRefs = scraper.getAllVCCBookingsThatCanBeCharged( driver, wait );
+        List<String> bookingRefs = scraper.getAllVCCBookingsThatCanBeCharged();
         LOGGER.info( "Found {} bookings", bookingRefs.size() );
         bookingRefs.stream().forEach( b -> LOGGER.info( b ) );
     }

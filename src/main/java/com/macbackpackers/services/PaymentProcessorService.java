@@ -3,7 +3,6 @@ package com.macbackpackers.services;
 
 import static com.macbackpackers.scrapers.AllocationsPageScraper.POUND;
 
-import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -21,14 +20,8 @@ import java.util.stream.Collectors;
 import javax.mail.MessagingException;
 
 import org.apache.commons.collections.ListUtils;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
-import org.apache.commons.pool2.impl.GenericObjectPool;
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TakesScreenshot;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -152,9 +145,6 @@ public class PaymentProcessorService {
 
     @Autowired
     private BookingComScraper bdcScraper;
-
-    @Autowired
-    private GenericObjectPool<WebDriver> driverFactory;
 
     /**
      * Attempt to charge the deposit payment for the given reservation. This method does nothing if
@@ -573,7 +563,7 @@ public class PaymentProcessorService {
         }
         else if ( "Booking.com".equals( cbReservation.getSourceName() ) ) {
             LOGGER.info( "Retrieving BDC customer card details for BDC#" + cbReservation.getThirdPartyIdentifier() );
-            ccDetails = retrieveCardDetailsFromBDC( cbReservation );
+            ccDetails = bdcScraper.returnCardDetailsForBooking( cbReservation.getThirdPartyIdentifier() );
         }
         //        else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
         //            LOGGER.info( "Retrieving AGO customer card details" );
@@ -592,34 +582,6 @@ public class PaymentProcessorService {
         }
         cloudbedsScraper.addCardDetails( webClient, cbReservation.getReservationId(), ccDetails );
         return cloudbedsScraper.getReservationRetry( webClient, cbReservation.getReservationId() ); // reload reservation
-    }
-
-    private CardDetails retrieveCardDetailsFromBDC( Reservation cbReservation ) throws Exception {
-        CardDetails ccDetails;
-        WebDriver driver = driverFactory.borrowObject();
-        try {
-            WebDriverWait wait = new WebDriverWait( driver, 30 );
-            ccDetails = bdcScraper.returnCardDetailsForBooking( driver, wait, cbReservation.getThirdPartyIdentifier() );
-        }
-        catch ( Exception ex ) {
-            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            String filename = "logs/bdc_" + cbReservation.getThirdPartyIdentifier() + "-" + System.currentTimeMillis() + ".png";
-            FileUtils.copyFile( scrFile, new File( filename ) );
-            LOGGER.info( driver.getPageSource() );
-            LOGGER.error( "Screenshot saved in " + filename );
-            throw ex;
-        }
-        finally {
-            // we can't have more than one window open... especially if that window
-            // contains credit card details (we don't want to mix it up with another booking)
-            if ( driver.getWindowHandles().size() > 1 ) {
-                driverFactory.invalidateObject( driver );
-            }
-            else {
-                driverFactory.returnObject( driver );
-            }
-        }
-        return ccDetails;
     }
 
     /**
@@ -767,37 +729,30 @@ public class PaymentProcessorService {
                 return;
             }
             LOGGER.info( "Looks like a prepaid card... Looking up actual value to charge on BDC" );
-            WebDriver driver = driverFactory.borrowObject();
-            try {
-                WebDriverWait wait = new WebDriverWait( driver, 60 );
-                final BigDecimal amountToCharge = bdcScraper.getVirtualCardBalance( driver, wait, cbReservation.getThirdPartyIdentifier() );
-                final BigDecimal MINIMUM_CHARGE_AMOUNT = new BigDecimal( "0.3" );
-                final String MODIFIED_OUTSIDE_OF_BDC = "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL.";
-                LOGGER.info( "VCC balance is " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
-                if ( amountToCharge.compareTo( MINIMUM_CHARGE_AMOUNT ) > 0 ) {
-                    cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, amountToCharge );
+            final BigDecimal amountToCharge = bdcScraper.getVirtualCardBalance( cbReservation.getThirdPartyIdentifier() );
+            final BigDecimal MINIMUM_CHARGE_AMOUNT = new BigDecimal( "0.3" );
+            final String MODIFIED_OUTSIDE_OF_BDC = "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL.";
+            LOGGER.info( "VCC balance is " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
+            if ( amountToCharge.compareTo( MINIMUM_CHARGE_AMOUNT ) > 0 ) {
+                cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, amountToCharge );
 
-                    if ( 0 != cbReservation.getBalanceDue().compareTo( amountToCharge )
-                            && false == "canceled".equals( cbReservation.getStatus() ) ) {
-                        cloudbedsScraper.addNote( webClient, reservationId, MODIFIED_OUTSIDE_OF_BDC );
-                    }
-                }
-                else {
-                    final String MINIMUM_CHARGE_NOTE = "Minimum charge amount not reached. Remaining balance not charged.";
-                    if ( cbReservation.getBalanceDue().compareTo( MINIMUM_CHARGE_AMOUNT ) > 0
-                            && false == "canceled".equals( cbReservation.getStatus() ) ) {
-                        cloudbedsScraper.addNote( webClient, reservationId, MODIFIED_OUTSIDE_OF_BDC );
-                    }
-                    else if ( cbReservation.containsNote( MINIMUM_CHARGE_NOTE ) ) {
-                        LOGGER.info( MINIMUM_CHARGE_NOTE );
-                    }
-                    else {
-                        cloudbedsScraper.addNote( webClient, reservationId, MINIMUM_CHARGE_NOTE );
-                    }
+                if ( 0 != cbReservation.getBalanceDue().compareTo( amountToCharge )
+                        && false == "canceled".equals( cbReservation.getStatus() ) ) {
+                    cloudbedsScraper.addNote( webClient, reservationId, MODIFIED_OUTSIDE_OF_BDC );
                 }
             }
-            finally {
-                driverFactory.returnObject( driver );
+            else {
+                final String MINIMUM_CHARGE_NOTE = "Minimum charge amount not reached. Remaining balance not charged.";
+                if ( cbReservation.getBalanceDue().compareTo( MINIMUM_CHARGE_AMOUNT ) > 0
+                        && false == "canceled".equals( cbReservation.getStatus() ) ) {
+                    cloudbedsScraper.addNote( webClient, reservationId, MODIFIED_OUTSIDE_OF_BDC );
+                }
+                else if ( cbReservation.containsNote( MINIMUM_CHARGE_NOTE ) ) {
+                    LOGGER.info( MINIMUM_CHARGE_NOTE );
+                }
+                else {
+                    cloudbedsScraper.addNote( webClient, reservationId, MINIMUM_CHARGE_NOTE );
+                }
             }
         }
         else {

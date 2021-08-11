@@ -1,14 +1,10 @@
 
 package com.macbackpackers.scrapers;
 
-import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
-
-import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.text.ParseException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -16,28 +12,31 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
-import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TakesScreenshot;
-import org.openqa.selenium.TimeoutException;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.Select;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.WebWindow;
+import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
+import com.gargoylesoftware.htmlunit.html.HtmlButton;
+import com.gargoylesoftware.htmlunit.html.HtmlElement;
+import com.gargoylesoftware.htmlunit.html.HtmlOption;
+import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
+import com.gargoylesoftware.htmlunit.html.HtmlSelect;
+import com.gargoylesoftware.htmlunit.html.HtmlSpan;
+import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.services.BasicCardMask;
+import com.macbackpackers.services.FileService;
 
 @Component
 public class BookingComScraper {
@@ -47,129 +46,138 @@ public class BookingComScraper {
     @Autowired
     private WordPressDAO wordPressDAO;
 
+    @Autowired
+    @Qualifier( "webClientForBDC" )
+    private WebClient webClient;
+
+    @Autowired
+    private FileService fileService;
+
+    /** for saving login credentials */
+    private static final String COOKIE_FILE = "bdc.cookies";
+    
     /**
      * Logs into BDC providing the necessary credentials.
      * 
-     * @param driver web client
-     * @param wait
      * @throws IOException
      */
-    public void doLogin( WebDriver driver, WebDriverWait wait ) throws IOException {
-        doLogin( driver, wait,
-                wordPressDAO.getOption( "hbo_bdc_username" ),
+    public void doLogin() throws IOException {
+        fileService.loadCookiesFromFile( webClient, COOKIE_FILE );
+        doLogin( wordPressDAO.getOption( "hbo_bdc_username" ),
                 wordPressDAO.getOption( "hbo_bdc_password" ) );
     }
 
     /**
      * Logs into BDC with the necessary credentials.
      * 
-     * @param driver web client to use
-     * @param wait
      * @param username user credentials
      * @param password user credentials
      * @param lasturl previous home URL (optional) - contains previous session
      * @throws IOException
      */
-    public synchronized void doLogin( WebDriver driver, WebDriverWait wait, String username, String password ) throws IOException {
+    public synchronized void doLogin( String username, String password ) throws IOException {
 
         if ( username == null || password == null ) {
             throw new MissingUserDataException( "Missing BDC username/password" );
         }
 
         // don't use session-tracked URL if running locally (ie. for debugging)
-        String lasturl = SystemUtils.IS_OS_WINDOWS ? null : wordPressDAO.getOption( "hbo_bdc_lasturl" );
-        driver.get( lasturl == null ? "https://admin.booking.com/hotel/hoteladmin/" : lasturl );
-        LOGGER.info( "Loading Booking.com website: " + driver.getCurrentUrl() );
+        String lasturl = wordPressDAO.getOption( SystemUtils.IS_OS_WINDOWS ? "hbo_bdc_lasturl_win" : "hbo_bdc_lasturl" );
+        HtmlPage currentPage = webClient.getPage( lasturl == null ? "https://admin.booking.com/hotel/hoteladmin/" : lasturl );
+        LOGGER.info( "Loading Booking.com website: " + currentPage.getBaseURL() );
 
-        if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
+        if ( currentPage.getBaseURL().getPath().startsWith( "/sign-in" ) ) {
             LOGGER.info( "Doesn't look like we're logged in. Logging into Booking.com" );
-            doLoginForm( driver, wait, username, password );
+            doLoginForm( username, password );
         }
 
         // if we're actually logged in, we should get the hostel name identified here...
-        LOGGER.info( "Current URL: " + driver.getCurrentUrl() );
-        LOGGER.info( "Property name identified as: " + driver.getTitle() );
+        currentPage = getCurrentPage();
+        LOGGER.info( "Current URL: " + currentPage.getBaseURL() );
+        LOGGER.info( "Property name identified as: " + currentPage.getTitleText() );
 
         // verify we are logged in
-        if ( false == driver.getCurrentUrl().startsWith( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/home.html" ) ) {
-            LOGGER.info( "Current URL: " + driver.getCurrentUrl() );
-            LOGGER.info( driver.getPageSource() );
+        if ( false == currentPage.getBaseURL().getPath().startsWith( "/hotel/hoteladmin/extranet_ng/manage/home.html" ) ) {
+            LOGGER.info( "Current URL: " + currentPage.getBaseURL() );
+            LOGGER.info( currentPage.getWebResponse().getContentAsString() );
             throw new MissingUserDataException( "Are we logged in? Unexpected URL." );
         }
 
-        if ( false == SystemUtils.IS_OS_WINDOWS ) {
-            LOGGER.info( "Logged into Booking.com. Saving current URL." );
-            LOGGER.info( "Loaded " + driver.getCurrentUrl() );
-            wordPressDAO.setOption( "hbo_bdc_lasturl", driver.getCurrentUrl() );
-        }
+        LOGGER.info( "Logged into Booking.com. Saving current URL." );
+        LOGGER.info( "Loaded " + currentPage.getBaseURL() );
+        wordPressDAO.setOption( SystemUtils.IS_OS_WINDOWS ? "hbo_bdc_lasturl_win" : "hbo_bdc_lasturl", currentPage.getBaseURL().toString() );
     }
 
     /**
      * Performs sign-in from the sign-in screen.
      * 
-     * @param driver web client to use
-     * @param wait
      * @param username user credentials
      * @param password user credentials
+     * @throws IOException
      */
-    private void doLoginForm( WebDriver driver, WebDriverWait wait, String username, String password ) {
+    private void doLoginForm( String username, String password ) throws IOException {
 
-        WebElement usernameField = findElement( driver, wait, By.id( "loginname" ) );
-        usernameField.sendKeys( wordPressDAO.getOption( "hbo_bdc_username" ) );
-        findElement( driver, wait, By.xpath( "//span[text()='Next']/.." ) ).click();
-        WebElement passwordField = findElement( driver, wait, By.id( "password" ) );
-        passwordField.sendKeys( wordPressDAO.getOption( "hbo_bdc_password" ) );
-
-        WebElement nextButton = findElement( driver, wait, By.xpath( "//span[text()='Sign in']/.." ) );
+        HtmlPage page = getCurrentPage();
+        HtmlTextInput usernameField = page.getHtmlElementById( "loginname" );
+        usernameField.type( wordPressDAO.getOption( "hbo_bdc_username" ) );
+        HtmlButton nextButton = page.getFirstByXPath( "//span[text()='Next']/.." );
         nextButton.click();
-        wait.until( stalenessOf( nextButton ) );
 
-        if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in/verification" ) ||
-                driver.getCurrentUrl().startsWith( "https://secure-admin.booking.com/2fa/" ) ) {
+        HtmlPasswordInput passwordField = page.getHtmlElementById( "password" );
+        passwordField.type( wordPressDAO.getOption( "hbo_bdc_password" ) );
+
+        nextButton = page.getFirstByXPath( "//span[text()='Sign in']/.." );
+        nextButton.click();
+
+        if ( page.getBaseURL().getPath().startsWith( "/sign-in/verification" ) ||
+                page.getBaseURL().getPath().startsWith( "/2fa/" ) ) {
             // if this is the first time we're doing this, we'll need to go thru 2FA
             LOGGER.info( "BDC verification required" );
-            List<WebElement> phoneLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-call-verification-link')] | //input[@value='call']" ) );
-            List<WebElement> smsLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-sms-verification-link')] | //input[@value='sms']" ) );
+            List<HtmlElement> phoneLinks = page.getByXPath( "//a[contains(@class, 'nw-call-verification-link')] | //input[@value='call']" );
+            List<HtmlElement> smsLinks = page.getByXPath( "//a[contains(@class, 'nw-sms-verification-link')] | //input[@value='sms']" );
 
             String verificationMode = wordPressDAO.getOption( "hbo_bdc_verificationmode" );
             if ( "sms".equalsIgnoreCase( verificationMode ) && smsLinks.size() > 0 ) {
                 LOGGER.info( "Performing SMS verification" );
                 smsLinks.get( 0 ).click();
-                WebElement selectedPhone = driver.findElement( By.xpath( "//*[@id='selected_phone'] | //select[@name='phone_id_sms']" ) );
-                if ( false == selectedPhone.getText().trim().endsWith( "4338" ) ) {
-                    throw new MissingUserDataException( "Phone number not registered: " + selectedPhone.getText() );
+                HtmlElement selectedPhone = page.getFirstByXPath( "//*[@id='selected_phone'] | //select[@name='phone_id_sms']" );
+                if ( false == selectedPhone.getVisibleText().trim().endsWith( "4338" ) ) {
+                    throw new MissingUserDataException( "Phone number not registered: " + selectedPhone.getVisibleText() );
                 }
 
-                driver.findElement( By.xpath( "//span[text()='Send verification code'] "
-                        + "| //div[contains(@class,'cta-phone')]/input[@value='Send text message']" ) ).click();
+                HtmlElement send2faCode = page.getFirstByXPath( "//span[text()='Send verification code'] "
+                        + "| //div[contains(@class,'cta-phone')]/input[@value='Send text message']" );
+                send2faCode.click();
 
                 // now blank out the code and wait for it to appear
-                findElement( driver, wait, By.xpath( "//*[@id='sms_code' or @id='ask_pin_input']" ) ).sendKeys( fetch2FACode() );
+                HtmlElement code2fa = page.getFirstByXPath( "//*[@id='sms_code' or @id='ask_pin_input']" );
+                code2fa.type( fetch2FACode() );
 
-                nextButton = driver.findElement( By.xpath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" ) );
-                nextButton.click();
-                wait.until( stalenessOf( nextButton ) );
+                HtmlElement verifyNow = page.getFirstByXPath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" );
+                verifyNow.click();
             }
             else if ( "phone".equalsIgnoreCase( verificationMode ) && phoneLinks.size() > 0 ) {
                 LOGGER.info( "Performing phone verification" );
                 phoneLinks.get( 0 ).click();
-                nextButton = driver.findElement( By.xpath( "//span[text()='Call now']/.." ) );
+                nextButton = page.getFirstByXPath( "//span[text()='Call now']/.." );
                 nextButton.click();
 
-                findElement( driver, wait, By.xpath( "//*[@id='sms_code' or @id='ask_pin_input']" ) ).sendKeys( fetch2FACode() );
+                HtmlElement code2fa = page.getFirstByXPath( "//*[@id='sms_code' or @id='ask_pin_input']" );
+                code2fa.type( fetch2FACode() );
 
-                nextButton = driver.findElement( By.xpath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" ) );
-                nextButton.click();
-                wait.until( stalenessOf( nextButton ) );
+                HtmlElement verifyNow = page.getFirstByXPath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" );
+                verifyNow.click();
             }
             else {
                 throw new MissingUserDataException( "Verification required for BDC?" );
             }
         }
 
-        if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
+        if ( getCurrentPage().getBaseURL().getPath().startsWith( "/sign-in" ) ) {
             throw new MissingUserDataException( "Failed to login to BDC" );
         }
+        
+        fileService.writeCookiesToFile( webClient, COOKIE_FILE );
     }
 
     /**
@@ -230,41 +238,31 @@ public class BookingComScraper {
     /**
      * Looks up a given reservation in BDC.
      * 
-     * @param driver
-     * @param wait
      * @param reservationId the BDC reference
      * @throws IOException
      */
-    public void lookupReservation( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException {
-        doLogin( driver, wait );
+    public void lookupReservation( String reservationId ) throws IOException {
+        doLogin();
 
         // load reservation from URL
+        String currentUrl = getCurrentPage().getBaseURL().toString();
         String reservationUrl = MessageFormat.format( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/booking.html?res_id={0}&ses={1}&lang=en&hotel_id={2}",
-                reservationId, getSessionFromURL( driver.getCurrentUrl() ), getHotelIdFromURL( driver.getCurrentUrl() ) );
+                reservationId, getSessionFromURL( currentUrl ), getHotelIdFromURL( currentUrl ) );
         LOGGER.info( "Looking up reservation " + reservationId + " using URL " + reservationUrl );
-        driver.get( reservationUrl );
-
-        wait.until( ExpectedConditions.or(
-                ExpectedConditions.titleContains( "Reservation Details" ),
-                ExpectedConditions.titleContains( "Reservation details" ) ) );
-        LOGGER.info( "Loaded " + driver.getCurrentUrl() );
+        HtmlPage currentPage = webClient.getPage( reservationUrl );
+        LOGGER.info( "Loaded " + currentPage.getBaseURL() );
 
         // multiple places where the booking reference can appear; it should be in one of these
         LOGGER.info( "Looking up reservation ID by hidden field." );
-        By BOOKING_NUMBER_XPATH = By.xpath( "//input[@type='hidden' and @name='res_id'] "
+        String BOOKING_NUMBER_XPATH = "//input[@type='hidden' and @name='res_id'] "
                 + "| //p/span[text()='Booking number:']/../following-sibling::p "
-                + "| //div[not(contains(@class, 'hidden-print'))]/span[normalize-space(text())='Booking number:']/following-sibling::span" );
-        wait.until( ExpectedConditions.visibilityOfElementLocated( BOOKING_NUMBER_XPATH ) );
-        WebElement bookingNumberField = driver.findElement( BOOKING_NUMBER_XPATH );
-        String resIdFromPage = "input".equals( bookingNumberField.getTagName() ) ? bookingNumberField.getAttribute( "value" ) : bookingNumberField.getText();
+                + "| //div[not(contains(@class, 'hidden-print'))]/span[normalize-space(text())='Booking number:']/following-sibling::span";
+        HtmlElement bookingNumberField = getElementByXPath( BOOKING_NUMBER_XPATH );
+        String resIdFromPage = "input".equals( bookingNumberField.getTagName() ) ? bookingNumberField.getAttribute( "value" ) : bookingNumberField.getVisibleText();
 
         if ( false == reservationId.equals( resIdFromPage ) ) {
             LOGGER.error( "Reservation ID mismatch?!: Expected " + reservationId + " but found " + resIdFromPage );
-            LOGGER.info( driver.getPageSource() );
-            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            String filename = "logs/bdc_reservation_" + reservationId + ".png";
-            FileUtils.copyFile( scrFile, new File( filename ) );
-            LOGGER.info( "Screenshot written to " + filename );
+            LOGGER.info( currentPage.getWebResponse().getContentAsString() );
             throw new IOException( "Unable to load reservation details. Reservation ID mismatch!" );
         }
     }
@@ -272,39 +270,34 @@ public class BookingComScraper {
     /**
      * Looks up a given reservation in BDC and returns the virtual card balance on the booking.
      * 
-     * @param driver
-     * @param wait
      * @param reservationId the BDC reference
      * @return the amount available on the VCC
      * @throws IOException if unable to login
      * @throws NoSuchElementException if VCC details not found
      */
-    public BigDecimal getVirtualCardBalance( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException, NoSuchElementException {
-        lookupReservation( driver, wait, reservationId );
+    public BigDecimal getVirtualCardBalance( String reservationId ) throws IOException, NoSuchElementException {
+        lookupReservation( reservationId );
 
         // Click on VCC confirmation dialog "VCC changes for Covid 19"
-        By OKAY_GOT_IT_BUTTON = By.xpath( "//button/span/span[text()='Okay, got it']" );
-        if ( driver.findElements( OKAY_GOT_IT_BUTTON ).size() > 0 ) {
-            driver.findElement( OKAY_GOT_IT_BUTTON ).click();
+        HtmlPage currentPage = getCurrentPage();
+        List<HtmlButton> okayGotItButtons = currentPage.getByXPath( "//button/span/span[text()='Okay, got it']/../.." );
+        if ( okayGotItButtons.size() > 0 ) {
+            okayGotItButtons.get( 0 ).click();
         }
-
-        // payment details loaded by javascript
-        final By PAYMENT_DETAILS_BLOCK = By.xpath( "//span[normalize-space(text())='Virtual credit card'] | //span[contains(text(),'successfully charged')]" );
-        wait.until( ExpectedConditions.visibilityOfElementLocated( PAYMENT_DETAILS_BLOCK ) );
 
         try {
             // two different views of a booking? this one is from CRH
             LOGGER.info( "Looking up VCC balance (attempt 1)" );
-            return fetchVccBalanceFromPage( driver,
-                    By.xpath( "//p[@class='reservation_bvc--balance']" ),
+            return fetchVccBalanceFromPage(
+                    "//p[@class='reservation_bvc--balance']",
                     Pattern.compile( "Virtual card balance: £(\\d+\\.?\\d*)" ),
-                    e -> e.getText() );
+                    e -> e.getVisibleText() );
         }
         catch ( NoSuchElementException ex ) {
             try { // this view is from HSH
                 LOGGER.info( "Looking up VCC balance (attempt 2)" );
-                return fetchVccBalanceFromPage( driver,
-                        By.xpath( "//div/span[normalize-space(text())='Virtual card balance:']/../following-sibling::div" ),
+                return fetchVccBalanceFromPage( 
+                        "//div/span[normalize-space(text())='Virtual card balance:']/../following-sibling::div",
                         Pattern.compile( "£(\\d+\\.?\\d*)" ),
                         e -> getTextNode( e ) ); // remove any subelements in case of a partial charge
             }
@@ -312,17 +305,23 @@ public class BookingComScraper {
                 LOGGER.info( "Unable to find VCC amount to charge." );
                 // the next line will either a) display that we have already fully charged the VCC or
                 // b) throw an exception if we can't find anything wrt the VCC amount to charge
-                LOGGER.info( "Looks like we've already charged it! BDC message: "
-                        + driver.findElement( By.xpath( "//div[contains(@class, 'fully_charged')] | //span[contains(text(),'successfully charged the total amount')]" ) ).getText() );
+                HtmlElement elem = currentPage.getFirstByXPath( "//div[contains(@class, 'fully_charged')] | //span[contains(text(),'successfully charged the total amount')]" );
+                if ( elem != null ) {
+                    LOGGER.info( "Looks like we've already charged it! BDC message: " + elem.getVisibleText() );
+                }
                 return BigDecimal.ZERO;
             }
         }
     }
 
-    private BigDecimal fetchVccBalanceFromPage( WebDriver driver, By path, Pattern p, Function<WebElement, String> fn ) {
-        String totalAmount = fn.apply( driver.findElement( path ) );
+    private BigDecimal fetchVccBalanceFromPage( String xpath, Pattern p, Function<HtmlElement, String> fn ) {
+        List<HtmlElement> elem = getCurrentPage().getByXPath( xpath );
+        if ( elem.isEmpty() ) {
+            throw new NoSuchElementException( "Couldn't find virtual card balance from '" + xpath );
+        }
+        String totalAmount = fn.apply( elem.get( 0 ) );
 
-        LOGGER.info( "Matched " + totalAmount + " from " + path );
+        LOGGER.info( "Matched " + totalAmount + " from " + xpath );
         LOGGER.info( "Attempting match with pattern " + p.pattern() );
         Matcher m = p.matcher( totalAmount );
         if ( m.find() == false ) {
@@ -339,11 +338,11 @@ public class BookingComScraper {
      * @param e the parent element
      * @return the text from the child textNodes
      */
-    private static String getTextNode( WebElement e ) {
-        String text = e.getText().trim();
-        List<WebElement> children = e.findElements( By.xpath( "./*" ) );
-        for ( WebElement child : children ) {
-            text = text.replaceFirst( child.getText(), "" ).trim();
+    private static String getTextNode( HtmlElement e ) {
+        String text = e.getVisibleText().trim();
+        List<HtmlElement> children = e.getByXPath( "./*" );
+        for ( HtmlElement child : children ) {
+            text = text.replaceFirst( child.getVisibleText(), "" ).trim();
         }
         return text;
     }
@@ -351,66 +350,64 @@ public class BookingComScraper {
     /**
      * Mark credit card for the given reservation as invalid.
      * 
-     * @param driver
-     * @param wait
      * @param reservationId BDC reservation
      * @param last4Digits last 4 digits of CC
      * @throws IOException
      */
-    public void markCreditCardAsInvalid( WebDriver driver, WebDriverWait wait, String reservationId, String last4Digits ) throws IOException {
-        lookupReservation( driver, wait, reservationId );
+    public void markCreditCardAsInvalid( String reservationId, String last4Digits ) throws IOException {
+        lookupReservation( reservationId );
         LOGGER.info( "Marking card ending in " + last4Digits + " as invalid for reservation " + reservationId );
 
-        List<WebElement> headerMarkInvalid = driver.findElements( By.xpath( "//button[span/span[text()='Mark credit card as invalid']]" ) );
+        HtmlPage currentPage = getCurrentPage();
+        List<HtmlElement> headerMarkInvalid = currentPage.getByXPath( "//button[span/span[text()='Mark credit card as invalid']]" );
         if ( headerMarkInvalid.isEmpty() ) {
             LOGGER.info( "Link not available (or already marked invalid). Nothing to do..." );
             return;
         }
         headerMarkInvalid.get( 0 ).click();
-        wait.until( ExpectedConditions.visibilityOfElementLocated( By.id( "last-digits" ) ) );
 
-        WebElement last4DigitsInput = driver.findElement( By.id( "last-digits" ) );
-        last4DigitsInput.sendKeys( last4Digits );
+        HtmlElement last4DigitsInput = currentPage.getHtmlElementById( "last-digits" );
+        last4DigitsInput.type( last4Digits );
 
-        Select cardInvalidSelect = new Select( driver.findElement( By.id( "reason" ) ) );
-        cardInvalidSelect.selectByValue( "declined" );
+        HtmlSelect select = currentPage.getHtmlElementById("reason");
+        HtmlOption option = select.getOptionByValue("declined");
+        select.setSelectedAttribute(option, true);
 
-        WebElement confirmBtn = driver.findElement( By.xpath( "//button[span/span[text()='Confirm']]" ) );
-        confirmBtn.click();
+        HtmlElement confirmBtn = getElementByXPath( "//button[span/span[text()='Confirm']]" );
+        currentPage = confirmBtn.click();
 
-        By CLOSE_MODAL_BTN = By.xpath( "//aside[header/h1/span[text()='Mark credit card as invalid']]/footer/button[span/span[text()='Close']]" );
-        wait.until( ExpectedConditions.visibilityOfElementLocated( CLOSE_MODAL_BTN ) ).click();
+        String CLOSE_MODAL_BTN = "//aside[header/h1/span[text()='Mark credit card as invalid']]/footer/button[span/span[text()='Close']]";
+        HtmlButton closeBtn = currentPage.getFirstByXPath( CLOSE_MODAL_BTN );
+        closeBtn.click();
         LOGGER.info( "Card marked as invalid." );
     }
 
     /**
      * Retrieves the card details for the given booking.
      * 
-     * @param driver
-     * @param wait
      * @param bdcReservation BDC reservation
      * @return credit card details
      * @throws IOException
      * @throws ParseException on parse error during retrieval
      * @throws MissingUserDataException if card details are missing
      */
-    public CardDetails returnCardDetailsForBooking( WebDriver driver, WebDriverWait wait, String bdcReservation ) throws IOException, ParseException {
-        lookupReservation( driver, wait, bdcReservation );
+    public CardDetails returnCardDetailsForBooking( String bdcReservation ) throws IOException, ParseException {
+        lookupReservation( bdcReservation );
+        HtmlPage currentPage = getCurrentPage();
 
         // payment details loaded by javascript
-        final By PAYMENT_DETAILS_BLOCK = By.xpath( "//span[normalize-space(text())='Virtual credit card'] "
+        final String PAYMENT_DETAILS_BLOCK = "//span[normalize-space(text())='Virtual credit card'] "
                 + "| //span[contains(text(),'successfully charged')] "
                 + "| //span[contains(text(),'This virtual card is no longer active')] "
                 + "| //span[contains(text(),\"This virtual card isn't active anymore\")] "
-                + "| //a/span/span[normalize-space(text())='View credit card details']" );
-        wait.until( ExpectedConditions.visibilityOfElementLocated( PAYMENT_DETAILS_BLOCK ) );
+                + "| //a/span/span[normalize-space(text())='View credit card details']";
 
-        List<WebElement> headerViewCCDetails = driver.findElements( By.xpath( "//*[self::button or self::a]/span/span[normalize-space(text())='View credit card details']/../.." ) );
+        List<HtmlElement> headerViewCCDetails = currentPage.getByXPath( "//*[self::button or self::a]/span/span[normalize-space(text())='View credit card details']/../.." );
         LOGGER.info( "Matched " + headerViewCCDetails.size() + " sign-in elements" );
         if ( headerViewCCDetails.isEmpty() ) {
-            WebElement paymentDetails = driver.findElement( PAYMENT_DETAILS_BLOCK );
-            if ( paymentDetails.getText().contains( "This virtual card is no longer active." )
-                    || paymentDetails.getText().contains( "This virtual card isn't active anymore" ) ) {
+            HtmlElement paymentDetails = getElementByXPath( PAYMENT_DETAILS_BLOCK );
+            if ( paymentDetails.getVisibleText().contains( "This virtual card is no longer active." )
+                    || paymentDetails.getVisibleText().contains( "This virtual card isn't active anymore" ) ) {
                 throw new MissingUserDataException( "This virtual card is no longer active." );
             }
             throw new MissingUserDataException( "No card details link available." );
@@ -420,11 +417,11 @@ public class BookingComScraper {
         String nextLink = headerViewCCDetails.get( 0 ).getAttribute( "href" );
         if ( StringUtils.isNotBlank( nextLink ) ) {
             LOGGER.info( "Link found, going to " + nextLink );
-            driver.get( nextLink );
+            currentPage = webClient.getPage( nextLink );
         }
         else {
             LOGGER.info( "Clicking on View CC details." );
-            headerViewCCDetails.get( 0 ).click();
+            currentPage = headerViewCCDetails.get( 0 ).click();
         }
 
         // we may or may not need to login again to view CC details
@@ -432,55 +429,58 @@ public class BookingComScraper {
         final String CC_DETAILS_PATH = "//th[contains(text(),'Credit Card Details')] | //th[contains(text(),'credit card details')]";
         final String CC_DETAILS_NOT_AVAIL_PATH = "//h2[contains(text(),\"credit card details aren't available\")]";
         final String CONTINUE_WITH_CC_DETAILS = "//p[normalize-space(text())='Continue to view the credit card details.']";
-        WebElement locator;
-        try {
-            locator = wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath(
-                    SIGN_IN_LOCATOR_PATH + " | " + CC_DETAILS_PATH + " | " + CC_DETAILS_NOT_AVAIL_PATH + " | " + CONTINUE_WITH_CC_DETAILS ) ) );
-        }
-        catch ( TimeoutException ex ) {
-            LOGGER.info( "Timeout. Trying to click on view CC details again." );
-            headerViewCCDetails.get( 0 ).click();
-            locator = wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath(
-                    SIGN_IN_LOCATOR_PATH + " | " + CC_DETAILS_PATH + " | " + CC_DETAILS_NOT_AVAIL_PATH + " | " + CONTINUE_WITH_CC_DETAILS ) ) );
-        }
 
         Optional<Runnable> CLOSE_WINDOW_TASK = Optional.empty();
-        if ( "h2".equals( locator.getTagName() ) ) {
+        if ( currentPage.getFirstByXPath( CC_DETAILS_NOT_AVAIL_PATH ) != null ) {
             throw new MissingUserDataException( "Credit card details aren't available." );
         }
-        else if ( "p".equals( locator.getTagName() ) ) {
-            doLoginForm( driver, wait, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
+        else if ( currentPage.getFirstByXPath( CONTINUE_WITH_CC_DETAILS ) != null ) {
+             doLoginForm( wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
         }
-        else if ( "span".equals( locator.getTagName() ) ) {
+        else if ( currentPage.getFirstByXPath( SIGN_IN_LOCATOR_PATH ) != null ) {
             // the following should open a new window; switch to new window
             LOGGER.info( "Logging in again to view CC details..." );
-            final String CURRENT_WINDOW = driver.getWindowHandle();
-            driver.findElement( By.xpath( SIGN_IN_LOCATOR_PATH ) ).click();
-            wait.until( ExpectedConditions.numberOfWindowsToBe( 2 ) );
+            final WebWindow CURRENT_WINDOW = webClient.getCurrentWindow();
+            HtmlSpan signInToView = currentPage.getFirstByXPath( SIGN_IN_LOCATOR_PATH );
+            signInToView.click(); // this should open a new window
 
             // switch to other window
-            driver.getWindowHandles().stream()
-                .filter( w -> false == CURRENT_WINDOW.equals( w ) )
-                .findFirst()
-                .map( w -> driver.switchTo().window( w ) )
-                .orElseThrow( () -> new IOException("Unable to find new login window.") );
+            Optional<WebWindow> otherWindow = webClient.getWebWindows().stream()
+                    .filter( w -> CURRENT_WINDOW != w )
+                    .findFirst();
+            if ( otherWindow.isPresent() ) {
+                webClient.setCurrentWindow( otherWindow.get() );
+            }
+            else {
+                throw new IOException( "Unable to find new login window." );
+            }
 
             // login again
-            doLoginForm( driver, wait, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
+            webClient.getPage( getCurrentPage().getBaseURL().toString() ); // need to reload page for some reason
+            doLoginForm( wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
 
             CLOSE_WINDOW_TASK = Optional.of( () -> {
-                driver.findElement( By.xpath( "//div[contains(@class,'sbm')]/button[normalize-space(text())='Close']" ) ).click();
-                driver.switchTo().window( CURRENT_WINDOW ); // switch back to main tab
+                HtmlElement btn = getElementByXPath( "//div[contains(@class,'sbm')]/button[normalize-space(text())='Close']" );
+                try {
+                    btn.click(); // this should close the window
+                }
+                catch ( IOException ex ) {
+                    throw new RuntimeException( ex );
+                }
+                webClient.setCurrentWindow( CURRENT_WINDOW ); // switch back to main tab
             } );
         }
+        else if ( getElementByXPath( CC_DETAILS_PATH ) == null ) {
+            LOGGER.info( getCurrentPage().getWebResponse().getContentAsString() );
+            throw new MissingUserDataException( "Expecting credit card details page but not found?" );
+        }
 
-        wait.until( ExpectedConditions.visibilityOfElementLocated( By.xpath( CC_DETAILS_PATH ) ) );
         CardDetails cardDetails = new CardDetails();
-        cardDetails.setName( driver.findElement( By.xpath( "//td[text()=\"Card holder's name:\"]/following-sibling::td" ) ).getText().trim() );
-        cardDetails.setCardNumber( driver.findElement( By.xpath( "//td[text()='Card number:']/following-sibling::td" ) ).getText().replaceAll("\\s", "") );
-        cardDetails.setCardType( driver.findElement( By.xpath( "//td[text()='Card type:']/following-sibling::td" ) ).getText().trim() );
-        cardDetails.setExpiry( parseExpiryDate( driver.findElement( By.xpath( "//td[contains(text(),'Expiration')]/following-sibling::td" ) ).getText().trim() ) );
-        cardDetails.setCvv( StringUtils.trimToNull( driver.findElement( By.xpath( "//td[contains(text(),'CVC')]/following-sibling::td" ) ).getText() ) );
+        cardDetails.setName( getElementByXPath( "//td[text()=\"Card holder's name:\"]/following-sibling::td" ).getVisibleText().trim() );
+        cardDetails.setCardNumber( getElementByXPath( "//td[text()='Card number:']/following-sibling::td").getVisibleText().replaceAll("\\s", "") );
+        cardDetails.setCardType( getElementByXPath( "//td[text()='Card type:']/following-sibling::td" ).getVisibleText().trim() );
+        cardDetails.setExpiry( parseExpiryDate( getElementByXPath( "//td[contains(text(),'Expiration')]/following-sibling::td" ).getVisibleText().trim() ) );
+        cardDetails.setCvv( StringUtils.trimToNull( getElementByXPath( "//td[contains(text(),'CVC')]/following-sibling::td" ).getVisibleText() ) );
         LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( cardDetails.getCardNumber() ) + " for " + cardDetails.getName() );
 
         // we're done here; close the newly opened window
@@ -491,28 +491,22 @@ public class BookingComScraper {
     /**
      * Searches for all VCC bookings that can be charged immediately.
      * 
-     * @param driver
-     * @param wait
      * @return non-null list of BDC booking refs
      * @throws IOException
      */
-    public List<String> getAllVCCBookingsThatCanBeCharged( WebDriver driver, WebDriverWait wait ) throws IOException {
-        doLogin( driver, wait );
+    public List<String> getAllVCCBookingsThatCanBeCharged() throws IOException {
+        doLogin();
 
         // load Virtual cards to charge page
+        String currentUrl = getCurrentPage().getBaseURL().toString();
         String vccUrl = MessageFormat.format( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/vccs_management.html?lang=en&ses={0}&hotel_id={1}&route=vccs_to_charge",
-                getSessionFromURL( driver.getCurrentUrl() ), getHotelIdFromURL( driver.getCurrentUrl() ) );
+                getSessionFromURL( currentUrl ), getHotelIdFromURL( currentUrl ) );
         LOGGER.info( "Looking up VCCs to charge " + vccUrl );
-        driver.get( vccUrl );
+        HtmlPage currentPage = webClient.getPage( vccUrl );
 
         LOGGER.info( "Virtual cards to charge..." );
-        By LOADING_CELLS = By.xpath( "//span[contains(@class, 'loading-bar--animated')]" );
-        wait.until( ExpectedConditions.numberOfElementsToBe( LOADING_CELLS, 0 ) ); // wait for page load        
-
-        List<String> reservationIds = new ArrayList<>();
-        reservationIds.addAll( driver.findElements( By.xpath( "//div[div/h2/span/text()='Virtual cards to charge']/div/div/table/tbody/tr/th/span/a" ) )
-                .stream().map( a -> a.getText() ).collect( Collectors.toList() ) );
-        return reservationIds;
+        List<HtmlAnchor> reservationIds = currentPage.getByXPath( "//div[div/h2/span/text()='Virtual cards to charge']/div/div/table/tbody/tr/th/span/a" );
+        return reservationIds.stream().map( a -> a.getVisibleText() ).collect( Collectors.toList() );
     }
 
     /**
@@ -540,16 +534,11 @@ public class BookingComScraper {
         }
     }
 
-    /**
-     * Waits until element is visible and returns it.
-     * 
-     * @param wait
-     * @param by
-     * @return visible element
-     */
-    private WebElement findElement( WebDriver driver, WebDriverWait wait, By by ) {
-        wait.until( ExpectedConditions.visibilityOfElementLocated( by ) );
-        return driver.findElement( by );
+    private HtmlPage getCurrentPage() {
+        return HtmlPage.class.cast( webClient.getCurrentWindow().getEnclosedPage() );
     }
 
+    private HtmlElement getElementByXPath( String xpath ) {
+        return getCurrentPage().getFirstByXPath( xpath );
+    }
 }
