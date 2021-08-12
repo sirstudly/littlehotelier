@@ -24,6 +24,8 @@ import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
 import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebRequest;
+import com.gargoylesoftware.htmlunit.WebWindowEvent;
+import com.gargoylesoftware.htmlunit.WebWindowListener;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -67,17 +69,29 @@ public class LittleHotelierConfig {
     @Bean( name = "webClientForBDC" )
     @Scope( "prototype" )
     public WebClient getWebClientForBDC() {
-        // return the default web client (with JS enabled)
         WebClient webClient = new WebClient( BrowserVersion.FIREFOX );
         webClient.getOptions().setTimeout( 120000 );
         webClient.getOptions().setRedirectEnabled( true );
         webClient.getOptions().setJavaScriptEnabled( true );
         webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
         webClient.getOptions().setThrowExceptionOnScriptError( false );
-        webClient.getOptions().setCssEnabled( false );
+        webClient.getOptions().setCssEnabled( true );
         webClient.getOptions().setUseInsecureSSL( true );
         webClient.setAjaxController( new NicelyResynchronizingAjaxController() );
-        webClient.waitForBackgroundJavaScript(60000); 
+        webClient.addWebWindowListener( new WebWindowListener() {
+            @Override
+            public void webWindowOpened( WebWindowEvent event ) {
+            }
+
+            @Override
+            public void webWindowContentChanged( WebWindowEvent event ) {
+                LOGGER.info( "Content changed: " + event.getNewPage().getUrl() );
+            }
+
+            @Override
+            public void webWindowClosed( WebWindowEvent event ) {
+            }
+        });
         return webClient;
     }
 

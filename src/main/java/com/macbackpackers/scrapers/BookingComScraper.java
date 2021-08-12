@@ -172,6 +172,11 @@ public class BookingComScraper {
             }
         }
 
+        int numberOfTasks = webClient.waitForBackgroundJavaScript( 60000 );
+        if ( numberOfTasks > 0 ) {
+            LOGGER.info( "Still waiting on {} javascript tasks to finish...", numberOfTasks );
+        }
+
         if ( getCurrentPage( webClient ).getBaseURL().getPath().startsWith( "/sign-in" ) ) {
             throw new MissingUserDataException( "Failed to login to BDC" );
         }
