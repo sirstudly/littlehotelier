@@ -50,4 +50,9 @@ public class PrepaidChargeJob extends AbstractJob {
     public void setReservationId( String reservationId ) {
         setParameter( "reservation_id", reservationId );
     }
+
+    @Override
+    public int getRetryCount() {
+        return 1; // limit failed email attempts
+    }
 }
