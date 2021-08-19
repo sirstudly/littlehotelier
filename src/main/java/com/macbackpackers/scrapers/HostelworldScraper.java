@@ -129,7 +129,7 @@ public class HostelworldScraper {
 
         // if we get redirected to the login page again...
         if ( LOGIN_PAGE_TITLE.equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
-            LOGGER.debug( nextPage.asXml() );
+            LOGGER.error( nextPage.asXml() );
             throw new UnrecoverableFault( "Unable to login to Hostelworld. Incorrect password?" );
         }
 

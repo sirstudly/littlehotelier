@@ -644,7 +644,7 @@ public class PaymentProcessorService {
                     + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) + " successfully charged." );
 
             // mark booking as fully paid in Hostelworld
-            if ( "Hostelworld & Hostelbookers".equals( cbReservation.getSourceName() ) ) {
+            if ( Arrays.asList( "Hostelworld & Hostelbookers", "Hostelworld" ).contains( cbReservation.getSourceName() ) ) {
                 try (WebClient hwlWebClient = context.getBean( "webClientForHostelworld", WebClient.class )) {
                     hostelworldScraper.acknowledgeFullPaymentTaken( hwlWebClient, cbReservation.getThirdPartyIdentifier() );
                 }

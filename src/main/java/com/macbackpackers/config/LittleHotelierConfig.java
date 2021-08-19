@@ -127,6 +127,11 @@ public class LittleHotelierConfig {
             public <P extends Page> P getPage( final WebRequest request ) throws IOException,
                     FailingHttpStatusCodeException {
                 LOGGER.info( request.getHttpMethod() + ": " + request.getUrl() );
+                if ( request.getRequestBody() != null ) {
+                    LOGGER.info( request.getRequestBody() );
+                }
+                request.getRequestParameters().stream()
+                        .forEach( p -> LOGGER.info( p.getName() + " -> " + p.getValue() ) );
                 return super.getPage( request );
             }
         };

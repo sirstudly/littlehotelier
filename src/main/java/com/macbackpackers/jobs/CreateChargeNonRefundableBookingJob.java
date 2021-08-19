@@ -33,7 +33,7 @@ public class CreateChargeNonRefundableBookingJob extends AbstractJob {
     public void processJob() throws Exception {
         cbScraper.getReservationsForBookingSources( cbWebClient, null, null,
                 getBookingDate(), getBookingDate().plusDays( getDaysAhead() ),
-                "Booking.com (Hotel Collect Booking)", "Hostelworld & Hostelbookers" )
+                "Booking.com (Hotel Collect Booking)", "Hostelworld & Hostelbookers", "Hostelworld" )
                 .stream()
                 .filter( p -> false == p.isPaid() )
                 .filter( p -> p.isHotelCollectBooking() )
@@ -42,8 +42,8 @@ public class CreateChargeNonRefundableBookingJob extends AbstractJob {
                 .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
                 .forEach( p -> {
                     LOGGER.info( "Creating a ChargeNonRefundableBookingJob for booking "
-                            + p.getThirdPartyIdentifier() + " (" + p.getStatus() + ")" );
-                    LOGGER.info( p.getFirstName() + " " + p.getLastName() );
+                            + p.getThirdPartyIdentifier() + " (" + p.getStatus() + "): "
+                            + p.getFirstName() + " " + p.getLastName() );
                     ChargeNonRefundableBookingJob chargeJob = new ChargeNonRefundableBookingJob();
                     chargeJob.setStatus( JobStatus.submitted );
                     chargeJob.setReservationId( p.getReservationId() );
