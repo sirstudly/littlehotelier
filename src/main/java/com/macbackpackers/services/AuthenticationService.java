@@ -18,6 +18,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.warrenstrange.googleauth.GoogleAuthenticator;
 
@@ -129,6 +130,54 @@ public class AuthenticationService {
      */
     public int getTotpPassword( String key ) {
         return new GoogleAuthenticator().getTotpPassword( key );
+    }
+
+    /**
+     * First _blanks out_ the 2FA code from the DB and waits for it to be re-populated. This is done
+     * outside this application.
+     * 
+     * @return non-null 2FA code
+     * @throws MissingUserDataException on timeout (1 + 10 minutes)
+     */
+    public String fetchCloudbeds2FACode() throws MissingUserDataException {
+        return fetch2FACode( "hbo_cloudbeds_2facode" );
+    }
+
+    /**
+     * First _blanks out_ the 2FA code from the DB and waits for it to be re-populated. This is done
+     * outside this application.
+     * 
+     * @return non-null 2FA code
+     * @throws MissingUserDataException on timeout (1 + 10 minutes)
+     */
+    public String fetchBDC2FACode() throws MissingUserDataException {
+        return fetch2FACode( "hbo_bdc_2facode" );
+    }
+
+    private String fetch2FACode( String optionName ) throws MissingUserDataException {
+        // now blank out the code and wait for it to appear
+        LOGGER.info( "waiting for {} to be set...", optionName );
+        wordpressDAO.setOption( optionName, "" );
+        sleep( 60 );
+        // force timeout after 10 minutes (60x10 seconds)
+        for ( int i = 0 ; i < 60 ; i++ ) {
+            String scaCode = wordpressDAO.getOption( optionName );
+            if ( StringUtils.isNotBlank( scaCode ) ) {
+                return scaCode;
+            }
+            LOGGER.info( "waiting for another 10 seconds..." );
+            sleep( 10 );
+        }
+        throw new MissingUserDataException( "2FA code timeout waiting for verification." );
+    }
+
+    private void sleep( int seconds ) {
+        try {
+            Thread.sleep( seconds * 1000 );
+        }
+        catch ( InterruptedException e ) {
+            // nothing to do
+        }
     }
 
     /**

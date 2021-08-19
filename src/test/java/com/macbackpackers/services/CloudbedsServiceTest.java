@@ -38,7 +38,7 @@ public class CloudbedsServiceTest {
     WordPressDAO dao;
 
     @Autowired
-    @Qualifier( "webClientForCloudbeds" )
+    @Qualifier( "webClientForBDC" )
     WebClient webClient;
 
     @Test

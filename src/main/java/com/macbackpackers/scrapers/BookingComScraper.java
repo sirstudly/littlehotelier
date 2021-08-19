@@ -34,6 +34,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.services.AuthenticationService;
 import com.macbackpackers.services.BasicCardMask;
 import com.macbackpackers.services.FileService;
 
@@ -47,6 +48,9 @@ public class BookingComScraper {
 
     @Autowired
     private FileService fileService;
+
+    @Autowired
+    private AuthenticationService authService;
 
     /** for saving login credentials */
     private static final String COOKIE_FILE = "bdc.cookies";
@@ -150,7 +154,7 @@ public class BookingComScraper {
 
                 // now blank out the code and wait for it to appear
                 HtmlElement code2fa = page.getFirstByXPath( "//*[@id='sms_code' or @id='ask_pin_input']" );
-                code2fa.type( fetch2FACode() );
+                code2fa.type( authService.fetchBDC2FACode() );
 
                 HtmlElement verifyNow = page.getFirstByXPath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" );
                 verifyNow.click();
@@ -162,7 +166,7 @@ public class BookingComScraper {
                 nextButton.click();
 
                 HtmlElement code2fa = page.getFirstByXPath( "//*[@id='sms_code' or @id='ask_pin_input']" );
-                code2fa.type( fetch2FACode() );
+                code2fa.type( authService.fetchBDC2FACode() );
 
                 HtmlElement verifyNow = page.getFirstByXPath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" );
                 verifyNow.click();
@@ -182,30 +186,6 @@ public class BookingComScraper {
         }
         
         fileService.writeCookiesToFile( webClient, COOKIE_FILE );
-    }
-
-    /**
-     * First _blanks out_ the 2FA code from the DB and waits for it to be re-populated. This is done
-     * outside this application.
-     * 
-     * @return non-null 2FA code
-     * @throws MissingUserDataException on timeout (1 + 10 minutes)
-     */
-    private String fetch2FACode() throws MissingUserDataException {
-        // now blank out the code and wait for it to appear
-        LOGGER.info( "waiting for hbo_bdc_2facode to be set..." );
-        wordPressDAO.setOption( "hbo_bdc_2facode", "" );
-        sleep( 60 );
-        // force timeout after 10 minutes (60x10 seconds)
-        for ( int i = 0 ; i < 60 ; i++ ) {
-            String scaCode = wordPressDAO.getOption( "hbo_bdc_2facode" );
-            if ( StringUtils.isNotBlank( scaCode ) ) {
-                return scaCode;
-            }
-            LOGGER.info( "waiting for another 10 seconds..." );
-            sleep( 10 );
-        }
-        throw new MissingUserDataException( "2FA code timeout waiting for BDC verification." );
     }
 
     /**
@@ -531,15 +511,6 @@ public class BookingComScraper {
             throw new ParseException( "Unable to get card expiry date", 0 );
         }
         return m.group( 1 ) + m.group( 2 );
-    }
-
-    private void sleep( int seconds ) {
-        try {
-            Thread.sleep( seconds * 1000 );
-        }
-        catch ( InterruptedException e ) {
-            // nothing to do
-        }
     }
 
     private HtmlPage getCurrentPage( WebClient webClient ) {

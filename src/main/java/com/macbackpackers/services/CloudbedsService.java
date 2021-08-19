@@ -1,12 +1,9 @@
 package com.macbackpackers.services;
 
-import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
-import static org.openqa.selenium.support.ui.ExpectedConditions.titleContains;
-
-import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URISyntaxException;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
@@ -28,19 +25,10 @@ import java.util.stream.StreamSupport;
 
 import javax.mail.MessagingException;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.text.StringEscapeUtils;
-import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TakesScreenshot;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +38,12 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.html.HtmlButton;
+import com.gargoylesoftware.htmlunit.html.HtmlHiddenInput;
+import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
+import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
+import com.gargoylesoftware.htmlunit.util.Cookie;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.Allocation;
@@ -113,9 +107,6 @@ public class CloudbedsService {
 
     @Autowired
     private ApplicationContext appContext;
-
-    @Autowired
-    private GenericObjectPool<WebDriver> driverFactory;
 
     @Value( "${chromescraper.maxwait.seconds:60}" )
     private int maxWaitSeconds;
@@ -1384,87 +1375,74 @@ public class CloudbedsService {
      * @throws Exception 
      */
     public void loginAndSaveSession( WebClient webClient ) throws Exception {
-        final int MAX_WAIT_SECONDS = 60;
-        WebDriver driver = driverFactory.borrowObject();
-        try {
-            WebDriverWait wait = new WebDriverWait( driver, MAX_WAIT_SECONDS );
-            doLogin( webClient, driver, wait,
-                    dao.getOption( "hbo_cloudbeds_username" ),
-                    dao.getOption( "hbo_cloudbeds_password" ) );
-        }
-        catch ( Exception ex ) {
-            LOGGER.error( "Login failed.", ex );
-            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            FileUtils.copyFile( scrFile, new File( "logs/cloudbeds_login_failed.png" ) );
-            LOGGER.info( "Error attempting to login. Screenshot saved as cloudbeds_login_failed.png" );
-        }
-        finally {
-            driverFactory.returnObject( driver );
-        }
+        doLogin( webClient,
+                dao.getOption( "hbo_cloudbeds_username" ),
+                dao.getOption( "hbo_cloudbeds_password" ) );
     }
 
     /**
      * Logs into Cloudbeds with the necessary credentials.
      * 
      * @param webClient used for sending 2captcha requests
-     * @param driver web client to use
-     * @param wait
      * @param username user credentials
      * @param password user credentials
-     * @throws IOException 
-     * @throws URISyntaxException 
+     * @throws IOException
+     * @throws URISyntaxException
      */
-    public synchronized void doLogin( WebClient webClient, WebDriver driver, WebDriverWait wait, String username, String password ) throws IOException, URISyntaxException {
+    public synchronized void doLogin( WebClient webClient, String username, String password ) throws IOException, URISyntaxException {
 
         if ( username == null || password == null ) {
             throw new MissingUserDataException( "Missing username/password" );
         }
 
         // we need to navigate first before loading the cookies for that domain
-        driver.get( "https://hotels.cloudbeds.com/auth/login" );
+        HtmlPage page = webClient.getPage( "https://hotels.cloudbeds.com/auth/login" );
 
-        WebElement usernameField = driver.findElement( By.id( "email" ) );
-        usernameField.sendKeys( username );
+        HtmlTextInput usernameField = page.getHtmlElementById( "email" );
+        usernameField.type( username );
 
-        WebElement passwordField = driver.findElement( By.id( "password" ) );
-        passwordField.sendKeys( password );
+        HtmlPasswordInput passwordField = page.getHtmlElementById( "password" );
+        passwordField.type( password );
 
-        JavascriptExecutor jse = (JavascriptExecutor) driver;
-        String token = captchaService.solveRecaptchaV2( webClient, driver.getCurrentUrl(), driver.getPageSource() );
-        jse.executeScript( String.format( "var input = $('[name=visible_captcha]'); input.val('%s'); $('#login_form button').removeClass('disabled');", token ) );
+        String token = captchaService.solveRecaptchaV2( webClient, page.getBaseURL().toString(), page.getWebResponse().getContentAsString() );
+        HtmlHiddenInput captchaResponse = page.getFirstByXPath( "//input[@name='visible_captcha']" );
+        captchaResponse.setValueAttribute( token );
 
-        WebElement loginButton = driver.findElement( By.xpath( "//button[@type='submit']" ) );
-        loginButton.click();
-        wait.until( stalenessOf( loginButton ) );
+        HtmlButton loginButton = page.getFirstByXPath( "//button[@type='submit']" );
+        loginButton.setAttribute( "class", loginButton.getAttribute( "class" ).replaceAll( "disabled", "" ) ); // remove disabled
+        page = loginButton.click();
 
-        if ( driver.getCurrentUrl().startsWith( "https://hotels.cloudbeds.com/auth/awaiting_user_verification" ) ) {
-            WebElement scaCode = driver.findElement( By.name( "token" ) );
-            if ( StringUtils.isBlank( CLOUDBEDS_2FA_SECRET ) ) {
-                throw new UnrecoverableFault( "Missing Cloudbeds 2FA secret key" );
+        if ( page.getBaseURL().getPath().startsWith( "/auth/awaiting_user_verification" ) ) {
+            HtmlTextInput scaCode = page.getElementByName( "token" );
+            if ( StringUtils.isNotBlank( CLOUDBEDS_2FA_SECRET ) ) {
+                LOGGER.info( "Attempting TOTP verification" );
+                scaCode.type( String.valueOf( authService.getTotpPassword( CLOUDBEDS_2FA_SECRET ) ) );
             }
-            scaCode.sendKeys( String.valueOf( authService.getTotpPassword( CLOUDBEDS_2FA_SECRET ) ) );
-            loginButton = driver.findElement( By.xpath( "//button[contains(text(),'Submit')]" ) );
-            loginButton.click();
-            wait.until( stalenessOf( loginButton ) );
+            else {
+                LOGGER.info( "Attempting SMS verification" );
+                scaCode.type( authService.fetchCloudbeds2FACode() );
+            }
+            loginButton = page.getFirstByXPath( "//button[contains(text(),'Submit')]" );
+            page = loginButton.click();
         }
 
-        if ( false == driver.getCurrentUrl().startsWith( "https://hotels.cloudbeds.com/connect" ) ) {
-            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
-            FileUtils.copyFile( scrFile, new File( "logs/cloudbeds_login_failed.png" ) );
+        LOGGER.info( "Loading dashboard..." );
+        if ( false == page.getBaseURL().getPath().startsWith( "/connect" ) ) {
+            LOGGER.error( "Current page is " + page.getBaseURL() );
             throw new UnrecoverableFault( "2FA verification failed" );
         }
 
-        // if we're actually logged in, we should get the hostel name identified here...
-        wait.until( titleContains( "Dashboard" ) );
-        LOGGER.info( "Logged in title? is: " + driver.getTitle() );
+        // if we're actually logged in, we should be able to get the hostel name
+        Cookie hc = webClient.getCookieManager().getCookie( "hotel_name" );
+        LOGGER.info( "PROPERTY NAME is: " + (hc == null ? "unknown???" : URLDecoder.decode( hc.getValue(), "UTF-8" )) );
 
         // save credentials to disk so we don't need to do this again
         dao.setOption( "hbo_cloudbeds_cookies",
-                driver.manage().getCookies().stream()
+                webClient.getCookieManager().getCookies().stream()
                         .map( c -> c.getName() + "=" + c.getValue() )
                         .collect( Collectors.joining( ";" ) ) );
         dao.setOption( "hbo_cloudbeds_useragent",
-                jse.executeScript( "return navigator.userAgent;" ).toString() );
+                webClient.getBrowserVersion().getUserAgent() );
     }
 
     /**
