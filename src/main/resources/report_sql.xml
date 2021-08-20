@@ -57,13 +57,14 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
                          AND (f.notes IS NULL OR 
                              (f.notes NOT LIKE '%You have received a virtual credit card for this reservation%'
                          AND f.notes NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'))))
-               OR ( -- any prepaid bookings with a checkin date of today or earlier should be charged in full by now
+               /* OR ( -- VCC charge date seems erratic; disabling since it can be found out easy enough on BDC site
+                       -- any prepaid bookings with a checkin date of today or earlier should be charged in full by now
                         f.payment_outstanding &gt; 0
                     AND f.booking_source IN ('Booking.com')
                     AND f.checkin_date &lt; NOW()
                     AND (   c.comments LIKE '%You have received a virtual credit card for this reservation%'
                          OR c.comments LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'
-                         OR c.comments LIKE '%The VCC shown is still not active.%'))
+                         OR c.comments LIKE '%The VCC shown is still not active.%')) */
                OR ( -- include non-refundable bookings
                         f.booking_source IN ('Hostelworld &amp; Hostelbookers', 'Booking.com', 'Hostelworld')
                     AND f.rate_plan_name IN ('Non-refundable', 'nonref')
