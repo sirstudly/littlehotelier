@@ -189,7 +189,7 @@ public class Allocation {
     }
     
     public void setCheckinDate( LocalDate checkinDate ) {
-        setCheckinDate( Date.from( checkinDate.atStartOfDay( ZoneId.systemDefault() ).toInstant() ) );
+        setCheckinDate( Date.from( checkinDate.atStartOfDay( ZoneId.of( "GMT" ) ).toInstant() ) );
     }
 
     public Date getCheckoutDate() {
@@ -205,7 +205,7 @@ public class Allocation {
     }
     
     public void setCheckoutDate( LocalDate checkoutDate ) {
-        setCheckoutDate( Date.from( checkoutDate.atStartOfDay( ZoneId.systemDefault() ).toInstant() ) );
+        setCheckoutDate( Date.from( checkoutDate.atStartOfDay( ZoneId.of( "GMT" ) ).toInstant() ) );
     }
 
     public BigDecimal getPaymentTotal() {
@@ -299,7 +299,7 @@ public class Allocation {
     }
 
     public void setBookedDate( LocalDate bookedDate ) {
-        this.bookedDate = Date.from( bookedDate.atStartOfDay( ZoneId.systemDefault() ).toInstant() );
+        this.bookedDate = Date.from( bookedDate.atStartOfDay( ZoneId.of( "GMT" ) ).toInstant() );
     }
 
     /**
