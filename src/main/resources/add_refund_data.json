@@ -1,0 +1,11 @@
+{
+  "credit_card_id" : "21700142",
+  "paid" : 1,
+  "folio_id" : 0,
+  "payment_type" : "exist_credit_card",
+  "transaction_type" : "Refund",
+  "amount" : 1,
+  "payment_method" : "cards",
+  "parent_payment_id" : "53428342",
+  "property_id" : 17363
+}

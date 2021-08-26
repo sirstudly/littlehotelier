@@ -651,25 +651,44 @@ public class CloudbedsJsonRequestFactory {
      * @param cardType one of "mastercard", "visa". Anything else will blank the field.
      * @param amount amount to record
      * @param description description
+     * @param csrf csrf token
+     * @param billingPortalId
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createAddNewPaymentRequest( String reservationId, String bookingRoomId, String cardType, BigDecimal amount, String description ) throws IOException {
+    public WebRequest createAddNewPaymentRequest( String reservationId, String bookingRoomId, String cardType, BigDecimal amount, String description, String csrf, String billingPortalId ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_payment" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "payment_type", "cards" ),
+                new NameValuePair( "paymentType", "cards" ),
                 new NameValuePair( "choose_card",
                         cardType.equalsIgnoreCase( "mastercard" ) ? "master" : cardType.equalsIgnoreCase( "visa" ) ? "visa" : "" ),
                 new NameValuePair( "assign_to", bookingRoomId ),
+                new NameValuePair( "assignTo", bookingRoomId ),
                 new NameValuePair( "paid", CURRENCY_FORMAT.format( amount ) ),
-                new NameValuePair( "payment_date", LocalDate.now().format( DD_MM_YYYY ) ),
-                new NameValuePair( "cash_drawer_option", "add-to-opened-drawer" ),
+                new NameValuePair( "payment_date", LocalDate.now().format( YYYY_MM_DD ) ),
+                new NameValuePair( "paymentDate", LocalDate.now().format( YYYY_MM_DD ) ),
+                new NameValuePair( "rawDate", LocalDate.now().format( YYYY_MM_DD ) ),
                 new NameValuePair( "description", description ),
                 new NameValuePair( "process_payment", "0" ),
+                new NameValuePair( "processPayment", "false" ),
                 new NameValuePair( "refund_payment", "0" ),
                 new NameValuePair( "auth_payment", "0" ),
+                new NameValuePair( "authPayment", "false" ),
                 new NameValuePair( "keep_credit_card_info", "0" ),
+                new NameValuePair( "keep_pending_payment", "1" ),
                 new NameValuePair( "auto_date", "1" ),
+                new NameValuePair( "autoDate", "true" ),
+                new NameValuePair( "isAllocatePayment", "false" ),
+                new NameValuePair( "allocate_payment", "0" ),
+                new NameValuePair( "isAuthAvailable", "true" ),
+                new NameValuePair( "inventoryObjectType", "reservation_room" ),
+                new NameValuePair( "is_private_ha", "0" ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "announcementsLast", "" ),
                 new NameValuePair( "booking_id", reservationId ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
@@ -717,37 +736,37 @@ public class CloudbedsJsonRequestFactory {
     }
     
     /**
-     * Processes a new refund onto an existing reservation with the current active card.
+     * Processes a new refund onto an existing reservation with the given card.
      * 
      * @param reservationId ID of reservation (as it appears in the URL)
      * @param paymentId linked payment id
      * @param bookingRoomId (which "room" we're booking the payment to)
      * @param cardId active card to charge
-     * @param cardType one of "mastercard", "visa". Anything else will blank the field.
-     * @param amount amount to record
+     * @param amount amount to refund
      * @param description description
+     * @param csrf cross-site request forgery cookie
+     * @param billingPortalId
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createAddNewProcessRefundRequest( String reservationId, String paymentId, String bookingRoomId, String cardId, String cardType, BigDecimal amount, String description ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_payment" );
+    public WebRequest createAddNewProcessRefundRequest( String reservationId, String paymentId, String bookingRoomId,
+            String cardId, BigDecimal amount, String description, String csrf, String billingPortalId ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
+        String paymentJson = IOUtils.toString( getClass().getClassLoader()
+                .getResourceAsStream( "add_refund_data.json" ), StandardCharsets.UTF_8 )
+                .replaceAll( "__PROPERTY_ID__", getPropertyId() )
+                .replaceAll( "__REFUND_AMOUNT__", CURRENCY_FORMAT.format( amount ) )
+                .replaceAll( "__PAYMENT_ID__", paymentId )
+                .replaceAll( "__CREDIT_CARD_ID__", cardId )
+                .replaceAll( "__DESCRIPTION__", description );
         webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "payment_id", paymentId ),
-                new NameValuePair( "payment_type", "exist_credit_card" ),
-                new NameValuePair( "assign_to", bookingRoomId ),
-                new NameValuePair( "paid", CURRENCY_FORMAT.format( amount ) ),
-                new NameValuePair( "choose_card",
-                        cardType.equalsIgnoreCase( "mastercard" ) ? "master" : cardType.equalsIgnoreCase( "visa" ) ? "visa" : "" ),
-                new NameValuePair( "credit_card_id", cardId ),
-                new NameValuePair( "cash_drawer_option", "add-to-opened-drawer" ),
-                new NameValuePair( "refund_type", "refund_payment_gateway_transaction" ),
-                new NameValuePair( "description", description ),
-                new NameValuePair( "process_payment", "0" ),
-                new NameValuePair( "refund_payment", "1" ),
-                new NameValuePair( "auth_payment", "0" ),
-                new NameValuePair( "keep_credit_card_info", "0" ),
-                new NameValuePair( "auto_date", "1" ),
-                new NameValuePair( "booking_id", reservationId ),
+                new NameValuePair( "payment", paymentJson ),
+                new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation\",\"id\":\"%s\"}", reservationId ) ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "announcementsLast", "" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
@@ -761,86 +780,26 @@ public class CloudbedsJsonRequestFactory {
      * @param bookingRoomId (which "room" we're booking the payment to)
      * @param amount amount to record
      * @param description description
+     * @param csrf cross-site request forgery cookie
+     * @param billingPortalId
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createAddRefundRequest( String reservationId, String bookingRoomId, BigDecimal amount, String description ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_payment" );
+    public WebRequest createAddRefundRequest( String reservationId, String bookingRoomId, BigDecimal amount, String description, String csrf, String billingPortalId ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
+        String paymentJson = IOUtils.toString( getClass().getClassLoader()
+                .getResourceAsStream( "add_existing_refund_data.json" ), StandardCharsets.UTF_8 )
+                .replaceAll( "__PROPERTY_ID__", getPropertyId() )
+                .replaceAll( "__PAYMENT_AMOUNT__", CURRENCY_FORMAT.format( amount ) )
+                .replaceAll( "__DESCRIPTION__", description );
         webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "payment_type", "cards" ),
-                new NameValuePair( "assign_to", bookingRoomId ),
-                new NameValuePair( "paid", CURRENCY_FORMAT.format( amount ) ),
-                new NameValuePair( "cash_drawer_option", "add-to-opened-drawer" ),
-                new NameValuePair( "refund_type", "capture_note_existing_refund" ),
-                new NameValuePair( "description", description ),
-                new NameValuePair( "process_payment", "0" ),
-                new NameValuePair( "refund_payment", "1" ),
-                new NameValuePair( "auth_payment", "0" ),
-                new NameValuePair( "keep_credit_card_info", "0" ),
-                new NameValuePair( "auto_date", "1" ),
-                new NameValuePair( "booking_id", reservationId ),
-                new NameValuePair( "property_id", getPropertyId() ),
-                new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
-        return webRequest;
-    }
-
-    /**
-     * Processes a refund against the given payment.
-     * 
-     * @param paymentId ID of payment in "transactions by reservation" to refund against
-     * @param cardId card to charge
-     * @param amount amount to record
-     * @param description description
-     * @return web request
-     * @throws IOException on creation failure
-     */
-    public WebRequest createRefundPaymentRequest( String paymentId, String cardId, BigDecimal amount ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/refund_payment" );
-        webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "payment_type", "exist_credit_card" ),
-                new NameValuePair( "paid", CURRENCY_FORMAT.format( amount ) ),
-                new NameValuePair( "payment_id", paymentId ),
-                new NameValuePair( "credit_card_id", cardId ),
+                new NameValuePair( "payment", paymentJson ),
+                new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation_room\",\"id\":\"%s\"}", bookingRoomId ) ),
                 new NameValuePair( "suppress_client_errors", "true" ),
-                new NameValuePair( "property_id", getPropertyId() ),
-                new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
-        return webRequest;
-    }
-    
-    /**
-     * Process payment (AUTH and CAPTURE) onto an existing reservation.
-     * 
-     * @param reservationId ID of reservation (as it appears in the URL)
-     * @param bookingRoomId (which "room" we're booking the payment to)
-     * @param cardType one of "mastercard", "visa". Anything else will blank the field.
-     * @param cardId unique id of card being processed
-     * @param amount amount to record
-     * @param description description
-     * @return web request
-     * @throws IOException on creation failure
-     */
-    public WebRequest createProcessPaymentRequest( String reservationId, String bookingRoomId, String cardType,
-            String cardId, BigDecimal amount, String description ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_payment" );
-        webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "payment_type", "exist_credit_card" ),
-                new NameValuePair( "choose_card",
-                        cardType.equalsIgnoreCase( "mastercard" ) ? "master" : cardType.equalsIgnoreCase( "visa" ) ? "visa" : "" ),
-                new NameValuePair( "credit_card_id", cardId ),
-                new NameValuePair( "assign_to", bookingRoomId ),
-                new NameValuePair( "paid", CURRENCY_FORMAT.format( amount ) ),
-                new NameValuePair( "payment_date", LocalDate.now().format( DD_MM_YYYY ) ),
-                new NameValuePair( "cash_drawer_option", "add-to-opened-drawer" ),
-                new NameValuePair( "description", description ),
-                new NameValuePair( "isAllocatePayment", "false" ),
-                new NameValuePair( "isRequireAllocate", "false" ),
-                new NameValuePair( "process_payment", "1" ),
-                new NameValuePair( "refund_payment", "0" ),
-                new NameValuePair( "auth_payment", "0" ),
-                new NameValuePair( "keep_credit_card_info", "0" ),
-                new NameValuePair( "booking_id", reservationId ),
+                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "announcementsLast", "" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );

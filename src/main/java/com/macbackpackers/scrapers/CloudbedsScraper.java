@@ -448,7 +448,8 @@ public class CloudbedsScraper {
         // just take the first one
         String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
         WebRequest requestSettings = jsonRequestFactory.createAddNewPaymentRequest(
-                res.getReservationId(), bookingRoomId, cardType, amount, description );
+                res.getReservationId(), bookingRoomId, cardType, amount, description,
+                getCsrfToken( webClient ), getBillingPortalId( webClient ) );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
@@ -473,7 +474,8 @@ public class CloudbedsScraper {
         // just take the first one
         String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
         WebRequest requestSettings = jsonRequestFactory.createAddRefundRequest(
-                res.getReservationId(), bookingRoomId, amount, description );
+                res.getReservationId(), bookingRoomId, amount, description,
+                getCsrfToken( webClient ), getBillingPortalId( webClient ) );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
@@ -487,6 +489,7 @@ public class CloudbedsScraper {
      * @param description description of payment
      * @return response from Cloudbeds
      * @throws IOException on page load failure
+     * @deprecated not currently used as Stripe refunds get processed directly via the Stripe API and recorded in Cloudbeds
      */
     public CloudbedsJsonResponse processRefund( WebClient webClient, Reservation res, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException {
 
@@ -501,22 +504,7 @@ public class CloudbedsScraper {
         String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessRefundRequest(
                 res.getReservationId(), authTxn.getPaymentId(), bookingRoomId, authTxn.getCreditCardId(),
-                authTxn.getCreditCardType(), amount, description );
-        return doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
-    }
-
-    /**
-     * Performs a refund (against the gateway) for the given payment.
-     * 
-     * @param webClient web client instance to use
-     * @param payment initial charge we're refunding against
-     * @param amount amount to add
-     * @return JSON response
-     * @throws IOException on page load failure
-     */
-    public CloudbedsJsonResponse performRefund( WebClient webClient, TransactionRecord payment, BigDecimal amount ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createRefundPaymentRequest( 
-                payment.getPaymentId(), payment.getCreditCardId(), amount );
+                amount, description, getCsrfToken( webClient ), getBillingPortalId( webClient ) );
         return doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
