@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -684,26 +685,31 @@ public class CloudbedsJsonRequestFactory {
      * @param cardId active card to charge
      * @param amount amount to record
      * @param description description
+     * @param csrf cross-site request forgery cookie
+     * @param billingPortalId
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createAddNewProcessPaymentRequest( String reservationId, String bookingRoomId, String cardId, BigDecimal amount, String description ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_payment" );
+    public WebRequest createAddNewProcessPaymentRequest( String reservationId, String bookingRoomId, String cardId, BigDecimal amount,
+            String description, String csrf, String billingPortalId ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
+        String paymentJson = IOUtils.toString( getClass().getClassLoader()
+                .getResourceAsStream( "add_payment_data.json" ), StandardCharsets.UTF_8 )
+                .replaceAll( "__PROPERTY_ID__", getPropertyId() )
+                .replaceAll( "__PAYMENT_AMOUNT__", CURRENCY_FORMAT.format( amount ) )
+                .replaceAll( "__CREDIT_CARD_ID__", cardId )
+                .replaceAll( "__DESCRIPTION__", description )
+                .replaceAll( "__TRANSACTION_DATE__", LocalDate.now().format( YYYY_MM_DD ) )
+                .replaceAll( "__BOOKING_ID__", reservationId )
+                .replaceAll( "__ROOM_ID__", bookingRoomId );
         webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "payment_type", "exist_credit_card" ),
-                new NameValuePair( "assign_to", bookingRoomId ),
-                new NameValuePair( "paid", CURRENCY_FORMAT.format( amount ) ),
-                new NameValuePair( "payment_date", LocalDate.now().format( DD_MM_YYYY ) ),
-                new NameValuePair( "credit_card_id", cardId ),
-                new NameValuePair( "cash_drawer_option", "add-to-opened-drawer" ),
-                new NameValuePair( "description", description ),
-                new NameValuePair( "process_payment", "1" ),
-                new NameValuePair( "refund_payment", "0" ),
-                new NameValuePair( "auth_payment", "0" ),
-                new NameValuePair( "keep_pending_payment", "0" ),
-                new NameValuePair( "keep_credit_card_info", "1" ),
-                new NameValuePair( "auto_date", "1" ),
-                new NameValuePair( "booking_id", reservationId ),
+                new NameValuePair( "payment", paymentJson ),
+                new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation_room\",\"id\":\"%s\"}", bookingRoomId ) ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "announcementsLast", "" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );

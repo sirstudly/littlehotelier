@@ -448,4 +448,10 @@ public class CloudbedsScraperTest {
         LOGGER.info( json );
     }
 
+    @Test
+    public void testChargeCardForBooking() throws Exception {
+        Reservation r = cloudbedsScraper.getReservation( webClient, "43994808" );
+        cloudbedsScraper.chargeCardForBooking( webClient, r, new BigDecimal( "37.26" ) );
+    }
+
 }
