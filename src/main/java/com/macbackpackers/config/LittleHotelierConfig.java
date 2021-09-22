@@ -135,7 +135,7 @@ public class LittleHotelierConfig {
                         .forEach( p -> LOGGER.info( p.getName() + " -> "
                                 + ("card_number".equals( p.getName() ) ? new BasicCardMask().replaceCardWith( p.getValue() ) : p.getValue()) ) );
                 P response = super.getPage( request );
-                LOGGER.info( "RESPONSE: " + response.getWebResponse().getContentAsString() );
+                LOGGER.debug( "RESPONSE: " + response.getWebResponse().getContentAsString() );
                 return response;
             }
         };
