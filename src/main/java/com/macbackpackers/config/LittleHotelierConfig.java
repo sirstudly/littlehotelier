@@ -30,6 +30,7 @@ import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
+import com.macbackpackers.services.BasicCardMask;
 
 @Configuration
 @EnableTransactionManagement
@@ -131,8 +132,11 @@ public class LittleHotelierConfig {
                     LOGGER.info( request.getRequestBody() );
                 }
                 request.getRequestParameters().stream()
-                        .forEach( p -> LOGGER.info( p.getName() + " -> " + p.getValue() ) );
-                return super.getPage( request );
+                        .forEach( p -> LOGGER.info( p.getName() + " -> "
+                                + ("card_number".equals( p.getName() ) ? new BasicCardMask().replaceCardWith( p.getValue() ) : p.getValue()) ) );
+                P response = super.getPage( request );
+                LOGGER.info( "RESPONSE: " + response.getWebResponse().getContentAsString() );
+                return response;
             }
         };
         webClient.getOptions().setTimeout( 120000 );
