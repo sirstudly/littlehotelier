@@ -736,7 +736,8 @@ public class PaymentProcessorService {
                 amountToCharge = bdcScraper.getVirtualCardBalance( webClientForBDC, cbReservation.getThirdPartyIdentifier() );
             }
             final BigDecimal MINIMUM_CHARGE_AMOUNT = new BigDecimal( "0.3" );
-            final String MODIFIED_OUTSIDE_OF_BDC = "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC. VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL.";
+            final String MODIFIED_OUTSIDE_OF_BDC = "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC (or payment was incorrectly collected from guest). "
+                    + "VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL.";
             LOGGER.info( "VCC balance is " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
             if ( amountToCharge.compareTo( MINIMUM_CHARGE_AMOUNT ) > 0 ) {
                 cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, amountToCharge );
