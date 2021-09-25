@@ -8,6 +8,7 @@ public class CloudbedsJsonResponse {
 
     private Boolean success;
     private String message;
+    private String statusMessage;
     private String version;
 
     public Boolean getSuccess() {
@@ -20,6 +21,7 @@ public class CloudbedsJsonResponse {
 
     /**
      * Returns true unless success == false.
+     * 
      * @return true iff success is blank or true
      */
     public boolean isSuccess() {
@@ -41,6 +43,14 @@ public class CloudbedsJsonResponse {
 
     public void setMessage( String message ) {
         this.message = message;
+    }
+
+    public String getStatusMessage() {
+        return statusMessage;
+    }
+
+    public void setStatusMessage( String statusMessage ) {
+        this.statusMessage = statusMessage;
     }
 
     public String getVersion() {

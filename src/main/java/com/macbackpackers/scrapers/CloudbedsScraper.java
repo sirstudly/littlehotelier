@@ -700,7 +700,7 @@ public class CloudbedsScraper {
                 (resp, jsonResp) -> {
                     LOGGER.error( "Failed to charge booking. " + jsonResp );
                     try {
-                        addNote( webClient, res.getReservationId(), "Failed to charge booking: " + resp.getMessage() );
+                        addNote( webClient, res.getReservationId(), "Failed to charge booking: " + resp.getStatusMessage() );
                     }
                     catch ( IOException e ) {
                         LOGGER.error( "Failed to add note for failed charge..." );
