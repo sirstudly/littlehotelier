@@ -1,6 +1,8 @@
 
 package com.macbackpackers.beans.cloudbeds.responses;
 
+import com.google.gson.annotations.SerializedName;
+
 /**
  * I think all JSON responses from Cloudbeds includes these fields.
  */
@@ -8,6 +10,7 @@ public class CloudbedsJsonResponse {
 
     private Boolean success;
     private String message;
+    @SerializedName( "statusMessage" )
     private String statusMessage;
     private String version;
 
