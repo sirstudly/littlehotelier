@@ -1427,10 +1427,7 @@ public class CloudbedsService {
         }
 
         LOGGER.info( "Loading dashboard..." );
-        if ( false == page.getBaseURL().getPath().startsWith( "/connect" ) ) {
-            LOGGER.error( "Current page is " + page.getBaseURL() );
-            throw new UnrecoverableFault( "2FA verification failed" );
-        }
+        LOGGER.info( "Waiting for " +  webClient.waitForBackgroundJavaScript( 30000 ) + " JS processes remaining.");
 
         // if we're actually logged in, we should be able to get the hostel name
         Cookie hc = webClient.getCookieManager().getCookie( "hotel_name" );

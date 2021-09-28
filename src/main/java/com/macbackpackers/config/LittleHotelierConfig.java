@@ -141,7 +141,7 @@ public class LittleHotelierConfig {
         };
         webClient.getOptions().setTimeout( 120000 );
         webClient.getOptions().setRedirectEnabled( true );
-        webClient.getOptions().setJavaScriptEnabled( false );
+        webClient.getOptions().setJavaScriptEnabled( true );
         webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
         webClient.getOptions().setThrowExceptionOnScriptError( false );
         webClient.getOptions().setCssEnabled( false );
