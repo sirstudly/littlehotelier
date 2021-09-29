@@ -35,7 +35,6 @@ import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
-import com.gargoylesoftware.htmlunit.util.Cookie;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -51,6 +50,7 @@ import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Guest;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
+import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.exceptions.PaymentPendingException;
@@ -86,6 +86,9 @@ public class CloudbedsScraper {
                     throw new UnsupportedOperationException( "Not used." ); // logic defined in get(key, Callable)
                 }
             } );
+
+    @Autowired
+    private WordPressDAO dao;
 
     @Autowired
     @Qualifier( "gsonForCloudbeds" )
@@ -191,7 +194,7 @@ public class CloudbedsScraper {
      */
     public Reservation getReservation( WebClient webClient, String reservationId ) throws IOException {
 
-        Reservation r = doRequestErrorOnFailure( webClient, jsonRequestFactory.createGetReservationRequest( reservationId, getCsrfToken( webClient ) ), Reservation.class,
+        Reservation r = doRequestErrorOnFailure( webClient, jsonRequestFactory.createGetReservationRequest( reservationId, getCsrfToken() ), Reservation.class,
                 ( resv, jsonResponse ) -> {
                     // need to parse the credit_cards object manually to check for presence
                     JsonObject rootElem = fromJson( jsonResponse, JsonObject.class );
@@ -303,7 +306,7 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<Customer> getReservations( WebClient webClient, String query ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( query, getCsrfToken( webClient ) ) );
+        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( query, getCsrfToken() ) );
     }
 
     /**
@@ -449,7 +452,7 @@ public class CloudbedsScraper {
         String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
         WebRequest requestSettings = jsonRequestFactory.createAddNewPaymentRequest(
                 res.getReservationId(), bookingRoomId, cardType, amount, description,
-                getCsrfToken( webClient ), getBillingPortalId( webClient ) );
+                getCsrfToken(), getBillingPortalId( webClient ) );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
@@ -475,7 +478,7 @@ public class CloudbedsScraper {
         String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
         WebRequest requestSettings = jsonRequestFactory.createAddRefundRequest(
                 res.getReservationId(), bookingRoomId, amount, description,
-                getCsrfToken( webClient ), getBillingPortalId( webClient ) );
+                getCsrfToken(), getBillingPortalId( webClient ) );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
@@ -504,7 +507,7 @@ public class CloudbedsScraper {
         String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessRefundRequest(
                 res.getReservationId(), authTxn.getPaymentId(), bookingRoomId, authTxn.getCreditCardId(),
-                amount, description, getCsrfToken( webClient ), getBillingPortalId( webClient ) );
+                amount, description, getCsrfToken(), getBillingPortalId( webClient ) );
         return doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
@@ -685,7 +688,7 @@ public class CloudbedsScraper {
             throws IOException, PaymentPendingException, RecordPaymentFailedException {
         LOGGER.info( "Begin PROCESS CHARGE for reservation " + res.getReservationId()  + " for " + getCurrencyFormat().format( amount ) );
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessPaymentRequest( res.getReservationId(), res.getBookingRooms().get( 0 ).getId(),
-                res.getCreditCardId(), amount, "Autocharging -RONBOT", getCsrfToken( webClient ), getBillingPortalId( webClient ) );
+                res.getCreditCardId(), amount, "Autocharging -RONBOT", getCsrfToken(), getBillingPortalId( webClient ) );
         doRequest( webClient, requestSettings, CloudbedsJsonResponse.class, 
                 (resp, jsonResp) -> {
                     // 2021-03-19: success when charge from Stripe is incomplete??
@@ -721,12 +724,14 @@ public class CloudbedsScraper {
         return jobject.get( "billing_portal_id" ).getAsString();
     }
 
-    public String getCsrfToken( WebClient webClient ) {
-        Cookie csrf = webClient.getCookieManager().getCookie( "csrf_accessa_cookie" );
-        if ( csrf == null ) {
+    public String getCsrfToken() {
+        String cookies = dao.getOption( "hbo_cloudbeds_cookies" );
+        Pattern p = Pattern.compile( "csrf_accessa_cookie=([0-9a-f]+)" );
+        Matcher m = p.matcher( cookies );
+        if ( false == m.find() ) {
             throw new MissingUserDataException( "Missing CSRF cookie??" );
         }
-        return csrf.getValue();
+        return m.group( 1 );
     }
 
     /**
