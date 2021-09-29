@@ -465,6 +465,13 @@ public interface WordPressDAO {
     public String getOption( String property );
 
     /**
+     * Returns the Cloudbeds CSRF token from the current session.
+     * 
+     * @return CSRF token
+     */
+    public String getCsrfToken();
+
+    /**
      * Returns the wordpress option for the given property.
      * 
      * @param property name of key to get

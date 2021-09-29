@@ -80,6 +80,9 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Value( "${wordpress.db.prefix}" )
     private String wordpressPrefix;
 
+    // cached
+    private static String CSRF_TOKEN = null;
+
     @Override
     public boolean isCloudbeds() {
         return "cloudbeds".equalsIgnoreCase( getOption( "hbo_property_manager" ) );
@@ -936,6 +939,20 @@ public class WordPressDAOImpl implements WordPressDAO {
             return null;
         }
         return sqlResult.get( 0 );
+    }
+
+    @Override
+    public String getCsrfToken() {
+        if ( CSRF_TOKEN == null ) {
+            String cookies = getOption( "hbo_cloudbeds_cookies" );
+            Pattern p = Pattern.compile( "csrf_accessa_cookie=([0-9a-f]+)" );
+            Matcher m = p.matcher( cookies );
+            if ( false == m.find() ) {
+                throw new MissingUserDataException( "Missing CSRF cookie??" );
+            }
+            CSRF_TOKEN = m.group( 1 );
+        }
+        return CSRF_TOKEN;
     }
 
     @Override
