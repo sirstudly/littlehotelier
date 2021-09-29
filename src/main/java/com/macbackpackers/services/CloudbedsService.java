@@ -1431,7 +1431,11 @@ public class CloudbedsService {
 
         // if we're actually logged in, we should be able to get the hostel name
         Cookie hc = webClient.getCookieManager().getCookie( "hotel_name" );
-        LOGGER.info( "PROPERTY NAME is: " + (hc == null ? "unknown???" : URLDecoder.decode( hc.getValue(), "UTF-8" )) );
+        if ( hc == null ) {
+            LOGGER.error( page.asXml() );
+            throw new UnrecoverableFault( "Failed login. Hostel cookie not set." );
+        }
+        LOGGER.info( "PROPERTY NAME is: " + URLDecoder.decode( hc.getValue(), "UTF-8" ) );
 
         // save credentials to disk so we don't need to do this again
         dao.setOption( "hbo_cloudbeds_cookies",
