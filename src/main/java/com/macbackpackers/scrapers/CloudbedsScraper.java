@@ -191,7 +191,7 @@ public class CloudbedsScraper {
      */
     public Reservation getReservation( WebClient webClient, String reservationId ) throws IOException {
 
-        Reservation r = doRequestErrorOnFailure( webClient, jsonRequestFactory.createGetReservationRequest( reservationId ), Reservation.class,
+        Reservation r = doRequestErrorOnFailure( webClient, jsonRequestFactory.createGetReservationRequest( reservationId, getCsrfToken( webClient ) ), Reservation.class,
                 ( resv, jsonResponse ) -> {
                     // need to parse the credit_cards object manually to check for presence
                     JsonObject rootElem = fromJson( jsonResponse, JsonObject.class );
@@ -303,7 +303,7 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<Customer> getReservations( WebClient webClient, String query ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( query ) );
+        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( query, getCsrfToken( webClient ) ) );
     }
 
     /**

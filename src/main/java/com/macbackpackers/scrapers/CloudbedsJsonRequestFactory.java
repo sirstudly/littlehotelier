@@ -40,7 +40,6 @@ public class CloudbedsJsonRequestFactory {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
     private final DateTimeFormatter YYYY_MM_DD = DateTimeFormatter.ofPattern( "yyyy-MM-dd" );
-    private final DateTimeFormatter DD_MM_YYYY = DateTimeFormatter.ofPattern( "dd/MM/yyyy" );
     private final DecimalFormat CURRENCY_FORMAT = new DecimalFormat( "###0.00" );
 
     @Autowired
@@ -206,16 +205,18 @@ public class CloudbedsJsonRequestFactory {
      * Returns a single reservation request.
      * 
      * @param reservationId unique ID of reservation
+     * @param csrf csrf token
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetReservationRequest( String reservationId ) throws IOException {
+    public WebRequest createGetReservationRequest( String reservationId, String csrf ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservation" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "id", reservationId ),
                 new NameValuePair( "is_identifier", "0" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "csrf_accessa", csrf ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
@@ -292,10 +293,11 @@ public class CloudbedsJsonRequestFactory {
      * Get info on all customers including cancelled bookings by searching on a generic term.
      * 
      * @param query whatever you want to search by
+     * @param csrf csrf token
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetReservationsRequest( String query ) throws IOException {
+    public WebRequest createGetReservationsRequest( String query, String csrf ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "date_start[0]", "" ),
@@ -305,6 +307,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "booking_date[0]", "" ),
                 new NameValuePair( "booking_date[1]", "" ),
                 new NameValuePair( "status", "all" ),
+                new NameValuePair( "csrf_accessa", csrf ),
                 new NameValuePair( "query", query ) );
         return webRequest;
     }
