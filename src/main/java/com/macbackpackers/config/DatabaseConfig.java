@@ -31,9 +31,6 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
 @PropertySource( "classpath:config.properties" )
 public class DatabaseConfig {
 
-    @Value( "${processor.thread.count:1}" )
-    private int threadCount;
-
     @Value( "${db.poolsize.min}" )
     private int minPoolSize;
 

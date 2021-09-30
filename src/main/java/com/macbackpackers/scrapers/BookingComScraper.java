@@ -181,7 +181,10 @@ public class BookingComScraper {
             LOGGER.info( "Still waiting on {} javascript tasks to finish...", numberOfTasks );
         }
 
-        if ( getCurrentPage( webClient ).getBaseURL().getPath().startsWith( "/sign-in" ) ) {
+        page = getCurrentPage( webClient );
+        if ( page.getBaseURL().getPath().startsWith( "/sign-in" ) ) {
+            LOGGER.error( page.getBaseURL().getPath() );
+            LOGGER.error( page.asXml() );
             throw new MissingUserDataException( "Failed to login to BDC" );
         }
         
@@ -365,8 +368,14 @@ public class BookingComScraper {
 
         String CLOSE_MODAL_BTN = "//aside[header/h1/span[text()='Mark credit card as invalid']]/footer/button[span/span[text()='Close']]";
         HtmlButton closeBtn = currentPage.getFirstByXPath( CLOSE_MODAL_BTN );
-        closeBtn.click();
-        LOGGER.info( "Card marked as invalid." );
+        if ( closeBtn == null ) {
+            LOGGER.error( "Could not find Close (window) button? Assuming task completed anyways..." );
+            LOGGER.error( currentPage.asXml() );
+        }
+        else {
+            closeBtn.click();
+            LOGGER.info( "Card marked as invalid." );
+        }
     }
 
     /**
