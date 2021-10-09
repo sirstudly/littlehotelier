@@ -534,13 +534,21 @@ public class CloudbedsService {
         scraper.getReservations( webClient, null, null, LocalDate.now(), checkinDate, "confirmed,not_confirmed" ).stream()
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .forEach( r -> {
-                    LOGGER.info( "Creating SendCovidPrestayEmailJob for Res #" + r.getReservationId()
-                            + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
-                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
-                    SendCovidPrestayEmailJob j = new SendCovidPrestayEmailJob();
-                    j.setStatus( JobStatus.submitted );
-                    j.setReservationId( r.getReservationId() );
-                    dao.insertJob( j );
+                    // AirBNB does not populate with a valid email address
+                    if ( r.getEmail().contains( "@" ) ) {
+                        LOGGER.info( "Creating SendCovidPrestayEmailJob for Res #" + r.getReservationId()
+                                + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                                + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
+                        SendCovidPrestayEmailJob j = new SendCovidPrestayEmailJob();
+                        j.setStatus( JobStatus.submitted );
+                        j.setReservationId( r.getReservationId() );
+                        dao.insertJob( j );
+                    }
+                    else {
+                        LOGGER.error( "Invalid email on Res #" + r.getReservationId()
+                                + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                                + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
+                    }
                 } );
     }
 
