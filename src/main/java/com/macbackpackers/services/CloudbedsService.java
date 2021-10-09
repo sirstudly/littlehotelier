@@ -533,6 +533,7 @@ public class CloudbedsService {
 
         scraper.getReservations( webClient, null, null, LocalDate.now(), checkinDate, "confirmed,not_confirmed" ).stream()
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_COVID_PRESTAY ) )
                 .forEach( r -> {
                     // AirBNB does not populate with a valid email address
                     if ( r.getEmail().contains( "@" ) ) {
