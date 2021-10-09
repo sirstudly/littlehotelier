@@ -1125,7 +1125,9 @@ public class CloudbedsService {
                             .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
                                     .replaceAll( "\\[first name\\]", res.getFirstName() )
                                     .replaceAll( "\\[booking URL\\]", "<a href='" + bookingURL + "'>" + bookingURL + "</a>" ) ) );
-            scraper.addNote( webClient, reservationId, note );
+
+            // add archived note to booking (so it doesn't show up on the calendar)
+            scraper.addArchivedNote( webClient, reservationId, note );
         }
     }
 

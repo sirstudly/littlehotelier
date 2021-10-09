@@ -44,6 +44,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
+import com.macbackpackers.beans.cloudbeds.responses.AddNoteResponse;
 import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
@@ -523,6 +524,58 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createAddNoteRequest( reservationId, note );
         LOGGER.info( "Adding note: " + note + " to reservation " + reservationId );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
+    }
+
+    /**
+     * Adds a note to an existing reservation.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId unique reservation ID
+     * @param note note description to add
+     * @param fnOnSuccess something to run when response is successful (optional)
+     * @throws IOException on page load failure
+     */
+    public void addNote( WebClient webClient, String reservationId, String note, BiConsumer<AddNoteResponse, String> fnOnSuccess ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createAddNoteRequest( reservationId, note );
+        LOGGER.info( "Adding note: " + note + " to reservation " + reservationId );
+        doRequestErrorOnFailure( webClient, requestSettings, AddNoteResponse.class, fnOnSuccess );
+    }
+
+    /**
+     * Archives an existing note of a reservation. If the request was not successful, it will be
+     * logged but no exception will be thrown.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId unique reservation ID
+     * @param noteId note to archive
+     * @throws IOException on page load failure
+     */
+    public void archiveNote( WebClient webClient, String reservationId, String noteId ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createArchiveNoteRequest( reservationId, noteId );
+        LOGGER.info( "Archiving note " + noteId + " for reservation " + reservationId );
+        doRequest( webClient, requestSettings, CloudbedsJsonResponse.class, null, ( resp, jsonResp ) -> {
+            LOGGER.error( "Failed to archive note: " + jsonResp );
+        } );
+    }
+
+    /**
+     * Adds a note to a reservation and then immediately archives it.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId unique reservation ID
+     * @param note note to add
+     * @throws IOException on page load failure
+     */
+    public void addArchivedNote( WebClient webClient, String reservationId, String note ) throws IOException {
+        addNote( webClient, reservationId, note, ( resp, jsonResp ) -> {
+            LOGGER.info( "Response: " + jsonResp );
+            try {
+                archiveNote( webClient, reservationId, resp.getId() );
+            }
+            catch ( IOException ex ) {
+                LOGGER.error( "Failed to archive note.", ex );
+            }
+        } );
     }
 
     /**
@@ -1092,8 +1145,7 @@ public class CloudbedsScraper {
      * 
      * @param <T> expected response type
      * @param webClient
-     * @param req
-     * @param clazz * @param req requested type
+     * @param req requested type
      * @param clazz expected response type
      * @param fnOnSuccess something to run when response is successful (optional)
      * @return parsed response

@@ -167,7 +167,12 @@ public class CloudbedsScraperTest {
     public void testAddNote() throws Exception {
         cloudbedsScraper.addNote( webClient, "9897593", "Test Note& with <> Special characters\n\t ?" );
     }
-    
+
+    @Test
+    public void testAddArchivedNote() throws Exception {
+        cloudbedsScraper.addArchivedNote( webClient, "35079875", "Sent another custom-templated email." );
+    }
+
     @Test
     public void testAddCreditCard() throws Exception {
         CardDetails cd = new CardDetails();

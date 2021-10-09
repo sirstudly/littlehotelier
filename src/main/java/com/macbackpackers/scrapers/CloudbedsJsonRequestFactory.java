@@ -847,6 +847,25 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Archives an existing note on an existing reservation.
+     * 
+     * @param reservationId ID of reservation (as it appears in the URL)
+     * @param noteId note to be archived
+     * @return web request
+     * @throws IOException on creation failure
+     */
+    public WebRequest createArchiveNoteRequest( String reservationId, String noteId ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/notes/archive_reservation_note" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "reservation_id", reservationId ),
+                new NameValuePair( "note_id", noteId ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    /**
      * Records a new credit card onto the existing reservation.
      * 
      * @param reservationId ID of reservation (as it appears in the URL)

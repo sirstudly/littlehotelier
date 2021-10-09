@@ -6,9 +6,18 @@ package com.macbackpackers.beans.cloudbeds.responses;
  */
 public class BookingNote {
 
+    private String id;
     private String notes;
     private String created;
     private String ownerName;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId( String id ) {
+        this.id = id;
+    }
 
     public String getNotes() {
         return notes;
