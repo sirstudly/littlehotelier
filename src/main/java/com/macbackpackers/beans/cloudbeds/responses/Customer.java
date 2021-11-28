@@ -1,6 +1,8 @@
 
 package com.macbackpackers.beans.cloudbeds.responses;
 
+import java.math.BigDecimal;
+
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
 /**
@@ -15,13 +17,13 @@ public class Customer extends CloudbedsJsonResponse {
     private String bookingDate;
     private String checkinDate;
     private String checkoutDate;
-    private String balanceDue;
+    private BigDecimal balanceDue;
     private String grandTotal;
     private String id;
     private String sourceName;
     private String status;
     private String nights;
-    private String numberOfGuests;
+    private String isHotelCollectBooking;
 
     public String getFirstName() {
         return firstName;
@@ -79,11 +81,11 @@ public class Customer extends CloudbedsJsonResponse {
         this.checkoutDate = checkoutDate;
     }
 
-    public String getBalanceDue() {
+    public BigDecimal getBalanceDue() {
         return balanceDue;
     }
 
-    public void setBalanceDue( String balanceDue ) {
+    public void setBalanceDue( BigDecimal balanceDue ) {
         this.balanceDue = balanceDue;
     }
 
@@ -127,12 +129,16 @@ public class Customer extends CloudbedsJsonResponse {
         this.nights = nights;
     }
 
-    public String getNumberOfGuests() {
-        return numberOfGuests;
+    public String getIsHotelCollectBooking() {
+        return isHotelCollectBooking;
     }
 
-    public void setNumberOfGuests( String numberOfGuests ) {
-        this.numberOfGuests = numberOfGuests;
+    public void setIsHotelCollectBooking( String isHotelCollectBooking ) {
+        this.isHotelCollectBooking = isHotelCollectBooking;
+    }
+
+    public boolean isHotelCollectBooking() {
+        return "1".equals( getIsHotelCollectBooking() );
     }
 
     @Override

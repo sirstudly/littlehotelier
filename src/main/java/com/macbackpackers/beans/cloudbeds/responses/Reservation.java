@@ -301,6 +301,10 @@ public class Reservation extends CloudbedsJsonResponse {
         this.bookingDateHotelTime = bookingDateHotelTime;
     }
 
+    public LocalDate getBookingDateAsLocalDate() {
+        return LocalDate.parse( getBookingDateHotelTime().substring( 0, 10 ) );
+    }
+
     public String getUsedRoomTypes() {
         return usedRoomTypes;
     }

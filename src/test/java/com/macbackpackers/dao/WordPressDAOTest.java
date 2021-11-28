@@ -4,6 +4,7 @@ package com.macbackpackers.dao;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.text.ParseException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -99,8 +100,8 @@ public class WordPressDAOTest {
         alloc.setBedName( "the bed" );
         alloc.setReservationId( 92415 );
         alloc.setGuestName( "elizabeth" );
-        alloc.setCheckinDate( DATE_FORMAT_YYYY_MM_DD.parse( "2014-04-21" ) );
-        alloc.setCheckoutDate( DATE_FORMAT_YYYY_MM_DD.parse( "2014-05-03" ) );
+        alloc.setCheckinDate( LocalDate.parse( "2014-04-21" ) );
+        alloc.setCheckoutDate( LocalDate.parse( "2014-05-03" ) );
         alloc.setPaymentTotal( "14.93" );
         alloc.setPaymentOutstanding( "3.99" );
         alloc.setRatePlanName( "super discounted" );

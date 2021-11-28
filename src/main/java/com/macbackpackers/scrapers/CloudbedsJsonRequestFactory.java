@@ -361,12 +361,14 @@ public class CloudbedsJsonRequestFactory {
      * @param stayDateEnd checkin date (inclusive)
      * @param checkinDateStart checkin date (inclusive)
      * @param checkinDateEnd checkin date (inclusive)
+     * @param bookingDateStart booking date (inclusive)
+     * @param bookingDateEnd booking date (inclusive)
      * @param statuses comma-delimited list of statuses (optional)
      * @return web request
      * @throws IOException on i/o error
      */
     public WebRequest createGetReservationsRequest( LocalDate stayDateStart, LocalDate stayDateEnd,
-            LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
+            LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "status", StringUtils.isBlank(statuses) ? "all" : statuses ),
@@ -376,8 +378,8 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "date_end[1]", "" ),
                 new NameValuePair( "date_stay[0]", stayDateStart == null ? "" : stayDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_stay[1]", stayDateEnd == null ? "" : stayDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "booking_date[0]", "" ),
-                new NameValuePair( "booking_date[1]", "" ) );
+                new NameValuePair( "booking_date[0]", bookingDateStart == null ? "" : bookingDateStart.format( YYYY_MM_DD ) ),
+                new NameValuePair( "booking_date[1]", bookingDateEnd == null ? "" : bookingDateEnd.format( YYYY_MM_DD ) ) );
         return webRequest;
     }
 

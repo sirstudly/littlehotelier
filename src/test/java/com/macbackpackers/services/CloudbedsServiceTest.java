@@ -147,6 +147,21 @@ public class CloudbedsServiceTest {
     }
     
     @Test
+    public void testCreateSendGroupBookingApprovalRequiredEmailJobs() throws Exception {
+        cloudbedsService.createSendGroupBookingApprovalRequiredEmailJobs( webClient, LocalDate.now().plusDays( -5 ), LocalDate.now() );
+    }
+
+    @Test
+    public void testSendGroupBookingApprovalRequiredGmail() throws Exception {
+        cloudbedsService.sendGroupBookingApprovalRequiredGmail( webClient, "41696492" );
+    }
+    
+    @Test
+    public void testCreateSendGroupBookingPaymentReminderEmailJobs() throws Exception {
+        cloudbedsService.createSendGroupBookingPaymentReminderEmailJobs( webClient, LocalDate.now().plusDays( 1 ), LocalDate.now().plusDays( 7 ) );
+    }
+
+    @Test
     public void testSendCovidPrestayGmail() throws Exception {
         cloudbedsService.sendCovidPrestayGmail( webClient, "10568950" );
     }

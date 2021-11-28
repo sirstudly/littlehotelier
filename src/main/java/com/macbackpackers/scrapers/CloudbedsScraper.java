@@ -76,6 +76,9 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_COVID19_CLOSING = "Coronavirus- Doors Closing";
     public static final String TEMPLATE_REFUND_PROCESSED = "Refund Processed";
     public static final String TEMPLATE_COVID_PRESTAY = "COVID Pre-Stay Email";
+    public static final String TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED = "Group Booking Approval Required";
+    public static final String TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED_PREPAID = "Group Booking Approval Required PREPAID";
+    public static final String TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER = "Group Booking Payment Reminder";
 
     // the last result of getPropertyContent() as it's an expensive operation
     private static JsonObject propertyContent;
@@ -281,7 +284,7 @@ public class CloudbedsScraper {
     public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd,
             LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest(
-                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, statuses ) );
+                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, null, null, statuses ) );
     }
 
     /**
@@ -296,6 +299,22 @@ public class CloudbedsScraper {
     public List<Customer> getReservationsByCheckinDate( WebClient webClient, LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByCheckinDate(
                 checkinDateStart, checkinDateEnd ) );
+    }
+
+    /**
+     * Get all reservations booked between the given checkin date range.
+     * 
+     * @param webClient web client instance to use
+     * @param bookingDateStart checkin date (inclusive)
+     * @param bookingDateEnd checkin date (inclusive)
+     * @param statuses comma-delimited list of statuses (optional)
+     * @return non-null list of reservations
+     * @throws IOException
+     */
+    public List<Customer> getReservationsByBookingDate( WebClient webClient,
+            LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
+        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest(
+                null, null, null, null, bookingDateStart, bookingDateEnd, statuses ) );
     }
 
     /**
@@ -1002,6 +1021,39 @@ public class CloudbedsScraper {
      */
     public EmailTemplateInfo getCovidPrestayEmailTemplate( WebClient webClient ) throws IOException {
         return fetchEmailTemplate( webClient, TEMPLATE_COVID_PRESTAY );
+    }
+
+    /**
+     * Retrieves the group booking approval required email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getGroupBookingApprovalRequiredEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED );
+    }
+
+    /**
+     * Retrieves the group booking approval required email template for PREPAID bookings.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getGroupBookingApprovalRequiredPrepaidEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED_PREPAID );
+    }
+
+    /**
+     * Retrieves the group booking payment reminder email template.
+     * 
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getGroupBookingPaymentReminderEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED );
     }
 
     /**

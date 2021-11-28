@@ -7,6 +7,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
+import java.time.Period;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -68,6 +69,8 @@ import com.macbackpackers.jobs.CreateFixedRateReservationJob;
 import com.macbackpackers.jobs.PrepaidChargeJob;
 import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
 import com.macbackpackers.jobs.SendDepositChargeRetractionEmailJob;
+import com.macbackpackers.jobs.SendGroupBookingApprovalRequiredEmailJob;
+import com.macbackpackers.jobs.SendGroupBookingPaymentReminderEmailJob;
 import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
@@ -550,6 +553,66 @@ public class CloudbedsService {
                                 + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
                                 + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
                     }
+                } );
+    }
+
+    /**
+     * Creates send email jobs for all group bookings between the given booking dates.
+     * 
+     * @param webClient
+     * @param bookingDateStart
+     * @param bookingDateEnd
+     * @throws IOException
+     */
+    public void createSendGroupBookingApprovalRequiredEmailJobs( WebClient webClient, LocalDate bookingDateStart, LocalDate bookingDateEnd ) throws IOException {
+
+        final int GROUP_BOOKING_SIZE = dao.getGroupBookingSize();
+        scraper.getReservationsByBookingDate( webClient, bookingDateStart, bookingDateEnd, "confirmed,not_confirmed" ).stream()
+                // do not include any bookings that have been taken by staff
+                .filter( c -> false == Arrays.asList( "Walk-In", "Phone", "Reception", "Default Travel Agent" ).contains( c.getSourceName() ) )
+                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED ) )
+                .filter( r -> r.getNumberOfGuests() >= GROUP_BOOKING_SIZE )
+                .forEach( r -> {
+                    LOGGER.info( "Creating SendGroupBookingApprovalRequiredEmailJob for Res #" + r.getReservationId()
+                            + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() + (r.isChannelCollectBooking() ? " which is a PREPAID booking." : "") );
+                    SendGroupBookingApprovalRequiredEmailJob j = new SendGroupBookingApprovalRequiredEmailJob();
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( r.getReservationId() );
+                    j.setPrepaid( r.isChannelCollectBooking() );
+//                    dao.insertJob( j );  TEMP DISABLED
+                } );
+    }
+
+    /**
+     * Creates send email jobs for all upcoming unpaid group bookings.
+     * 
+     * @param webClient
+     * @param checkinDateStart
+     * @param checkinDateEnd
+     * @throws IOException
+     */
+    public void createSendGroupBookingPaymentReminderEmailJobs( WebClient webClient, LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
+
+        final int GROUP_BOOKING_SIZE = dao.getGroupBookingSize();
+        scraper.getReservationsByCheckinDate( webClient, checkinDateStart, checkinDateEnd ).stream()
+                .filter( c -> Arrays.asList( "confirmed", "not_confirmed" ).contains( c.getStatus() ) )
+                .filter( c -> c.getBalanceDue().compareTo( BigDecimal.ZERO ) > 0 )
+                .filter( c -> c.isHotelCollectBooking() )
+                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .filter( r -> r.getNumberOfGuests() >= GROUP_BOOKING_SIZE )
+                .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER ) )
+                // don't send the payment reminder if they booked within the payment reminder window
+                .filter( r -> r.getBookingDateAsLocalDate().compareTo( LocalDate.now().minusDays( Period.between( LocalDate.now(), checkinDateEnd ).getDays() ) ) < 0 )
+                .forEach( r -> {
+                    LOGGER.info( "Creating SendGroupBookingPaymentReminderEmailJob for Res #" + r.getReservationId()
+                            + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() + " with amount due of £" + r.getBalanceDue() );
+                    SendGroupBookingPaymentReminderEmailJob j = new SendGroupBookingPaymentReminderEmailJob();
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( r.getReservationId() );
+//                    dao.insertJob( j );  TEMP DISABLED
                 } );
     }
 
@@ -1141,6 +1204,66 @@ public class CloudbedsService {
     }
 
     /**
+     * Sends the group booking approval required email.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @throws IOException
+     * @throws MessagingException
+     */
+    public void sendGroupBookingApprovalRequiredGmail( WebClient webClient, String reservationId ) throws IOException, MessagingException {
+        sendGroupBookingGmail( webClient, reservationId, scraper.getGroupBookingApprovalRequiredEmailTemplate( webClient ) );
+    }
+
+    /**
+     * Sends the group booking approval required email for PREPAID bookings.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @throws IOException
+     * @throws MessagingException
+     */
+    public void sendGroupBookingApprovalRequiredPrepaidGmail( WebClient webClient, String reservationId ) throws IOException, MessagingException {
+        sendGroupBookingGmail( webClient, reservationId, scraper.getGroupBookingApprovalRequiredPrepaidEmailTemplate( webClient ) );
+    }
+
+    /**
+     * Sends the group booking payment reminder email if balance is due.
+     * 
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @throws IOException
+     * @throws MessagingException
+     */
+    public void sendGroupBookingPaymentReminderGmail( WebClient webClient, String reservationId ) throws IOException, MessagingException {
+        sendGroupBookingGmail( webClient, reservationId, scraper.getGroupBookingPaymentReminderEmailTemplate( webClient ) );
+    }
+
+    private void sendGroupBookingGmail( WebClient webClient, String reservationId, EmailTemplateInfo template ) throws IOException, MessagingException {
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            String lookupKey = generateUniqueBookingKey( reservationId );
+            String bookingURL = dao.getBookingsURL() + lookupKey;
+            String paymentURL = dao.getBookingPaymentsURL() + lookupKey;
+            gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
+                    template.getSubject().replaceAll( "\\[conf number\\]", res.getIdentifier() ),
+                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
+                            .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
+                            .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
+                            .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
+                                    .replaceAll( "\\[first name\\]", res.getFirstName() )
+                                    .replaceAll( "\\[booking URL\\]", "<a href='" + bookingURL + "'>" + bookingURL + "</a>" )
+                                    .replaceAll( "\\[payment URL\\]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) ) );
+            scraper.addNote( webClient, reservationId, note );
+        }
+    }
+
+    /**
      * Sends an email to the guest for the given reservation to ignore the previous email we sent.
      * 
      * @param webClient web client instance to use
@@ -1478,10 +1601,20 @@ public class CloudbedsService {
      * @return booking URL
      */
     public String generateUniqueBookingURL( String reservationId ) {
+        String lookupKey = generateUniqueBookingKey( reservationId );
+        return dao.getBookingsURL() + lookupKey;
+    }
+
+    /**
+     * Creates a new unique booking key for the given reservation.
+     * 
+     * @param reservationId unique Cloudbeds reservation ID
+     * @return booking key
+     */
+    public String generateUniqueBookingKey( String reservationId ) {
         String lookupKey = generateRandomLookupKey( LOOKUPKEY_LENGTH );
-        String bookingURL = dao.getBookingsURL() + lookupKey;
         dao.insertBookingLookupKey( reservationId, lookupKey, null );
-        return bookingURL;
+        return lookupKey;
     }
 
     /**

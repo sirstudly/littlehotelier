@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -146,6 +147,21 @@ public class CloudbedsScraperTest {
         results.stream().forEach( t -> LOGGER.info( t.getIdentifier() + " (" + t.getStatus() + ") - "
                 + t.isCardDetailsPresent() + "," + t.getThirdPartyIdentifier() + ": " +
                 t.getFirstName() + " " + t.getLastName() + " cancelled on " + t.getCancellationDate() ) );
+        LOGGER.info( "Found " + results.size() + " entries" );
+    }
+
+    @Test
+    public void testGetReservationsByBookingDate() throws Exception {
+        List<Reservation> results = cloudbedsScraper.getReservationsByBookingDate( webClient, 
+                LocalDate.now().plusDays( -1 ),
+                LocalDate.now(),
+                "confirmed,not_confirmed" )
+                .stream()
+                .map( c -> cloudbedsScraper.getReservationRetry( webClient, c.getId() ) )
+                .collect( Collectors.toList() );
+        results.stream().forEach( t -> LOGGER.info( t.getIdentifier() + " (" + t.getStatus() + ") - "
+                + t.isCardDetailsPresent() + "," + t.getThirdPartyIdentifier() + ": " +
+                t.getFirstName() + " " + t.getLastName() ) );
         LOGGER.info( "Found " + results.size() + " entries" );
     }
 
