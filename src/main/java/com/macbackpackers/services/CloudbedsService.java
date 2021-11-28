@@ -601,6 +601,7 @@ public class CloudbedsService {
                 .filter( c -> Arrays.asList( "confirmed", "not_confirmed" ).contains( c.getStatus() ) )
                 .filter( c -> c.getBalanceDue().compareTo( BigDecimal.ZERO ) > 0 )
                 .filter( c -> c.isHotelCollectBooking() )
+                .filter( c -> false == "Airbnb (API)".equals( c.getSourceName() ) ) // Airbnb is channel-collect apparently
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> r.getNumberOfGuests() >= GROUP_BOOKING_SIZE )
                 .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER ) )

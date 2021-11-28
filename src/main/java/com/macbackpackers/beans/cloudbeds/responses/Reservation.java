@@ -358,7 +358,8 @@ public class Reservation extends CloudbedsJsonResponse {
     }
 
     public boolean isChannelCollectBooking() {
-        return "Channel".equals( getChannelPaymentType() ) && false == isHotelCollectBooking();
+        return ("Channel".equals( getChannelPaymentType() ) && false == isHotelCollectBooking())
+                || "Airbnb (API)".equals( getSourceName() ); // Airbnb is channel-collect apparently
     }
 
     public BigDecimal getPaidValue() {
