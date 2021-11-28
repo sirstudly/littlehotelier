@@ -114,7 +114,7 @@ public class CloudbedsServiceTest {
 
     @Test
     public void testSendTemplatedGmail() throws Exception {
-        cloudbedsService.sendTemplatedGmail( webClient, "10568885", CloudbedsScraper.TEMPLATE_COVID19_CLOSING );
+        cloudbedsService.sendTemplatedGmail( webClient, "10568885", CloudbedsScraper.TEMPLATE_COVID19_CLOSING, true );
     }
 
     @Test
@@ -137,11 +137,6 @@ public class CloudbedsServiceTest {
     }
 
     @Test
-    public void testSendDepositChargeJobRetractionEmails() {
-        cloudbedsService.sendDepositChargeJobRetractionEmails( webClient, 469807, 469929 );
-    }
-
-    @Test
     public void testCreateSendCovidPrestayEmailJobs() throws Exception {
         cloudbedsService.createSendCovidPrestayEmailJobs( webClient, LocalDate.now().plusDays( 1 ) );
     }
@@ -159,6 +154,11 @@ public class CloudbedsServiceTest {
     @Test
     public void testCreateSendGroupBookingPaymentReminderEmailJobs() throws Exception {
         cloudbedsService.createSendGroupBookingPaymentReminderEmailJobs( webClient, LocalDate.now().plusDays( 1 ), LocalDate.now().plusDays( 7 ) );
+    }
+
+    @Test
+    public void testCreateSendTemplatedEmailJobs() throws Exception {
+        cloudbedsService.createSendTemplatedEmailJobs( webClient, "COVID-19 Guidance Update", LocalDate.parse("2021-12-03"), LocalDate.parse( "2021-12-04" ) );
     }
 
     @Test

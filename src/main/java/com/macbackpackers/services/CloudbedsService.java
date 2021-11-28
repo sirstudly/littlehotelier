@@ -68,7 +68,6 @@ import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
 import com.macbackpackers.jobs.CreateFixedRateReservationJob;
 import com.macbackpackers.jobs.PrepaidChargeJob;
 import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
-import com.macbackpackers.jobs.SendDepositChargeRetractionEmailJob;
 import com.macbackpackers.jobs.SendGroupBookingApprovalRequiredEmailJob;
 import com.macbackpackers.jobs.SendGroupBookingPaymentReminderEmailJob;
 import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
@@ -437,30 +436,29 @@ public class CloudbedsService {
     }
 
     /**
-     * We done fucked up and charged these bookings an additional deposit amount (all HWL i think).
-     * Send a retraction email for these.
+     * Creates jobs for sending out emails by checkin date.
      * 
      * @param webClient
-     * @param jobIdStart job id inclusive
-     * @param jobIdEnd job id inclusive
+     * @param emailTemplate
+     * @param checkinDateStart
+     * @param checkinDateEnd
+     * @throws IOException
      */
-    public void sendDepositChargeJobRetractionEmails( WebClient webClient, int jobIdStart, int jobIdEnd ) {
-        List<String> ids = dao.getReservationIdsForDepositChargeJobs( jobIdStart, jobIdEnd );
-        LOGGER.info( "Found {} DepositChargeJobs", ids.size() );
-
-        // find all bookings that were hotel collect
-        // that were sent either: Deposit Charge Successful/Declined email
-        ids.stream().map( id -> scraper.getReservationRetry( webClient, id ) )
-                .filter( r -> "Hostelworld & Hostelbookers".equals( r.getSourceName() ) )
-                .filter( r -> r.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED )
-                        || r.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL ) )
+    public void createSendTemplatedEmailJobs( WebClient webClient, String emailTemplate, LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
+        scraper.getEmailTemplate( webClient, emailTemplate ); // check if it exists before creating a bunch of jobs
+        scraper.getReservations( webClient,
+                null, null, checkinDateStart, checkinDateEnd, "confirmed,not_confirmed" ).stream()
+                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .filter( r -> false == r.containsNote( emailTemplate + " email sent." ) )
                 .forEach( r -> {
-                    LOGGER.info( "Creating a SendRetractionDepositChargeJob for {} #{} - {}, {} ({} to {})",
-                            r.getSourceName(), r.getReservationId(), r.getLastName(), r.getFirstName(),
-                            r.getCheckinDate(), r.getCheckoutDate() );
-                    SendDepositChargeRetractionEmailJob j = new SendDepositChargeRetractionEmailJob();
+                    LOGGER.info( "Creating SendTemplatedEmailJob for Res #" + r.getReservationId()
+                            + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
+                    SendTemplatedEmailJob j = new SendTemplatedEmailJob();
                     j.setStatus( JobStatus.submitted );
                     j.setReservationId( r.getReservationId() );
+                    j.setEmailTemplate( emailTemplate );
+                    j.setNoteArchived( true );
                     dao.insertJob( j );
                 } );
     }
@@ -1266,35 +1264,6 @@ public class CloudbedsService {
     }
 
     /**
-     * Sends an email to the guest for the given reservation to ignore the previous email we sent.
-     * 
-     * @param webClient web client instance to use
-     * @param reservationId associated reservation
-     * @throws IOException
-     * @throws MessagingException
-     */
-    public void sendDepositChargeRetractionGmail( WebClient webClient, String reservationId ) throws IOException, MessagingException {
-
-        Reservation res = scraper.getReservationRetry( webClient, reservationId );
-        String templateName = null;
-        if ( res.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL ) ) {
-            templateName = CloudbedsScraper.TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL;
-        }
-        else if ( res.containsNote( CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED ) ) {
-            templateName = CloudbedsScraper.TEMPLATE_RETRACT_DEPOSIT_CHARGE_DECLINED;
-        }
-        else {
-            throw new MissingUserDataException( "No email was sent?!" );
-        }
-
-        sendTemplatedGmail( webClient, reservationId, templateName );
-
-        if ( CloudbedsScraper.TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL.equals( templateName ) ) {
-            scraper.addNote( webClient, reservationId, "Additional payment was taken by mistake. This has been applied against the total." );
-        }
-    }
-
-    /**
      * Sends an email to the guest for the given reservation when the deposit charge was declined.
      * 
      * @param webClient web client instance to use
@@ -1408,9 +1377,10 @@ public class CloudbedsService {
      * @param webClient web client instance to use
      * @param reservationId associated reservation
      * @param templateName email template (mandatory)
+     * @param isArchiveNote true to archive note straight away, false otherwise
      * @throws IOException
      */
-    public void sendTemplatedGmail( WebClient webClient, String reservationId, String templateName ) throws IOException, MessagingException {
+    public void sendTemplatedGmail( WebClient webClient, String reservationId, String templateName, boolean isArchiveNote ) throws IOException, MessagingException {
 
         EmailTemplateInfo template = scraper.fetchEmailTemplate( webClient, templateName );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
@@ -1427,7 +1397,13 @@ public class CloudbedsService {
                             .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
                             .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
                                     .replaceAll( "\\[first name\\]", res.getFirstName() ) ) );
-            scraper.addNote( webClient, reservationId, note );
+
+            if ( isArchiveNote ) {
+                scraper.addArchivedNote( webClient, reservationId, note );
+            }
+            else {
+                scraper.addNote( webClient, reservationId, note );
+            }
         }
     }
 

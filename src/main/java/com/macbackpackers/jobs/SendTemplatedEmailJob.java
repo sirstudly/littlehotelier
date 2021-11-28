@@ -34,7 +34,7 @@ public class SendTemplatedEmailJob extends AbstractJob {
                 cloudbedsService.sendTemplatedEmail( webClient, getReservationId(), getEmailTemplate() );
             }
             else {
-                cloudbedsService.sendTemplatedGmail( webClient, getReservationId(), getEmailTemplate() );
+                cloudbedsService.sendTemplatedGmail( webClient, getReservationId(), getEmailTemplate(), isNoteArchived() );
             }
         }
     }
@@ -63,6 +63,14 @@ public class SendTemplatedEmailJob extends AbstractJob {
 
     public void setEmailTemplate( String template ) {
         setParameter( "email_template", template );
+    }
+
+    public boolean isNoteArchived() {
+        return "Y".equalsIgnoreCase( getParameter( "archive_note_yn" ) );
+    }
+
+    public void setNoteArchived( boolean archiveNote ) {
+        setParameter( "archive_note_yn", archiveNote ? "Y" : "N" );
     }
 
     @Override

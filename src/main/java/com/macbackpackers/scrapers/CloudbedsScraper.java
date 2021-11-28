@@ -70,8 +70,6 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_STRIPE_PAYMENT_CONFIRMATION = "Stripe Payment Confirmation";
     public static final String TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL = "Deposit Charge Successful";
     public static final String TEMPLATE_DEPOSIT_CHARGE_DECLINED = "Deposit Charge Declined";
-    public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_SUCCESSFUL = "Retract Deposit Charge Successful";
-    public static final String TEMPLATE_RETRACT_DEPOSIT_CHARGE_DECLINED = "Retract Deposit Charge Declined";
     public static final String TEMPLATE_PAYMENT_LINK = "Payment Link";
     public static final String TEMPLATE_COVID19_CLOSING = "Coronavirus- Doors Closing";
     public static final String TEMPLATE_REFUND_PROCESSED = "Refund Processed";
