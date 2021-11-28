@@ -569,7 +569,7 @@ public class CloudbedsService {
         final int GROUP_BOOKING_SIZE = dao.getGroupBookingSize();
         scraper.getReservationsByBookingDate( webClient, bookingDateStart, bookingDateEnd, "confirmed,not_confirmed" ).stream()
                 // do not include any bookings that have been taken by staff
-                .filter( c -> false == Arrays.asList( "Walk-In", "Phone", "Reception", "Default Travel Agent" ).contains( c.getSourceName() ) )
+                .filter( c -> false == Arrays.asList( "Walk-In", "Phone", "Reception", "RECEPTION", "Default Travel Agent" ).contains( c.getSourceName() ) )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED ) )
                 .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED_PREPAID ) )
@@ -582,7 +582,7 @@ public class CloudbedsService {
                     j.setStatus( JobStatus.submitted );
                     j.setReservationId( r.getReservationId() );
                     j.setPrepaid( r.isChannelCollectBooking() );
-//                    dao.insertJob( j );  TEMP DISABLED
+                    dao.insertJob( j );
                 } );
     }
 
@@ -614,7 +614,7 @@ public class CloudbedsService {
                     SendGroupBookingPaymentReminderEmailJob j = new SendGroupBookingPaymentReminderEmailJob();
                     j.setStatus( JobStatus.submitted );
                     j.setReservationId( r.getReservationId() );
-//                    dao.insertJob( j );  TEMP DISABLED
+                    dao.insertJob( j );
                 } );
     }
 
