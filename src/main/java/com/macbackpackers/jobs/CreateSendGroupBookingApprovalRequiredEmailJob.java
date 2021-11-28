@@ -1,7 +1,6 @@
 
 package com.macbackpackers.jobs;
 
-import java.text.ParseException;
 import java.time.LocalDate;
 
 import javax.persistence.DiscriminatorValue;
@@ -39,15 +38,26 @@ public class CreateSendGroupBookingApprovalRequiredEmailJob extends AbstractJob 
     @Override
     public void processJob() throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            cloudbedsService.createSendGroupBookingApprovalRequiredEmailJobs( webClient, LocalDate.now().minusDays( getDaysBefore() ), LocalDate.now() );
+            cloudbedsService.createSendGroupBookingApprovalRequiredEmailJobs( webClient, getBookingDate(), LocalDate.now() );
         }
     }
 
-    public int getDaysBefore() throws ParseException {
-        return Integer.parseInt( getParameter( "days_before" ) );
+    /**
+     * Gets the (start) booking date.
+     * 
+     * @return non-null date parameter
+     */
+    public LocalDate getBookingDate() {
+        return LocalDate.parse( getParameter( "booking_date" ) );
     }
 
-    public void setDaysBefore( int daysBefore ) {
-        setParameter( "days_before", String.valueOf( daysBefore ) );
+    /**
+     * Sets the (start) booking date.
+     * 
+     * @param bookingDate non-null date
+     */
+    public void setBookingDate( LocalDate bookingDate ) {
+        setParameter( "booking_date", bookingDate.toString() );
     }
+
 }

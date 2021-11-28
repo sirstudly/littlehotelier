@@ -572,6 +572,7 @@ public class CloudbedsService {
                 .filter( c -> false == Arrays.asList( "Walk-In", "Phone", "Reception", "Default Travel Agent" ).contains( c.getSourceName() ) )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED ) )
+                .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED_PREPAID ) )
                 .filter( r -> r.getNumberOfGuests() >= GROUP_BOOKING_SIZE )
                 .forEach( r -> {
                     LOGGER.info( "Creating SendGroupBookingApprovalRequiredEmailJob for Res #" + r.getReservationId()
