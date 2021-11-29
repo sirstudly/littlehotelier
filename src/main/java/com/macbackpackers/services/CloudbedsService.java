@@ -445,7 +445,7 @@ public class CloudbedsService {
      * @throws IOException
      */
     public void createSendTemplatedEmailJobs( WebClient webClient, String emailTemplate, LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
-        scraper.getEmailTemplate( webClient, emailTemplate ); // check if it exists before creating a bunch of jobs
+        scraper.fetchEmailTemplate( webClient, emailTemplate ); // check if it exists before creating a bunch of jobs
         scraper.getReservations( webClient,
                 null, null, checkinDateStart, checkinDateEnd, "confirmed,not_confirmed" ).stream()
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
