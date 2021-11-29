@@ -448,6 +448,8 @@ public class CloudbedsService {
         scraper.fetchEmailTemplate( webClient, emailTemplate ); // check if it exists before creating a bunch of jobs
         scraper.getReservations( webClient,
                 null, null, checkinDateStart, checkinDateEnd, "confirmed,not_confirmed" ).stream()
+                .filter( c -> false == Arrays.asList( c.getFirstName().toUpperCase().split( " " ) ).contains( "LT" )
+                        && false == Arrays.asList( c.getLastName().toUpperCase().split( " " ) ).contains( "LT" ) )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.containsNote( emailTemplate + " email sent." ) )
                 .forEach( r -> {
