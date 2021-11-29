@@ -30,11 +30,6 @@ public class CreateSendBulkEmailJob extends AbstractJob {
     @Transient
     private CloudbedsService cloudbedsService;
 
-    @Autowired
-    @Transient
-    @Qualifier( "webClient" )
-    private WebClient webClient;
-
     @Override
     public void processJob() throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
