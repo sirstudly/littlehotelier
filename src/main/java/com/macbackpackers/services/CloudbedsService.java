@@ -452,6 +452,7 @@ public class CloudbedsService {
                         && false == Arrays.asList( c.getLastName().toUpperCase().split( " " ) ).contains( "LT" ) )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.containsNote( emailTemplate + " email sent." ) )
+                .filter( r -> r.getEmail().contains( "@" ) ) // Airbnb has N/A in email address field?
                 .forEach( r -> {
                     LOGGER.info( "Creating SendTemplatedEmailJob for Res #" + r.getReservationId()
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
