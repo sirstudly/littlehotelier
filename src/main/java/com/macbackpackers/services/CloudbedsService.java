@@ -379,6 +379,7 @@ public class CloudbedsService {
         final LocalDate DEC_31 = LocalDate.of( LocalDate.now().getYear(), 12, 31 );
         scraper.getReservations( webClient, DEC_31, DEC_31, null, null, "confirmed,not_confirmed" )
                 .stream()
+                .filter( c -> false == c.isLongTermer() )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .peek( r -> LOGGER.info( "Res #" + r.getReservationId() + " (" + r.getThirdPartyIdentifier() + ") "
                         + r.getFirstName() + " " + r.getLastName() + " booked from " + r.getCheckinDate() + " to " + r.getCheckoutDate()
@@ -480,8 +481,7 @@ public class CloudbedsService {
         scraper.fetchEmailTemplate( webClient, emailTemplate ); // check if it exists before creating a bunch of jobs
         scraper.getReservations( webClient,
                 stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, statuses ).stream()
-                .filter( c -> false == Arrays.asList( c.getFirstName().toUpperCase().split( " " ) ).contains( "LT" )
-                        && false == Arrays.asList( c.getLastName().toUpperCase().split( " " ) ).contains( "LT" ) )
+                .filter( c -> false == c.isLongTermer() )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.containsNote( emailTemplate + " email sent." ) )
                 .filter( r -> r.getEmail().contains( "@" ) ) // Airbnb has N/A in email address field?
@@ -681,8 +681,7 @@ public class CloudbedsService {
         }
 
         scraper.getReservations( webClient, forDate.minusDays( 1 ), forDate.minusDays( 1 ) ).stream()
-                .filter( c -> Arrays.asList( c.getFirstName().toUpperCase().split( " " ) ).contains( "LT" )
-                        || Arrays.asList( c.getLastName().toUpperCase().split( " " ) ).contains( "LT" ) )
+                .filter( c -> c.isLongTermer() )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> r.getCheckoutDateAsLocalDate().equals( forDate ) )
                 .filter( r -> false == "checked_out".equals( r.getStatus() ) )
@@ -712,7 +711,7 @@ public class CloudbedsService {
     public void createSendPaymentLinkEmailJobs(WebClient webClient, LocalDate stayDate ) throws IOException {
 
         scraper.getReservations( webClient, stayDate, stayDate ).stream()
-                .filter( c -> c.getFirstName().toUpperCase().contains( "LT" ) || c.getLastName().toUpperCase().contains( "LT" ) )
+                .filter( c -> c.isLongTermer() )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.isPaid() )
                 .filter( r -> false == "castlerock@macbackpackers.com".equalsIgnoreCase( r.getEmail() ) )

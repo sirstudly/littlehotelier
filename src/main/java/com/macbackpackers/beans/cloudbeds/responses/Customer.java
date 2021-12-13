@@ -2,6 +2,7 @@
 package com.macbackpackers.beans.cloudbeds.responses;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
@@ -139,6 +140,16 @@ public class Customer extends CloudbedsJsonResponse {
 
     public boolean isHotelCollectBooking() {
         return "1".equals( getIsHotelCollectBooking() );
+    }
+
+    /**
+     * Returns true if first or last name contains LT by itself.
+     *
+     * @return true if LT, false for normal guest
+     */
+    public boolean isLongTermer() {
+        return Arrays.asList( getFirstName().toUpperCase().split( " " ) ).contains( "LT" )
+                || Arrays.asList( getLastName().toUpperCase().split( " " ) ).contains( "LT" );
     }
 
     @Override
