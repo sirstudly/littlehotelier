@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
@@ -110,6 +111,9 @@ public class CloudbedsService {
 
     @Autowired
     private ApplicationContext appContext;
+
+    @Autowired
+    AutowireCapableBeanFactory autowireBeanFactory;
 
     @Value( "${chromescraper.maxwait.seconds:60}" )
     private int maxWaitSeconds;
@@ -492,6 +496,7 @@ public class CloudbedsService {
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
                             + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
                     SendTemplatedEmailJob j = new SendTemplatedEmailJob();
+                    autowireBeanFactory.autowireBean( j );
                     j.setStatus( JobStatus.submitted );
                     j.setReservationId( r.getReservationId() );
                     j.setEmailTemplate( emailTemplate );
