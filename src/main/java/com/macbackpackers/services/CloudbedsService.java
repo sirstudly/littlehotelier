@@ -478,11 +478,13 @@ public class CloudbedsService {
      * @param checkinDateStart
      * @param checkinDateEnd
      * @param statuses comma-delimited list of statuses to apply for
-     * @param replacementFn apply any replacements for the given reservation
+     * @param reservationFilterFn apply filter to the given reservation (optional)
+     * @param replacementFn apply any replacements for the given reservation (optional)
      * @throws IOException
      */
     public void createSendTemplatedEmailJobs( WebClient webClient, String emailTemplate, LocalDate stayDateStart, LocalDate stayDateEnd,
                                               LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses,
+                                              Function<Reservation, Boolean> reservationFilterFn,
                                               Function<Reservation, Map<String, String>> replacementFn ) throws IOException {
         scraper.fetchEmailTemplate( webClient, emailTemplate ); // check if it exists before creating a bunch of jobs
         scraper.getReservations( webClient,
@@ -491,6 +493,7 @@ public class CloudbedsService {
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.containsNote( emailTemplate + " email sent." ) )
                 .filter( r -> r.getEmail().contains( "@" ) ) // Airbnb has N/A in email address field?
+                .filter( r -> reservationFilterFn == null || reservationFilterFn.apply( r ) )
                 .forEach( r -> {
                     LOGGER.info( "Creating SendTemplatedEmailJob for Res #" + r.getReservationId()
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()

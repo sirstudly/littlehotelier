@@ -156,8 +156,8 @@ public class CloudbedsServiceTest {
 
     @Test
     public void testCreateSendTemplatedEmailJobs() throws Exception {
-        cloudbedsService.createSendTemplatedEmailJobs(webClient, "COVID-19 Guidance Update", null, null,
-                LocalDate.parse("2021-12-03"), LocalDate.parse("2021-12-04"), "confirmed,not_confirmed", null);
+        cloudbedsService.createSendTemplatedEmailJobs( webClient, "COVID-19 Guidance Update", null, null,
+                LocalDate.parse( "2021-12-03" ), LocalDate.parse( "2021-12-04" ), "confirmed,not_confirmed", null, null );
     }
 
     @Test

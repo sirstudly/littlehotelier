@@ -31,10 +31,11 @@ public class CreateSendBulkEmailJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        try (WebClient webClient = appContext.getBean("webClientForCloudbeds", WebClient.class)) {
-            cloudbedsService.createSendTemplatedEmailJobs(webClient,
+        try( WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            cloudbedsService.createSendTemplatedEmailJobs( webClient,
                     getEmailTemplate(), getStayDateStart(), getStayDateEnd(),
-                    getCheckinDateStart(), getCheckinDateEnd(), getStatuses(), null);
+                    getCheckinDateStart(), getCheckinDateEnd(), getStatuses(),
+                    null, null );
         }
     }
 
