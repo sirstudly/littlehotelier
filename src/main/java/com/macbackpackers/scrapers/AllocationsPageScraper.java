@@ -147,12 +147,12 @@ public class AllocationsPageScraper {
                 LOGGER.debug( "data-room_type_id: " + dataRoomTypeId );
 
                 if ( false == div.hasChildNodes() ) {
-                    LOGGER.warn( "no child nodes for " + div.asText() );
+                    LOGGER.warn( "no child nodes for " + div.getTextContent() );
                 }
                 else {
                     DomElement label = div.getFirstElementChild();
                     if ( false == "label".equals( label.getTagName() ) ) {
-                        LOGGER.debug( "not a label? " + label.asText() );
+                        LOGGER.debug( "not a label? " + label.getTextContent() );
                     }
                     else {
                         LOGGER.debug( "Bed Name: " + label.getAttribute( "title" ) );
@@ -188,7 +188,7 @@ public class AllocationsPageScraper {
     /**
      * Builds an allocation object from the given span element and inserts it into the db.
      * 
-     * @param job job we are currently running
+     * @param jobId job we are currently running
      * @param dataRoomTypeId the unique id for the room <i>type</i> (required)
      * @param dataRoomId room id (optional)
      * @param currentBedName the bed name for the allocation (required)

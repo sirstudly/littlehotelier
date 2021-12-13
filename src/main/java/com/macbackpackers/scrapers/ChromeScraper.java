@@ -69,12 +69,12 @@ public class ChromeScraper {
 
             // select only row and click
             WebElement bookingLink = driver.findElement( By.xpath( "//a[text()='" + bookingRef + "']" ) );
-            wait.until( visibilityOf( bookingLink ) );
+            //wait.until( visibilityOf( bookingLink ) );
             bookingLink.click();
 
             // wait for header
             WebElement reservationHeader = driver.findElement( By.xpath( "//h4[starts-with(.,'Edit Reservation')]" ) );
-            wait.until( visibilityOf( reservationHeader ) );
+            //wait.until( visibilityOf( reservationHeader ) );
 
             ensureCardDetailsVisible( driver, wait );
 
@@ -126,14 +126,14 @@ public class ChromeScraper {
             WebElement securityTokenInput = driver.findElement( By.id( "security_token" ) );
             WebElement confirmAnchor = driver.findElement( By.xpath( "//a[text()='Confirm']" ) );
 
-            wait.until( visibilityOfAllElements( securityTokenInput, confirmAnchor ) );
+            //wait.until( visibilityOfAllElements( securityTokenInput, confirmAnchor ) );
 
             // enter confirmation
             securityTokenInput.sendKeys( gmailService.fetchLHSecurityToken() );
             confirmAnchor.click();
 
             // wait until reservations form is visible again
-            wait.until( stalenessOf( confirmAnchor ) );
+            //wait.until( stalenessOf( confirmAnchor ) );
         }
         catch ( NoSuchElementException ex ) {
             LOGGER.info( "View card details anchor not present. I guess we can see the card details..." );
@@ -143,7 +143,7 @@ public class ChromeScraper {
     /**
      * Retrieves to booking reference from the given reservation page.
      * 
-     * @param reservationPage the page to check
+     * @param reservationHeader the header to check
      * @return non-null booking reference
      * @throws UnrecoverableFault if booking ref not found
      */
