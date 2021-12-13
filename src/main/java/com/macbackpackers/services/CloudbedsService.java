@@ -436,18 +436,22 @@ public class CloudbedsService {
     }
 
     /**
-     * Creates jobs for sending out emails by checkin date.
+     * Creates jobs for sending out emails by stay date, checkin date.
      * 
      * @param webClient
      * @param emailTemplate
+     * @param stayDateStart
+     * @param stayDateEnd
      * @param checkinDateStart
      * @param checkinDateEnd
+     * @param statuses comma-delimited list of statuses to apply for
      * @throws IOException
      */
-    public void createSendTemplatedEmailJobs( WebClient webClient, String emailTemplate, LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
+    public void createSendTemplatedEmailJobs( WebClient webClient, String emailTemplate, LocalDate stayDateStart, LocalDate stayDateEnd,
+                                              LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
         scraper.fetchEmailTemplate( webClient, emailTemplate ); // check if it exists before creating a bunch of jobs
         scraper.getReservations( webClient,
-                null, null, checkinDateStart, checkinDateEnd, "confirmed,not_confirmed" ).stream()
+                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, statuses ).stream()
                 .filter( c -> false == Arrays.asList( c.getFirstName().toUpperCase().split( " " ) ).contains( "LT" )
                         && false == Arrays.asList( c.getLastName().toUpperCase().split( " " ) ).contains( "LT" ) )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
@@ -777,7 +781,6 @@ public class CloudbedsService {
      * Converts a Reservation object (which contains multiple bed assignments) into a List of
      * Allocation.
      * 
-     * @param lhWebClient web client instance to use
      * @param jobId job ID to populate allocation
      * @param r reservation to be converted
      * @return non-null list of allocation
@@ -819,8 +822,8 @@ public class CloudbedsService {
      * Sends an email to the guest for a successful payment.
      * 
      * @param webClient web client instance to use
-     * @param res associated reservation
-     * @param txn successful transaction
+     * @param reservationId associated reservation
+     * @param sagepayTxnId successful transaction
      * @throws IOException
      */
     public void sendSagepayPaymentConfirmationEmail( WebClient webClient, String reservationId, int sagepayTxnId ) throws IOException {
@@ -846,11 +849,9 @@ public class CloudbedsService {
     /**
      * Sends a payment confirmation email using the given template, reservation and transaction.
      * 
-     * Same as {@link CloudbedsScraper#sendSagepayPaymentConfirmationEmail(WebClient, Reservation, SagepayTransaction)
-     * but sent via Gmail.
-     * 
      * @param webClient web client instance to use
-     * @param txn successful sagepay transaction
+     * @param reservationId reservation ID
+     * @param sagepayTxnId successful sagepay transaction
      * @throws IOException 
      * @throws MessagingException 
      */
@@ -1618,8 +1619,8 @@ public class CloudbedsService {
      * template (for customer, room assignment, etc) and create a {SendPaymentLinkEmailJob} for it.
      * 
      * @param reservationId reservation to clone
-     * @param startDate booking start date (inclusive)
-     * @param endDate booking end date (exclusive)
+     * @param checkinDate checkin date (inclusive)
+     * @param checkoutDate checkout date (exclusive)
      * @param ratePerDay amount to charge per diem (or list of rates)
      * @throws IOException 
      */
@@ -1646,8 +1647,8 @@ public class CloudbedsService {
      * template (for customer, room assignment, etc).
      * 
      * @param reservationId reservation to clone
-     * @param startDate booking start date (inclusive)
-     * @param endDate booking end date (exclusive)
+     * @param checkinDate booking start date (inclusive)
+     * @param checkoutDate booking end date (exclusive)
      * @param ratesPerDay amount to charge per diem (or list of rates for all dates)
      * @return newly created reservation id
      * @throws IOException 

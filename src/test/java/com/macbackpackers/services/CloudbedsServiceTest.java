@@ -158,7 +158,8 @@ public class CloudbedsServiceTest {
 
     @Test
     public void testCreateSendTemplatedEmailJobs() throws Exception {
-        cloudbedsService.createSendTemplatedEmailJobs( webClient, "COVID-19 Guidance Update", LocalDate.parse("2021-12-03"), LocalDate.parse( "2021-12-04" ) );
+        cloudbedsService.createSendTemplatedEmailJobs(webClient, "COVID-19 Guidance Update", null, null,
+                LocalDate.parse("2021-12-03"), LocalDate.parse("2021-12-04"), "confirmed,not_confirmed");
     }
 
     @Test
@@ -187,5 +188,10 @@ public class CloudbedsServiceTest {
     @Test
     public void testSendStripePaymentConfirmationGmail() throws Exception {
         cloudbedsService.sendStripePaymentConfirmationGmail( webClient, "CRH-INV-ABCDEFG-SDQE" );
+    }
+
+    @Test
+    public void testSendTemplatedGmailTest() throws Exception {
+        cloudbedsService.sendTemplatedGmail( webClient, "34802644", "COVID-19 Guidance Update", true );
     }
 }
