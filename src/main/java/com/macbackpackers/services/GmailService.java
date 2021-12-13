@@ -11,6 +11,7 @@ import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -50,7 +51,7 @@ import com.macbackpackers.exceptions.UnrecoverableFault;
 
 /**
  * Uses the Gmail API to query a Gmail inbox. 
- * @see https://developers.google.com/gmail/api/quickstart/java
+ * @link https://developers.google.com/gmail/api/quickstart/java
  */
 @Service
 public class GmailService {
@@ -289,6 +290,21 @@ public class GmailService {
         Message message = createMessageWithEmail( createEmail( toAddress, toName, null, subject, bodyText ) );
         message = connectAsClient().users().messages().send( GMAIL_USER, message ).execute();
         LOGGER.info( "Sent message " + message.getId() + ": " + message.toPrettyString() );
+    }
+
+    /**
+     * Sends an email from the current email address.
+     *
+     * @param toAddress email address of the receiver
+     * @param toName (optional) name for destination address
+     * @param subject subject of the email
+     * @param bodyText body text of the email
+     * @param bodyTransformFn function to apply to body text
+     * @throws IOException on send error
+     * @throws MessagingException on message creation exception
+     */
+    public void sendEmail( String toAddress, String toName, String subject, String bodyText, Function<String, String> bodyTransformFn ) throws MessagingException, IOException {
+        sendEmail( toAddress, toName, subject, bodyTransformFn.apply( bodyText ) );
     }
 
     /**

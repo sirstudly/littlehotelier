@@ -9,6 +9,8 @@ import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
 import org.hamcrest.Matchers;
@@ -34,6 +36,7 @@ import com.macbackpackers.jobs.AgodaChargeJob;
 import com.macbackpackers.jobs.AgodaNoChargeNoteJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
+import com.macbackpackers.jobs.BedCountJob;
 import com.macbackpackers.jobs.BookingReportJob;
 import com.macbackpackers.jobs.CancelBookingJob;
 import com.macbackpackers.jobs.ChargeNonRefundableBookingJob;
@@ -77,6 +80,7 @@ import com.macbackpackers.jobs.VerifyGoogleAssistantLoggedInJob;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 
+@SuppressWarnings( "deprecation" )
 @RunWith( SpringJUnit4ClassRunner.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class ProcessorServiceTest {
@@ -403,8 +407,18 @@ public class ProcessorServiceTest {
     @Test
     public void testCreatePrepaidChargeJob() throws Exception {
         CreatePrepaidChargeJob j = new CreatePrepaidChargeJob();
-        j.setStatus( JobStatus.submitted );
-        dao.insertJob( j );
+        autowireBeanFactory.autowireBean( j );
+        j.processJob();
+    }
+
+    @Test
+    public void testBedCountJob() throws Exception {
+        BedCountJob j = new BedCountJob();
+        j.setId( 496768 );
+        j.setParameter( "selected_date", "2021-08-21" );
+        autowireBeanFactory.autowireBean( j );
+        j.resetJob();
+        j.processJob();
     }
 
     @Test
@@ -628,11 +642,18 @@ public class ProcessorServiceTest {
     }
 
     @Test
-    public void testSendTemplatedEmailJob() throws Exception {
+    public void testSendTemplatedEmailJob() {
         SendTemplatedEmailJob j = new SendTemplatedEmailJob();
+        autowireBeanFactory.autowireBean( j );
+        Map<String, String> replaceMap = new HashMap<>();
+        replaceMap.put( "\\[charge_amount\\]", "12.09" );
+        replaceMap.put( "\\[payment URL\\]", "https://pay.here.now/CLKF285" );
         j.setStatus( JobStatus.submitted );
         j.setReservationId( "10568885" );
         j.setEmailTemplate( CloudbedsScraper.TEMPLATE_COVID19_CLOSING );
+        j.setReplacementMap( replaceMap );
+        Assert.assertEquals( "12.09", j.getReplacementMap().get( "\\[charge_amount\\]" ) );
+        Assert.assertEquals( "https://pay.here.now/CLKF285", j.getReplacementMap().get( "\\[payment URL\\]" ) );
         dao.insertJob( j );
     }
 
@@ -650,6 +671,16 @@ public class ProcessorServiceTest {
                     j.setNote( "Covid-19 - forced cancellation." );
                     dao.insertJob( j );
                 } );
+    }
+    
+    @Test
+    public void testCreateSendTemplatedEmailJob() throws Exception {
+        SendTemplatedEmailJob j = new SendTemplatedEmailJob();
+        j.setStatus( JobStatus.submitted );
+        j.setReservationId( "34802644" );
+        j.setNoteArchived( true );
+        j.setEmailTemplate( "COVID-19 Guidance Update" );
+        dao.insertJob( j );
     }
 
     @Test

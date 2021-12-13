@@ -3,7 +3,9 @@ package com.macbackpackers.services;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -114,7 +116,10 @@ public class CloudbedsServiceTest {
 
     @Test
     public void testSendTemplatedGmail() throws Exception {
-        cloudbedsService.sendTemplatedGmail( webClient, "10568885", CloudbedsScraper.TEMPLATE_COVID19_CLOSING, true );
+        Map<String, String> replaceText = new HashMap<>();
+        replaceText.put( "\\[charge amount\\]", "3.99" );
+        replaceText.put( "\\[last four digits\\]", "1234" );
+        cloudbedsService.sendTemplatedGmail( webClient, "10568885", "Payment Successful", replaceText, true );
     }
 
     @Test
@@ -191,7 +196,7 @@ public class CloudbedsServiceTest {
     }
 
     @Test
-    public void testSendTemplatedGmailTest() throws Exception {
-        cloudbedsService.sendTemplatedGmail( webClient, "34802644", "COVID-19 Guidance Update", true );
+    public void testCreateChargeHogmanayBookingJobs() throws Exception {
+        cloudbedsService.createChargeHogmanayBookingJobs( webClient );
     }
 }

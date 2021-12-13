@@ -12,13 +12,16 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.mail.MessagingException;
 
+import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import org.apache.commons.collections.ListUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
@@ -95,6 +98,8 @@ public class PaymentProcessorService {
     private static final FastDateFormat DATETIME_FORMAT = FastDateFormat.getInstance( "dd/MM/yyyy HH:mm:ss" );
     private static final FastDateFormat DATETIME_STANDARD = FastDateFormat.getInstance( "yyyy-MM-dd HH:mm:ss" );
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
+
+    public final static String CHARGE_REMAINING_BALANCE_NOTE = "Attempting to charge remaining balance for booking.";
 
     @Value( "${stripe.apikey}" )
     private String STRIPE_API_KEY;
@@ -772,7 +777,6 @@ public class PaymentProcessorService {
      * 
      * @param webClient web client for cloudbeds
      * @param reservationId the unique cloudbeds reservation ID
-     * @param amount amount to charge
      * @throws IOException on i/o error
      */
     public synchronized void processHostelworldLateCancellationCharge( WebClient webClient, String reservationId ) throws IOException {
@@ -845,6 +849,78 @@ public class PaymentProcessorService {
     }
 
     /**
+     * Attempts to charge the balance due for the given booking. If successful, send confirmation email.
+     * If unsuccessful, send payment declined email (with payment link).
+     *
+     * @param webClient
+     * @param reservationId
+     * @throws IOException
+     */
+    public synchronized void chargeRemainingBalanceForBooking( WebClient webClient, String reservationId ) throws IOException {
+        LOGGER.info( "Processing remaining balance for booking: " + reservationId );
+        Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+
+        LOGGER.info( cbReservation.getThirdPartyIdentifier() + ": "
+                + cbReservation.getFirstName() + " " + cbReservation.getLastName() );
+        LOGGER.info( "Status: " + cbReservation.getStatus() );
+        LOGGER.info( "Checkin: " + cbReservation.getCheckinDate() );
+        LOGGER.info( "Checkout: " + cbReservation.getCheckoutDate() );
+        LOGGER.info( "Grand Total: " + cbReservation.getGrandTotal() );
+        LOGGER.info( "Balance Due: " + cbReservation.getBalanceDue() );
+
+        if( cbReservation.containsNote( CHARGE_REMAINING_BALANCE_NOTE ) ) {
+            LOGGER.info( "Already attempted to charge booking. Not attempting to try again." );
+            return;
+        }
+        cloudbedsScraper.addArchivedNote( webClient, reservationId, CHARGE_REMAINING_BALANCE_NOTE );
+
+        if( BigDecimal.ZERO.compareTo( cbReservation.getBalanceDue() ) >= 0 ) {
+            LOGGER.info( "Nothing to do. Booking has an outstanding balance of " + cbReservation.getBalanceDue() );
+            return;
+        }
+
+        if( false == Arrays.asList( "confirmed", "not_confirmed" ).contains( cbReservation.getStatus() ) ) {
+            throw new UnrecoverableFault( "Booking is at unsupported status " + cbReservation.getStatus() );
+        }
+
+        // check if card details exist in CB
+        if( false == cbReservation.isCardDetailsPresent() ) {
+            throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
+        }
+
+        // should have credit card details at this point
+        try {
+            cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
+            cloudbedsScraper.addNote( webClient, reservationId, "Successfully charged £"
+                    + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
+        }
+        catch( RecordPaymentFailedException | PaymentPendingException ex ) {
+            SendTemplatedEmailJob job = new SendTemplatedEmailJob();
+            Map<String, String> replaceMap = new HashMap<>();
+            String paymentURL = cloudbedsService.generateUniquePaymentURL( reservationId, null );
+            replaceMap.put( "\\[charge_amount\\]", cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
+            replaceMap.put( "\\[payment URL\\]", paymentURL );
+            job.setEmailTemplate( "Payment Declined" );
+            job.setReservationId( reservationId );
+            job.setReplacementMap( replaceMap );
+            job.setStatus( JobStatus.submitted );
+            wordpressDAO.insertJob( job );
+            return;
+        }
+
+        // send email if successful
+        SendTemplatedEmailJob job = new SendTemplatedEmailJob();
+        Map<String, String> replaceMap = new HashMap<>();
+        replaceMap.put( "\\[charge_amount\\]", cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
+        replaceMap.put( "\\[last four digits\\]", cbReservation.getCreditCardLast4Digits() );
+        job.setEmailTemplate( "Payment Successful" );
+        job.setReservationId( reservationId );
+        job.setReplacementMap( replaceMap );
+        job.setStatus( JobStatus.submitted );
+        wordpressDAO.insertJob( job );
+    }
+
+    /**
      * Does the nitty-gritty of posting the transaction, or recovering if we've already attempted to
      * do a post, updates the payment details in LH or leaves a note on the booking if the
      * transaction was not approved. If we've already successfully charged this {@code bookingRef},
@@ -903,7 +979,7 @@ public class PaymentProcessorService {
     }
 
     /**
-     * Similar to {@link #processPxPostTransaction(int, String, int, Payment, boolean, HtmlPage)}
+     * Similar to {@link #processPxPostTransaction(int, String, Payment, boolean, HtmlPage)}
      * but specifically for handling bookings which allow for multiple authorizations (possibly,
      * once for the first night and a secondary auth for the remainder). This method will always
      * initiate a new transaction for the given payment amount.

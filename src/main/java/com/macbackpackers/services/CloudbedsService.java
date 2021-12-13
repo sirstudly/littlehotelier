@@ -26,6 +26,7 @@ import java.util.stream.StreamSupport;
 
 import javax.mail.MessagingException;
 
+import com.macbackpackers.jobs.ChargeRemainingBalanceForBookingJob;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -365,6 +366,33 @@ public class CloudbedsService {
                 j.setReservationId( r.getReservationId() );
                 dao.insertJob( j );
             } );
+    }
+
+    /**
+     * Create ChargeHogmanayBookingJob for all bookings staying thru Dec-31 of this year.
+     *
+     * @param webClient
+     * @throws IOException
+     */
+    public void createChargeHogmanayBookingJobs( WebClient webClient ) throws IOException {
+
+        final LocalDate DEC_31 = LocalDate.of( LocalDate.now().getYear(), 12, 31 );
+        scraper.getReservations( webClient, DEC_31, DEC_31, null, null, "confirmed,not_confirmed" )
+                .stream()
+                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .peek( r -> LOGGER.info( "Res #" + r.getReservationId() + " (" + r.getThirdPartyIdentifier() + ") "
+                        + r.getFirstName() + " " + r.getLastName() + " booked from " + r.getCheckinDate() + " to " + r.getCheckoutDate()
+                        + " with balance of " + r.getBalanceDue() ) )
+                .filter( r -> BigDecimal.ZERO.compareTo( r.getBalanceDue() ) <= 0 ) // still something to pay
+                .filter( r -> false == r.isChannelCollectBooking() )
+                .filter( r -> false == r.containsNote( PaymentProcessorService.CHARGE_REMAINING_BALANCE_NOTE ) )
+                .forEach( r -> {
+                    LOGGER.info( "Creating ChargeRemainingBalanceForBookingJob for " + r.getReservationId() );
+                    ChargeRemainingBalanceForBookingJob j = new ChargeRemainingBalanceForBookingJob();
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( r.getReservationId() );
+                    dao.insertJob( j );
+                } );
     }
 
     /**
@@ -1381,10 +1409,12 @@ public class CloudbedsService {
      * @param webClient web client instance to use
      * @param reservationId associated reservation
      * @param templateName email template (mandatory)
+     * @param replaceMap string replacement map
      * @param isArchiveNote true to archive note straight away, false otherwise
      * @throws IOException
      */
-    public void sendTemplatedGmail( WebClient webClient, String reservationId, String templateName, boolean isArchiveNote ) throws IOException, MessagingException {
+    public void sendTemplatedGmail( WebClient webClient, String reservationId, String templateName,
+            Map<String, String> replaceMap, boolean isArchiveNote ) throws IOException, MessagingException {
 
         EmailTemplateInfo template = scraper.fetchEmailTemplate( webClient, templateName );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
@@ -1399,8 +1429,9 @@ public class CloudbedsService {
                     IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
                             .replaceAll( "__IMG_ALIGN__", template.getTopImageAlign() )
                             .replaceAll( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody()
-                                    .replaceAll( "\\[first name\\]", res.getFirstName() ) ) );
+                            .replaceAll( "__EMAIL_CONTENT__", template.getEmailBody() ),
+                    b -> replaceMap.keySet().stream().reduce( b.replaceAll( "\\[first name\\]", res.getFirstName() ),
+                            ( str, key ) -> str.replaceAll( key, replaceMap.get( key ) ) ) );
 
             if ( isArchiveNote ) {
                 scraper.addArchivedNote( webClient, reservationId, note );

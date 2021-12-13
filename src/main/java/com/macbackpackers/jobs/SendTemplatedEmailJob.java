@@ -5,15 +5,20 @@ import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.Transient;
 
+import com.google.gson.Gson;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationContext;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.services.CloudbedsService;
 
+import java.util.Collections;
+import java.util.Map;
+
 /**
  * Job that sends email from a template.
- *
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.SendTemplatedEmailJob" )
@@ -27,21 +32,26 @@ public class SendTemplatedEmailJob extends AbstractJob {
     @Transient
     private ApplicationContext appContext;
 
+    @Autowired
+    @Qualifier( "gsonForCloudbeds" )
+    @Transient
+    private Gson gson;
+
     @Override
     public void processJob() throws Exception {
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            if ( dao.isCloudbedsEmailEnabled() ) {
+        try( WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            if( dao.isCloudbedsEmailEnabled() ) {
                 cloudbedsService.sendTemplatedEmail( webClient, getReservationId(), getEmailTemplate() );
             }
             else {
-                cloudbedsService.sendTemplatedGmail( webClient, getReservationId(), getEmailTemplate(), isNoteArchived() );
+                cloudbedsService.sendTemplatedGmail( webClient, getReservationId(), getEmailTemplate(), getReplacementMap(), isNoteArchived() );
             }
         }
     }
 
     /**
      * Returns the reservation id.
-     * 
+     *
      * @return reservationId
      */
     public String getReservationId() {
@@ -50,7 +60,7 @@ public class SendTemplatedEmailJob extends AbstractJob {
 
     /**
      * Sets the reservation id.
-     * 
+     *
      * @param reservationId
      */
     public void setReservationId( String reservationId ) {
@@ -71,6 +81,15 @@ public class SendTemplatedEmailJob extends AbstractJob {
 
     public void setNoteArchived( boolean archiveNote ) {
         setParameter( "archive_note_yn", archiveNote ? "Y" : "N" );
+    }
+
+    public void setReplacementMap( Map<String, String> replacementMap ) {
+        setParameter( "replacement_map", gson.toJson( replacementMap ) );
+    }
+
+    public Map<String, String> getReplacementMap() {
+        String replacementMap = getParameter( "replacement_map" );
+        return StringUtils.isBlank( replacementMap ) ? Collections.EMPTY_MAP : gson.fromJson( replacementMap, Map.class );
     }
 
     @Override
