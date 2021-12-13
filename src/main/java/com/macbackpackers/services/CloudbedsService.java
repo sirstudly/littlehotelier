@@ -474,10 +474,12 @@ public class CloudbedsService {
      * @param checkinDateStart
      * @param checkinDateEnd
      * @param statuses comma-delimited list of statuses to apply for
+     * @param replacementFn apply any replacements for the given reservation
      * @throws IOException
      */
     public void createSendTemplatedEmailJobs( WebClient webClient, String emailTemplate, LocalDate stayDateStart, LocalDate stayDateEnd,
-                                              LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
+                                              LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses,
+                                              Function<Reservation, Map<String, String>> replacementFn ) throws IOException {
         scraper.fetchEmailTemplate( webClient, emailTemplate ); // check if it exists before creating a bunch of jobs
         scraper.getReservations( webClient,
                 stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, statuses ).stream()
@@ -494,39 +496,9 @@ public class CloudbedsService {
                     j.setReservationId( r.getReservationId() );
                     j.setEmailTemplate( emailTemplate );
                     j.setNoteArchived( true );
-                    dao.insertJob( j );
-                } );
-    }
-
-    /**
-     * Creates SendTemplatedEmailJobs for the given parameters.
-     * 
-     * @param webClient
-     * @param templateName mandatory email template
-     * @param stayDateStart (optional inclusive)
-     * @param stayDateEnd (optional inclusive)
-     * @param checkinDateStart (optional inclusive)
-     * @param checkinDateEnd (optional inclusive)
-     * @param statuses (optional)
-     * @throws IOException
-     */
-    public void createBulkEmailJob( WebClient webClient, String templateName,
-            LocalDate stayDateStart, LocalDate stayDateEnd,
-            LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
-
-        scraper.getReservations( webClient,
-                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, statuses ).stream()
-                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
-                .filter( r -> false == "Macb Tour".equals( r.getLastName() ) )
-                .filter( r -> false == r.containsNote( templateName + " email sent." ) )
-                .forEach( r -> {
-                    LOGGER.info( "Creating SendTemplatedEmailJob for Res #" + r.getReservationId()
-                    + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
-                    + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
-                    SendTemplatedEmailJob j = new SendTemplatedEmailJob();
-                    j.setStatus( JobStatus.submitted );
-                    j.setReservationId( r.getReservationId() );
-                    j.setEmailTemplate( templateName );
+                    if( replacementFn != null ) {
+                        j.setReplacementMap( replacementFn.apply( r ) );
+                    }
                     dao.insertJob( j );
                 } );
     }

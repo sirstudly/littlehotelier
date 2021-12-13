@@ -34,7 +34,7 @@ public class CreateSendBulkEmailJob extends AbstractJob {
         try (WebClient webClient = appContext.getBean("webClientForCloudbeds", WebClient.class)) {
             cloudbedsService.createSendTemplatedEmailJobs(webClient,
                     getEmailTemplate(), getStayDateStart(), getStayDateEnd(),
-                    getCheckinDateStart(), getCheckinDateEnd(), getStatuses());
+                    getCheckinDateStart(), getCheckinDateEnd(), getStatuses(), null);
         }
     }
 

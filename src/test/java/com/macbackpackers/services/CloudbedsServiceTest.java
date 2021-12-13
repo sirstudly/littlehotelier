@@ -108,13 +108,6 @@ public class CloudbedsServiceTest {
     }
 
     @Test
-    public void testCreateBulkEmailJob() throws Exception {
-        cloudbedsService.createBulkEmailJob(webClient, CloudbedsScraper.TEMPLATE_COVID19_CLOSING,
-                null, null,
-                LocalDate.now().plusDays( 1 ), LocalDate.parse( "2020-04-30" ), "confirmed,not_confirmed" );
-    }
-
-    @Test
     public void testSendTemplatedGmail() throws Exception {
         Map<String, String> replaceText = new HashMap<>();
         replaceText.put( "\\[charge amount\\]", "3.99" );
@@ -164,7 +157,7 @@ public class CloudbedsServiceTest {
     @Test
     public void testCreateSendTemplatedEmailJobs() throws Exception {
         cloudbedsService.createSendTemplatedEmailJobs(webClient, "COVID-19 Guidance Update", null, null,
-                LocalDate.parse("2021-12-03"), LocalDate.parse("2021-12-04"), "confirmed,not_confirmed");
+                LocalDate.parse("2021-12-03"), LocalDate.parse("2021-12-04"), "confirmed,not_confirmed", null);
     }
 
     @Test
