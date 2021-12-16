@@ -388,7 +388,7 @@ public class CloudbedsService {
                 .peek( r -> LOGGER.info( "Res #" + r.getReservationId() + " (" + r.getThirdPartyIdentifier() + ") "
                         + r.getFirstName() + " " + r.getLastName() + " booked from " + r.getCheckinDate() + " to " + r.getCheckoutDate()
                         + " with balance of " + r.getBalanceDue() ) )
-                .filter( r -> BigDecimal.ZERO.compareTo( r.getBalanceDue() ) <= 0 ) // still something to pay
+                .filter( r -> BigDecimal.ZERO.compareTo( r.getBalanceDue() ) < 0 ) // still something to pay
                 .filter( r -> false == r.isChannelCollectBooking() )
                 .filter( r -> false == r.containsNote( PaymentProcessorService.CHARGE_REMAINING_BALANCE_NOTE ) )
                 .forEach( r -> {
