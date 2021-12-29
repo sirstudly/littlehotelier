@@ -110,12 +110,8 @@ public class ProcessorService {
                     try {
                         s.setLastRunDate( new Timestamp( System.currentTimeMillis() ) );
                         dao.updateJobScheduler( s );
-
-                        // only need to create job if it's not already queued
-                        if( false == dao.isJobCurrentlyPending( s.getClassname() ) ) {
-                            LOGGER.info( "Creating new job " + s.getClassname() );
-                            dao.insertJob( s.createNewJob() );
-                        }
+                        LOGGER.info( "Creating new job " + s.getClassname() );
+                        dao.insertJob( s.createNewJob() );
                     }
                     catch ( ReflectiveOperationException e ) {
                         LOGGER.error( "Whoops! Something went wrong here!", e );
