@@ -38,7 +38,7 @@ public class CreateSendHogmanayAdvancedPaymentEmailJob extends AbstractJob {
         try( WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class ) ) {
             final LocalDate DEC_31 = LocalDate.of( LocalDate.now().getYear(), 12, 31 );
             cloudbedsService.createSendTemplatedEmailJobs( webClient, "Hogmanay Advanced Payment",
-                    DEC_31, DEC_31, null, null, "confirmed,not_confirmed",
+                    DEC_31, DEC_31, null, null, null, null,"confirmed,not_confirmed",
                     r -> false == r.isChannelCollectBooking(),
                     r -> ImmutableMap.of(
                             "\\[amount due\\]", cloudbedsScraper.getCurrencyFormat().format( r.getBalanceDue() ),

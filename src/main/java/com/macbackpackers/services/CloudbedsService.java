@@ -473,22 +473,25 @@ public class CloudbedsService {
      * 
      * @param webClient
      * @param emailTemplate
-     * @param stayDateStart
-     * @param stayDateEnd
-     * @param checkinDateStart
-     * @param checkinDateEnd
+     * @param stayDateStart (optional)
+     * @param stayDateEnd (optional)
+     * @param checkinDateStart (optional)
+     * @param checkinDateEnd (optional)
+     * @param bookingDateStart (optional)
+     * @param bookingDateEnd (optional)
      * @param statuses comma-delimited list of statuses to apply for
      * @param reservationFilterFn apply filter to the given reservation (optional)
      * @param replacementFn apply any replacements for the given reservation (optional)
      * @throws IOException
      */
     public void createSendTemplatedEmailJobs( WebClient webClient, String emailTemplate, LocalDate stayDateStart, LocalDate stayDateEnd,
-                                              LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses,
-                                              Function<Reservation, Boolean> reservationFilterFn,
+                                              LocalDate checkinDateStart, LocalDate checkinDateEnd,
+                                              LocalDate bookingDateStart, LocalDate bookingDateEnd,
+                                              String statuses, Function<Reservation, Boolean> reservationFilterFn,
                                               Function<Reservation, Map<String, String>> replacementFn ) throws IOException {
         scraper.fetchEmailTemplate( webClient, emailTemplate ); // check if it exists before creating a bunch of jobs
-        scraper.getReservations( webClient,
-                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, statuses ).stream()
+        scraper.getReservations( webClient, stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd,
+                        bookingDateStart, bookingDateEnd, statuses ).stream()
                 .filter( c -> false == c.isLongTermer() )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.containsNote( emailTemplate + " email sent." ) )

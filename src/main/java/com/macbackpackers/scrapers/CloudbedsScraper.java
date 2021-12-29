@@ -280,9 +280,30 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd,
-            LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
+                                           LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
+        return getReservations( webClient, stayDateStart, stayDateEnd,
+                checkinDateStart, checkinDateEnd, null, null, statuses );
+    }
+
+    /**
+     * Get all reservations within the given date ranges.
+     *
+     * @param webClient web client instance to use
+     * @param stayDateStart stay date (inclusive; optional)
+     * @param stayDateEnd stay date (inclusive; optional)
+     * @param checkinDateStart checkin date (inclusive; optional)
+     * @param checkinDateEnd checkin date (inclusive; optional)
+     * @param bookingDateStart (inclusive; optional)
+     * @param bookingDateEnd (inclusive; optional)
+     * @param statuses comma-delimited list of statuses (optional)
+     * @return non-null list of customer reservations
+     * @throws IOException
+     */
+    public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd,
+                                           LocalDate checkinDateStart, LocalDate checkinDateEnd,
+                                           LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest(
-                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, null, null, statuses ) );
+                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, bookingDateStart, bookingDateEnd, statuses ) );
     }
 
     /**
@@ -661,7 +682,7 @@ public class CloudbedsScraper {
      * @param checkinDateEnd checkin date (inclusive)
      * @param bookedDateStart booked date (inclusive)
      * @param bookedDateEnd booked date (inclusive)
-     * @param bookingSources comma-delimited list of booking source(s)
+     * @param sourceNames comma-delimited list of booking source(s)
      * @return non-null list of reservations
      * @throws IOException
      */
@@ -684,7 +705,7 @@ public class CloudbedsScraper {
      * @param checkinDateEnd checkin date (inclusive)
      * @param cancelDateStart cancellation date (inclusive)
      * @param cancelDateEnd cancellation date (inclusive)
-     * @param bookingSources comma-delimited list of booking source(s)
+     * @param sourceNames comma-delimited list of booking source(s)
      * @return non-null list of reservations
      * @throws IOException
      */
