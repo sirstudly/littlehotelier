@@ -1072,7 +1072,7 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public EmailTemplateInfo getGroupBookingPaymentReminderEmailTemplate( WebClient webClient ) throws IOException {
-        return fetchEmailTemplate( webClient, TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED );
+        return fetchEmailTemplate( webClient, TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER );
     }
 
     /**
