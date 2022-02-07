@@ -589,6 +589,7 @@ public class CloudbedsService {
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED ) )
                 .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED_PREPAID ) )
+                .filter( r -> r.getEmail().contains("@")) // email not available for airbnb
                 .filter( r -> r.getNumberOfGuests() >= GROUP_BOOKING_SIZE )
                 .forEach( r -> {
                     LOGGER.info( "Creating SendGroupBookingApprovalRequiredEmailJob for Res #" + r.getReservationId()
