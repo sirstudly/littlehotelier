@@ -410,7 +410,7 @@ public class CloudbedsService {
         try (WebClient webClient = appContext.getBean( "webClientForBDC", WebClient.class )) {
             return bdcScraper.getAllVCCBookingsThatCanBeCharged( webClient )
                     .stream()
-                    .filter( r -> false == "2129535783".equals( r ) ) // TEMPORARY!: refund currently in progress!
+                    .filter( r -> false == "3532390404".equals( r ) ) // TEMPORARY!: chargeable amount is 0.01
                     .map( bdc -> getReservationForBDC( bdc ) )
                     .filter( r -> r.isPresent() )
                     .map( r -> r.get() )
