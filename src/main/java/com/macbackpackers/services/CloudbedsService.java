@@ -411,6 +411,8 @@ public class CloudbedsService {
             return bdcScraper.getAllVCCBookingsThatCanBeCharged( webClient )
                     .stream()
                     .filter( r -> false == "3532390404".equals( r ) ) // TEMPORARY!: chargeable amount is 0.01
+                    .filter( r -> false == "3492021542".equals( r ) ) // TEMPORARY!: chargeable amount is 0.01
+                    .filter( r -> false == "3176498633".equals( r ) ) // TEMPORARY!: refund in progress; revisit before feb 2023
                     .map( bdc -> getReservationForBDC( bdc ) )
                     .filter( r -> r.isPresent() )
                     .map( r -> r.get() )
