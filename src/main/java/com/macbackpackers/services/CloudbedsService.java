@@ -1536,9 +1536,10 @@ public class CloudbedsService {
         HtmlPasswordInput passwordField = page.getHtmlElementById( "password" );
         passwordField.type( password );
 
-        String token = captchaService.solveRecaptchaV2( webClient, page.getBaseURL().toString(), page.getWebResponse().getContentAsString() );
-        HtmlHiddenInput captchaResponse = page.getFirstByXPath( "//input[@name='visible_captcha']" );
-        captchaResponse.setValueAttribute( token );
+        // no longer present? march 2022
+//        String token = captchaService.solveRecaptchaV2( webClient, page.getBaseURL().toString(), page.getWebResponse().getContentAsString() );
+//        HtmlHiddenInput captchaResponse = page.getFirstByXPath( "//input[@name='visible_captcha']" );
+//        captchaResponse.setValueAttribute( token );
 
         HtmlButton loginButton = page.getFirstByXPath( "//button[@type='submit']" );
         loginButton.setAttribute( "class", loginButton.getAttribute( "class" ).replaceAll( "disabled", "" ) ); // remove disabled
