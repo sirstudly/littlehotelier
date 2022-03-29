@@ -99,7 +99,8 @@ public class PaymentProcessorService {
     private static final FastDateFormat DATETIME_STANDARD = FastDateFormat.getInstance( "yyyy-MM-dd HH:mm:ss" );
     private static final int MAX_PAYMENT_ATTEMPTS = 3; // max number of transaction attempts
 
-    public final static String CHARGE_REMAINING_BALANCE_NOTE = "Attempting to charge remaining balance for booking.";
+    public static final String CHARGE_REMAINING_BALANCE_NOTE = "Attempting to charge remaining balance for booking.";
+    public static final BigDecimal MINIMUM_CHARGE_AMOUNT = new BigDecimal( "0.3" );
 
     @Value( "${stripe.apikey}" )
     private String STRIPE_API_KEY;
@@ -740,7 +741,6 @@ public class PaymentProcessorService {
             try (WebClient webClientForBDC = context.getBean( "webClientForBDC", WebClient.class )) {
                 amountToCharge = bdcScraper.getVirtualCardBalance( webClientForBDC, cbReservation.getThirdPartyIdentifier() );
             }
-            final BigDecimal MINIMUM_CHARGE_AMOUNT = new BigDecimal( "0.3" );
             final String MODIFIED_OUTSIDE_OF_BDC = "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC (or payment was incorrectly collected from guest). "
                     + "VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL.";
             LOGGER.info( "VCC balance is " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
@@ -1335,6 +1335,20 @@ public class PaymentProcessorService {
             }
         }
         return false;
+    }
+
+    /**
+     * Returns true iff amount is over the minimum chargeable amount.
+     * @param amount amount starting with £
+     * @return
+     */
+    public static boolean isChargeableAmount(String amount) {
+        Pattern p = Pattern.compile("£(\\d+\\.?\\d*)");
+        Matcher m = p.matcher(amount);
+        if (false == m.find()) {
+            throw new RuntimeException("Unable to parse amount " + amount);
+        }
+        return MINIMUM_CHARGE_AMOUNT.compareTo(new BigDecimal(m.group(1))) < 0;
     }
 
     /**

@@ -1,25 +1,6 @@
 
 package com.macbackpackers.scrapers;
 
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.text.MessageFormat;
-import java.text.ParseException;
-import java.util.List;
-import java.util.Optional;
-import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
-import org.openqa.selenium.NoSuchElementException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebWindow;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
@@ -30,6 +11,8 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
 import com.gargoylesoftware.htmlunit.html.HtmlSelect;
 import com.gargoylesoftware.htmlunit.html.HtmlSpan;
+import com.gargoylesoftware.htmlunit.html.HtmlTableCell;
+import com.gargoylesoftware.htmlunit.html.HtmlTableRow;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.dao.WordPressDAO;
@@ -37,6 +20,24 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.services.AuthenticationService;
 import com.macbackpackers.services.BasicCardMask;
 import com.macbackpackers.services.FileService;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.SystemUtils;
+import org.openqa.selenium.NoSuchElementException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.text.MessageFormat;
+import java.text.ParseException;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Component
 public class BookingComScraper {
@@ -73,7 +74,6 @@ public class BookingComScraper {
      * @param webClient
      * @param username user credentials
      * @param password user credentials
-     * @param lasturl previous home URL (optional) - contains previous session
      * @throws IOException
      */
     public synchronized void doLogin( WebClient webClient, String username, String password ) throws IOException {
@@ -83,7 +83,7 @@ public class BookingComScraper {
         }
 
         // don't use session-tracked URL if running locally (ie. for debugging)
-        String lasturl = wordPressDAO.getOption( SystemUtils.IS_OS_WINDOWS ? "hbo_bdc_lasturl_win" : "hbo_bdc_lasturl" );
+        String lasturl = wordPressDAO.getOption( SystemUtils.IS_OS_WINDOWS || SystemUtils.IS_OS_MAC ? "hbo_bdc_lasturl_win" : "hbo_bdc_lasturl" );
         HtmlPage currentPage = webClient.getPage( lasturl == null ? "https://admin.booking.com/hotel/hoteladmin/" : lasturl );
         LOGGER.info( "Loading Booking.com website: " + currentPage.getBaseURL() );
 
@@ -417,6 +417,9 @@ public class BookingComScraper {
             currentPage = webClient.getPage( nextLink );
         }
         else {
+            if (StringUtils.isNotBlank(headerViewCCDetails.get(0).getAttribute("disabled"))) {
+                throw new MissingUserDataException("Credit card details are not available");
+            }
             LOGGER.info( "Clicking on View CC details." );
             currentPage = headerViewCCDetails.get( 0 ).click();
         }
@@ -502,8 +505,11 @@ public class BookingComScraper {
         HtmlPage currentPage = webClient.getPage( vccUrl );
 
         LOGGER.info( "Virtual cards to charge..." );
-        List<HtmlAnchor> reservationIds = currentPage.getByXPath( "//div[div/h2/span/text()='Virtual cards to charge']/div/div/table/tbody/tr/th/span/a" );
-        return reservationIds.stream().map( a -> a.getVisibleText() ).collect( Collectors.toList() );
+        List<HtmlTableRow> reservationRows = currentPage.getByXPath( "//div[div/h2/span/text()='Virtual cards to charge']/div/div/table/tbody/tr" );
+        return reservationRows.stream()
+                .filter(r -> com.macbackpackers.services.PaymentProcessorService.isChargeableAmount(HtmlTableCell.class.cast(r.getFirstByXPath("td[@data-heading='Amount']")).getVisibleText()))
+                .map(r -> HtmlAnchor.class.cast(r.getFirstByXPath("th/span/a")).getVisibleText())
+                .collect(Collectors.toList());
     }
 
     /**
