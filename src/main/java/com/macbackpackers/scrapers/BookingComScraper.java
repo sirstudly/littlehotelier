@@ -392,6 +392,11 @@ public class BookingComScraper {
         lookupReservation( webClient, bdcReservation );
         HtmlPage currentPage = getCurrentPage( webClient );
 
+        int numberOfTasks = webClient.waitForBackgroundJavaScript( 30000 );
+        if ( numberOfTasks > 0 ) {
+            LOGGER.info( "Still waiting on {} javascript tasks to finish...", numberOfTasks );
+        }
+
         // payment details loaded by javascript
         final String PAYMENT_DETAILS_BLOCK = "//span[normalize-space(text())='Virtual credit card'] "
                 + "| //span[contains(text(),'successfully charged')] "
