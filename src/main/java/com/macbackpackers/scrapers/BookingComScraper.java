@@ -84,7 +84,7 @@ public class BookingComScraper {
 
         // don't use session-tracked URL if running locally (ie. for debugging)
         String lasturl = wordPressDAO.getOption( SystemUtils.IS_OS_WINDOWS || SystemUtils.IS_OS_MAC ? "hbo_bdc_lasturl_win" : "hbo_bdc_lasturl" );
-        HtmlPage currentPage = webClient.getPage( lasturl == null ? "https://admin.booking.com/hotel/hoteladmin/" : lasturl );
+        HtmlPage currentPage = webClient.getPage( lasturl == null ? "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/home.html" : lasturl );
         LOGGER.info( "Loading Booking.com website: " + currentPage.getBaseURL() );
 
         if ( currentPage.getBaseURL().getPath().startsWith( "/sign-in" ) ) {
@@ -106,7 +106,7 @@ public class BookingComScraper {
 
         LOGGER.info( "Logged into Booking.com. Saving current URL." );
         LOGGER.info( "Loaded " + currentPage.getBaseURL() );
-        wordPressDAO.setOption( SystemUtils.IS_OS_WINDOWS ? "hbo_bdc_lasturl_win" : "hbo_bdc_lasturl", currentPage.getBaseURL().toString() );
+        wordPressDAO.setOption( SystemUtils.IS_OS_WINDOWS || SystemUtils.IS_OS_MAC ? "hbo_bdc_lasturl_win" : "hbo_bdc_lasturl", currentPage.getBaseURL().toString() );
     }
 
     /**
@@ -391,46 +391,12 @@ public class BookingComScraper {
     public synchronized CardDetails returnCardDetailsForBooking( WebClient webClient, String bdcReservation ) throws IOException, ParseException {
         lookupReservation( webClient, bdcReservation );
         HtmlPage currentPage = getCurrentPage( webClient );
+        String currentUrl = getCurrentPage( webClient ).getBaseURL().toString();
 
-        int numberOfTasks = webClient.waitForBackgroundJavaScript( 30000 );
-        if ( numberOfTasks > 0 ) {
-            LOGGER.info( "Still waiting on {} javascript tasks to finish...", numberOfTasks );
-        }
-
-        // payment details loaded by javascript
-        final String PAYMENT_DETAILS_BLOCK = "//span[normalize-space(text())='Virtual credit card'] "
-                + "| //span[contains(text(),'successfully charged')] "
-                + "| //span[contains(text(),'This virtual card is no longer active')] "
-                + "| //span[contains(text(),\"This virtual card isn't active anymore\")] "
-                + "| //a/span/span[normalize-space(text())='View credit card details']";
-
-        List<HtmlElement> headerViewCCDetails = currentPage.getByXPath( "//*[self::button or self::a]/span/span[normalize-space(text())='View credit card details']/../.." );
-        LOGGER.info( "Matched " + headerViewCCDetails.size() + " sign-in elements" );
-        if ( headerViewCCDetails.isEmpty() ) {
-            HtmlElement paymentDetails = getElementByXPath( webClient, PAYMENT_DETAILS_BLOCK );
-            if ( paymentDetails.getVisibleText().contains( "This virtual card is no longer active." )
-                    || paymentDetails.getVisibleText().contains( "This virtual card isn't active anymore" ) ) {
-                throw new MissingUserDataException( "This virtual card is no longer active." );
-            }
-            throw new MissingUserDataException( "No card details link available." );
-        }
-
-        LOGGER.info( "Found {} view CC details elements.", headerViewCCDetails.size() );
-        Optional<String> nextLink = headerViewCCDetails.stream()
-                .filter(p -> StringUtils.isNotBlank(p.getAttribute("href")))
-                .map(p -> p.getAttribute( "href" ))
-                .findFirst();
-        if (nextLink.isPresent()) {
-            LOGGER.info( "Link found, going to " + nextLink );
-            currentPage = webClient.getPage( nextLink.get() );
-        }
-        else {
-            if (StringUtils.isNotBlank(headerViewCCDetails.get(0).getAttribute("disabled"))) {
-                throw new MissingUserDataException("Credit card details are not available");
-            }
-            LOGGER.info( "Clicking on View CC details." );
-            currentPage = headerViewCCDetails.get( 0 ).click();
-        }
+        String vccUrl = MessageFormat.format( "https://secure-admin.booking.com/booking_cc_details.html?lang=en&bn={0}&hotel_id={1}&ses={2}&has_bvc=1",
+                bdcReservation, getHotelIdFromURL( currentUrl ), getSessionFromURL( currentUrl ) );
+        LOGGER.info( "Looking up VCC card details " + vccUrl );
+        currentPage = webClient.getPage( vccUrl );
 
         // we may or may not need to login again to view CC details
         final String SIGN_IN_LOCATOR_PATH = "//span[normalize-space(text())='Sign in to view credit card details']";
