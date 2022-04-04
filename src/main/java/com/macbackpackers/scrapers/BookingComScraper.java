@@ -411,10 +411,13 @@ public class BookingComScraper {
         }
 
         LOGGER.info( "Found {} view CC details elements.", headerViewCCDetails.size() );
-        String nextLink = headerViewCCDetails.get( 0 ).getAttribute( "href" );
-        if ( StringUtils.isNotBlank( nextLink ) ) {
+        Optional<String> nextLink = headerViewCCDetails.stream()
+                .filter(p -> StringUtils.isNotBlank(p.getAttribute("href")))
+                .map(p -> p.getAttribute( "href" ))
+                .findFirst();
+        if (nextLink.isPresent()) {
             LOGGER.info( "Link found, going to " + nextLink );
-            currentPage = webClient.getPage( nextLink );
+            currentPage = webClient.getPage( nextLink.get() );
         }
         else {
             if (StringUtils.isNotBlank(headerViewCCDetails.get(0).getAttribute("disabled"))) {
