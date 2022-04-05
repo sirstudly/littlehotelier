@@ -552,8 +552,7 @@ public class PaymentProcessorService {
 
         // check if card details exist in CB
         if ( cbReservation.isCardDetailsPresent() ) {
-            LOGGER.info( "Card details found; skipping copy" );
-            return cbReservation;
+            LOGGER.info( "Card details already exist; copying anyways..." );
         }
 
         CardDetails ccDetails = null;
