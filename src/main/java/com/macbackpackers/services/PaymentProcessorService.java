@@ -1,38 +1,6 @@
 
 package com.macbackpackers.services;
 
-import static com.macbackpackers.scrapers.AllocationsPageScraper.POUND;
-
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.ParseException;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
-import javax.mail.MessagingException;
-
-import com.macbackpackers.jobs.SendTemplatedEmailJob;
-import org.apache.commons.collections.ListUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.time.FastDateFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationContext;
-import org.springframework.stereotype.Service;
-
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlDivision;
@@ -67,9 +35,11 @@ import com.macbackpackers.jobs.SendNonRefundableDeclinedEmailJob;
 import com.macbackpackers.jobs.SendNonRefundableSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendRefundSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendStripePaymentConfirmationEmailJob;
+import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.AgodaScraper;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingComScraper;
+import com.macbackpackers.scrapers.BookingComSeleniumScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.scrapers.ChromeScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -85,6 +55,38 @@ import com.stripe.model.PaymentIntent;
 import com.stripe.model.Refund;
 import com.stripe.net.RequestOptions.RequestOptionsBuilder;
 import com.stripe.param.RefundCreateParams;
+import org.apache.commons.collections.ListUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.FastDateFormat;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+
+import javax.mail.MessagingException;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.ParseException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import static com.macbackpackers.scrapers.AllocationsPageScraper.POUND;
 
 /**
  * Service for checking payments in LH, sending (deposit) payments through the payment gateway and
@@ -152,13 +154,46 @@ public class PaymentProcessorService {
     @Autowired
     private BookingComScraper bdcScraper;
 
+    @Autowired
+    private BookingComSeleniumScraper bdcSeleniumScraper;
+
+    @Autowired
+    private GenericObjectPool<WebDriver> driverFactory;
+
+    @Value( "${chromescraper.maxwait.seconds:30}" )
+    private int maxWaitSeconds;
+
+    class AutocloseableWebDriver implements AutoCloseable {
+
+        private WebDriver driver;
+        private WebDriverWait wait;
+
+        public AutocloseableWebDriver() throws Exception {
+            this.driver = driverFactory.borrowObject();
+            this.wait = new WebDriverWait(driver, Duration.ofSeconds(maxWaitSeconds));
+        }
+
+        public WebDriver getDriver() {
+            return this.driver;
+        }
+
+        public WebDriverWait getDriverWait() {
+            return this.wait;
+        }
+
+        @Override
+        public void close() throws Exception {
+            driverFactory.returnObject(this.driver);
+        }
+    }
+
     /**
      * Attempt to charge the deposit payment for the given reservation. This method does nothing if
      * the payment outstanding != payment total. It also checks whether there was already a previous
      * attempt to charge the booking and updates LH payment details if it was previously successful.
      * To avoid multiple failed transactions, this method should only be called again if new card
      * details have been updated.
-     * 
+     *
      * @param webClient web client to use
      * @param jobId current job id
      * @param bookingRef booking reference e.g. BDC-123456789
@@ -244,7 +279,7 @@ public class PaymentProcessorService {
     /**
      * Attempt to charge the deposit payment for the given reservation. This method does nothing if
      * the payment outstanding != payment total.
-     * 
+     *
      * @param webClient web client to use
      * @param reservationId unique CB reservation
      * @throws IOException on I/O error
@@ -353,7 +388,7 @@ public class PaymentProcessorService {
 
     /**
      * Loads the given booking and processes any payments (if applicable).
-     * 
+     *
      * @param webClient web client used for LH
      * @param jobId current job id
      * @param bookingRef booking reference e.g. BDC-123456789
@@ -384,7 +419,7 @@ public class PaymentProcessorService {
      * Attempt to charge the no-show amount for the given reservation. This method fails fast if the
      * payment already received &gt= amount to charge . If there was already a previous attempt to
      * charge the booking, this will update LH payment details so it is synced.
-     * 
+     *
      * @param lhWebClient web client to use for little hotelier
      * @param jobId current job id
      * @param bookingRef booking reference e.g. BDC-123456789
@@ -465,7 +500,7 @@ public class PaymentProcessorService {
 
     /**
      * Copies the card details from LH (or HWL/AGO/EXP) to CB if it doesn't already exist.
-     * 
+     *
      * @param cbWebClient web client for cloudbeds
      * @param bookingRef the booking ref to copy
      * @param checkinDate checkin date of this booking
@@ -529,7 +564,7 @@ public class PaymentProcessorService {
 
     /**
      * Copies the card details (for HWL/BDC/EXP) to CB if it doesn't already exist.
-     * 
+     *
      * @param webClient web client for cloudbeds
      * @param reservationId the unique cloudbeds reservation ID
      * @return the reloaded reservation
@@ -541,7 +576,7 @@ public class PaymentProcessorService {
 
     /**
      * Copies the card details (for HWL/BDC/EXP) to CB if it doesn't already exist.
-     * 
+     *
      * @param webClient web client for cloudbeds
      * @param cbReservation the loaded cloudbeds reservation
      * @return the reloaded reservation
@@ -571,6 +606,11 @@ public class PaymentProcessorService {
             try (WebClient webClientForBDC = context.getBean( "webClientForBDC", WebClient.class )) {
                 ccDetails = bdcScraper.returnCardDetailsForBooking( webClientForBDC, cbReservation.getThirdPartyIdentifier() );
             }
+
+            // use Selenium driver
+//            try (AutocloseableWebDriver driver = new AutocloseableWebDriver()) {
+//                ccDetails = bdcSeleniumScraper.returnCardDetailsForBooking(driver.getDriver(), driver.getDriverWait(), cbReservation.getThirdPartyIdentifier());
+//            }
         }
         //        else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
         //            LOGGER.info( "Retrieving AGO customer card details" );

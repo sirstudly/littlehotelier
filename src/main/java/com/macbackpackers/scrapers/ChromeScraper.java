@@ -6,6 +6,7 @@ import static org.openqa.selenium.support.ui.ExpectedConditions.visibilityOf;
 import static org.openqa.selenium.support.ui.ExpectedConditions.visibilityOfAllElements;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -52,7 +53,7 @@ public class ChromeScraper {
 
     /**
      * Returns the guest details for a reservation.
-     * 
+     *
      * @param bookingRef booking reference
      * @param checkinDate checkin-date
      * @return guest details (card details may be null if not found)
@@ -65,7 +66,7 @@ public class ChromeScraper {
 
         try {
             driver.get( pageURL );
-            WebDriverWait wait = new WebDriverWait( driver, maxWaitSeconds );
+            WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( maxWaitSeconds ) );
 
             // select only row and click
             WebElement bookingLink = driver.findElement( By.xpath( "//a[text()='" + bookingRef + "']" ) );
