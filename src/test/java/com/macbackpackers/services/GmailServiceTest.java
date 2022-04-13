@@ -35,6 +35,12 @@ public class GmailServiceTest {
     }
 
     @Test
+    public void testAuthorize() throws Exception {
+        // this should throw up a login window on first run
+        gmailService.connectAsClient();
+    }
+
+    @Test
     public void testSendEmail() throws Exception {
         gmailService.sendEmail( "ronchan@techie.com", "Mister Chan", "Testing", "<HTML><BODY>This is an <em>HTML</em> message. <br>Thanks for participating!</BODY></HTML>" );
     }
