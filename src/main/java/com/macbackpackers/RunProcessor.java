@@ -224,6 +224,7 @@ public class RunProcessor
             processor.releaseExclusivityLock();
             context.close();
             LOGGER.info( "Finished processor... " + new Date() );
+            System.exit(0);
         }
     }
 
