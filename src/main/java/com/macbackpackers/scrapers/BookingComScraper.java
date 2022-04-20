@@ -126,6 +126,10 @@ public class BookingComScraper {
         HtmlButton nextButton = page.getFirstByXPath( "//span[text()='Next']/.." );
         nextButton.click();
 
+        int numberOfTasks = webClient.waitForBackgroundJavaScript( 10000 );
+        if ( numberOfTasks > 0 ) {
+            LOGGER.info( "Still waiting on {} javascript tasks to finish...", numberOfTasks );
+        }
         HtmlPasswordInput passwordField = page.getHtmlElementById( "password" );
         passwordField.type( wordPressDAO.getOption( "hbo_bdc_password" ) );
 
@@ -176,7 +180,7 @@ public class BookingComScraper {
             }
         }
 
-        int numberOfTasks = webClient.waitForBackgroundJavaScript( 60000 );
+        numberOfTasks = webClient.waitForBackgroundJavaScript( 60000 );
         if ( numberOfTasks > 0 ) {
             LOGGER.info( "Still waiting on {} javascript tasks to finish...", numberOfTasks );
         }
