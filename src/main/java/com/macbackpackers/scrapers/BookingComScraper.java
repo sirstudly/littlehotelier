@@ -124,9 +124,9 @@ public class BookingComScraper {
         HtmlTextInput usernameField = page.getHtmlElementById( "loginname" );
         usernameField.type( wordPressDAO.getOption( "hbo_bdc_username" ) );
         HtmlButton nextButton = page.getFirstByXPath( "//span[text()='Next']/.." );
-        nextButton.click();
+        page = nextButton.click();
 
-        int numberOfTasks = webClient.waitForBackgroundJavaScript( 10000 );
+        int numberOfTasks = webClient.waitForBackgroundJavaScript( 30000 );
         if ( numberOfTasks > 0 ) {
             LOGGER.info( "Still waiting on {} javascript tasks to finish...", numberOfTasks );
         }

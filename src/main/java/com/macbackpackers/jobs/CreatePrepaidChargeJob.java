@@ -36,9 +36,4 @@ public class CreatePrepaidChargeJob extends AbstractJob {
                     dao.insertJob( chargeJob );
                 } );
     }
-
-    @Override
-    public int getRetryCount() {
-        return 1;
-    }
 }
