@@ -541,25 +541,14 @@ public class CloudbedsScraper {
      * Processes (charges) a refund for the given reservation.
      * 
      * @param webClient web client instance to use
-     * @param res cloudbeds reservation
      * @param authTxn original transaction
      * @param amount amount to add
      * @param description description of payment
      * @throws IOException on page load failure
      */
-    public void processRefund( WebClient webClient, Reservation res, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException {
-
-        // first we need to find a "room" we're booking to
-        // it doesn't actually map to a room, just an assigned guest
-        // it doesn't even have to be an allocated room
-        if ( res.getBookingRooms() == null || res.getBookingRooms().isEmpty() ) {
-            throw new MissingUserDataException( "Unable to find allocation to assign payment to!" );
-        }
-
-        // just take the first one
-        String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
+    public void processRefund( WebClient webClient, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessRefundRequest(
-                authTxn, amount, bookingRoomId, description, dao.getCsrfToken(), getBillingPortalId( webClient ) );
+                authTxn, amount, description, dao.getCsrfToken(), getBillingPortalId( webClient ) );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 

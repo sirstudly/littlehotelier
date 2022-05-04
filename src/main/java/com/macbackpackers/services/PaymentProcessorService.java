@@ -835,9 +835,6 @@ public class PaymentProcessorService {
         LOGGER.info("Amount being refunded: " + amountToRefund);
         LOGGER.info("Refund description: " + description);
 
-        if (false == cbReservation.isCardDetailsPresent()) {
-            cbReservation = copyCardDetailsToCloudbeds(webClient, cbReservation);
-        }
         if (false == "Booking.com".equals(cbReservation.getSourceName())) {
             throw new MissingUserDataException("Unsupported source " + cbReservation.getSourceName());
         }
@@ -851,16 +848,16 @@ public class PaymentProcessorService {
         List<TransactionRecord> records = cloudbedsScraper.getTransactionsForRefund(webClient, reservationId);
 
         // find the transaction record that matches the amount exactly
-        Optional<TransactionRecord> txnRecord = records.stream().filter(txn -> txn.getDebitNotFormated().equals(amountToRefund)).findFirst();
+        Optional<TransactionRecord> txnRecord = records.stream().filter(txn -> txn.getDebitAsBigDecimal().equals(amountToRefund)).findFirst();
 
         // otherwise, find the first transaction that is large enough that we can refund it
         if (false == txnRecord.isPresent()) {
-            txnRecord = records.stream().filter(txn -> txn.getDebitNotFormated().compareTo(amountToRefund) > 0).findFirst();
+            txnRecord = records.stream().filter(txn -> txn.getDebitAsBigDecimal().compareTo(amountToRefund) >= 0).findFirst();
         }
         if (false == txnRecord.isPresent()) {
             throw new MissingUserDataException("Unable to find suitable transaction to refund against!");
         }
-        cloudbedsScraper.processRefund(webClient, cbReservation, txnRecord.get(), cbReservation.getBalanceDue(), description);
+        cloudbedsScraper.processRefund(webClient, txnRecord.get(), cbReservation.getBalanceDue(), description);
     }
 
     /**

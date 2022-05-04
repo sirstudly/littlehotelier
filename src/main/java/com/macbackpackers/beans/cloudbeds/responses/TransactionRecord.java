@@ -10,14 +10,13 @@ import java.math.BigDecimal;
 public class TransactionRecord {
 
     private String id;
+    private String reservationId;
     private String datetimeTransaction;
     private String description;
     private String notes;
     private String type;
     private String debit;
     private String credit;
-    private BigDecimal debitNotFormated;
-    private BigDecimal creditNotFormated;
     private BigDecimal paid;
     private String transactionType;
     private String creditCardType;
@@ -35,6 +34,14 @@ public class TransactionRecord {
 
     public void setId( String id ) {
         this.id = id;
+    }
+
+    public String getReservationId() {
+        return reservationId;
+    }
+
+    public void setReservationId(String reservationId) {
+        this.reservationId = reservationId;
     }
 
     public String getDatetimeTransaction() {
@@ -85,20 +92,8 @@ public class TransactionRecord {
         this.credit = credit;
     }
 
-    public BigDecimal getDebitNotFormated() {
-        return debitNotFormated;
-    }
-
-    public void setDebitNotFormated(BigDecimal debitNotFormated) {
-        this.debitNotFormated = debitNotFormated;
-    }
-
-    public BigDecimal getCreditNotFormated() {
-        return creditNotFormated;
-    }
-
-    public void setCreditNotFormated(BigDecimal creditNotFormated) {
-        this.creditNotFormated = creditNotFormated;
+    public BigDecimal getDebitAsBigDecimal() {
+        return debit == null ? null : new BigDecimal(debit.replaceAll("£", ""));
     }
 
     public BigDecimal getPaid() {
