@@ -420,6 +420,22 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Returns the transactions which are available to refund for the given reservation.
+     *
+     * @param webClient
+     * @param reservationId cloudbeds reservation
+     * @return List of transactions
+     * @throws IOException
+     */
+    public List<TransactionRecord> getTransactionsForRefund( WebClient webClient, String reservationId ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsForRefundModalRequest( reservationId, dao.getCsrfToken(), getBillingPortalId( webClient ) );
+        JsonObject rpt = doRequest( webClient, requestSettings );
+        return StreamSupport.stream( rpt.get( "records" ).getAsJsonArray().spliterator(), false )
+                .map( r -> gson.fromJson( r, TransactionRecord.class ) )
+                .collect( Collectors.toList() );
+    }
+
+    /**
      * Checks if there are any refund transactions for the given reservation.
      * 
      * @param webClient web client instance to use
@@ -529,11 +545,9 @@ public class CloudbedsScraper {
      * @param authTxn original transaction
      * @param amount amount to add
      * @param description description of payment
-     * @return response from Cloudbeds
      * @throws IOException on page load failure
-     * @deprecated not currently used as Stripe refunds get processed directly via the Stripe API and recorded in Cloudbeds
      */
-    public CloudbedsJsonResponse processRefund( WebClient webClient, Reservation res, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException {
+    public void processRefund( WebClient webClient, Reservation res, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException {
 
         // first we need to find a "room" we're booking to
         // it doesn't actually map to a room, just an assigned guest
@@ -545,9 +559,8 @@ public class CloudbedsScraper {
         // just take the first one
         String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessRefundRequest(
-                res.getReservationId(), authTxn.getPaymentId(), bookingRoomId, authTxn.getCreditCardId(),
-                amount, description, dao.getCsrfToken(), getBillingPortalId( webClient ) );
-        return doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
+                authTxn, amount, bookingRoomId, description, dao.getCsrfToken(), getBillingPortalId( webClient ) );
+        doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
     /**

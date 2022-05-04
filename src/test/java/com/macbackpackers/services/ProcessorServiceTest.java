@@ -12,6 +12,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.macbackpackers.jobs.CreatePrepaidRefundJob;
+import com.macbackpackers.jobs.PrepaidRefundJob;
 import org.apache.commons.io.IOUtils;
 import org.hamcrest.Matchers;
 import org.junit.Assert;
@@ -412,6 +414,13 @@ public class ProcessorServiceTest {
     }
 
     @Test
+    public void testCreatePrepaidRefundJob() throws Exception {
+        CreatePrepaidRefundJob j = new CreatePrepaidRefundJob();
+        autowireBeanFactory.autowireBean( j );
+        j.processJob();
+    }
+
+    @Test
     public void testBedCountJob() throws Exception {
         BedCountJob j = new BedCountJob();
         j.setId( 496768 );
@@ -427,6 +436,17 @@ public class ProcessorServiceTest {
         j.setStatus( JobStatus.submitted );
         j.setReservationId( "23486284" );
         dao.insertJob( j );
+    }
+
+    @Test
+    public void testPrepaidRefundJob() throws Exception {
+        PrepaidRefundJob j = new PrepaidRefundJob();
+        j.setStatus( JobStatus.submitted );
+        j.setReservationId( "52449219" );
+        j.setReason("Waived fees");
+        j.setAmount(new BigDecimal("56.80"));
+        autowireBeanFactory.autowireBean( j );
+        j.processJob();
     }
 
     @Test

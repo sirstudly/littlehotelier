@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -743,30 +744,30 @@ public class CloudbedsJsonRequestFactory {
     /**
      * Processes a new refund onto an existing reservation with the given card.
      * 
-     * @param reservationId ID of reservation (as it appears in the URL)
-     * @param paymentId linked payment id
+     * @param txnRecord the transaction record to refund against
+     * @param refundAmount amount to refund
      * @param bookingRoomId (which "room" we're booking the payment to)
-     * @param cardId active card to charge
-     * @param amount amount to refund
      * @param description description
      * @param csrf cross-site request forgery cookie
      * @param billingPortalId
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createAddNewProcessRefundRequest( String reservationId, String paymentId, String bookingRoomId,
-            String cardId, BigDecimal amount, String description, String csrf, String billingPortalId ) throws IOException {
+    public WebRequest createAddNewProcessRefundRequest(TransactionRecord txnRecord, BigDecimal refundAmount, String bookingRoomId, String description, String csrf, String billingPortalId ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
         String paymentJson = IOUtils.toString( getClass().getClassLoader()
                 .getResourceAsStream( "add_refund_data.json" ), StandardCharsets.UTF_8 )
                 .replaceAll( "__PROPERTY_ID__", getPropertyId() )
-                .replaceAll( "__REFUND_AMOUNT__", CURRENCY_FORMAT.format( amount ) )
-                .replaceAll( "__PAYMENT_ID__", paymentId )
-                .replaceAll( "__CREDIT_CARD_ID__", cardId )
+                .replaceAll( "__PAID__", CURRENCY_FORMAT.format( txnRecord.getPaid() ) )
+                .replaceAll( "__REFUND_AMOUNT__", CURRENCY_FORMAT.format( refundAmount ) )
+                .replaceAll( "__PARENT_PAYMENT_ID__", txnRecord.getPaymentId() )
+                .replaceAll( "__CREDIT_CARD_ID__", txnRecord.getCreditCardId() )
+                .replaceAll( "__CREDIT_CARD_TYPE__", txnRecord.getCreditCardType() )
+                .replaceAll( "__SELECTED_TRANSACTION__", txnRecord.getId() )
                 .replaceAll( "__DESCRIPTION__", description );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "payment", paymentJson ),
-                new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation\",\"id\":\"%s\"}", reservationId ) ),
+                new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation_room\",\"id\":\"%s\"}", bookingRoomId ) ),
                 new NameValuePair( "suppress_client_errors", "true" ),
                 new NameValuePair( "csrf_accessa", csrf ),
                 new NameValuePair( "billing_portal_id", billingPortalId ),
@@ -823,6 +824,27 @@ public class CloudbedsJsonRequestFactory {
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "booking_id", res.getReservationId() ),
                 new NameValuePair( "options", "{\"filters\":{\"from\":\"\",\"to\":\"\",\"filter\":\"\",\"user\":\"all\",\"posted\":[\"1\"],\"description\":[]},\"group\":{\"main\":\"\",\"sub\":\"\"},\"sort\":{\"column\":\"datetime_transaction\",\"order\":\"desc\"},\"loaded_filter\":1}" ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Retrieves all transactions that are refundable for a booking.
+     *
+     * @param reservationId cloudbeds reservation
+     * @return web request
+     * @throws IOException on creation failure
+     */
+    public WebRequest createGetTransactionsForRefundModalRequest( String reservationId, String csrf, String billingPortalId ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reports/transactions_for_refund_modal" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "booking_id", reservationId ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );

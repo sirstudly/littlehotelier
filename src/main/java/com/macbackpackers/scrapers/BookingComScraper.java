@@ -15,6 +15,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlTableCell;
 import com.gargoylesoftware.htmlunit.html.HtmlTableRow;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.bdc.BookingComRefundRequest;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.services.AuthenticationService;
@@ -487,6 +488,33 @@ public class BookingComScraper {
         return reservationRows.stream()
                 .filter(r -> com.macbackpackers.services.PaymentProcessorService.isChargeableAmount(HtmlTableCell.class.cast(r.getFirstByXPath("td[@data-heading='Amount']")).getVisibleText()))
                 .map(r -> HtmlAnchor.class.cast(r.getFirstByXPath("th/span/a")).getVisibleText())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Searches for all VCC bookings that need to be refunded.
+     *
+     * @param webClient
+     * @return non-null list of BDC booking refs
+     * @throws IOException
+     */
+    public synchronized List<BookingComRefundRequest> getAllVCCBookingsThatMustBeRefunded( WebClient webClient ) throws IOException {
+        doLogin( webClient );
+
+        // load Virtual cards to charge page
+        String currentUrl = getCurrentPage( webClient ).getBaseURL().toString();
+        String vccUrl = MessageFormat.format( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/vccs_management.html?lang=en&ses={0}&hotel_id={1}",
+                getSessionFromURL( currentUrl ), getHotelIdFromURL( currentUrl ) );
+        LOGGER.info( "Looking up VCCs to refund " + vccUrl );
+        HtmlPage currentPage = webClient.getPage( vccUrl );
+
+        LOGGER.info( "Virtual cards to refund..." );
+        List<HtmlTableRow> reservationRows = currentPage.getByXPath( "//div[div/div/h2/span/text()='Virtual cards to refund']/table/tbody/tr" );
+        return reservationRows.stream()
+                .filter(r -> StringUtils.isBlank(HtmlAnchor.class.cast(r.getFirstByXPath("td[@data-heading='Possible actions']/div/a")).getAttribute("disabled")))
+                .map(r -> new BookingComRefundRequest(HtmlAnchor.class.cast(r.getFirstByXPath("th/span/a")).getVisibleText(),
+                        HtmlSpan.class.cast(r.getFirstByXPath("td[1]/span")).getVisibleText(),
+                        HtmlSpan.class.cast(r.getFirstByXPath("td[3]/span")).getVisibleText()))
                 .collect(Collectors.toList());
     }
 

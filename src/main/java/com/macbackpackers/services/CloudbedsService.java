@@ -26,6 +26,7 @@ import java.util.stream.StreamSupport;
 
 import javax.mail.MessagingException;
 
+import com.macbackpackers.beans.bdc.BookingComRefundRequest;
 import com.macbackpackers.jobs.ChargeRemainingBalanceForBookingJob;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -417,6 +418,34 @@ public class CloudbedsService {
                             r.getThirdPartyIdentifier(), r.getReservationId(), r.getFirstName(), r.getLastName() ) )
                     .map( r -> r.getReservationId() )
                     .collect( Collectors.toList() );
+        }
+    }
+
+    /**
+     * Returns all reservations for BDC with virtual cards that need to be refunded.
+     *
+     * @return List<BookingComRefundRequest> bdc refunds with associated cloudbeds reservation ids
+     * @throws IOException
+     */
+    public List<BookingComRefundRequest> getAllVCCBookingsThatMustBeRefunded() throws IOException {
+        try (WebClient webClient = appContext.getBean("webClientForBDC", WebClient.class)) {
+            return bdcScraper.getAllVCCBookingsThatMustBeRefunded(webClient)
+                    .stream()
+                    .map(rr -> {
+                        Optional<Reservation> r = getReservationForBDC(rr.getBookingRef());
+                        if (r.isPresent()) {
+                            // save the cloudbeds id
+                            rr.setReservationId(r.get().getReservationId());
+                            LOGGER.info("Found BDC reservation {} - {} with VCC for {} {}",
+                                    r.get().getThirdPartyIdentifier(), r.get().getReservationId(),
+                                    r.get().getFirstName(), r.get().getLastName());
+                        }
+                        else {
+                            LOGGER.error("Unable to find BDC reservation {}", rr.getBookingRef());
+                        }
+                        return rr;
+                    })
+                    .collect(Collectors.toList());
         }
     }
 

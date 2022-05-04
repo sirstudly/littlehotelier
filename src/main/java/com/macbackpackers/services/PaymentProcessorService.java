@@ -82,6 +82,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -808,6 +809,58 @@ public class PaymentProcessorService {
         else {
             cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
         }
+    }
+
+    /**
+     * Does a REFUND on the card details for the prepaid BDC booking.
+     *
+     * @param webClient web client for cloudbeds
+     * @param reservationId the unique cloudbeds reservation ID
+     * @param amountToRefund amount being refunded
+     * @param description description to go onto the refund payment
+     * @throws Exception
+     */
+    public synchronized void processPrepaidRefund(WebClient webClient, String reservationId, BigDecimal amountToRefund, String description) throws Exception {
+        LOGGER.info( "Processing refund for booking: " + reservationId );
+        Reservation cbReservation = cloudbedsScraper.getReservationRetry(webClient, reservationId);
+
+        LOGGER.info(cbReservation.getThirdPartyIdentifier() + ": "
+                + cbReservation.getFirstName() + " " + cbReservation.getLastName());
+        LOGGER.info("Source: " + cbReservation.getSourceName());
+        LOGGER.info("Status: " + cbReservation.getStatus());
+        LOGGER.info("Checkin: " + cbReservation.getCheckinDate());
+        LOGGER.info("Checkout: " + cbReservation.getCheckoutDate());
+        LOGGER.info("Grand Total: " + cbReservation.getGrandTotal());
+        LOGGER.info("Balance Due: " + cbReservation.getBalanceDue());
+        LOGGER.info("Amount being refunded: " + amountToRefund);
+        LOGGER.info("Refund description: " + description);
+
+        if (false == cbReservation.isCardDetailsPresent()) {
+            cbReservation = copyCardDetailsToCloudbeds(webClient, cbReservation);
+        }
+        if (false == "Booking.com".equals(cbReservation.getSourceName())) {
+            throw new MissingUserDataException("Unsupported source " + cbReservation.getSourceName());
+        }
+        if (false == cbReservation.isPrepaid()) {
+            throw new MissingUserDataException("Booking not identified as a prepaid booking");
+        }
+        if (amountToRefund.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new MissingUserDataException("Refund amount must be greater than 0");
+        }
+
+        List<TransactionRecord> records = cloudbedsScraper.getTransactionsForRefund(webClient, reservationId);
+
+        // find the transaction record that matches the amount exactly
+        Optional<TransactionRecord> txnRecord = records.stream().filter(txn -> txn.getDebitNotFormated().equals(amountToRefund)).findFirst();
+
+        // otherwise, find the first transaction that is large enough that we can refund it
+        if (false == txnRecord.isPresent()) {
+            txnRecord = records.stream().filter(txn -> txn.getDebitNotFormated().compareTo(amountToRefund) > 0).findFirst();
+        }
+        if (false == txnRecord.isPresent()) {
+            throw new MissingUserDataException("Unable to find suitable transaction to refund against!");
+        }
+        cloudbedsScraper.processRefund(webClient, cbReservation, txnRecord.get(), cbReservation.getBalanceDue(), description);
     }
 
     /**

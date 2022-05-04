@@ -1,6 +1,8 @@
 
 package com.macbackpackers.beans.cloudbeds.responses;
 
+import java.math.BigDecimal;
+
 /**
  * Corresponds with an entry on the "Folio" page for a booking.
  *
@@ -14,6 +16,9 @@ public class TransactionRecord {
     private String type;
     private String debit;
     private String credit;
+    private BigDecimal debitNotFormated;
+    private BigDecimal creditNotFormated;
+    private BigDecimal paid;
     private String transactionType;
     private String creditCardType;
     private String creditCardId;
@@ -78,6 +83,30 @@ public class TransactionRecord {
 
     public void setCredit( String credit ) {
         this.credit = credit;
+    }
+
+    public BigDecimal getDebitNotFormated() {
+        return debitNotFormated;
+    }
+
+    public void setDebitNotFormated(BigDecimal debitNotFormated) {
+        this.debitNotFormated = debitNotFormated;
+    }
+
+    public BigDecimal getCreditNotFormated() {
+        return creditNotFormated;
+    }
+
+    public void setCreditNotFormated(BigDecimal creditNotFormated) {
+        this.creditNotFormated = creditNotFormated;
+    }
+
+    public BigDecimal getPaid() {
+        return paid;
+    }
+
+    public void setPaid(BigDecimal paid) {
+        this.paid = paid;
     }
 
     public String getTransactionType() {

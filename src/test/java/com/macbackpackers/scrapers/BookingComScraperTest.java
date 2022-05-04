@@ -3,6 +3,8 @@ package com.macbackpackers.scrapers;
 
 import java.util.List;
 
+import com.macbackpackers.beans.bdc.BookingComRefundRequest;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -58,5 +60,12 @@ public class BookingComScraperTest {
         List<String> bookingRefs = scraper.getAllVCCBookingsThatCanBeCharged( webClient );
         LOGGER.info( "Found {} bookings", bookingRefs.size() );
         bookingRefs.stream().forEach( b -> LOGGER.info( b ) );
+    }
+
+    @Test
+    public void testGetAllVCCBookingsThatMustBeRefunded() throws Exception {
+        List<BookingComRefundRequest> bookings = scraper.getAllVCCBookingsThatMustBeRefunded(webClient);
+        LOGGER.info("Found {} bookings", bookings.size());
+        bookings.stream().forEach(b -> LOGGER.info(ToStringBuilder.reflectionToString(b)));
     }
 }

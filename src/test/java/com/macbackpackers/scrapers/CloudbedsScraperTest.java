@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -101,7 +102,14 @@ public class CloudbedsScraperTest {
         Reservation r = cloudbedsScraper.getReservation( webClient, "34321814" );
         Assert.assertThat( cloudbedsScraper.isExistsRefund( webClient, r ), Matchers.is( true ) );
     }
-    
+
+    @Test
+    public void testGetTransactionsForRefund() throws Exception {
+        List<TransactionRecord> recs = cloudbedsScraper.getTransactionsForRefund(webClient, "53004499");
+        LOGGER.info("Found " + recs.size() + " records.");
+        recs.stream().forEach(r -> LOGGER.info(ToStringBuilder.reflectionToString(r)));
+    }
+
     @Test
     public void testGetCustomers() throws Exception {
         List<Customer> results = cloudbedsScraper.getCustomers( webClient, 
