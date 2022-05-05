@@ -414,10 +414,17 @@ public class ProcessorServiceTest {
     }
 
     @Test
-    public void testCreatePrepaidRefundJob() throws Exception {
+    public void testRunCreatePrepaidRefundJob() throws Exception {
         CreatePrepaidRefundJob j = new CreatePrepaidRefundJob();
         autowireBeanFactory.autowireBean( j );
         j.processJob();
+    }
+
+    @Test
+    public void testCreatePrepaidRefundJob() throws Exception {
+        CreatePrepaidRefundJob j = new CreatePrepaidRefundJob();
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
     }
 
     @Test

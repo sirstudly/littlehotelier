@@ -857,7 +857,7 @@ public class PaymentProcessorService {
         if (false == txnRecord.isPresent()) {
             throw new MissingUserDataException("Unable to find suitable transaction to refund against!");
         }
-        cloudbedsScraper.processRefund(webClient, txnRecord.get(), cbReservation.getBalanceDue(), description);
+        cloudbedsScraper.processRefund(webClient, txnRecord.get(), amountToRefund, description);
     }
 
     /**
