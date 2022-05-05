@@ -846,6 +846,13 @@ public class PaymentProcessorService {
         }
 
         List<TransactionRecord> records = cloudbedsScraper.getTransactionsForRefund(webClient, reservationId);
+        if (records.stream()
+                .map(txn -> txn.getCardNumber())
+                .distinct()
+                .collect(Collectors.toList())
+                .size() > 1) {
+            throw new UnrecoverableFault("Multiple cards are available to refund against. Please refund manually.");
+        }
 
         // find the transaction record that matches the amount exactly
         Optional<TransactionRecord> txnRecord = records.stream().filter(txn -> txn.getDebitAsBigDecimal().equals(amountToRefund)).findFirst();
