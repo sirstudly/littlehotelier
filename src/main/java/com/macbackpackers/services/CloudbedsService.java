@@ -1574,8 +1574,9 @@ public class CloudbedsService {
         if ( page.getBaseURL().getPath().startsWith( "/auth/awaiting_user_verification" ) ) {
             HtmlTextInput scaCode = page.getElementByName( "token" );
             if ( StringUtils.isNotBlank( CLOUDBEDS_2FA_SECRET ) ) {
-                LOGGER.info( "Attempting TOTP verification" );
-                scaCode.type( String.valueOf( authService.getTotpPassword( CLOUDBEDS_2FA_SECRET ) ) );
+                String otp = StringUtils.leftPad( String.valueOf( authService.getTotpPassword( CLOUDBEDS_2FA_SECRET ) ), 6, '0' );
+                LOGGER.info( "Attempting TOTP verification: " + otp );
+                scaCode.type( otp );
             }
             else {
                 LOGGER.info( "Attempting SMS verification" );
