@@ -1580,7 +1580,7 @@ public class CloudbedsService {
             }
             else {
                 LOGGER.info( "Attempting SMS verification" );
-                scaCode.type( authService.fetchCloudbeds2FACode() );
+                scaCode.type( authService.fetchCloudbeds2FACode( webClient ) );
             }
             loginButton = page.getFirstByXPath( "//button[contains(text(),'Submit')]" );
             page = loginButton.click();

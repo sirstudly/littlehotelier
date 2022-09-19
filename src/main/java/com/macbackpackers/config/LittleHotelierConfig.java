@@ -191,6 +191,14 @@ public class LittleHotelierConfig {
                 .create();
     }
 
+    @Bean( name = "gsonForExternalWebService" )
+    public Gson getGsonForExternalWebService() {
+        // these are thread safe
+        return new GsonBuilder()
+                .setPrettyPrinting()
+                .create();
+    }
+
     @Bean
     public RoomBedMatcher getRoomBedMatcher()
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
