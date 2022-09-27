@@ -1571,6 +1571,7 @@ public class CloudbedsService {
         loginButton.setAttribute( "class", loginButton.getAttribute( "class" ).replace( "disabled", "" ) ); // remove disabled
         page = loginButton.click();
 
+        String code = null;
         if ( page.getBaseURL().getPath().startsWith( "/auth/awaiting_user_verification" ) ) {
             HtmlTextInput scaCode = page.getElementByName( "token" );
             if ( StringUtils.isNotBlank( CLOUDBEDS_2FA_SECRET ) ) {
@@ -1580,7 +1581,8 @@ public class CloudbedsService {
             }
             else {
                 LOGGER.info( "Attempting SMS verification" );
-                scaCode.type( authService.fetchCloudbeds2FACode( webClient ) );
+                code = authService.fetchCloudbeds2FACode( webClient );
+                scaCode.type( code );
             }
             loginButton = page.getFirstByXPath( "//button[contains(text(),'Submit')]" );
             page = loginButton.click();
@@ -1592,8 +1594,22 @@ public class CloudbedsService {
         // if we're actually logged in, we should be able to get the hostel name
         Cookie hc = webClient.getCookieManager().getCookie( "hotel_name" );
         if ( hc == null ) {
-            LOGGER.error( page.asXml() );
-            throw new UnrecoverableFault( "Failed login. Hostel cookie not set." );
+            LOGGER.info( "Hostel cookie not set? Currently on " + page.getBaseURL().getPath() );
+            if( code != null ) {
+                LOGGER.info( "Attempting to re-enter 2FA code " + code );
+                HtmlTextInput scaCode = page.getElementByName( "token" );
+                scaCode.type( code );
+                loginButton = page.getFirstByXPath( "//button[contains(text(),'Submit')]" );
+                page = loginButton.click();
+                LOGGER.info( "Loading dashboard..." );
+                LOGGER.info( "Waiting for " +  webClient.waitForBackgroundJavaScript( 30000 ) + " JS processes remaining.");
+                hc = webClient.getCookieManager().getCookie( "hotel_name" );
+            }
+            if( hc == null ) {
+                LOGGER.error( "Currently on " + page.getBaseURL().getPath() );
+                LOGGER.error(page.asXml());
+                throw new UnrecoverableFault("Failed login. Hostel cookie not set.");
+            }
         }
         LOGGER.info( "PROPERTY NAME is: " + URLDecoder.decode( hc.getValue(), "UTF-8" ) );
 
