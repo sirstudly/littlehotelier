@@ -143,8 +143,7 @@ public class RunProcessor
             String failedLoginCountStr = dao.getOption( "hbo_failed_logins" );
             int failedLoginCount = failedLoginCountStr == null ? 0 : Integer.parseInt( failedLoginCountStr );
             if ( failedLoginCount == 3 ) {
-                //Reset session manually for now
-                //processorService.createAndRunResetCloudbedsLoginJob();
+                processorService.createAndRunResetCloudbedsLoginJob();
             }
             else if ( failedLoginCount == 5 ) {
                 String supportEmail = dao.getOption( "hbo_support_email" );

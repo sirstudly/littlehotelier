@@ -147,8 +147,8 @@ public class AuthenticationService {
      */
     public String fetchCloudbeds2FACode(WebClient webClient) throws MissingUserDataException, IOException {
         if ( wordpressDAO.getOption("hbo_sms_lookup_url") != null ) {
-            LOGGER.info( "waiting 20 seconds before attempting 2FA lookup." );
-            sleep( 20 );
+            LOGGER.info( "waiting 30 seconds before attempting 2FA lookup." );
+            sleep( 30 );
             return externalWebService.getCloudbedsLast2faCode(webClient);
         }
         return fetch2FACode( "hbo_cloudbeds_2facode" );
