@@ -44,7 +44,9 @@ public class ExternalWebService {
         Pattern p = Pattern.compile(".*(\\d{7})$");
         Matcher m = p.matcher(jelement.getAsJsonObject().get("message").getAsString());
         if (m.find()) {
-            return m.group(1);
+            String code = m.group(1);
+            LOGGER.info("Responding with 2FA code " + code);
+            return code;
         }
         throw new MissingUserDataException("Failed to lookup 2FA code for Cloudbeds");
     }
