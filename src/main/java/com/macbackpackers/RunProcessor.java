@@ -220,6 +220,9 @@ public class RunProcessor
         catch ( ShutdownException ex ) {
             LOGGER.info( "Shutdown task requested" );
         }
+        catch ( Throwable th ) {
+            LOGGER.error( "Unexpected error", th );
+        }
         finally {
             processor.releaseExclusivityLock();
             context.close();
