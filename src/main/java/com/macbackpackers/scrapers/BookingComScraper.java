@@ -123,7 +123,7 @@ public class BookingComScraper {
         webClient.getPage( getCurrentPage( webClient ).getBaseURL().toString() ); // need to reload page for some reason
         HtmlPage page = getCurrentPage( webClient );
         HtmlTextInput usernameField = page.getHtmlElementById( "loginname" );
-        usernameField.type( wordPressDAO.getOption( "hbo_bdc_username" ) );
+        usernameField.type( username );
         HtmlButton nextButton = page.getFirstByXPath( "//span[text()='Next']/.." );
         page = nextButton.click();
 
@@ -132,7 +132,7 @@ public class BookingComScraper {
             LOGGER.info( "Still waiting on {} javascript tasks to finish...", numberOfTasks );
         }
         HtmlPasswordInput passwordField = page.getHtmlElementById( "password" );
-        passwordField.type( wordPressDAO.getOption( "hbo_bdc_password" ) );
+        passwordField.type( password );
 
         nextButton = page.getFirstByXPath( "//span[text()='Sign in']/.." );
         nextButton.click();
@@ -149,8 +149,17 @@ public class BookingComScraper {
                 LOGGER.info( "Performing SMS verification" );
                 smsLinks.get( 0 ).click();
                 HtmlElement selectedPhone = page.getFirstByXPath( "//*[@id='selected_phone'] | //select[@name='phone_id_sms']" );
-                if ( false == selectedPhone.getVisibleText().trim().endsWith( wordPressDAO.getMandatoryOption("hbo_bdc_sms_last4digits" ) ) ) {
-                    throw new MissingUserDataException( "Phone number not registered: " + selectedPhone.getVisibleText() );
+                String last4digits = wordPressDAO.getMandatoryOption("hbo_bdc_sms_last4digits" );
+                if ( false == selectedPhone.getVisibleText().trim().endsWith( last4digits ) ) {
+                    // check if there is more than one number available
+                    LOGGER.info( "More than one number available? " + selectedPhone.getVisibleText() );
+                    HtmlOption phone = page.getFirstByXPath( "//select[@id='selected_phone']/option[contains(text(),'****" + last4digits + "')]" );
+                    if( phone != null ) {
+                        phone.setSelected( true );
+                    }
+                    else {
+                        throw new MissingUserDataException("Phone number not registered: " + selectedPhone.getVisibleText());
+                    }
                 }
 
                 HtmlElement send2faCode = page.getFirstByXPath( "//span[text()='Send verification code'] "
@@ -159,7 +168,7 @@ public class BookingComScraper {
 
                 // now blank out the code and wait for it to appear
                 HtmlElement code2fa = page.getFirstByXPath( "//*[@id='sms_code' or @id='ask_pin_input']" );
-                code2fa.type( authService.fetchBDC2FACode( webClient ) );
+                code2fa.type( authService.fetchBDC2FACode() );
 
                 HtmlElement verifyNow = page.getFirstByXPath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" );
                 verifyNow.click();
@@ -171,7 +180,7 @@ public class BookingComScraper {
                 nextButton.click();
 
                 HtmlElement code2fa = page.getFirstByXPath( "//*[@id='sms_code' or @id='ask_pin_input']" );
-                code2fa.type( authService.fetchBDC2FACode( webClient ) );
+                code2fa.type( authService.fetchBDC2FACode() );
 
                 HtmlElement verifyNow = page.getFirstByXPath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" );
                 verifyNow.click();

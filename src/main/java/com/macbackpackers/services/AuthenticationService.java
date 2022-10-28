@@ -8,6 +8,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +33,9 @@ public class AuthenticationService {
 
     @Autowired
     private Environment env;
+
+    @Autowired
+    private ApplicationContext context;
 
     @Autowired
     private WordPressDAO wordpressDAO;
@@ -159,16 +163,18 @@ public class AuthenticationService {
      * _blanks out_ the 2FA code from the DB and waits for it to be re-populated. This is done
      * outside this application.
      *
-     * @param webClient web client
      * @return non-null 2FA code
      * @throws MissingUserDataException on timeout (1 + 10 minutes)
      * @throws IOException
      */
-    public String fetchBDC2FACode( WebClient webClient ) throws MissingUserDataException, IOException {
+    public String fetchBDC2FACode() throws MissingUserDataException, IOException {
         if ( wordpressDAO.getOption("hbo_sms_lookup_url") != null ) {
             LOGGER.info( "waiting 30 seconds before attempting 2FA lookup." );
             sleep( 30 );
-            return externalWebService.getLast2faCode(webClient, "bdc");
+            // we'll just re-use the webClient for Cloudbeds so we don't mess up the one for BDC
+            try (WebClient c = context.getBean( "webClientForCloudbeds", WebClient.class )) {
+                return externalWebService.getLast2faCode(c, "bdc");
+            }
         }
         return fetch2FACode( "hbo_bdc_2facode" );
     }
