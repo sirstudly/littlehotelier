@@ -168,7 +168,7 @@ public class AuthenticationService {
      * @throws IOException
      */
     public String fetchBDC2FACode() throws MissingUserDataException, IOException {
-        if ( wordpressDAO.getOption("hbo_sms_lookup_url") != null ) {
+        if ( StringUtils.isNotBlank( wordpressDAO.getOption("hbo_sms_lookup_url" ) ) ) {
             LOGGER.info( "waiting 30 seconds before attempting 2FA lookup." );
             sleep( 30 );
             // we'll just re-use the webClient for Cloudbeds so we don't mess up the one for BDC
