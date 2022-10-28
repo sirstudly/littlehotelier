@@ -26,6 +26,11 @@ public class ExternalWebServiceTest {
 
     @Test
     public void testGetCloudbedsLast2faCode() throws Exception {
-        LOGGER.info(webService.getCloudbedsLast2faCode(webClient));
+        LOGGER.info(webService.getLast2faCode(webClient, "cloudbeds"));
+    }
+
+    @Test
+    public void testGetBDCLast2faCode() throws Exception {
+        LOGGER.info(webService.getLast2faCode(webClient, "bdc"));
     }
 }

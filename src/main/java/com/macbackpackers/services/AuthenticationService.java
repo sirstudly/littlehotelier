@@ -149,19 +149,27 @@ public class AuthenticationService {
         if ( wordpressDAO.getOption("hbo_sms_lookup_url") != null ) {
             LOGGER.info( "waiting 30 seconds before attempting 2FA lookup." );
             sleep( 30 );
-            return externalWebService.getCloudbedsLast2faCode(webClient);
+            return externalWebService.getLast2faCode(webClient, "cloudbeds");
         }
         return fetch2FACode( "hbo_cloudbeds_2facode" );
     }
 
     /**
-     * First _blanks out_ the 2FA code from the DB and waits for it to be re-populated. This is done
+     * If option hbo_sms_lookup_url is defined, then attempt to lookup on external host. Otherwise,
+     * _blanks out_ the 2FA code from the DB and waits for it to be re-populated. This is done
      * outside this application.
-     * 
+     *
+     * @param webClient web client
      * @return non-null 2FA code
      * @throws MissingUserDataException on timeout (1 + 10 minutes)
+     * @throws IOException
      */
-    public String fetchBDC2FACode() throws MissingUserDataException {
+    public String fetchBDC2FACode( WebClient webClient ) throws MissingUserDataException, IOException {
+        if ( wordpressDAO.getOption("hbo_sms_lookup_url") != null ) {
+            LOGGER.info( "waiting 30 seconds before attempting 2FA lookup." );
+            sleep( 30 );
+            return externalWebService.getLast2faCode(webClient, "bdc");
+        }
         return fetch2FACode( "hbo_bdc_2facode" );
     }
 
