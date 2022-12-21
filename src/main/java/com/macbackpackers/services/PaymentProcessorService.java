@@ -66,6 +66,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
@@ -114,6 +115,9 @@ public class PaymentProcessorService {
 
     @Autowired
     private ApplicationContext context;
+
+    @Autowired
+    private AutowireCapableBeanFactory autowireBeanFactory;
 
     /** Amount to charge BDC bookings. Either a percentage between 0-1 or "first_night". */
     @Value( "${bdc.deposit.strategy}" )
@@ -987,11 +991,12 @@ public class PaymentProcessorService {
         // should have credit card details at this point
         try {
             cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
-            cloudbedsScraper.addNote( webClient, reservationId, "Successfully charged £"
+            cloudbedsScraper.addArchivedNote( webClient, reservationId, "Successfully charged £"
                     + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
         }
         catch( RecordPaymentFailedException | PaymentPendingException ex ) {
             SendTemplatedEmailJob job = new SendTemplatedEmailJob();
+            autowireBeanFactory.autowireBean( job );
             Map<String, String> replaceMap = new HashMap<>();
             String paymentURL = cloudbedsService.generateUniquePaymentURL( reservationId, null );
             replaceMap.put( "\\[charge_amount\\]", cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
@@ -1006,12 +1011,14 @@ public class PaymentProcessorService {
 
         // send email if successful
         SendTemplatedEmailJob job = new SendTemplatedEmailJob();
+        autowireBeanFactory.autowireBean( job );
         Map<String, String> replaceMap = new HashMap<>();
         replaceMap.put( "\\[charge_amount\\]", cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
         replaceMap.put( "\\[last four digits\\]", cbReservation.getCreditCardLast4Digits() );
         job.setEmailTemplate( "Payment Successful" );
         job.setReservationId( reservationId );
         job.setReplacementMap( replaceMap );
+        job.setNoteArchived( true );
         job.setStatus( JobStatus.submitted );
         wordpressDAO.insertJob( job );
     }

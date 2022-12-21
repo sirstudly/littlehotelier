@@ -711,6 +711,20 @@ public class ProcessorServiceTest {
     }
 
     @Test
+    public void testCreateSendPaymentSuccessfulTemplatedEmailJob() throws Exception {
+        SendTemplatedEmailJob j = new SendTemplatedEmailJob();
+        autowireBeanFactory.autowireBean( j );
+        Map<String, String> replaceMap = new HashMap<>();
+        replaceMap.put( "\\[charge_amount\\]", "88.00" );
+        replaceMap.put( "\\[last four digits\\]", "5775" );
+        j.setEmailTemplate( "Payment Successful" );
+        j.setReservationId( "65929389" );
+        j.setReplacementMap( replaceMap );
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+    }
+
+    @Test
     public void testSendCovidPrestayEmailJob() throws Exception {
         SendCovidPrestayEmailJob j = new SendCovidPrestayEmailJob();
         j.setStatus( JobStatus.submitted );
