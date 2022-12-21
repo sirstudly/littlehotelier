@@ -999,7 +999,7 @@ public class PaymentProcessorService {
             autowireBeanFactory.autowireBean( job );
             Map<String, String> replaceMap = new HashMap<>();
             String paymentURL = cloudbedsService.generateUniquePaymentURL( reservationId, null );
-            replaceMap.put( "\\[charge_amount\\]", cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
+            replaceMap.put( "\\[charge amount\\]", cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
             replaceMap.put( "\\[payment URL\\]", paymentURL );
             job.setEmailTemplate( "Payment Declined" );
             job.setReservationId( reservationId );
@@ -1013,7 +1013,7 @@ public class PaymentProcessorService {
         SendTemplatedEmailJob job = new SendTemplatedEmailJob();
         autowireBeanFactory.autowireBean( job );
         Map<String, String> replaceMap = new HashMap<>();
-        replaceMap.put( "\\[charge_amount\\]", cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
+        replaceMap.put( "\\[charge amount\\]", cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
         replaceMap.put( "\\[last four digits\\]", cbReservation.getCreditCardLast4Digits() );
         job.setEmailTemplate( "Payment Successful" );
         job.setReservationId( reservationId );
