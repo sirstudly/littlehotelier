@@ -222,6 +222,7 @@ public class CloudbedsService {
                     if( rb == null ) {
                         // if you get this error; probably a room/bed name was changed
                         // dump a call to getReservation() and update wp_lh_rooms with the correct room_id, room_type, bed_name
+                        // or view the /connect/room_types/find_one API response under Property Details, Accommodation Types
                         throw new MissingUserDataException( "Missing mapping for " + lookupKey );
                     }
                     Allocation a = createAllocationFromRoomBed( rb );
