@@ -760,7 +760,8 @@ public class PaymentProcessorService {
 
         // check if we have anything to pay
         if ( cbReservation.isPaid() ) {
-            LOGGER.warn( "Booking is paid! Attempting to charge VCC anyways..." );
+            LOGGER.warn( "Booking is paid! Stopping here." );
+            return;
         }
 
         if ( false == cbReservation.isCardDetailsPresent() ) {

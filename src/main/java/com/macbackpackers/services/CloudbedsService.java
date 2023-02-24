@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import javax.mail.MessagingException;
@@ -408,7 +409,7 @@ public class CloudbedsService {
      * @return List<String> cloudbeds reservation ids
      * @throws Exception
      */
-    public List<String> getAllVCCBookingsThatCanBeCharged() throws Exception {
+    public List<String> getAllVCCBookingsThatCanBeCharged_LookupViaBDC() throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForBDC", WebClient.class )) {
             return bdcScraper.getAllVCCBookingsThatCanBeCharged( webClient )
                     .stream()
@@ -419,6 +420,31 @@ public class CloudbedsService {
                             r.getThirdPartyIdentifier(), r.getReservationId(), r.getFirstName(), r.getLastName() ) )
                     .map( r -> r.getReservationId() )
                     .collect( Collectors.toList() );
+        }
+    }
+
+    /**
+     * Returns all reservations for BDC with virtual cards that can be charged immediately.
+     *
+     * @return List<String> cloudbeds reservation ids
+     * @throws Exception
+     */
+    public Set<String> getAllVCCBookingsThatCanBeCharged() throws Exception {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+            final LocalDate TODAY = LocalDate.now();
+            // find all BDC prepaid bookings with checkins/checkouts for today
+            return Stream.concat(scraper.getReservations( webClient, null, null, null, null,
+                            TODAY, TODAY, null, null, "confirmed,not_confirmed,checked_in,checked_out,no_show" ).stream(),
+                    scraper.getReservations( webClient, null, null, TODAY, TODAY,
+                            null, null, null, null, "confirmed,not_confirmed" ).stream())
+                    .filter( c -> c.getSourceName().contains( "Booking.com" ) )
+                    .filter( c -> false == c.isHotelCollectBooking() )
+                    .filter( c -> c.getBalanceDue().compareTo( BigDecimal.ZERO ) > 0 )
+                    .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                    .peek( r -> LOGGER.info( "Found BDC reservation {} - {} with VCC for {} {}",
+                            r.getThirdPartyIdentifier(), r.getReservationId(), r.getFirstName(), r.getLastName() ) )
+                    .map( r -> r.getReservationId() )
+                    .collect( Collectors.toSet() );
         }
     }
 
@@ -519,7 +545,7 @@ public class CloudbedsService {
                                               String statuses, Function<Reservation, Boolean> reservationFilterFn,
                                               Function<Reservation, Map<String, String>> replacementFn ) throws IOException {
         scraper.fetchEmailTemplate( webClient, emailTemplate ); // check if it exists before creating a bunch of jobs
-        scraper.getReservations( webClient, stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd,
+        scraper.getReservations( webClient, stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, null, null,
                         bookingDateStart, bookingDateEnd, statuses ).stream()
                 .filter( c -> false == c.isLongTermer() )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )

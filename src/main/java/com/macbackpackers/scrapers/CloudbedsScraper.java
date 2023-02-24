@@ -282,7 +282,7 @@ public class CloudbedsScraper {
     public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd,
                                            LocalDate checkinDateStart, LocalDate checkinDateEnd, String statuses ) throws IOException {
         return getReservations( webClient, stayDateStart, stayDateEnd,
-                checkinDateStart, checkinDateEnd, null, null, statuses );
+                checkinDateStart, checkinDateEnd, null, null, null, null, statuses );
     }
 
     /**
@@ -293,6 +293,8 @@ public class CloudbedsScraper {
      * @param stayDateEnd stay date (inclusive; optional)
      * @param checkinDateStart checkin date (inclusive; optional)
      * @param checkinDateEnd checkin date (inclusive; optional)
+     * @param checkoutDateStart checkout date (inclusive; optional)
+     * @param checkoutDateEnd checkout date (inclusive; optional)
      * @param bookingDateStart (inclusive; optional)
      * @param bookingDateEnd (inclusive; optional)
      * @param statuses comma-delimited list of statuses (optional)
@@ -300,10 +302,10 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd,
-                                           LocalDate checkinDateStart, LocalDate checkinDateEnd,
+                                           LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate checkoutDateStart, LocalDate checkoutDateEnd,
                                            LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest(
-                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, bookingDateStart, bookingDateEnd, statuses ) );
+        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( stayDateStart, stayDateEnd,
+                checkinDateStart, checkinDateEnd, checkoutDateStart, checkoutDateEnd, bookingDateStart, bookingDateEnd, statuses ) );
     }
 
     /**
@@ -333,7 +335,7 @@ public class CloudbedsScraper {
     public List<Customer> getReservationsByBookingDate( WebClient webClient,
             LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest(
-                null, null, null, null, bookingDateStart, bookingDateEnd, statuses ) );
+                null, null, null, null, null, null, bookingDateStart, bookingDateEnd, statuses ) );
     }
 
     /**

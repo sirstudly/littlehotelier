@@ -362,6 +362,8 @@ public class CloudbedsJsonRequestFactory {
      * @param stayDateEnd checkin date (inclusive)
      * @param checkinDateStart checkin date (inclusive)
      * @param checkinDateEnd checkin date (inclusive)
+     * @param checkoutDateStart checkout date (inclusive)
+     * @param checkoutDateEnd checkout date (inclusive)
      * @param bookingDateStart booking date (inclusive)
      * @param bookingDateEnd booking date (inclusive)
      * @param statuses comma-delimited list of statuses (optional)
@@ -369,14 +371,15 @@ public class CloudbedsJsonRequestFactory {
      * @throws IOException on i/o error
      */
     public WebRequest createGetReservationsRequest( LocalDate stayDateStart, LocalDate stayDateEnd,
-            LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
+            LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate checkoutDateStart, LocalDate checkoutDateEnd,
+            LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "status", StringUtils.isBlank(statuses) ? "all" : statuses ),
                 new NameValuePair( "date_start[0]", checkinDateStart == null ? "" : checkinDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_start[1]", checkinDateEnd == null ? "" : checkinDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_end[0]", "" ),
-                new NameValuePair( "date_end[1]", "" ),
+                new NameValuePair( "date_end[0]", checkoutDateStart == null ? "" : checkoutDateStart.format( YYYY_MM_DD ) ),
+                new NameValuePair( "date_end[1]", checkoutDateEnd == null ? "" : checkoutDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_stay[0]", stayDateStart == null ? "" : stayDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_stay[1]", stayDateEnd == null ? "" : stayDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "booking_date[0]", bookingDateStart == null ? "" : bookingDateStart.format( YYYY_MM_DD ) ),
