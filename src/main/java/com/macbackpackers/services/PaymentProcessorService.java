@@ -773,6 +773,9 @@ public class PaymentProcessorService {
         if ( false == cbReservation.isPrepaid() ) {
             throw new MissingUserDataException( "Booking not identified as a prepaid booking" );
         }
+        if ( false == cbReservation.isChannelCollectBooking() ) {
+            throw new MissingUserDataException( "Booking not identified as a channel-collect booking" );
+        }
 
         // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
         // if we have BDC login details, try to get the VCC balance to charge
