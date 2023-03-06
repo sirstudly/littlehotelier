@@ -43,6 +43,7 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         insertGroupBookingsReportJob( bookingScraperJobs );
         insertHostelworldHostelBookersConfirmDepositJob();
         insertCreateAgodaNoChargeNoteJob( bookingScraperJobs );
+        insertBlacklistEmailJob( bookingScraperJobs );
     }
 
     /**
@@ -139,6 +140,20 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
             j.setStatus( JobStatus.submitted );
             dao.insertJob( j );
         }
+    }
+
+    /**
+     * Creates an additional job identifying any bookings in the blacklist.
+     *
+     * @param dependentJobs the jobs which need to complete successfully before running the jobs
+     *            being created
+     */
+    private void insertBlacklistEmailJob( List<? extends Job> dependentJobs ) {
+        CheckNewBookingsOnBlacklistJob blacklistJob = new CheckNewBookingsOnBlacklistJob();
+        blacklistJob.setStatus( JobStatus.submitted );
+        blacklistJob.setAllocationScraperJobId( getAllocationScraperJobId() );
+        blacklistJob.getDependentJobs().addAll( dependentJobs );
+        dao.insertJob( blacklistJob );
     }
 
     public int getAllocationScraperJobId() {
