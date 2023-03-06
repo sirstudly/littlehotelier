@@ -193,4 +193,9 @@ public class CloudbedsServiceTest {
     public void testCreateChargeHogmanayBookingJobs() throws Exception {
         cloudbedsService.createChargeHogmanayBookingJobs( webClient );
     }
+
+    @Test
+    public void testCreateEmailsForBookingsOnBlacklist() throws Exception {
+        cloudbedsService.createEmailsForBookingsOnBlacklist( 543745 );
+    }
 }

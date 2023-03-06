@@ -28,7 +28,17 @@ import java.util.stream.StreamSupport;
 import javax.mail.MessagingException;
 
 import com.macbackpackers.beans.bdc.BookingComRefundRequest;
+import com.macbackpackers.dao.SharedDbDAO;
+import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
 import com.macbackpackers.jobs.ChargeRemainingBalanceForBookingJob;
+import com.macbackpackers.jobs.CreateFixedRateReservationJob;
+import com.macbackpackers.jobs.PrepaidChargeJob;
+import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
+import com.macbackpackers.jobs.SendGmailJob;
+import com.macbackpackers.jobs.SendGroupBookingApprovalRequiredEmailJob;
+import com.macbackpackers.jobs.SendGroupBookingPaymentReminderEmailJob;
+import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
+import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -44,7 +54,6 @@ import org.springframework.stereotype.Service;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlButton;
-import com.gargoylesoftware.htmlunit.html.HtmlHiddenInput;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
@@ -68,14 +77,6 @@ import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
-import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
-import com.macbackpackers.jobs.CreateFixedRateReservationJob;
-import com.macbackpackers.jobs.PrepaidChargeJob;
-import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
-import com.macbackpackers.jobs.SendGroupBookingApprovalRequiredEmailJob;
-import com.macbackpackers.jobs.SendGroupBookingPaymentReminderEmailJob;
-import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
-import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
@@ -92,6 +93,9 @@ public class CloudbedsService {
 
     @Autowired
     private WordPressDAO dao;
+
+    @Autowired
+    private SharedDbDAO sharedDao;
     
     @Autowired
     private AuthenticationService authService;
@@ -524,6 +528,31 @@ public class CloudbedsService {
     }
 
     /**
+     * Creates a job that sends a support email if a booking matches a name/email against the blacklist.
+     *
+     * @param allocationScraperJobId allocation scraper job ID
+     */
+    public void createEmailsForBookingsOnBlacklist( int allocationScraperJobId ) {
+        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+            String backofficeUrl = dao.getMandatoryOption("hbo_backoffice_url") + "/" + dao.getMandatoryOption("hbo_blacklist_url");
+            dao.fetchBookingsMatchingBlacklist( allocationScraperJobId, sharedDao.fetchBlacklistEntries() ).stream()
+                .map( a -> scraper.getReservationRetry( webClient, String.valueOf( a.getReservationId() ) ) )
+                .filter( r -> false == r.containsNote( "Guest Blacklisted email sent." ) )
+                .forEach( r -> {
+                    SendGmailJob j = new SendGmailJob();
+                    autowireBeanFactory.autowireBean( j );
+                    j.setStatus( JobStatus.submitted );
+                    j.setToAddress( dao.getMandatoryOption( "hbo_support_email" ) );
+                    j.setReservationId( r.getReservationId() );
+                    j.setSubject( "Guest Blacklisted" );
+                    j.setEmailBody( "Reservation #" + r.getIdentifier() + " for " + r.getFirstName() + " " + r.getLastName()
+                            + " (" + r.getEmail() + ") matches an entry in our blacklist. See " + backofficeUrl + " for details. -RONBOT" );
+                    dao.insertJob( j );
+                });
+        }
+    }
+
+    /**
      * Creates jobs for sending out emails by stay date, checkin date.
      * 
      * @param webClient
@@ -867,6 +896,7 @@ public class CloudbedsService {
                 a.setCheckoutDate( LocalDate.parse( br.getEndDate() ) );
                 a.setDataHref( "/connect/" + scraper.getPropertyId() + "#/reservations/" + r.getReservationId());
                 a.setGuestName( r.getFirstName() + " " + r.getLastName() );
+                a.setEmail( r.getEmail() );
                 a.setJobId( jobId );
                 a.setNumberGuests( r.getAdultsNumber() + r.getKidsNumber() );
                 a.setPaymentOutstanding( r.getBalanceDue() );

@@ -1,39 +1,9 @@
 
 package com.macbackpackers.dao;
 
-import java.math.BigDecimal;
-import java.sql.Timestamp;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.persistence.EntityManager;
-import javax.persistence.NoResultException;
-import javax.persistence.PersistenceContext;
-import javax.persistence.Query;
-
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.text.StringEscapeUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.dao.IncorrectResultSizeDataAccessException;
-import org.springframework.jdbc.IncorrectResultSetColumnCountException;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.BlacklistEntry;
 import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
@@ -57,6 +27,38 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.StringEscapeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.dao.IncorrectResultSizeDataAccessException;
+import org.springframework.jdbc.IncorrectResultSetColumnCountException;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.persistence.EntityManager;
+import javax.persistence.NoResultException;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Repository
 @Transactional
@@ -841,6 +843,34 @@ public class WordPressDAOImpl implements WordPressDAO {
                     + "   AND c.bookingSource = 'Booking.com'", BookingWithGuestComments.class )
                     .setParameter( "allocationScraperJobId", allocationScraperJobId )
                     .getResultList();
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<Allocation> fetchBookingsMatchingBlacklist( int allocationScraperJobId, List<BlacklistEntry> blacklistEntries ) {
+        if ( blacklistEntries.size() > 0 ) {
+            List<String> sqlClauses = new ArrayList<>();
+            List<Object> params = new ArrayList<>();
+            blacklistEntries.stream()
+                    .forEach( e -> {
+                        if( StringUtils.isNotBlank( e.getFirstName() ) && StringUtils.isNotBlank( e.getLastName() ) ) {
+                            sqlClauses.add( "c.guestName = ?" + (sqlClauses.size() + 1) );
+                            params.add( e.getFirstName() + " " + e.getLastName() );
+                        }
+                        if( StringUtils.isNotBlank( e.getEmail() ) ) {
+                            sqlClauses.add( "c.email = ?" + (sqlClauses.size() + 1) );
+                            params.add( e.getEmail() );
+                        }
+                    } );
+            TypedQuery<Allocation> query = em.createQuery( "FROM Allocation c "
+                            + " WHERE c.jobId = :allocationScraperJobId "
+                            + "   AND (" + sqlClauses.stream().collect(Collectors.joining(" OR ")) +  ")", Allocation.class )
+                    .setParameter( "allocationScraperJobId", allocationScraperJobId );
+            for( int i = 0; i < params.size(); i++ ) {
+                query.setParameter(i + 1, params.get( i ));
+            }
+            return query.getResultList();
         }
         return Collections.emptyList();
     }

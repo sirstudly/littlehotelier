@@ -63,6 +63,9 @@ public class Allocation {
     @Column( name = "guest_name" )
     private String guestName;
 
+    @Column( name = "email" )
+    private String email;
+
     @Column( name = "checkin_date" )
     private Date checkinDate;
 
@@ -174,6 +177,14 @@ public class Allocation {
 
     public void setGuestName( String guestName ) {
         this.guestName = guestName;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail( String email ) {
+        this.email = email;
     }
 
     public Date getCheckinDate() {

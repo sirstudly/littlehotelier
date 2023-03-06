@@ -9,7 +9,6 @@ import java.util.Properties;
 import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +16,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
@@ -31,12 +31,6 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
 @PropertySource( "classpath:config.properties" )
 public class DatabaseConfig {
 
-    @Value( "${db.poolsize.min}" )
-    private int minPoolSize;
-
-    @Value( "${db.poolsize.max}" )
-    private int maxPoolSize;
-
     @Value( "${db.maxidletime}" )
     private int maxIdleTime;
     
@@ -45,15 +39,6 @@ public class DatabaseConfig {
 
     @Value( "${db.max.idle.time.excess.connections}" )
     private int maxIdleTimeExcessConnections;
-
-    @Value( "${db.url}" )
-    private String url;
-
-    @Value( "${db.username}" )
-    private String username;
-
-    @Value( "${db.password}" )
-    private String password;
 
     @Value( "${db.driverclass}" )
     private String driverClass;
@@ -64,16 +49,35 @@ public class DatabaseConfig {
     }
 
     @Bean( name = "txnDataSource" )
-    public DataSource getDataSource() throws PropertyVetoException {
+    public DataSource getDataSource(
+            @Value( "${db.url}" ) String url,
+            @Value( "${db.username}" ) String username,
+            @Value( "${db.password}" ) String password,
+            @Value( "${db.poolsize.min}" ) int minPoolSize,
+            @Value( "${db.poolsize.max}" ) int maxPoolSize ) throws PropertyVetoException {
+        return createDataSource( url, username, password, minPoolSize, maxPoolSize );
+    }
+
+    @Bean( name = "sharedDataSource" )
+    public DataSource getSharedDataSource(
+            @Value( "${shareddb.url}" ) String url,
+            @Value( "${shareddb.username}" ) String username,
+            @Value( "${shareddb.password}" ) String password,
+            @Value( "${shareddb.poolsize.min}" ) int minPoolSize,
+            @Value( "${shareddb.poolsize.max}" ) int maxPoolSize ) throws PropertyVetoException {
+        return createDataSource( url, username, password, minPoolSize, maxPoolSize );
+    }
+
+    private DataSource createDataSource( String dbUrl, String user, String pass, int minPoolSize, int maxPoolSize ) throws PropertyVetoException {
         ComboPooledDataSource ds = new ComboPooledDataSource();
-        ds.setJdbcUrl( url );
+        ds.setJdbcUrl( dbUrl );
         ds.setDriverClass( driverClass );
 // uncomment following to check for db connection leaks
 // http://www.mchange.com/projects/c3p0/#unreturnedConnectionTimeout
 //        ds.setUnreturnedConnectionTimeout( 600 ); // in seconds
 //        ds.setDebugUnreturnedConnectionStackTraces( true );
-        ds.setUser( username );
-        ds.setPassword( password );
+        ds.setUser( user );
+        ds.setPassword( pass );
         ds.setMinPoolSize( minPoolSize );
         ds.setMaxPoolSize( maxPoolSize );
         ds.setMaxIdleTime( maxIdleTime );
@@ -84,15 +88,18 @@ public class DatabaseConfig {
         return ds;
     }
 
+    @Bean( name = "sharedJdbcTemplate" )
+    public JdbcTemplate getSharedJdbcTemplate( @Qualifier( "sharedDataSource" ) DataSource dataSource ) {
+        return new JdbcTemplate( dataSource );
+    }
+
     @Bean
     public PersistenceExceptionTranslationPostProcessor exceptionTranslation() {
         return new PersistenceExceptionTranslationPostProcessor();
     }
 
     @Bean( name = "entityManagerFactory" )
-    @Autowired
-    @Qualifier( "txnDataSource" )
-    public LocalContainerEntityManagerFactoryBean getLocalContainerEntityManagerFactoryBean( DataSource dataSource ) throws IOException {
+    public LocalContainerEntityManagerFactoryBean getLocalContainerEntityManagerFactoryBean( @Qualifier( "txnDataSource" ) DataSource dataSource ) throws IOException {
         LocalContainerEntityManagerFactoryBean emf = new LocalContainerEntityManagerFactoryBean();
         emf.setDataSource( dataSource );
         emf.setPackagesToScan( "com.macbackpackers.beans", "com.macbackpackers.jobs" );
@@ -102,9 +109,7 @@ public class DatabaseConfig {
     }
     
     @Bean( name = "transactionManager" )
-    @Autowired
-    @Qualifier( "txnDataSource" )
-    public PlatformTransactionManager getTransactionManager( DataSource dataSource, EntityManagerFactory emf ) {
+    public PlatformTransactionManager getTransactionManager( @Qualifier( "txnDataSource" ) DataSource dataSource, EntityManagerFactory emf ) {
         JpaTransactionManager tm = new JpaTransactionManager();
         tm.setEntityManagerFactory( emf );
         tm.setDataSource( dataSource );

@@ -59,6 +59,9 @@ public class WordPressDAOTest {
     @Autowired
     TestHarnessDAO testDAO;
 
+    @Autowired
+    SharedDbDAO sharedDao;
+
     static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
 
     @Before
@@ -683,5 +686,11 @@ public class WordPressDAOTest {
     public void fetchStripeRefundsAtStatus() throws Exception {
         List<StripeRefund> refunds = dao.fetchStripeRefundsAtStatus( "pending" );
         LOGGER.info( "Found " + refunds.size() + " records" );
+    }
+
+    @Test
+    public void testFetchBookingsMatchingBlacklist() {
+        List<Allocation> allocations = dao.fetchBookingsMatchingBlacklist(453596, sharedDao.fetchBlacklistEntries() );
+        LOGGER.info( "Found {} records.", allocations.size() );
     }
 }
