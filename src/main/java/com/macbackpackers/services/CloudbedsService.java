@@ -1616,6 +1616,9 @@ public class CloudbedsService {
         HtmlTextInput usernameField = page.getHtmlElementById( "email" );
         usernameField.type( username );
 
+        HtmlButton nextButton = page.getFirstByXPath( "//button[@type='submit']" );
+        page = nextButton.click();
+
         HtmlPasswordInput passwordField = page.getHtmlElementById( "password" );
         passwordField.type( password );
 
@@ -1625,7 +1628,6 @@ public class CloudbedsService {
 //        captchaResponse.setValueAttribute( token );
 
         HtmlButton loginButton = page.getFirstByXPath( "//button[@type='submit']" );
-        loginButton.setAttribute( "class", loginButton.getAttribute( "class" ).replace( "disabled", "" ) ); // remove disabled
         page = loginButton.click();
 
         String code = null;
