@@ -21,7 +21,7 @@ public class ChromeScraperTest {
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
-    ChromeScraper scraper = new ChromeScraper();
+    ChromeScraper scraper;
 
     @Test
     public void testRetrieveCardDetailsFromLH() throws Exception {
@@ -34,5 +34,10 @@ public class ChromeScraperTest {
         GuestDetails guest2 = scraper.retrieveGuestDetailsFromLH( "LH1803298780125", c.getTime() );
         LOGGER.info( ToStringBuilder.reflectionToString( guest ) );
         LOGGER.info( ToStringBuilder.reflectionToString( guest2 ) );
+    }
+
+    @Test
+    public void testLoginToCloudbedsAndSaveSession() throws Exception {
+        scraper.loginToCloudbedsAndSaveSession();
     }
 }

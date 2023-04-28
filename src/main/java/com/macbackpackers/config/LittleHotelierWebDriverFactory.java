@@ -40,7 +40,7 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
         ChromeOptions options = new ChromeOptions();
         List<String> optionValues = new ArrayList<>(Arrays.asList(chromeOptions.split( " " )));
         options.addArguments( optionValues.toArray(new String[optionValues.size()]) );
-        options.setExperimentalOption("debuggerAddress", "127.0.0.1:9222");
+//        options.setExperimentalOption("debuggerAddress", "127.0.0.1:9222");
 
         ChromeDriver driver = new ChromeDriver( options );
 

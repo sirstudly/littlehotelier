@@ -1,20 +1,19 @@
 
 package com.macbackpackers.scrapers;
 
-import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
-import static org.openqa.selenium.support.ui.ExpectedConditions.visibilityOf;
-import static org.openqa.selenium.support.ui.ExpectedConditions.visibilityOfAllElements;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.util.Date;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
+import com.gargoylesoftware.htmlunit.WebClient;
+import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.GuestDetails;
+import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.services.AuthenticationService;
+import com.macbackpackers.services.GmailService;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.openqa.selenium.By;
+import org.openqa.selenium.Cookie;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -24,12 +23,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
-import com.macbackpackers.beans.CardDetails;
-import com.macbackpackers.beans.GuestDetails;
-import com.macbackpackers.exceptions.UnrecoverableFault;
-import com.macbackpackers.services.GmailService;
+import java.io.IOException;
+import java.net.URLDecoder;
+import java.time.Duration;
+import java.util.Date;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import static org.openqa.selenium.support.ui.ExpectedConditions.presenceOfElementLocated;
+import static org.openqa.selenium.support.ui.ExpectedConditions.urlContains;
 
 @Component
 public class ChromeScraper {
@@ -37,7 +44,10 @@ public class ChromeScraper {
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Value( "${chromescraper.maxwait.seconds:30}" )
-    private int maxWaitSeconds;
+    private int MAX_WAIT_SECONDS;
+
+    @Value( "${cloudbeds.2fa.secret:}" )
+    private String CLOUDBEDS_2FA_SECRET;
 
     @Autowired
     private BookingsPageScraper bookingsScraper;
@@ -48,8 +58,38 @@ public class ChromeScraper {
     @Autowired
     private GmailService gmailService;
 
-    @Value( "${hostelworld.hostelnumber}" )
-    private String hostelNumber;
+    @Autowired
+    private AuthenticationService authService;
+
+    @Autowired
+    private ApplicationContext appContext;
+
+    @Autowired
+    private WordPressDAO dao;
+
+    class AutocloseableWebDriver implements AutoCloseable {
+
+        private WebDriver driver;
+        private WebDriverWait wait;
+
+        public AutocloseableWebDriver() throws Exception {
+            this.driver = driverFactory.borrowObject();
+            this.wait = new WebDriverWait(driver, Duration.ofSeconds( MAX_WAIT_SECONDS ));
+        }
+
+        public WebDriver getDriver() {
+            return this.driver;
+        }
+
+        public WebDriverWait getDriverWait() {
+            return this.wait;
+        }
+
+        @Override
+        public void close() throws Exception {
+            driverFactory.returnObject(this.driver);
+        }
+    }
 
     /**
      * Returns the guest details for a reservation.
@@ -66,7 +106,7 @@ public class ChromeScraper {
 
         try {
             driver.get( pageURL );
-            WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( maxWaitSeconds ) );
+            WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( MAX_WAIT_SECONDS ) );
 
             // select only row and click
             WebElement bookingLink = driver.findElement( By.xpath( "//a[text()='" + bookingRef + "']" ) );
@@ -120,7 +160,7 @@ public class ChromeScraper {
             driver.manage().timeouts().implicitlyWait( 5, TimeUnit.SECONDS );
             WebElement viewCardDetailsAnchor = driver.findElement( By.xpath( "//a[@class='view-card-details']" ) );
             LOGGER.info( "Card details hidden!" );
-            driver.manage().timeouts().implicitlyWait( maxWaitSeconds, TimeUnit.SECONDS );
+            driver.manage().timeouts().implicitlyWait( MAX_WAIT_SECONDS, TimeUnit.SECONDS );
             viewCardDetailsAnchor.click();
 
             // wait for id='security_token'
@@ -161,5 +201,68 @@ public class ChromeScraper {
         }
         LOGGER.info( "Loaded reservation " + bookingRef + " for " + m.group( 2 ) );
         return bookingRef;
+    }
+
+    public synchronized void loginToCloudbedsAndSaveSession() throws Exception {
+
+        String username = dao.getOption( "hbo_cloudbeds_username" );
+        String password = dao.getOption( "hbo_cloudbeds_password" );
+
+        if ( username == null || password == null ) {
+            throw new MissingUserDataException( "Missing username/password" );
+        }
+
+        try ( AutocloseableWebDriver driverFactory = new AutocloseableWebDriver() ) {
+            WebDriver driver = driverFactory.getDriver();
+            WebDriverWait wait = driverFactory.getDriverWait();
+
+            // we need to navigate first before loading the cookies for that domain
+            driver.get( "https://hotels.cloudbeds.com/auth/login" );
+            WebElement emailInput = driver.findElement( By.id( "email" ) );
+            emailInput.sendKeys( username );
+
+            WebElement nextButton = driver.findElement( By.xpath( "//button[@type='submit']" ) );
+            nextButton.click();
+
+            wait.until( presenceOfElementLocated( By.id( "password" ) ) );
+            WebElement passwordInput = driver.findElement( By.id( "password" ) );
+            passwordInput.sendKeys( password );
+
+            nextButton = driver.findElement( By.xpath( "//button[@type='submit']" ) );
+            nextButton.click();
+            wait.until( urlContains( "/auth/awaiting_user_verification" ) );
+
+            WebElement scaCode = driver.findElement( By.name( "token" ) );
+            if ( StringUtils.isNotBlank( CLOUDBEDS_2FA_SECRET ) ) {
+                String otp = StringUtils.leftPad( String.valueOf( authService.getTotpPassword( CLOUDBEDS_2FA_SECRET ) ), 6, '0' );
+                LOGGER.info( "Attempting TOTP verification: " + otp );
+                scaCode.sendKeys( otp );
+            } else {
+                LOGGER.info( "Attempting SMS verification" );
+                String otp = authService.fetchCloudbeds2FACode( appContext.getBean( "webClientForCloudbeds", WebClient.class ) );
+                scaCode.sendKeys( otp );
+            }
+            nextButton = driver.findElement( By.xpath( "//button[contains(text(),'Submit')]" ) );
+            nextButton.click();
+
+            LOGGER.info( "Loading dashboard..." );
+            wait.until( presenceOfElementLocated( By.id( "tab_arrivals-today" ) ) );
+
+            // if we're actually logged in, we should be able to get the hostel name
+            Cookie hc = driver.manage().getCookieNamed( "hotel_name" );
+            if ( hc == null ) {
+                LOGGER.info( "Hostel cookie not set? Currently on " + driver.getCurrentUrl() );
+                throw new UnrecoverableFault( "Failed login. Hostel cookie not set." );
+            }
+            LOGGER.info( "PROPERTY NAME is: " + URLDecoder.decode( hc.getValue(), "UTF-8" ) );
+
+            // save credentials to disk so we don't need to do this again
+            dao.setOption( "hbo_cloudbeds_cookies",
+                    driver.manage().getCookies().stream()
+                            .map( c -> c.getName() + "=" + c.getValue() )
+                            .collect( Collectors.joining( ";" ) ) );
+            dao.setOption( "hbo_cloudbeds_useragent",
+                    (String) ( (JavascriptExecutor) driver ).executeScript( "return navigator.userAgent;" ) );
+        }
     }
 }

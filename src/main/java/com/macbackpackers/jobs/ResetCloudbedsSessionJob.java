@@ -1,15 +1,12 @@
 
 package com.macbackpackers.jobs;
 
+import com.macbackpackers.scrapers.ChromeScraper;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.Transient;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
-
-import com.gargoylesoftware.htmlunit.WebClient;
-import com.macbackpackers.services.CloudbedsService;
 
 /**
  * Job that attempts to login to Cloudbeds and saves the session once successful.
@@ -20,17 +17,11 @@ public class ResetCloudbedsSessionJob extends AbstractJob {
 
     @Autowired
     @Transient
-    private CloudbedsService service;
-
-    @Autowired
-    @Transient
-    private ApplicationContext appContext;
+    private ChromeScraper scraper;
 
     @Override
     public void processJob() throws Exception {
-        try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            service.loginAndSaveSession( webClient );
-        }
+        scraper.loginToCloudbedsAndSaveSession();
     }
 
     @Override
