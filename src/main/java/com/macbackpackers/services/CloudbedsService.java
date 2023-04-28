@@ -27,6 +27,8 @@ import java.util.stream.StreamSupport;
 
 import javax.mail.MessagingException;
 
+import com.gargoylesoftware.htmlunit.Page;
+import com.gargoylesoftware.htmlunit.UnexpectedPage;
 import com.macbackpackers.beans.bdc.BookingComRefundRequest;
 import com.macbackpackers.dao.SharedDbDAO;
 import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
@@ -1616,9 +1618,6 @@ public class CloudbedsService {
         HtmlTextInput usernameField = page.getHtmlElementById( "email" );
         usernameField.type( username );
 
-        HtmlButton nextButton = page.getFirstByXPath( "//button[@type='submit']" );
-        page = nextButton.click();
-
         HtmlPasswordInput passwordField = page.getHtmlElementById( "password" );
         passwordField.type( password );
 
@@ -1628,7 +1627,14 @@ public class CloudbedsService {
 //        captchaResponse.setValueAttribute( token );
 
         HtmlButton loginButton = page.getFirstByXPath( "//button[@type='submit']" );
-        page = loginButton.click();
+        Page responsePage = loginButton.click();
+        if ( responsePage instanceof UnexpectedPage ) {
+            LOGGER.error( responsePage.getWebResponse().getStatusCode() + ": " + responsePage.getWebResponse().getStatusMessage() );
+            LOGGER.error( responsePage.getWebResponse().getContentAsString() );
+            throw new UnrecoverableFault( "Login failure." );
+        }
+        page = (HtmlPage) responsePage;
+        LOGGER.info( "Login clicked. Waiting for " +  webClient.waitForBackgroundJavaScript( 10000 ) + " JS processes remaining.");
 
         String code = null;
         if ( page.getBaseURL().getPath().startsWith( "/auth/awaiting_user_verification" ) ) {

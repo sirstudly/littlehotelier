@@ -146,6 +146,7 @@ public class LittleHotelierConfig {
         webClient.getOptions().setThrowExceptionOnScriptError( false );
         webClient.getOptions().setCssEnabled( false );
         webClient.getOptions().setUseInsecureSSL( true );
+        webClient.getOptions().setFetchPolyfillEnabled( true );
         return webClient;
     }
 
