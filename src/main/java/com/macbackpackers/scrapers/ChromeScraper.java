@@ -225,7 +225,7 @@ public class ChromeScraper {
             WebElement passwordInput = driver.findElement( By.id( "okta-signin-password" ) );
             passwordInput.sendKeys( password );
 
-            WebElement rememberMe = driver.findElement( By.name( "remember" ) );
+            WebElement rememberMe = driver.findElement( By.xpath( "//label[@data-se-for-name='remember']" ) );
             rememberMe.click();
 
             nextButton = driver.findElement( By.id( "okta-signin-submit" ) );
@@ -243,7 +243,7 @@ public class ChromeScraper {
                 scaCode.sendKeys( otp );
             }
 
-            WebElement rememberDevice = driver.findElement( By.name( "rememberDevice" ) );
+            WebElement rememberDevice = driver.findElement( By.name( "//label[@data-se-for-name='rememberDevice']" ) );
             rememberDevice.click();
 
             nextButton = driver.findElement( By.xpath( "//input[@data-type='save']" ) );
