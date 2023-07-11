@@ -129,9 +129,6 @@ public class CloudbedsService {
     @Value( "${hostelworld.latecancellation.hours:48}" )
     private int HWL_LATE_CANCEL_HOURS;
 
-    @Value( "${cloudbeds.2fa.secret:}" )
-    private String CLOUDBEDS_2FA_SECRET;
-
     private final DateTimeFormatter DD_MMM_YYYY = DateTimeFormatter.ofPattern( "dd-MMM-yyyy" );
 
     // all allowable characters for lookup key
@@ -1639,10 +1636,10 @@ public class CloudbedsService {
         String code = null;
         if ( page.getBaseURL().getPath().startsWith( "/auth/awaiting_user_verification" ) ) {
             HtmlTextInput scaCode = page.getElementByName( "token" );
-            if ( StringUtils.isNotBlank( CLOUDBEDS_2FA_SECRET ) ) {
-                String otp = StringUtils.leftPad( String.valueOf( authService.getTotpPassword( CLOUDBEDS_2FA_SECRET ) ), 6, '0' );
-                LOGGER.info( "Attempting TOTP verification: " + otp );
-                scaCode.type( otp );
+            String googleAuth2faCode = authService.fetchCloudbedsGoogleAuth2faCode();
+            if ( StringUtils.isNotBlank( googleAuth2faCode ) ) {
+                LOGGER.info( "Attempting TOTP verification: " + googleAuth2faCode );
+                scaCode.type( googleAuth2faCode );
             }
             else {
                 LOGGER.info( "Attempting SMS verification" );

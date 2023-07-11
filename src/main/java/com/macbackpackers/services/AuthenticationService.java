@@ -159,6 +159,20 @@ public class AuthenticationService {
     }
 
     /**
+     * Returns the google authenticator one-time code for logging into cloudbeds.
+     *
+     * @return OTP for cloudbeds or null if not 2FA is not set to google authenticator.
+     */
+    public String fetchCloudbedsGoogleAuth2faCode() {
+        String googleAuth2faSecret = wordpressDAO.getOption( "hbo_cloudbeds_googleauthenticator_2fa_secret" );
+        if ( StringUtils.isNotBlank( googleAuth2faSecret ) ) {
+            String otp = StringUtils.leftPad( String.valueOf( getTotpPassword( googleAuth2faSecret ) ), 6, '0' );
+            return otp;
+        }
+        return null;
+    }
+
+    /**
      * If option hbo_sms_lookup_url is defined, then attempt to lookup on external host. Otherwise,
      * _blanks out_ the 2FA code from the DB and waits for it to be re-populated. This is done
      * outside this application.

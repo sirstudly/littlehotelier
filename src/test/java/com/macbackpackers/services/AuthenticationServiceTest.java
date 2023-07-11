@@ -162,7 +162,12 @@ public class AuthenticationServiceTest {
     }
 
     @Test
-    public void testGetTotpPassword() throws Exception {
+    public void testGetTotpPassword() {
         LOGGER.info( "" + authService.getTotpPassword( "XXXXXXXXXXXXXXXXXXXXXXXX" ) );
+    }
+
+    @Test
+    public void testFetchCloudbedsGoogleAuth2faCode() {
+        LOGGER.info( "2fa code: " + authService.fetchCloudbedsGoogleAuth2faCode() );
     }
 }

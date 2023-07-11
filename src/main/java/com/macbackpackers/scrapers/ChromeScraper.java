@@ -46,9 +46,6 @@ public class ChromeScraper {
     @Value( "${chromescraper.maxwait.seconds:30}" )
     private int MAX_WAIT_SECONDS;
 
-    @Value( "${cloudbeds.2fa.secret:}" )
-    private String CLOUDBEDS_2FA_SECRET;
-
     @Autowired
     private BookingsPageScraper bookingsScraper;
 
@@ -233,10 +230,10 @@ public class ChromeScraper {
             wait.until( urlContains( "/auth/awaiting_user_verification" ) );
 
             WebElement scaCode = driver.findElement( By.name( "token" ) );
-            if ( StringUtils.isNotBlank( CLOUDBEDS_2FA_SECRET ) ) {
-                String otp = StringUtils.leftPad( String.valueOf( authService.getTotpPassword( CLOUDBEDS_2FA_SECRET ) ), 6, '0' );
-                LOGGER.info( "Attempting TOTP verification: " + otp );
-                scaCode.sendKeys( otp );
+            String googleAuth2faCode = authService.fetchCloudbedsGoogleAuth2faCode();
+            if ( StringUtils.isNotBlank( googleAuth2faCode ) ) {
+                LOGGER.info( "Attempting TOTP verification: " + googleAuth2faCode );
+                scaCode.sendKeys( googleAuth2faCode );
             } else {
                 LOGGER.info( "Attempting SMS verification" );
                 String otp = authService.fetchCloudbeds2FACode( appContext.getBean( "webClientForCloudbeds", WebClient.class ) );
