@@ -221,15 +221,18 @@ public class ChromeScraper {
             WebElement nextButton = driver.findElement( By.xpath( "//button[@type='submit']" ) );
             nextButton.click();
 
-            wait.until( presenceOfElementLocated( By.id( "password" ) ) );
-            WebElement passwordInput = driver.findElement( By.id( "password" ) );
+            wait.until( presenceOfElementLocated( By.id( "okta-signin-password" ) ) );
+            WebElement passwordInput = driver.findElement( By.id( "okta-signin-password" ) );
             passwordInput.sendKeys( password );
 
-            nextButton = driver.findElement( By.xpath( "//button[@type='submit']" ) );
-            nextButton.click();
-            wait.until( urlContains( "/auth/awaiting_user_verification" ) );
+            WebElement rememberMe = driver.findElement( By.name( "remember" ) );
+            rememberMe.click();
 
-            WebElement scaCode = driver.findElement( By.name( "token" ) );
+            nextButton = driver.findElement( By.id( "okta-signin-submit" ) );
+            nextButton.click();
+            wait.until( urlContains( "/signin/verify/google" ) ); // FIXME: assumes always google authenticator
+
+            WebElement scaCode = driver.findElement( By.name( "answer" ) );
             String googleAuth2faCode = authService.fetchCloudbedsGoogleAuth2faCode();
             if ( StringUtils.isNotBlank( googleAuth2faCode ) ) {
                 LOGGER.info( "Attempting TOTP verification: " + googleAuth2faCode );
@@ -239,7 +242,11 @@ public class ChromeScraper {
                 String otp = authService.fetchCloudbeds2FACode( appContext.getBean( "webClientForCloudbeds", WebClient.class ) );
                 scaCode.sendKeys( otp );
             }
-            nextButton = driver.findElement( By.xpath( "//button[contains(text(),'Submit')]" ) );
+
+            WebElement rememberDevice = driver.findElement( By.name( "rememberDevice" ) );
+            rememberDevice.click();
+
+            nextButton = driver.findElement( By.xpath( "//input[@data-type='save']" ) );
             nextButton.click();
 
             LOGGER.info( "Loading dashboard..." );
