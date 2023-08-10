@@ -35,6 +35,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static org.openqa.selenium.support.ui.ExpectedConditions.or;
 import static org.openqa.selenium.support.ui.ExpectedConditions.presenceOfElementLocated;
 import static org.openqa.selenium.support.ui.ExpectedConditions.urlContains;
 
@@ -230,7 +231,7 @@ public class ChromeScraper {
 
             nextButton = driver.findElement( By.id( "okta-signin-submit" ) );
             nextButton.click();
-            wait.until( urlContains( "/signin/verify/google" ) ); // FIXME: assumes always google authenticator
+            wait.until( or( urlContains( "/signin/verify/google" ), urlContains( "/dashboard" ) ) ); // assumes always google authenticator
 
             WebElement scaCode = driver.findElement( By.name( "answer" ) );
             String googleAuth2faCode = authService.fetchCloudbedsGoogleAuth2faCode();
