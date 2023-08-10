@@ -35,7 +35,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static org.openqa.selenium.support.ui.ExpectedConditions.or;
 import static org.openqa.selenium.support.ui.ExpectedConditions.presenceOfElementLocated;
 import static org.openqa.selenium.support.ui.ExpectedConditions.urlContains;
 
@@ -216,39 +215,46 @@ public class ChromeScraper {
 
             // we need to navigate first before loading the cookies for that domain
             driver.get( "https://hotels.cloudbeds.com/auth/login" );
-            WebElement emailInput = driver.findElement( By.id( "email" ) );
-            emailInput.sendKeys( username );
+            LOGGER.info( "Current URL is " + driver.getCurrentUrl() );
+            if ( false == driver.getCurrentUrl().contains( "/connect/" ) ) { // will redirect to dashboard if we're already logged in
+                LOGGER.info( "Current URL is " + driver.getCurrentUrl() );
+                WebElement emailInput = driver.findElement( By.id( "email" ) );
+                emailInput.sendKeys( username );
 
-            WebElement nextButton = driver.findElement( By.xpath( "//button[@type='submit']" ) );
-            nextButton.click();
+                WebElement nextButton = driver.findElement( By.xpath( "//button[@type='submit']" ) );
+                nextButton.click();
 
-            wait.until( presenceOfElementLocated( By.id( "okta-signin-password" ) ) );
-            WebElement passwordInput = driver.findElement( By.id( "okta-signin-password" ) );
-            passwordInput.sendKeys( password );
+                wait.until( presenceOfElementLocated( By.id( "okta-signin-password" ) ) );
+                WebElement passwordInput = driver.findElement( By.id( "okta-signin-password" ) );
+                passwordInput.sendKeys( password );
 
-            WebElement rememberMe = driver.findElement( By.xpath( "//label[@data-se-for-name='remember']" ) );
-            rememberMe.click();
+                WebElement rememberMe = driver.findElement( By.xpath( "//label[@data-se-for-name='remember']" ) );
+                rememberMe.click();
 
-            nextButton = driver.findElement( By.id( "okta-signin-submit" ) );
-            nextButton.click();
-            wait.until( or( urlContains( "/signin/verify/google" ), urlContains( "/dashboard" ) ) ); // assumes always google authenticator
+                nextButton = driver.findElement( By.id( "okta-signin-submit" ) );
+                nextButton.click();
 
-            WebElement scaCode = driver.findElement( By.name( "answer" ) );
-            String googleAuth2faCode = authService.fetchCloudbedsGoogleAuth2faCode();
-            if ( StringUtils.isNotBlank( googleAuth2faCode ) ) {
-                LOGGER.info( "Attempting TOTP verification: " + googleAuth2faCode );
-                scaCode.sendKeys( googleAuth2faCode );
-            } else {
-                LOGGER.info( "Attempting SMS verification" );
-                String otp = authService.fetchCloudbeds2FACode( appContext.getBean( "webClientForCloudbeds", WebClient.class ) );
-                scaCode.sendKeys( otp );
+                if ( false == driver.getCurrentUrl().contains( "/connect/" ) ) {
+                    wait.until( urlContains( "/signin/verify/google" ) ); // assumes always google authenticator
+
+                    WebElement scaCode = driver.findElement( By.name( "answer" ) );
+                    String googleAuth2faCode = authService.fetchCloudbedsGoogleAuth2faCode();
+                    if ( StringUtils.isNotBlank( googleAuth2faCode ) ) {
+                        LOGGER.info( "Attempting TOTP verification: " + googleAuth2faCode );
+                        scaCode.sendKeys( googleAuth2faCode );
+                    } else {
+                        LOGGER.info( "Attempting SMS verification" );
+                        String otp = authService.fetchCloudbeds2FACode( appContext.getBean( "webClientForCloudbeds", WebClient.class ) );
+                        scaCode.sendKeys( otp );
+                    }
+
+                    WebElement rememberDevice = driver.findElement( By.xpath( "//label[@data-se-for-name='rememberDevice']" ) );
+                    rememberDevice.click();
+
+                    nextButton = driver.findElement( By.xpath( "//input[@data-type='save']" ) );
+                    nextButton.click();
+                }
             }
-
-            WebElement rememberDevice = driver.findElement( By.xpath( "//label[@data-se-for-name='rememberDevice']" ) );
-            rememberDevice.click();
-
-            nextButton = driver.findElement( By.xpath( "//input[@data-type='save']" ) );
-            nextButton.click();
 
             LOGGER.info( "Loading dashboard..." );
             wait.until( presenceOfElementLocated( By.id( "tab_arrivals-today" ) ) );
