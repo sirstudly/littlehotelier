@@ -36,6 +36,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.openqa.selenium.support.ui.ExpectedConditions.presenceOfElementLocated;
+import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
 import static org.openqa.selenium.support.ui.ExpectedConditions.urlContains;
 
 @Component
@@ -233,6 +234,8 @@ public class ChromeScraper {
 
                 nextButton = driver.findElement( By.id( "okta-signin-submit" ) );
                 nextButton.click();
+
+                wait.until( stalenessOf( nextButton ) );
 
                 if ( false == driver.getCurrentUrl().contains( "/connect/" ) ) {
                     wait.until( urlContains( "/signin/verify/google" ) ); // assumes always google authenticator
