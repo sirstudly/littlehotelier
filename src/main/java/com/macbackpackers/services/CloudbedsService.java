@@ -322,7 +322,7 @@ public class CloudbedsService {
             .filter( r -> isCancellationDoneBySystem( webClient, r.getIdentifier() ) )
             .filter( r -> false == isExistsRefund( webClient, r ) )
             .forEach( r -> {
-                LOGGER.info( "Creating ChargeHostelworldLateCancellationJob for " + r.getReservationId() );
+                LOGGER.info( "Creating ChargeHostelworldLateCancellationJob for " + r.getReservationId() + ": " + r.getFirstName() + " " + r.getLastName() );
                 ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();
                 j.setStatus( JobStatus.submitted );
                 j.setReservationId( r.getReservationId() );
