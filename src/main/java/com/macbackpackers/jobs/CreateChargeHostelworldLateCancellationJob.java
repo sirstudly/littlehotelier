@@ -16,8 +16,8 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.services.CloudbedsService;
 
 /**
- * Creates {@link ChargeHostelworldLateCancellationJob} for all applicable bookings cancelled today
- * or yesterday.
+ * Creates {@link ChargeHostelworldLateCancellationJob} for all applicable bookings cancelled
+ * in the last few days.
  *
  */
 @Entity
@@ -43,7 +43,7 @@ public class CreateChargeHostelworldLateCancellationJob extends AbstractJob {
 //        }
 //        else {
             cbService.createChargeHostelworldLateCancellationJobs( cbWebClient,
-                    LocalDate.now().minusDays( 5 ), LocalDate.now() );
+                    LocalDate.now().minusDays( 4 ), LocalDate.now() );
 //        }
     }
 

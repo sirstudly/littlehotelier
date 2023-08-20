@@ -670,7 +670,7 @@ public class CloudbedsScraper {
                 .collect( Collectors.toList() );
         
         if ( sourceIds.size() != sourceNames.length ) {
-            LOGGER.warn( "Mismatch on booking source lookup: found source ids {} for sources {}", sourceIds, Arrays.toString( sourceNames ) );
+            throw new IOException( "Mismatch on booking source lookup: found source ids " + sourceIds + " for sources " + Arrays.toString( sourceNames ) );
         }
         if ( sourceIds.isEmpty() ) {
             throw new IOException( "Unable to find sources for " + Arrays.toString( sourceNames ) );

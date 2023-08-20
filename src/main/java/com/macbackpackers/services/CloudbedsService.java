@@ -301,7 +301,8 @@ public class CloudbedsService {
      */
     public void createChargeHostelworldLateCancellationJobs( WebClient webClient, 
             LocalDate cancelDateStart, LocalDate cancelDateEnd ) throws IOException {
-        
+        LOGGER.info( "Looking up reservations canceled between " + cancelDateStart + " to " + cancelDateEnd );
+
         // if we're running this daily
         // then this would apply to all cancellations done today/yesterday
         // and checkin date would have to be between
@@ -310,7 +311,7 @@ public class CloudbedsService {
         //                             then would charge if checkin on wednesday but not thursday
         List<Reservation> cxlRes = scraper.getCancelledReservationsForBookingSources( webClient, 
                 cancelDateStart.minusDays( 1 ), cancelDateEnd.plusDays( 1 ), 
-                cancelDateStart, cancelDateEnd, "Hostelworld & Hostelbookers" );
+                cancelDateStart, cancelDateEnd, "Hostelworld & Hostelbookers", "Hostelworld (Hotel Collect Booking)" );
         
         cxlRes.stream()
             .peek( r -> LOGGER.info( "Res #" + r.getReservationId() + " (" + r.getThirdPartyIdentifier() 
@@ -805,7 +806,7 @@ public class CloudbedsService {
      */
     public boolean isCancellationDoneBySystem( WebClient webClient, String identifier ) {
         try {
-            Pattern pattern = Pattern.compile( "Reservation Status Modified from .* to Cancelled" );
+            Pattern pattern = Pattern.compile( "Reservation status modified from .* to Canceled" );
             Optional<ActivityLogEntry> statusChange = scraper.getActivityLog( webClient, identifier ).stream()
                     .filter( p -> pattern.matcher( p.getContents() ).find() )
                     .findFirst();
