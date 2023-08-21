@@ -449,11 +449,10 @@ public class ProcessorServiceTest {
     public void testPrepaidRefundJob() throws Exception {
         PrepaidRefundJob j = new PrepaidRefundJob();
         j.setStatus( JobStatus.submitted );
-        j.setReservationId( "52449219" );
+        j.setReservationId( "70953983" );
         j.setReason("Waived fees");
-        j.setAmount(new BigDecimal("56.80"));
-        autowireBeanFactory.autowireBean( j );
-        j.processJob();
+        j.setAmount(new BigDecimal("91.08"));
+        dao.insertJob( j );
     }
 
     @Test
@@ -580,10 +579,11 @@ public class ProcessorServiceTest {
     @Test
     public void testCreateChargeNonRefundableBookingJob() throws Exception {
         CreateChargeNonRefundableBookingJob j = new CreateChargeNonRefundableBookingJob();
+        autowireBeanFactory.autowireBean( j );
         j.setStatus( JobStatus.submitted );
-        j.setBookingDate( LocalDate.now().withMonth( 6 ).withDayOfMonth( 9 ) );
-        j.setDaysAhead( 15 );
-        dao.insertJob( j );
+        j.setBookingDate( LocalDate.now().minusDays( 3 ) );
+        j.setDaysAhead( 4 );
+        j.processJob();
     }
     
     @Test
@@ -719,6 +719,20 @@ public class ProcessorServiceTest {
         replaceMap.put( "\\[last four digits\\]", "5775" );
         j.setEmailTemplate( "Payment Successful" );
         j.setReservationId( "65929389" );
+        j.setReplacementMap( replaceMap );
+        j.setStatus( JobStatus.submitted );
+        dao.insertJob( j );
+    }
+
+    @Test
+    public void testCreateSendPaymentDeclinedTemplatedEmailJob() throws Exception {
+        SendTemplatedEmailJob j = new SendTemplatedEmailJob();
+        autowireBeanFactory.autowireBean( j );
+        Map<String, String> replaceMap = new HashMap<>();
+        replaceMap.put( "\\[charge amount\\]", "99.00" );
+        replaceMap.put( "\\[payment URL\\]", "https://pay.macbackpackers.com/booking/CRH/WH6QLN2" );
+        j.setEmailTemplate( "Payment Declined" );
+        j.setReservationId( "67665909" );
         j.setReplacementMap( replaceMap );
         j.setStatus( JobStatus.submitted );
         dao.insertJob( j );
