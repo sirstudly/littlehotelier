@@ -695,7 +695,7 @@ public class PaymentProcessorService {
                     + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) + " successfully charged." );
 
             // mark booking as fully paid in Hostelworld
-            if ( Arrays.asList( "Hostelworld & Hostelbookers", "Hostelworld (Hotel Collect Booking)" ).contains( cbReservation.getSourceName() ) ) {
+            if ( Arrays.asList( "Hostelworld & Hostelbookers", "Hostelworld" ).contains( cbReservation.getSourceName() ) ) {
                 HostelworldAcknowledgeFullPaymentTakenJob ackJob = new HostelworldAcknowledgeFullPaymentTakenJob();
                 ackJob.setHostelworldBookingRef( cbReservation.getThirdPartyIdentifier() );
                 ackJob.setStatus( JobStatus.submitted );
