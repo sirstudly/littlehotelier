@@ -217,6 +217,10 @@ public class Reservation extends CloudbedsJsonResponse {
         return parseISODateTime( getCancellationDate() );        
     }
 
+    public LocalDateTime getCancellationDateTime() {
+        return LocalDateTime.parse( getCancellationDate(), DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss" ) );
+    }
+
     public void setCancellationDate( String cancellationDate ) {
         this.cancellationDate = cancellationDate;
     }
@@ -246,10 +250,7 @@ public class Reservation extends CloudbedsJsonResponse {
         LocalDateTime checkinDateTime = LocalDateTime.parse( getCheckinDate() + "T15:00:00",
                 DateTimeFormatter.ISO_LOCAL_DATE_TIME );
 
-        LocalDateTime cancellationDateTime = LocalDateTime.parse(
-                getCancellationDate(), DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss" ) );
-
-        return cancellationDateTime.plusHours( hoursBefore3pmOnCheckinDate )
+        return getCancellationDateTime().plusHours( hoursBefore3pmOnCheckinDate )
                 .compareTo( checkinDateTime ) > 0;
     }
 

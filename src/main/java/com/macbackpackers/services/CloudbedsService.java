@@ -7,6 +7,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.Period;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -321,6 +322,8 @@ public class CloudbedsService {
             .filter( r -> r.isLateCancellation( HWL_LATE_CANCEL_HOURS ) )
             .filter( r -> isCancellationDoneBySystem( webClient, r.getIdentifier() ) )
             .filter( r -> false == isExistsRefund( webClient, r ) )
+            // TEMPORARY -- to be removed once it falls off the window
+            .filter( r -> r.getCancellationDateTime().isAfter( LocalDateTime.of( 2023, 8, 20, 0, 0 ) ) )
             .forEach( r -> {
                 LOGGER.info( "Creating ChargeHostelworldLateCancellationJob for " + r.getReservationId() + ": " + r.getFirstName() + " " + r.getLastName() );
                 ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();
