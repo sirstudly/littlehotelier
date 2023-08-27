@@ -3,12 +3,15 @@ package com.macbackpackers.services;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.sql.Timestamp;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import com.macbackpackers.beans.JobParameter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.commons.pool2.impl.GenericObjectPool;
@@ -34,11 +37,17 @@ public class ProcessorService {
     @Value( "${processor.thread.count:1}" )
     private int threadCount;
 
+    @Value( "${gmail.sendfrom.name}" )
+    private String gmailSendName;
+
     @Autowired
     private WordPressDAO dao;
 
     @Autowired
     private AutowireCapableBeanFactory autowireBeanFactory;
+
+    @Autowired
+    private GmailService gmail;
 
     @Value( "${processor.repeat.interval.ms:60000}" )
     private long repeatIntervalMillis;
@@ -189,6 +198,7 @@ public class ProcessorService {
                 if ( i == job.getRetryCount() - 1 ) {
                     LOGGER.error( "Maximum number of attempts reached. Job " + job.getId() + " failed" );
                     dao.updateJobStatus( job.getId(), JobStatus.failed, JobStatus.processing );
+                    emailJobFailureToSupport( job, ex );
                 }
                 else { // wait a bit and try again
                     try {
@@ -216,6 +226,26 @@ public class ProcessorService {
             }
             finally {
                 MDC.remove( "jobId" );
+            }
+        }
+    }
+
+    private void emailJobFailureToSupport( AbstractJob job, Throwable ex ) {
+        String supportEmail = dao.getOption( "hbo_support_email" );
+        if ( supportEmail != null ) {
+            try ( PrintWriter pw = new PrintWriter( new StringWriter() ) ) {
+                pw.println( job.getClass().getName() + " (" + job.getId() + ") failed" );
+                for ( JobParameter param : job.getParameters() ) {
+                    pw.println( param.getName() + ": " + param.getValue() );
+                }
+                pw.println( "Stacktrace:" );
+                ex.printStackTrace( pw );
+                pw.println();
+                pw.println( "-RONBOT" );
+                gmail.sendEmail( supportEmail, null, gmailSendName + " Job Failed", pw.toString() );
+            }
+            catch ( Throwable th2 ) {
+                LOGGER.error( "Failed to send support email!", th2 );
             }
         }
     }

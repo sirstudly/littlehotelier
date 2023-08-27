@@ -46,7 +46,6 @@ public class ChargeHostelworldLateCancellationJob extends AbstractJob {
         catch ( RecordPaymentFailedException ex ) {
             LOGGER.info( "Payment not authorized. Lowering retry count on job to 1 to avoid spamming card" );
             numRetriesOverride = 1;
-            throw ex;
         }
     }
 
