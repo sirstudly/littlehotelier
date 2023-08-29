@@ -233,7 +233,8 @@ public class ProcessorService {
     private void emailJobFailureToSupport( AbstractJob job, Throwable ex ) {
         String supportEmail = dao.getOption( "hbo_support_email" );
         if ( supportEmail != null ) {
-            try ( PrintWriter pw = new PrintWriter( new StringWriter() ) ) {
+            StringWriter sw = new StringWriter();
+            try ( PrintWriter pw = new PrintWriter( sw ) ) {
                 pw.println( job.getClass().getName() + " (" + job.getId() + ") failed" );
                 for ( JobParameter param : job.getParameters() ) {
                     pw.println( param.getName() + ": " + param.getValue() );
@@ -242,7 +243,8 @@ public class ProcessorService {
                 ex.printStackTrace( pw );
                 pw.println();
                 pw.println( "-RONBOT" );
-                gmail.sendEmail( supportEmail, null, gmailSendName + " Job Failed", pw.toString() );
+                pw.flush();
+                gmail.sendEmail( supportEmail, null, gmailSendName + " Job Failed", sw.toString() );
             }
             catch ( Throwable th2 ) {
                 LOGGER.error( "Failed to send support email!", th2 );
