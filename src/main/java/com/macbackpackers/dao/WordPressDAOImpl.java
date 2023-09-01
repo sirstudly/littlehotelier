@@ -47,6 +47,7 @@ import javax.persistence.Query;
 import javax.persistence.TypedQuery;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -373,7 +374,12 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Override
     public AbstractJob fetchJobById( int id ) {
-        AbstractJob j = em.find( AbstractJob.class, id );
+        return fetchJobById( id, AbstractJob.class );
+    }
+
+    @Override
+    public <T extends AbstractJob> T fetchJobById( int id, Class<T> clazz) {
+        T j = em.find( clazz, id);
         if ( j == null ) {
             throw new EmptyResultDataAccessException( "Unable to find Job with ID " + id, 1 );
         }
@@ -919,6 +925,26 @@ public class WordPressDAOImpl implements WordPressDAO {
             .setParameter( "groupSize", getGroupBookingSize() )
             .setParameter( "propertyManager", StringUtils.defaultIfBlank( getOption( "hbo_property_manager" ), "n/a" ) )
             .executeUpdate();
+    }
+
+    @Override
+    public void runBedCountsReport( int bedCountJobId, LocalDate selectionDate ) {
+        LOGGER.info( "Running bedcounts report for job id: " + bedCountJobId );
+
+        // first remove any previous data in case we're running this again
+        int rowsDeleted = em
+                .createNativeQuery( "DELETE FROM wp_lh_bedcounts WHERE report_date = :selectionDate" )
+                .setParameter( "selectionDate", selectionDate )
+                .executeUpdate();
+        LOGGER.info( "Deleted " + rowsDeleted + " previous records from wp_lh_bedcounts" );
+
+        int rowsAdded = em.createNativeQuery( sql.getProperty( getOption( "siteurl" ).contains( "highstreet" )
+                                ? "bedcounts.report.insert.hsh" : "bedcounts.report.insert" )
+                        .replaceAll( "__SQL_SELECT__", sql.getProperty( "bedcounts.report.select" ) ) )
+                .setParameter( "jobId", bedCountJobId )
+                .setParameter( "selectionDate", selectionDate )
+                .executeUpdate();
+        LOGGER.info( "Added " + rowsAdded + " records to wp_lh_bedcounts" );
     }
 
     @Override

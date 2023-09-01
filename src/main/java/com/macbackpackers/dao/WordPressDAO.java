@@ -2,6 +2,7 @@
 package com.macbackpackers.dao;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -224,6 +225,16 @@ public interface WordPressDAO {
     AbstractJob fetchJobById( int id ) throws EmptyResultDataAccessException;
 
     /**
+     * Retrieve a job by PK.
+     *
+     * @param id job ID
+     * @param clazz expected class
+     * @return non-null job
+     * @throws EmptyResultDataAccessException if job not found
+     */
+    <T extends AbstractJob> T fetchJobById( int id, Class<T> clazz) throws EmptyResultDataAccessException;
+
+    /**
      * Finds any outstanding {@link ResetCloudbedsSessionJob}s and returns the first one.
      * 
      * @return first ResetCloudbedsSessionJob if any
@@ -373,6 +384,13 @@ public interface WordPressDAO {
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from
      */
     void runGroupBookingsReport( int allocationScraperJobId );
+
+    /**
+     * Updates the bed count report table for the given job ID.
+     * @param bedCountJobId job ID of the bed count job to use data from
+     * @param selectionDate the report date in which to run for
+     */
+    void runBedCountsReport( int bedCountJobId, LocalDate selectionDate );
 
     /**
      * Returns the list of HW/HB reservation IDs for which the deposit amount has not yet been

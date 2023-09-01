@@ -547,7 +547,12 @@ public class WordPressDAOTest {
     public void testRunGroupBookingsReport() {
         dao.runGroupBookingsReport( 137652 );   
     }
-    
+
+    @Test
+    public void testRunBedCountsReport() {
+        dao.runBedCountsReport( 557130, LocalDate.of( 2023, 8, 26 ) );
+    }
+
     @Test
     public void testDeleteHostelworldBookingsWithBookedDate() {
         Calendar c = Calendar.getInstance();

@@ -104,4 +104,63 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
       GROUP BY reservation_id, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, notes, viewed_yn
       HAVING CASE WHEN :propertyManager = 'cloudbeds' THEN num_guests ELSE SUM(num_guests) END = 5
     </entry>
+    <entry key="bedcounts.report.select">
+        SELECT room, capacity, room_type,
+            -- magnify private rooms based on size of room
+            IF(room_type IN ('DBL','TRIPLE','QUAD','TWIN'), num_empty * capacity, num_empty) `num_empty`,
+            IF(room_type IN ('DBL','TRIPLE','QUAD','TWIN'), num_staff * capacity, num_staff) `num_staff`,
+            IF(room_type IN ('DBL','TRIPLE','QUAD','TWIN'), num_paid * capacity, num_paid) `num_paid`,
+            IF(room_type IN ('DBL','TRIPLE','QUAD','TWIN'), num_noshow * capacity, num_noshow) `num_noshow`
+        FROM (
+            -- room 30/paid beds is split into separate rooms for some reason; collapse them
+            SELECT IF(p.room_type = 'PAID BEDS', '30', p.room) `room`, IF(p.room_type = 'PAID BEDS', 8, p.capacity) `capacity`, p.room_type,
+                SUM(IF(p.reservation_id IS NULL AND p.room_type != 'PAID BEDS', 1, 0)) `num_empty`,
+                SUM(IF(p.reservation_id = 0, 1, 0)) `num_staff`,
+                SUM(IF(p.lh_status IN ('checked-in', 'checked-out', 'checked_in', 'checked_out') AND p.reservation_id > 0, 1, 0)) `num_paid`,
+                SUM(IF(IFNULL(p.lh_status, '') NOT IN ('checked-in', 'checked-out', 'checked_in', 'checked_out') AND p.reservation_id > 0, 1, 0)) `num_noshow`
+            FROM (
+                SELECT rm.room, rm.bed_name, rm.capacity, rm.room_type, c.reservation_id, c.payment_outstanding, c.guest_name, c.notes, c.lh_status
+                FROM wp_lh_rooms rm
+                LEFT OUTER JOIN
+                ( SELECT cal.* FROM wp_lh_calendar cal, (select :selectionDate AS selection_date) const
+                    WHERE cal.job_id = :jobId -- the job_id to use data for
+                    AND cal.checkin_date &lt;= const.selection_date
+                    AND cal.checkout_date > const.selection_date
+                ) c
+                -- if unallocated (room_id = null), then ignore this join field and match on room_type_id
+                ON IFNULL(c.room_id, rm.id) = rm.id AND IFNULL(IF(c.room LIKE 'PB(%', 'PB', c.room), 'Unallocated') = rm.room AND c.room_type_id = rm.room_type_id
+                WHERE rm.active_yn = 'Y' OR rm.room_type = 'PAID BEDS' OR rm.room = 'Unallocated'
+            ) p
+            GROUP BY IF(p.room_type = 'PAID BEDS', 'PB', p.room), p.capacity, p.room_type
+        ) t
+        -- only include Unallocated if we have something to report
+        WHERE room != 'Unallocated'
+        -- 2018-06-17: don't include unallocated anymore; throws off count in cloudbeds
+        --  OR ((room_type = 'PAID BEDS' OR room = 'Unallocated') AND (num_staff > 0 OR num_paid > 0 OR num_noshow > 0))
+    </entry>
+    <entry key="bedcounts.report.insert">
+        INSERT INTO `wp_lh_bedcounts` (report_date, room, capacity, room_type, num_empty, num_staff, num_paid, num_noshow, created_date)
+        SELECT :selectionDate, room, capacity, room_type, num_empty, num_staff, num_paid, num_noshow,
+               (SELECT MIN(created_date) FROM wp_lh_calendar WHERE job_id = :jobId) AS created_date
+        FROM ( __SQL_SELECT__ ) bc
+    </entry>
+    <entry key="bedcounts.report.insert.hsh">
+        INSERT INTO `wp_lh_bedcounts` (report_date, room, capacity, room_type, num_empty, num_staff, num_paid, num_noshow, created_date)
+        SELECT :selectionDate, GROUP_CONCAT(room ORDER BY room SEPARATOR ', ') AS room,
+            SUM(capacity) AS capacity, hsh_room_type,
+            SUM(num_empty) AS num_empty, SUM(num_staff) AS num_staff, SUM(num_paid) AS num_paid, SUM(num_noshow) AS num_noshow,
+            (SELECT MIN(created_date) FROM wp_lh_calendar WHERE job_id = :jobId) AS created_date
+        FROM (
+            SELECT room, capacity, room_type,
+                -- these are the room types in the bedcounts for HSH
+                CASE WHEN capacity = 2 THEN 'Double/Twin'
+                WHEN capacity = 4 THEN 'Quad/4 Bed Dorm'
+                WHEN capacity BETWEEN 16 AND 18 THEN '16-18 Bed Dorm'
+                WHEN capacity BETWEEN 6 AND 12 THEN '6-12 Bed Dorm'
+                ELSE 'Unknown' END AS hsh_room_type,
+                num_empty, num_staff, num_paid, num_noshow
+            FROM ( __SQL_SELECT__ ) bc
+        ) hsh
+        GROUP BY CRC32(hsh_room_type) -- some weirdness with MariaDB here
+    </entry>
 </properties>

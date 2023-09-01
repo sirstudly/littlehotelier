@@ -10,6 +10,7 @@ import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.Transient;
 
+import com.macbackpackers.beans.JobStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
@@ -56,6 +57,13 @@ public class BedCountJob extends AbstractJob {
             LocalDate selectedDate = getSelectedLocalDate();
             cloudbedsService.dumpAllocationsFrom( getWebClient(),
                     getId(), selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
+
+            // aggregates data from above
+            BedCountReportJob j = new BedCountReportJob();
+            j.setStatus( JobStatus.submitted );
+            j.setBedCountJobId( getId() );
+            j.setSelectedDate( selectedDate );
+            dao.insertJob( j );
         }
         else {
             // we just need to scrape the data including the given date
