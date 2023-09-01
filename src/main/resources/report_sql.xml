@@ -142,7 +142,7 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
         INSERT INTO `wp_lh_bedcounts` (report_date, room, capacity, room_type, num_empty, num_staff, num_paid, num_noshow, created_date)
         SELECT :selectionDate, room, capacity, room_type, num_empty, num_staff,
                IF(room = 'PB', num_paid + num_noshow, num_paid) AS num_paid,
-               IF(room = 'PB', 0, num_noshow) AS num_noshow
+               IF(room = 'PB', 0, num_noshow) AS num_noshow,
                (SELECT MIN(created_date) FROM wp_lh_calendar WHERE job_id = :jobId) AS created_date
         FROM ( __SQL_SELECT__ ) bc
     </entry>
