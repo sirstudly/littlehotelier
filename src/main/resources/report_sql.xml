@@ -113,7 +113,7 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
             IF(room_type IN ('DBL','TRIPLE','QUAD','TWIN'), num_noshow * capacity, num_noshow) `num_noshow`
         FROM (
             -- room 30/paid beds is split into separate rooms for some reason; collapse them
-            SELECT IF(p.room_type = 'PAID BEDS', '30', p.room) `room`, IF(p.room_type = 'PAID BEDS', 8, p.capacity) `capacity`, p.room_type,
+            SELECT IF(p.room_type = 'PAID BEDS', 'PB', p.room) `room`, IF(p.room_type = 'PAID BEDS', 8, p.capacity) `capacity`, p.room_type,
                 SUM(IF(p.reservation_id IS NULL AND p.room_type != 'PAID BEDS', 1, 0)) `num_empty`,
                 SUM(IF(p.reservation_id = 0, 1, 0)) `num_staff`,
                 SUM(IF(p.lh_status IN ('checked-in', 'checked-out', 'checked_in', 'checked_out') AND p.reservation_id > 0, 1, 0)) `num_paid`,
