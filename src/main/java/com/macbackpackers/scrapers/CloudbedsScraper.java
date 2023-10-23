@@ -803,7 +803,7 @@ public class CloudbedsScraper {
                     catch ( IOException e ) {
                         LOGGER.error( "Failed to add note for failed charge..." );
                     }
-                    throw new RecordPaymentFailedException( "Failed to charge booking." );
+                    throw new RecordPaymentFailedException( "Failed to charge booking: " + resp.getStatusMessage() );
                 } );
     }
 

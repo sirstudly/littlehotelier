@@ -814,7 +814,20 @@ public class PaymentProcessorService {
             }
         }
         else {
-            cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
+            try {
+                cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
+            }
+            catch( RecordPaymentFailedException rpfe ) {
+                if ( rpfe.getMessage().contains( "insufficient funds" ) && cbReservation.isPossibleHotelCollectSmartFlexReservation() ) {
+                    final String SMART_FLEX_NOTE = "THIS DOES NOT APPEAR TO BE A CHANNEL-COLLECT BOOKING! GUEST TO PAY BALANCE ON ARRIVAL.";
+                    if ( cbReservation.containsNote( SMART_FLEX_NOTE ) ) {
+                        LOGGER.info( SMART_FLEX_NOTE );
+                    }
+                    else {
+                        cloudbedsScraper.addNote( webClient, reservationId, SMART_FLEX_NOTE );
+                    }
+                }
+            }
         }
     }
 

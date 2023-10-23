@@ -470,6 +470,23 @@ public class Reservation extends CloudbedsJsonResponse {
     }
 
     /**
+     * Certain BDC reservations marked as "channel-collect" which aren't actually channel collect;
+     * at least not at the time of checkin. I believe that "smart-flex" reservations which have canceled bookings
+     * replaced with new bookings can be hotel-collect, but if the new bookings are also canceled and they're
+     * not able to be filled before the checkin date, then this reverts to a channel-collect with the VCC
+     * appropriately funded. As it stands, we need to determine this before the guest checks in - so
+     * this is the checks whether it's a smart flex and if the VCC has any funds on it.
+     *
+     * @return true if smart flex and VCC contains moneys
+     */
+    public boolean isPossibleHotelCollectSmartFlexReservation() {
+        return getSpecialRequests() != null && getSourceName().contains( "Booking.com" )
+                && isChannelCollectBooking()
+                && getSpecialRequests().contains( "This is a Smart Flex reservation" )
+                && getSpecialRequests().contains( "You can charge 0.00 GBP" );
+    }
+
+    /**
      * Searches all notes for the given substring.
      * 
      * @param substr substring to match
