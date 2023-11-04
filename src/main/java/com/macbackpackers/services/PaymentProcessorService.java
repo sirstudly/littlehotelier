@@ -1611,7 +1611,7 @@ public class PaymentProcessorService {
                 cloudbedsScraper.addPayment( webClient, res, details.getCard().getBrand(), txn.getPaymentAmount(),
                         String.format( "VendorTxCode: %s, Status: %s, Card Type: %s, Card Number: ************%s, Gateway: STRIPE",
                                 txn.getVendorTxCode(), paymentIntent.getStatus(), details.getCard().getBrand(), details.getCard().getLast4() ) );
-                cloudbedsScraper.addNote( webClient, txn.getReservationId(),
+                cloudbedsScraper.addArchivedNote( webClient, txn.getReservationId(),
                         "Processed Stripe transaction for £" + txn.getPaymentAmount() + "." );
                 createSendStripePaymentConfirmationEmailJob( txn.getVendorTxCode() );
             }
