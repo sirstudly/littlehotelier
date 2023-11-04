@@ -1003,7 +1003,7 @@ public class CloudbedsService {
                                     .replace( "[card type]", StringUtils.upperCase( txn.getCardType() ) )
                                     .replace( "[last 4 digits]", txn.getLast4Digits() ) ) );
             if ( res != null ) {
-                scraper.addNote( webClient, res.getReservationId(), note );
+                scraper.addArchivedNote( webClient, res.getReservationId(), note );
             }
         }
     }
@@ -1085,7 +1085,7 @@ public class CloudbedsService {
         else {
             sendEmailFromTemplate( webClient, template, res,
                     b -> b.replace( "[charge amount]", "£" + scraper.getCurrencyFormat().format( amount ) ) );
-            scraper.addNote( webClient, reservationId, note );
+            scraper.addArchivedNote( webClient, reservationId, note );
         }
     }
 
@@ -1117,7 +1117,7 @@ public class CloudbedsService {
                             .replace( "__EMAIL_CONTENT__", template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[charge amount]", "£" + scraper.getCurrencyFormat().format( amount ) ) ) );
-            scraper.addNote( webClient, reservationId, note );
+            scraper.addArchivedNote( webClient, reservationId, note );
         }
     }
 
@@ -1203,7 +1203,7 @@ public class CloudbedsService {
         else {
             sendEmailFromTemplate( webClient, template, res,
                     b -> b.replace( "[charge amount]", "£" + scraper.getCurrencyFormat().format( amount ) ) );
-            scraper.addNote( webClient, reservationId, note );
+            scraper.addArchivedNote( webClient, reservationId, note );
         }
     }
 
@@ -1235,7 +1235,7 @@ public class CloudbedsService {
                             .replace( "__EMAIL_CONTENT__", template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[charge amount]", "£" + scraper.getCurrencyFormat().format( amount ) ) ) );
-            scraper.addNote( webClient, reservationId, note );
+            scraper.addArchivedNote( webClient, reservationId, note );
         }
     }
 

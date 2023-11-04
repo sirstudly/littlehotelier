@@ -346,7 +346,7 @@ public class PaymentProcessorService {
         try {
             // should have credit card details at this point; attempt autocharge
             cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, depositAmount );
-            cloudbedsScraper.addNote( webClient, reservationId,
+            cloudbedsScraper.addArchivedNote( webClient, reservationId,
                     "Successfully charged deposit of £" + cloudbedsScraper.getCurrencyFormat().format( depositAmount ) );
 
             // send email if successful
@@ -691,7 +691,7 @@ public class PaymentProcessorService {
         try {
             // should have credit card details at this point; attempt autocharge
             cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
-            cloudbedsScraper.addNote( webClient, reservationId, "Outstanding balance of "
+            cloudbedsScraper.addArchivedNote( webClient, reservationId, "Outstanding balance of "
                     + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) + " successfully charged." );
 
             // mark booking as fully paid in Hostelworld
