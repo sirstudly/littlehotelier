@@ -539,6 +539,7 @@ public class CloudbedsService {
             dao.fetchBookingsMatchingBlacklist( allocationScraperJobId, sharedDao.fetchBlacklistEntries() ).stream()
                 .map( a -> scraper.getReservationRetry( webClient, String.valueOf( a.getReservationId() ) ) )
                 .filter( r -> false == r.containsNote( "Guest Blacklisted email sent." ) )
+                .filter( r -> "confirmed".equals( r.getStatus() ) || "not_confirmed".equals( r.getStatus() ) )
                 .forEach( r -> {
                     SendGmailJob j = new SendGmailJob();
                     autowireBeanFactory.autowireBean( j );
