@@ -86,6 +86,8 @@ public class WordPressDAOImpl implements WordPressDAO {
     // cached
     private static String CSRF_TOKEN = null;
 
+    private static Map<String, String> WP_OPTIONS = null;
+
     @Override
     public boolean isCloudbeds() {
         return "cloudbeds".equalsIgnoreCase( getOption( "hbo_property_manager" ) );
@@ -983,18 +985,18 @@ public class WordPressDAOImpl implements WordPressDAO {
     @SuppressWarnings( "unchecked" )
     @Transactional( readOnly = true )
     public String getOption( String property ) {
-        List<String> sqlResult = em.createNativeQuery(
-                "          SELECT option_value"
-                        + "  FROM " + wordpressPrefix + "options"
-                        + " WHERE option_name = :optionName " )
-                .setParameter( "optionName", property )
-                .getResultList();
+        if ( WP_OPTIONS == null ) {
+            WP_OPTIONS = new HashMap<>();
+            List<Object[]> nvpList = em.createNativeQuery(
+                            "       SELECT option_name, option_value"
+                                    + "  FROM " + wordpressPrefix + "options" )
+                    .getResultList();
+            LOGGER.info( "Caching " + nvpList.size() + " records from " + wordpressPrefix + "options" );
+            nvpList.stream().forEach( nvp -> WP_OPTIONS.put( nvp[0].toString(), nvp[1].toString() ) );
+        }
 
         // key doesn't exist; just return null
-        if ( sqlResult.isEmpty() ) {
-            return null;
-        }
-        return sqlResult.get( 0 );
+        return WP_OPTIONS.get( property );
     }
 
     @Override
