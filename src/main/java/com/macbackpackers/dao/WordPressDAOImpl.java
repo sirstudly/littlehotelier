@@ -981,22 +981,52 @@ public class WordPressDAOImpl implements WordPressDAO {
         }
     }
 
+    private void verifyOptionsCacheIsInitialised() {
+        if ( WP_OPTIONS == null ) {
+            WP_OPTIONS = new HashMap<>();
+            synchronized ( WP_OPTIONS ) {
+                List<Object[]> nvpList = em.createNativeQuery(
+                                "       SELECT option_name, option_value"
+                                        + "  FROM " + wordpressPrefix + "options" )
+                        .getResultList();
+                LOGGER.info( "Caching " + nvpList.size() + " records from " + wordpressPrefix + "options" );
+                nvpList.stream().forEach( nvp -> WP_OPTIONS.put( nvp[0].toString(), nvp[1].toString() ) );
+            }
+        }
+    }
+
     @Override
     @SuppressWarnings( "unchecked" )
     @Transactional( readOnly = true )
     public String getOption( String property ) {
-        if ( WP_OPTIONS == null ) {
-            WP_OPTIONS = new HashMap<>();
-            List<Object[]> nvpList = em.createNativeQuery(
-                            "       SELECT option_name, option_value"
-                                    + "  FROM " + wordpressPrefix + "options" )
-                    .getResultList();
-            LOGGER.info( "Caching " + nvpList.size() + " records from " + wordpressPrefix + "options" );
-            nvpList.stream().forEach( nvp -> WP_OPTIONS.put( nvp[0].toString(), nvp[1].toString() ) );
-        }
-
+        verifyOptionsCacheIsInitialised();
         // key doesn't exist; just return null
         return WP_OPTIONS.get( property );
+    }
+
+    @Override
+    @SuppressWarnings( "unchecked" )
+    @Transactional( readOnly = true )
+    public String getOptionNoCache( String property ) {
+        verifyOptionsCacheIsInitialised();
+        List<String> sqlResult = em.createNativeQuery(
+                        "          SELECT option_value"
+                                + "  FROM " + wordpressPrefix + "options"
+                                + " WHERE option_name = :optionName " )
+                .setParameter( "optionName", property )
+                .getResultList();
+
+        // key doesn't exist; just return null
+        if ( sqlResult.isEmpty() ) {
+            synchronized ( WP_OPTIONS ) {
+                WP_OPTIONS.remove( property );
+            }
+            return null;
+        }
+        synchronized ( WP_OPTIONS ) {
+            WP_OPTIONS.put( property, sqlResult.get( 0 ) );
+        }
+        return sqlResult.get( 0 );
     }
 
     @Override
@@ -1050,6 +1080,10 @@ public class WordPressDAOImpl implements WordPressDAO {
             .setParameter( "name", property )
             .setParameter( "value", value )
             .executeUpdate();
+        verifyOptionsCacheIsInitialised();
+        synchronized ( WP_OPTIONS ) {
+            WP_OPTIONS.put( property, value );
+        }
     }
 
     @Override

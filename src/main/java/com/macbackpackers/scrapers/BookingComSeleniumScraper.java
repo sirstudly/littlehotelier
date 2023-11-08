@@ -177,7 +177,7 @@ public class BookingComSeleniumScraper {
         sleep( 60 );
         // force timeout after 10 minutes (60x10 seconds)
         for ( int i = 0 ; i < 60 ; i++ ) {
-            String scaCode = wordPressDAO.getOption( "hbo_bdc_2facode" );
+            String scaCode = wordPressDAO.getOptionNoCache( "hbo_bdc_2facode" );
             if ( StringUtils.isNotBlank( scaCode ) ) {
                 return scaCode;
             }

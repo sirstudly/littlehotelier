@@ -493,6 +493,14 @@ public interface WordPressDAO {
     String getOption( String property );
 
     /**
+     * Returns the wordpress option for the given property reading from the DB.
+     *
+     * @param property name of key to get
+     * @return option value or null if key doesn't exist
+     */
+    String getOptionNoCache( String property );
+
+    /**
      * Returns the Cloudbeds CSRF token from the current session.
      * 
      * @return CSRF token

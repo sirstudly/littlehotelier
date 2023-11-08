@@ -200,7 +200,7 @@ public class AuthenticationService {
         sleep( 60 );
         // force timeout after 10 minutes (60x10 seconds)
         for ( int i = 0 ; i < 60 ; i++ ) {
-            String scaCode = wordpressDAO.getOption( optionName );
+            String scaCode = wordpressDAO.getOptionNoCache( optionName );
             if ( StringUtils.isNotBlank( scaCode ) ) {
                 return scaCode;
             }
