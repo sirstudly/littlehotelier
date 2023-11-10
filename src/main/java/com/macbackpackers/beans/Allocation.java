@@ -108,6 +108,9 @@ public class Allocation {
     @Column( name = "notes" )
     private String notes;
 
+    @Column( name = "comments" )
+    private String comments;
+
     @Column( name = "viewed_yn" )
     @Type( type = "yes_no" )
     private boolean viewed;
@@ -350,6 +353,14 @@ public class Allocation {
 
     public void setNotes( String notes ) {
         this.notes = notes;
+    }
+
+    public String getComments() {
+        return comments;
+    }
+
+    public void setComments( String comments ) {
+        this.comments = comments;
     }
 
     public Timestamp getCreatedDate() {

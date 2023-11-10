@@ -910,6 +910,7 @@ public class CloudbedsService {
                 a.setStatus( r.getStatus() );
                 a.setViewed( true );
                 a.setNotes( r.getNotesAsString() );
+                a.setComments( r.getSpecialRequests() );
                 a.setRatePlanName( r.getUsedRoomTypes() );
                 return a;
             } )
