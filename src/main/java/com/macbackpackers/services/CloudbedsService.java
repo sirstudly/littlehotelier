@@ -399,6 +399,7 @@ public class CloudbedsService {
                 .filter( r -> BigDecimal.ZERO.compareTo( r.getBalanceDue() ) < 0 ) // still something to pay
                 .filter( r -> false == r.isChannelCollectBooking() )
                 .filter( r -> false == r.containsNote( PaymentProcessorService.CHARGE_REMAINING_BALANCE_NOTE ) )
+                .filter( r -> r.containsNote("Hogmanay Advanced Payment email sent."))
                 .forEach( r -> {
                     LOGGER.info( "Creating ChargeRemainingBalanceForBookingJob for " + r.getReservationId() );
                     ChargeRemainingBalanceForBookingJob j = new ChargeRemainingBalanceForBookingJob();
