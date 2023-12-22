@@ -231,7 +231,7 @@ public class CloudbedsScraper {
         for ( int i = 0 ; i < MAX_RETRY ; i++ ) {
             try {
                 Reservation r = getReservation( webClient, reservationId );
-                LOGGER.info( r.getThirdPartyIdentifier() + ": " + r.getFirstName() + " " + r.getLastName() );
+                LOGGER.info( StringUtils.defaultString( r.getThirdPartyIdentifier(), r.getIdentifier() ) + ": " + r.getFirstName() + " " + r.getLastName() );
                 LOGGER.info( "Source: " + r.getSourceName() );
                 LOGGER.info( "Status: " + r.getStatus() );
                 LOGGER.info( "Checkin: " + r.getCheckinDate() );

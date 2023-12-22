@@ -12,6 +12,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.macbackpackers.jobs.ArchiveAllTransactionNotesJob;
 import com.macbackpackers.jobs.BedCountReportJob;
 import com.macbackpackers.jobs.CreatePrepaidRefundJob;
 import com.macbackpackers.jobs.PrepaidRefundJob;
@@ -796,6 +797,14 @@ public class ProcessorServiceTest {
         VerifyAlexaLoggedInJob job = new VerifyAlexaLoggedInJob();
         autowireBeanFactory.autowireBean( job );
         job.processJob();
+    }
+
+    @Test
+    public void testAddArchiveAllTransactionNotesJob() {
+        ArchiveAllTransactionNotesJob j = new ArchiveAllTransactionNotesJob();
+        j.setStatus( JobStatus.submitted );
+        j.setReservationId( "87742801" );
+        dao.insertJob( j );
     }
 
 //    @Test
