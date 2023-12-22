@@ -33,4 +33,9 @@ public class StripeCheckoutCompletedJob extends AbstractJob {
     public void setVendorTxCode( String vendorTxCode ) {
         setParameter( "vendor_tx_code", vendorTxCode );
     }
+
+    @Override
+    public int getRetryCount() {
+        return 1; // failed attempts needs manually check
+    }
 }
