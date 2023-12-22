@@ -230,7 +230,15 @@ public class CloudbedsScraper {
     public Reservation getReservationRetry( WebClient webClient, String reservationId ) {
         for ( int i = 0 ; i < MAX_RETRY ; i++ ) {
             try {
-                return getReservation( webClient, reservationId );
+                Reservation r = getReservation( webClient, reservationId );
+                LOGGER.info( r.getThirdPartyIdentifier() + ": " + r.getFirstName() + " " + r.getLastName() );
+                LOGGER.info( "Source: " + r.getSourceName() );
+                LOGGER.info( "Status: " + r.getStatus() );
+                LOGGER.info( "Checkin: " + r.getCheckinDate() );
+                LOGGER.info( "Checkout: " + r.getCheckoutDate() );
+                LOGGER.info( "Grand Total: " + r.getGrandTotal() );
+                LOGGER.info( "Balance Due: " + r.getBalanceDue() );
+                return r;
             }
             catch ( IOException ex ) {
                 LOGGER.error( "Failed to retrieve reservation " + reservationId, ex );

@@ -106,10 +106,10 @@ public class BookingComSeleniumScraper {
     private void doLoginForm( WebDriver driver, WebDriverWait wait, String username, String password ) {
 
         WebElement usernameField = findElement( driver, wait, By.id( "loginname" ) );
-        usernameField.sendKeys( wordPressDAO.getOption( "hbo_bdc_username" ) );
+        usernameField.sendKeys( username );
         findElement( driver, wait, By.xpath( "//span[text()='Next']/.." ) ).click();
         WebElement passwordField = findElement( driver, wait, By.id( "password" ) );
-        passwordField.sendKeys( wordPressDAO.getOption( "hbo_bdc_password" ) );
+        passwordField.sendKeys( password );
 
         {
             final WebElement nextButton = findElement(driver, wait, By.xpath("//span[text()='Sign in']/.."));

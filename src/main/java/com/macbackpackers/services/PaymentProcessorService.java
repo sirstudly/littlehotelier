@@ -27,6 +27,7 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentPendingException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.jobs.ArchiveAllTransactionNotesJob;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
 import com.macbackpackers.jobs.HostelworldAcknowledgeFullPaymentTakenJob;
 import com.macbackpackers.jobs.SendDepositChargeDeclinedEmailJob;
@@ -294,15 +295,6 @@ public class PaymentProcessorService {
     public synchronized void processDepositPayment( WebClient webClient, String reservationId ) throws IOException, MessagingException {
         LOGGER.info( "Processing deposit payment for reservation " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
-
-        LOGGER.info( cbReservation.getThirdPartyIdentifier() + ": "
-                + cbReservation.getFirstName() + " " + cbReservation.getLastName() );
-        LOGGER.info( "Source: " + cbReservation.getSourceName() );
-        LOGGER.info( "Status: " + cbReservation.getStatus() );
-        LOGGER.info( "Checkin: " + cbReservation.getCheckinDate() );
-        LOGGER.info( "Checkout: " + cbReservation.getCheckoutDate() );
-        LOGGER.info( "Grand Total: " + cbReservation.getGrandTotal() );
-        LOGGER.info( "Balance Due: " + cbReservation.getBalanceDue() );
 
         // check if we have anything to pay
         if ( cbReservation.getPaidValue().compareTo( BigDecimal.ZERO ) > 0 ) {
@@ -649,14 +641,6 @@ public class PaymentProcessorService {
         LOGGER.info( "Processing charge of non-refundable booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
-        LOGGER.info( cbReservation.getThirdPartyIdentifier() + ": "
-                + cbReservation.getFirstName() + " " + cbReservation.getLastName() );
-        LOGGER.info( "Status: " + cbReservation.getStatus() );
-        LOGGER.info( "Checkin: " + cbReservation.getCheckinDate() );
-        LOGGER.info( "Checkout: " + cbReservation.getCheckoutDate() );
-        LOGGER.info( "Grand Total: " + cbReservation.getGrandTotal() );
-        LOGGER.info( "Balance Due: " + cbReservation.getBalanceDue() );
-
         // check if we have anything to pay
         if ( cbReservation.isPaid() ) {
             LOGGER.info( "Booking is paid. Nothing to do." );
@@ -748,15 +732,6 @@ public class PaymentProcessorService {
         LOGGER.info( "Processing full payment for booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
-        LOGGER.info( cbReservation.getThirdPartyIdentifier() + ": "
-                + cbReservation.getFirstName() + " " + cbReservation.getLastName() );
-        LOGGER.info( "Source: " + cbReservation.getSourceName() );
-        LOGGER.info( "Status: " + cbReservation.getStatus() );
-        LOGGER.info( "Checkin: " + cbReservation.getCheckinDate() );
-        LOGGER.info( "Checkout: " + cbReservation.getCheckoutDate() );
-        LOGGER.info( "Grand Total: " + cbReservation.getGrandTotal() );
-        LOGGER.info( "Balance Due: " + cbReservation.getBalanceDue() );
-
         // check if we have anything to pay
         if ( cbReservation.isPaid() ) {
             LOGGER.warn( "Booking is paid! Stopping here." );
@@ -843,15 +818,6 @@ public class PaymentProcessorService {
     public synchronized void processPrepaidRefund(WebClient webClient, String reservationId, BigDecimal amountToRefund, String description) throws Exception {
         LOGGER.info( "Processing refund for booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry(webClient, reservationId);
-
-        LOGGER.info(cbReservation.getThirdPartyIdentifier() + ": "
-                + cbReservation.getFirstName() + " " + cbReservation.getLastName());
-        LOGGER.info("Source: " + cbReservation.getSourceName());
-        LOGGER.info("Status: " + cbReservation.getStatus());
-        LOGGER.info("Checkin: " + cbReservation.getCheckinDate());
-        LOGGER.info("Checkout: " + cbReservation.getCheckoutDate());
-        LOGGER.info("Grand Total: " + cbReservation.getGrandTotal());
-        LOGGER.info("Balance Due: " + cbReservation.getBalanceDue());
         LOGGER.info("Amount being refunded: " + amountToRefund);
         LOGGER.info("Refund description: " + description);
 
@@ -898,14 +864,6 @@ public class PaymentProcessorService {
     public synchronized void processHostelworldLateCancellationCharge( WebClient webClient, String reservationId ) throws IOException {
         LOGGER.info( "Processing payment for 1st night of booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
-
-        LOGGER.info( cbReservation.getThirdPartyIdentifier() + ": "
-                + cbReservation.getFirstName() + " " + cbReservation.getLastName() );
-        LOGGER.info( "Status: " + cbReservation.getStatus() );
-        LOGGER.info( "Checkin: " + cbReservation.getCheckinDate() );
-        LOGGER.info( "Checkout: " + cbReservation.getCheckoutDate() );
-        LOGGER.info( "Grand Total: " + cbReservation.getGrandTotal() );
-        LOGGER.info( "Balance Due: " + cbReservation.getBalanceDue() );
 
         // check if we've paid anything
         if ( false == BigDecimal.ZERO.equals( cbReservation.getPaidValue() ) ) {
@@ -975,14 +933,6 @@ public class PaymentProcessorService {
     public synchronized void chargeRemainingBalanceForBooking( WebClient webClient, String reservationId ) throws IOException {
         LOGGER.info( "Processing remaining balance for booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
-
-        LOGGER.info( cbReservation.getThirdPartyIdentifier() + ": "
-                + cbReservation.getFirstName() + " " + cbReservation.getLastName() );
-        LOGGER.info( "Status: " + cbReservation.getStatus() );
-        LOGGER.info( "Checkin: " + cbReservation.getCheckinDate() );
-        LOGGER.info( "Checkout: " + cbReservation.getCheckoutDate() );
-        LOGGER.info( "Grand Total: " + cbReservation.getGrandTotal() );
-        LOGGER.info( "Balance Due: " + cbReservation.getBalanceDue() );
 
         if( cbReservation.containsNote( CHARGE_REMAINING_BALANCE_NOTE ) ) {
             LOGGER.info( "Already attempted to charge booking. Not attempting to try again." );
@@ -1614,6 +1564,7 @@ public class PaymentProcessorService {
                 cloudbedsScraper.addArchivedNote( webClient, txn.getReservationId(),
                         "Processed Stripe transaction for £" + txn.getPaymentAmount() + "." );
                 createSendStripePaymentConfirmationEmailJob( txn.getVendorTxCode() );
+                createArchiveAllTransactionNotesJob( res.getReservationId() );
             }
         }
     }
@@ -1693,6 +1644,19 @@ public class PaymentProcessorService {
         SendStripePaymentConfirmationEmailJob j = new SendStripePaymentConfirmationEmailJob();
         j.setStatus( JobStatus.submitted );
         j.setVendorTxCode( vendorTxCode );
+        wordpressDAO.insertJob( j );
+    }
+
+    /**
+     * Creates ArchiveAllTransactionNotesJob for the given reservation.
+     *
+     * @param reservationId
+     */
+    private void createArchiveAllTransactionNotesJob( String reservationId ) {
+        LOGGER.info( "Creating ArchiveAllTransactionNotesJob for reservation " + reservationId );
+        ArchiveAllTransactionNotesJob j = new ArchiveAllTransactionNotesJob();
+        j.setStatus( JobStatus.submitted );
+        j.setReservationId( reservationId );
         wordpressDAO.insertJob( j );
     }
 

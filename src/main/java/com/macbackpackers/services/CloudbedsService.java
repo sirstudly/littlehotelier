@@ -1,5 +1,62 @@
 package com.macbackpackers.services;
 
+import com.gargoylesoftware.htmlunit.Page;
+import com.gargoylesoftware.htmlunit.UnexpectedPage;
+import com.gargoylesoftware.htmlunit.WebClient;
+import com.gargoylesoftware.htmlunit.html.HtmlButton;
+import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
+import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
+import com.gargoylesoftware.htmlunit.util.Cookie;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.macbackpackers.beans.Allocation;
+import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.BookingReport;
+import com.macbackpackers.beans.GuestCommentReportEntry;
+import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.beans.RoomBed;
+import com.macbackpackers.beans.RoomBedLookup;
+import com.macbackpackers.beans.SagepayTransaction;
+import com.macbackpackers.beans.StripeTransaction;
+import com.macbackpackers.beans.bdc.BookingComRefundRequest;
+import com.macbackpackers.beans.cloudbeds.requests.CustomerInfo;
+import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
+import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
+import com.macbackpackers.beans.cloudbeds.responses.Guest;
+import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.dao.SharedDbDAO;
+import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
+import com.macbackpackers.jobs.ChargeRemainingBalanceForBookingJob;
+import com.macbackpackers.jobs.CreateFixedRateReservationJob;
+import com.macbackpackers.jobs.PrepaidChargeJob;
+import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
+import com.macbackpackers.jobs.SendGmailJob;
+import com.macbackpackers.jobs.SendGroupBookingApprovalRequiredEmailJob;
+import com.macbackpackers.jobs.SendGroupBookingPaymentReminderEmailJob;
+import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
+import com.macbackpackers.jobs.SendTemplatedEmailJob;
+import com.macbackpackers.scrapers.BookingComScraper;
+import com.macbackpackers.scrapers.CloudbedsScraper;
+import com.macbackpackers.scrapers.matchers.BedAssignment;
+import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.text.StringEscapeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+
+import javax.mail.MessagingException;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URISyntaxException;
@@ -7,7 +64,6 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.Period;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -26,64 +82,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import javax.mail.MessagingException;
-
-import com.gargoylesoftware.htmlunit.Page;
-import com.gargoylesoftware.htmlunit.UnexpectedPage;
-import com.macbackpackers.beans.bdc.BookingComRefundRequest;
-import com.macbackpackers.dao.SharedDbDAO;
-import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
-import com.macbackpackers.jobs.ChargeRemainingBalanceForBookingJob;
-import com.macbackpackers.jobs.CreateFixedRateReservationJob;
-import com.macbackpackers.jobs.PrepaidChargeJob;
-import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
-import com.macbackpackers.jobs.SendGmailJob;
-import com.macbackpackers.jobs.SendGroupBookingApprovalRequiredEmailJob;
-import com.macbackpackers.jobs.SendGroupBookingPaymentReminderEmailJob;
-import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
-import com.macbackpackers.jobs.SendTemplatedEmailJob;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.text.StringEscapeUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
-import org.springframework.context.ApplicationContext;
-import org.springframework.stereotype.Service;
-
-import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.html.HtmlButton;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
-import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
-import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
-import com.gargoylesoftware.htmlunit.util.Cookie;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.macbackpackers.beans.Allocation;
-import com.macbackpackers.beans.AllocationList;
-import com.macbackpackers.beans.BookingReport;
-import com.macbackpackers.beans.GuestCommentReportEntry;
-import com.macbackpackers.beans.JobStatus;
-import com.macbackpackers.beans.RoomBed;
-import com.macbackpackers.beans.RoomBedLookup;
-import com.macbackpackers.beans.SagepayTransaction;
-import com.macbackpackers.beans.StripeTransaction;
-import com.macbackpackers.beans.cloudbeds.requests.CustomerInfo;
-import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
-import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
-import com.macbackpackers.beans.cloudbeds.responses.Guest;
-import com.macbackpackers.beans.cloudbeds.responses.Reservation;
-import com.macbackpackers.dao.WordPressDAO;
-import com.macbackpackers.exceptions.MissingUserDataException;
-import com.macbackpackers.exceptions.UnrecoverableFault;
-import com.macbackpackers.scrapers.BookingComScraper;
-import com.macbackpackers.scrapers.CloudbedsScraper;
-import com.macbackpackers.scrapers.matchers.BedAssignment;
-import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
+import static com.macbackpackers.services.PaymentProcessorService.CHARGE_REMAINING_BALANCE_NOTE;
 
 @Service
 public class CloudbedsService {
@@ -398,7 +397,7 @@ public class CloudbedsService {
                         + " with balance of " + r.getBalanceDue() ) )
                 .filter( r -> BigDecimal.ZERO.compareTo( r.getBalanceDue() ) < 0 ) // still something to pay
                 .filter( r -> false == r.isChannelCollectBooking() )
-                .filter( r -> false == r.containsNote( PaymentProcessorService.CHARGE_REMAINING_BALANCE_NOTE ) )
+                .filter( r -> false == r.containsNote( CHARGE_REMAINING_BALANCE_NOTE ) )
                 .filter( r -> r.containsNote("Hogmanay Advanced Payment email sent."))
                 .forEach( r -> {
                     LOGGER.info( "Creating ChargeRemainingBalanceForBookingJob for " + r.getReservationId() );
@@ -795,6 +794,37 @@ public class CloudbedsService {
                     j.setReservationId( r.getReservationId() );
                     dao.insertJob( j );
                 } );
+    }
+
+    /**
+     * Archives all transaction related messages for this booking ONLY IF the booking is fully paid for (no balance owing).
+     *
+     * @param webClient
+     * @param reservationId
+     */
+    public void archiveAllTransactionNotes( WebClient webClient, String reservationId ) {
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        if ( res.getBalanceDue().compareTo( BigDecimal.ZERO ) > 0 ) {
+            LOGGER.info( "Outstanding balance of " + scraper.getCurrencyFormat().format( res.getBalanceDue() )
+                    + " remaining. Not archiving transaction notes." );
+        }
+        else {
+            res.getNotes()
+                    .stream()
+                    .filter( n -> n.getOwnerName().equals( "RON BOT" ) )
+                    // just need to archive all those declined messages now that everything has been paid for
+                    .filter( n -> n.getNotes().contains( "Failed to charge booking:" )
+                            || n.getNotes().contains( "Payment Declined email sent." ) )
+                    .forEach( n -> {
+                        try {
+                            LOGGER.info( "Archiving note: " + n.getNotes() );
+                            scraper.archiveNote( webClient, reservationId, n.getId() );
+                        }
+                        catch ( IOException e ) {
+                            throw new RuntimeException( e );
+                        }
+                    } );
+        }
     }
 
     /**
@@ -1554,14 +1584,6 @@ public class CloudbedsService {
     public void markCreditCardInvalidOnBDC( String reservationId ) throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
             Reservation r = scraper.getReservationRetry( webClient, reservationId );
-
-            LOGGER.info( r.getThirdPartyIdentifier() + ": " + r.getFirstName() + " " + r.getLastName() );
-            LOGGER.info( "Source: " + r.getSourceName() );
-            LOGGER.info( "Status: " + r.getStatus() );
-            LOGGER.info( "Checkin: " + r.getCheckinDate() );
-            LOGGER.info( "Checkout: " + r.getCheckoutDate() );
-            LOGGER.info( "Grand Total: " + r.getGrandTotal() );
-            LOGGER.info( "Balance Due: " + r.getBalanceDue() );
 
             if ( false == "Booking.com".equals( r.getSourceName() ) ) {
                 throw new UnrecoverableFault( "Unsupported booking source " + r.getSourceName() );

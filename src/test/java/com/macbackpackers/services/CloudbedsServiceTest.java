@@ -198,4 +198,9 @@ public class CloudbedsServiceTest {
     public void testCreateEmailsForBookingsOnBlacklist() throws Exception {
         cloudbedsService.createEmailsForBookingsOnBlacklist( 543745 );
     }
+
+    @Test
+    public void testArchiveAllTransactionNotes() {
+        cloudbedsService.archiveAllTransactionNotes( webClient, "87742801" );
+    }
 }

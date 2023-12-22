@@ -12,6 +12,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.macbackpackers.jobs.BedCountReportJob;
 import com.macbackpackers.jobs.CreatePrepaidRefundJob;
 import com.macbackpackers.jobs.PrepaidRefundJob;
 import org.apache.commons.io.IOUtils;
@@ -435,6 +436,15 @@ public class ProcessorServiceTest {
         autowireBeanFactory.autowireBean( j );
         j.resetJob();
         j.processJob();
+    }
+
+    @Test
+    public void testBedCountReportJob() throws Exception {
+        BedCountReportJob j = new BedCountReportJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBedCountJobId( 557130 );
+        j.setSelectedDate( LocalDate.of( 2023, 8, 26 ) );
+        dao.insertJob( j );
     }
 
     @Test
