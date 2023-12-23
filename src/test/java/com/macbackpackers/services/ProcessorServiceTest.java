@@ -84,6 +84,8 @@ import com.macbackpackers.jobs.VerifyGoogleAssistantLoggedInJob;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 
+import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_DECLINED;
+
 @SuppressWarnings( "deprecation" )
 @RunWith( SpringJUnit4ClassRunner.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
@@ -742,7 +744,7 @@ public class ProcessorServiceTest {
         Map<String, String> replaceMap = new HashMap<>();
         replaceMap.put( "\\[charge amount\\]", "99.00" );
         replaceMap.put( "\\[payment URL\\]", "https://pay.macbackpackers.com/booking/CRH/WH6QLN2" );
-        j.setEmailTemplate( "Payment Declined" );
+        j.setEmailTemplate( TEMPLATE_PAYMENT_DECLINED );
         j.setReservationId( "67665909" );
         j.setReplacementMap( replaceMap );
         j.setStatus( JobStatus.submitted );

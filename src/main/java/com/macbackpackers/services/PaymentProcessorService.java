@@ -91,6 +91,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.macbackpackers.scrapers.AllocationsPageScraper.POUND;
+import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_DECLINED;
 
 /**
  * Service for checking payments in LH, sending (deposit) payments through the payment gateway and
@@ -967,7 +968,7 @@ public class PaymentProcessorService {
             String paymentURL = cloudbedsService.generateUniquePaymentURL( reservationId, null );
             replaceMap.put( "\\[charge amount\\]", cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
             replaceMap.put( "\\[payment URL\\]", paymentURL );
-            job.setEmailTemplate( "Payment Declined" );
+            job.setEmailTemplate( TEMPLATE_PAYMENT_DECLINED );
             job.setReservationId( reservationId );
             job.setReplacementMap( replaceMap );
             job.setStatus( JobStatus.submitted );

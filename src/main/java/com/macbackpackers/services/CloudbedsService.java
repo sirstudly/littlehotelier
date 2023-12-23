@@ -82,6 +82,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED;
+import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER;
+import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED;
+import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_DECLINED;
+import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_LINK;
 import static com.macbackpackers.services.PaymentProcessorService.CHARGE_REMAINING_BALANCE_NOTE;
 
 @Service
@@ -707,7 +712,7 @@ public class CloudbedsService {
                 .filter( c -> false == "Airbnb (API)".equals( c.getSourceName() ) ) // Airbnb is channel-collect apparently
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> r.getNumberOfGuests() >= GROUP_BOOKING_SIZE )
-                .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER ) )
+                .filter( r -> false == r.containsNote( TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER ) )
                 // don't send the payment reminder if they booked within the payment reminder window
                 .filter( r -> r.getBookingDateAsLocalDate().compareTo( LocalDate.now().minusDays( Period.between( LocalDate.now(), checkinDateEnd ).getDays() ) ) < 0 )
                 .forEach( r -> {
@@ -814,7 +819,11 @@ public class CloudbedsService {
                     .filter( n -> n.getOwnerName().equals( "RON BOT" ) )
                     // just need to archive all those declined messages now that everything has been paid for
                     .filter( n -> n.getNotes().contains( "Failed to charge booking:" )
-                            || n.getNotes().contains( "Payment Declined email sent." ) )
+                            || n.getNotes().contains( TEMPLATE_PAYMENT_DECLINED + " email sent." )
+                            || n.getNotes().contains( TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED + " email sent." )
+                            || n.getNotes().contains( TEMPLATE_DEPOSIT_CHARGE_DECLINED + " email sent." )
+                            || n.getNotes().contains( TEMPLATE_PAYMENT_LINK + " email sent." )
+                            || n.getNotes().contains( TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER + " email sent." ) )
                     .forEach( n -> {
                         try {
                             LOGGER.info( "Archiving note: " + n.getNotes() );
