@@ -10,6 +10,7 @@ public class BookingNote {
     private String notes;
     private String created;
     private String ownerName;
+    private String archived;
 
     public String getId() {
         return id;
@@ -33,6 +34,18 @@ public class BookingNote {
 
     public void setCreated( String created ) {
         this.created = created;
+    }
+
+    public String getArchived() {
+        return archived;
+    }
+
+    public void setArchived( String archived ) {
+        this.archived = archived;
+    }
+
+    public boolean isArchived() {
+        return getArchived() != null;
     }
 
     public String getOwnerName() {

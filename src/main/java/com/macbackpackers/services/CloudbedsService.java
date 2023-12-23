@@ -816,7 +816,7 @@ public class CloudbedsService {
         else {
             res.getNotes()
                     .stream()
-                    .filter( n -> n.getOwnerName().equals( "RON BOT" ) )
+                    .filter( n -> n.getOwnerName().equals( "RON BOT" ) && false == n.isArchived() )
                     // just need to archive all those declined messages now that everything has been paid for
                     .filter( n -> n.getNotes().contains( "Failed to charge booking:" )
                             || n.getNotes().contains( TEMPLATE_PAYMENT_DECLINED + " email sent." )
