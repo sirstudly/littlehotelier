@@ -25,7 +25,7 @@ public class LochsideRoomBedMatcher implements RoomBedMatcher {
             bedName = m.group( 2 ).trim();
         }
         else {
-            p = Pattern.compile( "(.*)-(.*)$" );
+            p = Pattern.compile( "(.+?)-(.*)$" );
             m = p.matcher( roomLabel );
             if ( m.find() ) {
                 room = m.group( 1 ).trim(); // Capture group 1 includes whitespace
