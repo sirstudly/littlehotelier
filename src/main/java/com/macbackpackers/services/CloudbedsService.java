@@ -549,7 +549,7 @@ public class CloudbedsService {
                     SendGmailJob j = new SendGmailJob();
                     autowireBeanFactory.autowireBean( j );
                     j.setStatus( JobStatus.submitted );
-                    j.setToAddress( dao.getMandatoryOption( "hbo_support_email" ) );
+                    j.setToAddress( "me" );
                     j.setReservationId( r.getReservationId() );
                     j.setSubject( "Guest Blacklisted" );
                     j.setEmailBody( "Reservation #" + r.getIdentifier() + " for " + r.getFirstName() + " " + r.getLastName()

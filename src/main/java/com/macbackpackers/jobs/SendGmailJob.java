@@ -40,7 +40,12 @@ public class SendGmailJob extends AbstractJob {
                 LOGGER.info( "Email already sent. Nothing to do." );
             }
             else {
-                gmailService.sendEmail( getToAddress(), null, getSubject(), getEmailBody() );
+                if ( "me".equalsIgnoreCase( getToAddress() ) ) {
+                    gmailService.sendEmailToSelf( getSubject(), getEmailBody() );
+                }
+                else {
+                    gmailService.sendEmail( getToAddress(), null, getSubject(), getEmailBody() );
+                }
                 scraper.addNote( webClient, getReservationId(), note );
             }
         }
