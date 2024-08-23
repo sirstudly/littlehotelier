@@ -22,6 +22,7 @@ public class BookingRoom {
     private String roomNumber;
     private String detailedRates;
     private String rateId;
+    private String guestId;
 
     public String getId() {
         return id;
@@ -117,6 +118,14 @@ public class BookingRoom {
 
     public void setRateId( String rateId ) {
         this.rateId = rateId;
+    }
+
+    public String getGuestId() {
+        return guestId;
+    }
+
+    public void setGuestId( String guestId ) {
+        this.guestId = guestId;
     }
 
     @Override

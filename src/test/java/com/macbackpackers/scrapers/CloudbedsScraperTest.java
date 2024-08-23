@@ -176,8 +176,8 @@ public class CloudbedsScraperTest {
     @Test
     public void testAddPayment() throws Exception {
         cloudbedsScraper.addPayment( webClient,
-                cloudbedsScraper.getReservation( webClient, "9814194" ),
-                "visa", new BigDecimal( "0.15" ), "Test payment XYZ" );
+                cloudbedsScraper.getReservation( webClient, "34802644" ),
+                new BigDecimal( "0.15" ), "Test payment XYZ" );
     }
     
     @Test

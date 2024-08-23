@@ -47,7 +47,7 @@ public class CloudbedsJsonRequestFactory {
     private WordPressDAO dao;
 
     // a default version which we'll probably get prompted to update
-    private static final String DEFAULT_VERSION = "https://static1.cloudbeds.com/myfrontdesk-front/initial-12.0/app.js.gz";
+    private static final String DEFAULT_VERSION = "https://front.cloudbeds.com/mfd-root/app.js";
 
     // the cloudbeds property id
     private String propertyId;
@@ -657,23 +657,24 @@ public class CloudbedsJsonRequestFactory {
      * 
      * @param reservationId ID of reservation (as it appears in the URL)
      * @param bookingRoomId (which "room" we're booking the payment to)
-     * @param cardType one of "mastercard", "visa". Anything else will blank the field.
+     * @param guestId guest or customer ID to assign payment to
      * @param amount amount to record
      * @param description description
      * @param csrf csrf token
      * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createAddNewPaymentRequest( String reservationId, String bookingRoomId, String cardType, BigDecimal amount, String description, String csrf, String billingPortalId ) throws IOException {
+    public WebRequest createAddNewPaymentRequest( String reservationId, String bookingRoomId, String guestId, BigDecimal amount,
+                                                  String description, String csrf, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_payment" );
         webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "payment_type", "cards" ),
-                new NameValuePair( "paymentType", "cards" ),
-                new NameValuePair( "choose_card",
-                        cardType.equalsIgnoreCase( "mastercard" ) ? "master" : cardType.equalsIgnoreCase( "visa" ) ? "visa" : "" ),
+                new NameValuePair( "payment_type", "check" ),
+                new NameValuePair( "paymentType", "check" ),
                 new NameValuePair( "assign_to", bookingRoomId ),
                 new NameValuePair( "assignTo", bookingRoomId ),
+                new NameValuePair( "assignToGuestId", guestId ),
                 new NameValuePair( "paid", CURRENCY_FORMAT.format( amount ) ),
                 new NameValuePair( "payment_date", LocalDate.now().format( YYYY_MM_DD ) ),
                 new NameValuePair( "paymentDate", LocalDate.now().format( YYYY_MM_DD ) ),
@@ -697,10 +698,12 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "csrf_accessa", csrf ),
                 new NameValuePair( "billing_portal_id", billingPortalId ),
                 new NameValuePair( "is_bp_setup_completed", "1" ),
-                new NameValuePair( "announcementsLast", "" ),
+                new NameValuePair( "folioId", "0" ),
                 new NameValuePair( "booking_id", reservationId ),
+                new NameValuePair( "bookingId", reservationId ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
@@ -1111,4 +1114,18 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "token", token ) ) );
         return requestSettings;
     }
+
+    /**
+     * Returns the current version numbers.
+     * @return
+     * @throws IOException
+     */
+    public WebRequest createRemoteEntriesRequest() throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://front.cloudbeds.com/remotes/prod-ga/stable/remote-entries.json" );
+        webRequest.setHttpMethod( HttpMethod.GET );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "timestamp", String.valueOf( System.currentTimeMillis() ) ) ) );
+        return webRequest;
+    }
+
 }

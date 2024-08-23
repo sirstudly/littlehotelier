@@ -45,6 +45,7 @@ import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.AddNoteResponse;
+import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
 import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
@@ -81,6 +82,8 @@ public class CloudbedsScraper {
 
     // the last result of getPropertyContent() as it's an expensive operation
     private static JsonObject propertyContent;
+    // the last version numbers
+    private static JsonObject remoteEntries;
 
     private static LoadingCache<String, EmailTemplateInfo> emailTemplateCache = CacheBuilder.newBuilder()
             .build( new CacheLoader<String, EmailTemplateInfo>() {
@@ -500,12 +503,11 @@ public class CloudbedsScraper {
      * 
      * @param webClient web client instance to use
      * @param res cloudbeds reservation
-     * @param cardType one of "mastercard", "visa". Anything else will blank the field.
      * @param amount amount to add
      * @param description description of payment
      * @throws IOException on page load failure
      */
-    public void addPayment( WebClient webClient, Reservation res, String cardType, BigDecimal amount, String description ) throws IOException {
+    public void addPayment( WebClient webClient, Reservation res, BigDecimal amount, String description ) throws IOException {
 
         // first we need to find a "room" we're booking to
         // it doesn't actually map to a room, just an assigned guest
@@ -515,10 +517,10 @@ public class CloudbedsScraper {
         }
 
         // just take the first one
-        String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
+        BookingRoom bookingRoom = res.getBookingRooms().get( 0 );
         WebRequest requestSettings = jsonRequestFactory.createAddNewPaymentRequest(
-                res.getReservationId(), bookingRoomId, cardType, amount, description,
-                dao.getCsrfToken(), getBillingPortalId( webClient ) );
+                res.getReservationId(), bookingRoom.getId(), bookingRoom.getGuestId(), amount, description,
+                dao.getCsrfToken(), getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
@@ -826,6 +828,11 @@ public class CloudbedsScraper {
     public String getBillingPortalId( WebClient webClient ) throws IOException {
         JsonObject jobject = getPropertyContent( webClient );
         return jobject.get( "billing_portal_id" ).getAsString();
+    }
+
+    public String getFrontVersion( WebClient webClient ) throws IOException {
+        JsonObject jobject = getRemoteEntries( webClient );
+        return jobject.get( "mfd-core" ).getAsString();
     }
 
     /**
@@ -1203,6 +1210,19 @@ public class CloudbedsScraper {
             propertyContent = doRequest( webClient, jsonRequestFactory.createGetPropertyContent() );
         }
         return propertyContent;
+    }
+
+    /**
+     * Retrieves the current backend version numbers for cloudbeds.
+     * @param webClient
+     * @return
+     * @throws IOException
+     */
+    public JsonObject getRemoteEntries( WebClient webClient ) throws IOException {
+        if ( remoteEntries == null ) {
+            remoteEntries = doRequest( webClient, jsonRequestFactory.createRemoteEntriesRequest() );
+        }
+        return remoteEntries;
     }
 
     /**

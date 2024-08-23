@@ -1559,7 +1559,7 @@ public class PaymentProcessorService {
             updateStripeTransactionWithPayment( txn, paymentIntent );
 
             if ( "succeeded".equals( paymentIntent.getStatus() ) ) {
-                cloudbedsScraper.addPayment( webClient, res, details.getCard().getBrand(), txn.getPaymentAmount(),
+                cloudbedsScraper.addPayment( webClient, res, txn.getPaymentAmount(),
                         String.format( "VendorTxCode: %s, Status: %s, Card Type: %s, Card Number: ************%s, Gateway: STRIPE",
                                 txn.getVendorTxCode(), paymentIntent.getStatus(), details.getCard().getBrand(), details.getCard().getLast4() ) );
                 cloudbedsScraper.addArchivedNote( webClient, txn.getReservationId(),

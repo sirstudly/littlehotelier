@@ -220,7 +220,7 @@ public class SagepayService {
                         LOGGER.info( "Transaction " + txn.getVendorTxCode() + " has already been processed. Nothing to do." );
                     }
                     else {
-                        cloudbedsScraper.addPayment( webClient, res, txn.getMappedCardType(), txn.getPaymentAmount(),
+                        cloudbedsScraper.addPayment( webClient, res, txn.getPaymentAmount(),
                                 String.format( "VendorTxCode: %s, Status: %s, Detail: %s, VPS Auth Code: %s, "
                                         + "Card Type: %s, Card Number: ************%s, Auth Code: %s",
                                         txn.getVendorTxCode(), txn.getAuthStatus(), txn.getAuthStatusDetail(), txn.getVpsAuthCode(),
