@@ -1,10 +1,10 @@
 
 package com.macbackpackers.jobs;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.services.CloudbedsService;
+import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 

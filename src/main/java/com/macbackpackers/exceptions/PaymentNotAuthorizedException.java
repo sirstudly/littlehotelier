@@ -1,7 +1,7 @@
 
 package com.macbackpackers.exceptions;
 
-import com.gargoylesoftware.htmlunit.WebResponse;
+import org.htmlunit.WebResponse;
 
 /**
  * Thrown when an attempt to charge a card fails miserably.

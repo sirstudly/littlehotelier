@@ -15,6 +15,11 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.htmlunit.HttpMethod;
+import org.htmlunit.Page;
+import org.htmlunit.WebClient;
+import org.htmlunit.WebRequest;
+import org.htmlunit.util.NameValuePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,11 +27,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.gargoylesoftware.htmlunit.HttpMethod;
-import com.gargoylesoftware.htmlunit.Page;
-import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.WebRequest;
-import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CaptchaSolveRequest;
@@ -105,7 +105,7 @@ public class CaptchaSolverService {
      * @param webClient
      * @param key the google sitekey
      * @param action action found on site
-     * @param reservationId cloudbeds reservation
+     * @param pageUrl
      * @return captcha ID
      * @throws IOException
      */

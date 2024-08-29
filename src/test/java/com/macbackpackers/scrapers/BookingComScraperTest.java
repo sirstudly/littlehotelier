@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.macbackpackers.beans.bdc.BookingComRefundRequest;
 import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.htmlunit.WebClient;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -14,14 +15,13 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.config.LittleHotelierConfig;
 
 @RunWith( SpringJUnit4ClassRunner.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class BookingComScraperTest {
 
-    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+    private final Logger LOGGER = LoggerFactory.getLogger(getClass());
 
     @Autowired
     BookingComScraper scraper;

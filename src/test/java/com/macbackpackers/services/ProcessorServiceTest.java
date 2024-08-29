@@ -12,6 +12,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.ArchiveAllTransactionNotesJob;
 import com.macbackpackers.jobs.BedCountReportJob;
 import com.macbackpackers.jobs.CreatePrepaidRefundJob;
@@ -807,6 +808,13 @@ public class ProcessorServiceTest {
         j.setStatus( JobStatus.submitted );
         j.setReservationId( "87742801" );
         dao.insertJob( j );
+    }
+
+    @Test
+    public void testRunJob() throws Exception {
+        AbstractJob jobToRun = dao.fetchJobById( 23336 );
+        autowireBeanFactory.autowireBean( jobToRun );
+        jobToRun.processJob();
     }
 
 //    @Test

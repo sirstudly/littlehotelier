@@ -14,10 +14,10 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.apache.commons.csv.CSVRecord;
+import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;

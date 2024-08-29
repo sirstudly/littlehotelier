@@ -1,7 +1,7 @@
 package com.macbackpackers.services;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.config.LittleHotelierConfig;
+import org.htmlunit.WebClient;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;

@@ -6,6 +6,9 @@ import java.util.Calendar;
 import java.util.List;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.htmlunit.WebClient;
+import org.htmlunit.html.HtmlPage;
+import org.htmlunit.html.HtmlTableRow;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -17,9 +20,6 @@ import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
-import com.gargoylesoftware.htmlunit.html.HtmlTableRow;
 import com.macbackpackers.beans.Payment;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;

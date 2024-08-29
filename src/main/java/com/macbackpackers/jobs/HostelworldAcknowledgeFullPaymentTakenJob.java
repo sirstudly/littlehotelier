@@ -1,7 +1,7 @@
 package com.macbackpackers.jobs;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.HostelworldScraper;
+import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 

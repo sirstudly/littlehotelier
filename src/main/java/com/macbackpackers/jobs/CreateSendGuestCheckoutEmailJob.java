@@ -10,10 +10,10 @@ import javax.persistence.Transient;
 
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
+import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.BookingsPageScraper;

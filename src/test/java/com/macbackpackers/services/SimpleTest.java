@@ -332,7 +332,14 @@ public class SimpleTest {
         LocalDate d = LocalDate.parse( "Sep 3, 2020", MMM_DD_YYYY );
         LOGGER.info(  "Parsed date: " + d );
     }
-    
+
+    @Test
+    public void testDateTimeParse() throws Exception {
+        final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a" );
+        LocalDateTime d = LocalDateTime.parse( "18/04/2019 08:11 AM", DD_MM_YYYY_HH_MM );
+        LOGGER.info(  "Parsed datetime: " + d );
+    }
+
     @Test
     public void testMatchSession() throws Exception {
         Pattern p = Pattern.compile( "ses=([a-f\\d]+)" );
