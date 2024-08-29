@@ -248,7 +248,8 @@ public class CloudbedsScraperTest {
 
     @Test
     public void testGetPropertyContent() throws Exception {
-        cloudbedsScraper.getPropertyContent( webClient );
+        JsonObject j = cloudbedsScraper.getPropertyContent( webClient );
+        LOGGER.info( ToStringBuilder.reflectionToString( j ) );
     }
 
     /**
@@ -292,7 +293,7 @@ public class CloudbedsScraperTest {
     @Test
     public void testFetchEmailTemplate() throws Exception {
         EmailTemplateInfo mail = cloudbedsScraper.fetchEmailTemplate( webClient, CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL );
-        LOGGER.info( mail.getEmailBody() );
+        LOGGER.info( ToStringBuilder.reflectionToString( mail ) );
     }
 
     @Test

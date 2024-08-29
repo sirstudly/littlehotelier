@@ -166,10 +166,12 @@ public class CloudbedsJsonRequestFactory {
         requestSettings.setAdditionalHeader( "Content-Type", "application/x-www-form-urlencoded; charset=UTF-8" );
         requestSettings.setAdditionalHeader( "Referer", "https://hotels.cloudbeds.com/connect/" + getPropertyId() );
         requestSettings.setAdditionalHeader( "Accept-Language", "en-GB,en-US;q=0.9,en;q=0.8" );
-        requestSettings.setAdditionalHeader( "Accept-Encoding", "gzip, deflate, br" );
+        requestSettings.setAdditionalHeader( "Accept-Encoding", "gzip, deflate, br, zstd" );
         requestSettings.setAdditionalHeader( "X-Requested-With", "XMLHttpRequest" );
         requestSettings.setAdditionalHeader( "X-Used-Method", "common.ajax" );
-        requestSettings.setAdditionalHeader( "Cache-Control", "max-age=0" );
+        requestSettings.setAdditionalHeader( "Cache-Control", "no-cache" );
+        requestSettings.setAdditionalHeader( "Pragma", "no-cache" );
+        requestSettings.setAdditionalHeader( "Priority", "u=1, i" );
         requestSettings.setAdditionalHeader( "Origin", "https://hotels.cloudbeds.com" );
         requestSettings.setAdditionalHeader( "User-Agent", getUserAgent() );
         requestSettings.setAdditionalHeader( "Cookie", getCookies() );
@@ -206,19 +208,23 @@ public class CloudbedsJsonRequestFactory {
      * Returns a single reservation request.
      * 
      * @param reservationId unique ID of reservation
-     * @param csrf csrf token
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetReservationRequest( String reservationId, String csrf ) throws IOException {
+    public WebRequest createGetReservationRequest( String reservationId, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservation" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "id", reservationId ),
                 new NameValuePair( "is_identifier", "0" ),
+                new NameValuePair( "suppress_client_errors", "true" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "csrf_accessa", csrf ),
-                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ),
+                new NameValuePair( "frontVersion", frontVersion ) ) );
         return webRequest;
     }
 
@@ -226,10 +232,12 @@ public class CloudbedsJsonRequestFactory {
      * Returns a cancel reservation request.
      * 
      * @param reservationId unique ID of reservation
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createCancelReservationRequest( String reservationId ) throws IOException {
+    public WebRequest createCancelReservationRequest( String reservationId, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/set_reserva_status" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "reservation_id", reservationId ),
@@ -242,7 +250,9 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "propertyContext", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ),
+                new NameValuePair( "frontVersion", frontVersion ) ) );
         return webRequest;
     }
 
@@ -294,11 +304,12 @@ public class CloudbedsJsonRequestFactory {
      * Get info on all customers including cancelled bookings by searching on a generic term.
      * 
      * @param query whatever you want to search by
-     * @param csrf csrf token
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetReservationsRequest( String query, String csrf ) throws IOException {
+    public WebRequest createGetReservationsRequest( String query, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "date_start[0]", "" ),
@@ -308,7 +319,10 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "booking_date[0]", "" ),
                 new NameValuePair( "booking_date[1]", "" ),
                 new NameValuePair( "status", "all" ),
-                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "query", query ) );
         return webRequest;
     }
@@ -318,10 +332,13 @@ public class CloudbedsJsonRequestFactory {
      * 
      * @param checkinDateStart checkin date (inclusive)
      * @param checkinDateEnd checkin date (inclusive)
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetReservationsRequestByCheckinDate( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
+    public WebRequest createGetReservationsRequestByCheckinDate( LocalDate checkinDateStart, LocalDate checkinDateEnd,
+                                                                 String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "date_start[0]", checkinDateStart.format( YYYY_MM_DD ) ),
@@ -329,7 +346,11 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "date_end[0]", "" ),
                 new NameValuePair( "date_end[1]", "" ),
                 new NameValuePair( "booking_date[0]", "" ),
-                new NameValuePair( "booking_date[1]", "" ) );
+                new NameValuePair( "booking_date[1]", "" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ) );
         return webRequest;
     }
 
@@ -338,10 +359,13 @@ public class CloudbedsJsonRequestFactory {
      * 
      * @param stayDateStart checkin date (inclusive)
      * @param stayDateEnd checkin date (inclusive)
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetReservationsRequestByStayDate( LocalDate stayDateStart, LocalDate stayDateEnd ) throws IOException {
+    public WebRequest createGetReservationsRequestByStayDate( LocalDate stayDateStart, LocalDate stayDateEnd,
+                                                              String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "date_start[0]", "" ),
@@ -351,7 +375,11 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "date_stay[0]", stayDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_stay[1]", stayDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "booking_date[0]", "" ),
-                new NameValuePair( "booking_date[1]", "" ) );
+                new NameValuePair( "booking_date[1]", "" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ) );
         return webRequest;
     }
 
@@ -367,12 +395,14 @@ public class CloudbedsJsonRequestFactory {
      * @param bookingDateStart booking date (inclusive)
      * @param bookingDateEnd booking date (inclusive)
      * @param statuses comma-delimited list of statuses (optional)
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
     public WebRequest createGetReservationsRequest( LocalDate stayDateStart, LocalDate stayDateEnd,
             LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate checkoutDateStart, LocalDate checkoutDateEnd,
-            LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
+            LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "status", StringUtils.isBlank(statuses) ? "all" : statuses ),
@@ -383,7 +413,11 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "date_stay[0]", stayDateStart == null ? "" : stayDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_stay[1]", stayDateEnd == null ? "" : stayDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "booking_date[0]", bookingDateStart == null ? "" : bookingDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "booking_date[1]", bookingDateEnd == null ? "" : bookingDateEnd.format( YYYY_MM_DD ) ) );
+                new NameValuePair( "booking_date[1]", bookingDateEnd == null ? "" : bookingDateEnd.format( YYYY_MM_DD ) ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ) );
         return webRequest;
     }
 
@@ -395,12 +429,14 @@ public class CloudbedsJsonRequestFactory {
      * @param bookedDateStart booked date (inclusive)
      * @param bookedDateEnd booked date (inclusive)
      * @param bookingSourceIds comma-delimited list of booking source Id(s)
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetReservationsRequestByBookingSource( 
+    public WebRequest createGetReservationsRequestByBookingSource(
             LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate bookedDateStart,
-            LocalDate bookedDateEnd, String bookingSourceIds ) throws IOException {
+            LocalDate bookedDateEnd, String bookingSourceIds, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "date_start[0]", checkinDateStart == null ? "" : checkinDateStart.format( YYYY_MM_DD ) ),
@@ -410,7 +446,11 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "booking_date[0]", bookedDateStart == null ? "" : bookedDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "booking_date[1]", bookedDateEnd == null ? "" : bookedDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "status", "all" ),
-                new NameValuePair( "source", bookingSourceIds ) );
+                new NameValuePair( "source", bookingSourceIds ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ) );
         return webRequest;
     }
 
@@ -422,12 +462,14 @@ public class CloudbedsJsonRequestFactory {
      * @param cancelDateStart cancellation date (inclusive)
      * @param cancelDateEnd cancellation date (inclusive)
      * @param bookingSourceIds comma-delimited list of booking source Id(s)
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
     public WebRequest createGetCancelledReservationsRequestByBookingSource( LocalDate checkinDateStart,
             LocalDate checkinDateEnd, LocalDate cancelDateStart, LocalDate cancelDateEnd,
-            String bookingSourceIds ) throws IOException {
+            String bookingSourceIds, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         setCommonReservationsQueryParameters( webRequest,
                 new NameValuePair( "date_start[0]", checkinDateStart.format( YYYY_MM_DD ) ),
@@ -437,7 +479,11 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "cancellation_date[0]", cancelDateStart == null ? "" : cancelDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "cancellation_date[1]", cancelDateEnd == null ? "" : cancelDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "status", "canceled" ),
-                new NameValuePair( "source", bookingSourceIds ) );
+                new NameValuePair( "source", bookingSourceIds ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ) );
         return webRequest;
     }
 
@@ -446,19 +492,28 @@ public class CloudbedsJsonRequestFactory {
      * 
      * @param dateStart checkin date (inclusive)
      * @param dateEnd checkin date (inclusive)
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetRoomAssignmentsReport( LocalDate dateStart, LocalDate dateEnd ) throws IOException {
+    public WebRequest createGetRoomAssignmentsReport( LocalDate dateStart, LocalDate dateEnd, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reports/get_room_assignments_report" );
-        setCommonReservationsQueryParameters( webRequest,
+        webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "booking_date[0]", dateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "booking_date[1]", dateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "room_types", dao.getAllRoomTypeIds().stream()
                         .map( rt -> rt.toString() )
                         .collect( Collectors.joining( "," ) ) ),
                 new NameValuePair( "show_assigned_unassigned", "show_assigned_rooms,show_unassigned_rooms" ),
-                new NameValuePair( "view", "room_assignments_report" ) );
+                new NameValuePair( "view", "room_assignments_report" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
@@ -466,39 +521,57 @@ public class CloudbedsJsonRequestFactory {
      * Retrieves all activity for a reservation.
      * 
      * @param reservationId the cloudbeds reservation id
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetActivityLog( String reservationId ) throws IOException {
+    public WebRequest createGetActivityLog( String reservationId, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/get_activity_log" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "sEcho", "1" ),
-                new NameValuePair( "iColumns", "2" ),
-                new NameValuePair( "sColumns", "," ),
+                new NameValuePair( "iColumns", "4" ),
+                new NameValuePair( "sColumns", ",,," ),
                 new NameValuePair( "iDisplayStart", "0" ),
                 new NameValuePair( "iDisplayLength", "1000" ),
                 new NameValuePair( "mDataProp_0", "0" ),
                 new NameValuePair( "sSearch_0", "" ),
                 new NameValuePair( "bRegex_0", "false" ),
                 new NameValuePair( "bSearchable_0", "true" ),
-                new NameValuePair( "bSortable_0", "true" ),
+                new NameValuePair( "bSortable_0", "false" ),
                 new NameValuePair( "mDataProp_1", "1" ),
                 new NameValuePair( "sSearch_1", "" ),
                 new NameValuePair( "bRegex_1", "false" ),
                 new NameValuePair( "bSearchable_1", "true" ),
-                new NameValuePair( "bSortable_1", "false" ),
+                new NameValuePair( "bSortable_1", "true" ),
+                new NameValuePair( "mDataProp_2", "2" ),
+                new NameValuePair( "sSearch_2", "" ),
+                new NameValuePair( "bRegex_2", "false" ),
+                new NameValuePair( "bSearchable_2", "true" ),
+                new NameValuePair( "bSortable_2", "false" ),
+                new NameValuePair( "mDataProp_3", "3" ),
+                new NameValuePair( "sSearch_3", "" ),
+                new NameValuePair( "bRegex_3", "false" ),
+                new NameValuePair( "bSearchable_3", "true" ),
+                new NameValuePair( "bSortable_3", "false" ),
                 new NameValuePair( "sSearch", "" ),
                 new NameValuePair( "bRegex", "false" ),
-                new NameValuePair( "iSortCol_0", "0" ),
+                new NameValuePair( "iSortCol_0", "1" ),
                 new NameValuePair( "sSortDir_0", "desc" ),
                 new NameValuePair( "iSortingCols", "1" ),
                 new NameValuePair( "from_date", "" ),
                 new NameValuePair( "from_time", "" ),
                 new NameValuePair( "to_date", "" ),
                 new NameValuePair( "to_time", "" ),
-                new NameValuePair( "user", "0" ),
+                new NameValuePair( "user", "" ),
                 new NameValuePair( "change", "" ),
                 new NameValuePair( "filter", reservationId ),
+                new NameValuePair( "type", "reservation_with_guests" ),
+                new NameValuePair( "forceLang", "en" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
@@ -509,13 +582,20 @@ public class CloudbedsJsonRequestFactory {
      * Retrieves an existing email template.
      * 
      * @param templateId the email template id
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetEmailTemplate( String templateId ) throws IOException {
+    public WebRequest createGetEmailTemplate( String templateId, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/emails/get_email_template_info" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "id", templateId ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
@@ -529,11 +609,7 @@ public class CloudbedsJsonRequestFactory {
      */
     public WebRequest createGetPropertyContent() throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/get_content" );
-        webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "property_id", getPropertyId() ),
-                new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "lang", "en" ),
-                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        webRequest.setRequestParameters( Arrays.asList( new NameValuePair( "property_id", getPropertyId() ) ) );
         return webRequest;
     }
     
@@ -660,14 +736,13 @@ public class CloudbedsJsonRequestFactory {
      * @param guestId guest or customer ID to assign payment to
      * @param amount amount to record
      * @param description description
-     * @param csrf csrf token
      * @param billingPortalId
      * @param frontVersion
      * @return web request
      * @throws IOException on creation failure
      */
     public WebRequest createAddNewPaymentRequest( String reservationId, String bookingRoomId, String guestId, BigDecimal amount,
-                                                  String description, String csrf, String billingPortalId, String frontVersion ) throws IOException {
+                                                  String description, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_payment" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "payment_type", "check" ),
@@ -695,7 +770,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "inventoryObjectType", "reservation_room" ),
                 new NameValuePair( "is_private_ha", "0" ),
                 new NameValuePair( "suppress_client_errors", "true" ),
-                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
                 new NameValuePair( "billing_portal_id", billingPortalId ),
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "folioId", "0" ),
@@ -716,13 +791,13 @@ public class CloudbedsJsonRequestFactory {
      * @param cardId active card to charge
      * @param amount amount to record
      * @param description description
-     * @param csrf cross-site request forgery cookie
      * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on creation failure
      */
     public WebRequest createAddNewProcessPaymentRequest( String reservationId, String bookingRoomId, String cardId, BigDecimal amount,
-            String description, String csrf, String billingPortalId ) throws IOException {
+            String description, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
         String paymentJson = IOUtils.toString( getClass().getClassLoader()
                 .getResourceAsStream( "add_payment_data.json" ), StandardCharsets.UTF_8 )
@@ -737,12 +812,13 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "payment", paymentJson ),
                 new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation_room\",\"id\":\"%s\"}", bookingRoomId ) ),
                 new NameValuePair( "suppress_client_errors", "true" ),
-                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
                 new NameValuePair( "billing_portal_id", billingPortalId ),
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "announcementsLast", "" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
@@ -755,14 +831,13 @@ public class CloudbedsJsonRequestFactory {
      * @param refundAmount amount to refund
      * @param bookingRoomId (which "room" we're booking the payment to)
      * @param description description
-     * @param csrf cross-site request forgery cookie
      * @param billingPortalId
      * @return web request
      * @throws IOException on creation failure
      */
     public WebRequest createAddNewProcessRefundRequestByBookingRoom(
             TransactionRecord txnRecord, BigDecimal refundAmount, String bookingRoomId, String description,
-            String csrf, String billingPortalId ) throws IOException {
+            String billingPortalId ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
         String paymentJson = IOUtils.toString( getClass().getClassLoader()
                 .getResourceAsStream( "add_refund_data_booking_room.json" ), StandardCharsets.UTF_8 )
@@ -777,7 +852,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "payment", paymentJson ),
                 new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation_room\",\"id\":\"%s\"}", bookingRoomId ) ),
                 new NameValuePair( "suppress_client_errors", "true" ),
-                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
                 new NameValuePair( "billing_portal_id", billingPortalId ),
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "announcementsLast", "" ),
@@ -795,14 +870,14 @@ public class CloudbedsJsonRequestFactory {
      * @param txnRecord the transaction record to refund against
      * @param refundAmount amount to refund
      * @param description description
-     * @param csrf cross-site request forgery cookie
      * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on creation failure
      */
     public WebRequest createAddNewProcessRefundRequest(
             TransactionRecord txnRecord, BigDecimal refundAmount, String description,
-            String csrf, String billingPortalId ) throws IOException {
+            String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
         String paymentJson = IOUtils.toString( getClass().getClassLoader()
                         .getResourceAsStream( "add_refund_data.json" ), StandardCharsets.UTF_8 )
@@ -815,12 +890,13 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "payment", paymentJson ),
                 new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation\",\"id\":\"%s\"}", txnRecord.getReservationId() ) ),
                 new NameValuePair( "suppress_client_errors", "true" ),
-                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
                 new NameValuePair( "billing_portal_id", billingPortalId ),
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "announcementsLast", "" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
@@ -828,16 +904,15 @@ public class CloudbedsJsonRequestFactory {
     /**
      * Records a new refund onto the existing reservation.
      * 
-     * @param reservationId ID of reservation (as it appears in the URL)
      * @param bookingRoomId (which "room" we're booking the payment to)
      * @param amount amount to record
      * @param description description
-     * @param csrf cross-site request forgery cookie
      * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createAddRefundRequest( String reservationId, String bookingRoomId, BigDecimal amount, String description, String csrf, String billingPortalId ) throws IOException {
+    public WebRequest createAddRefundRequest( String bookingRoomId, BigDecimal amount, String description, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
         String paymentJson = IOUtils.toString( getClass().getClassLoader()
                 .getResourceAsStream( "add_existing_refund_data.json" ), StandardCharsets.UTF_8 )
@@ -848,12 +923,13 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "payment", paymentJson ),
                 new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation_room\",\"id\":\"%s\"}", bookingRoomId ) ),
                 new NameValuePair( "suppress_client_errors", "true" ),
-                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
                 new NameValuePair( "billing_portal_id", billingPortalId ),
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "announcementsLast", "" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
@@ -862,16 +938,23 @@ public class CloudbedsJsonRequestFactory {
      * Retrieves all transactions for a given reservation.
      * 
      * @param res cloudbeds reservation
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createGetTransactionsByReservationRequest( Reservation res ) throws IOException {
+    public WebRequest createGetTransactionsByReservationRequest( Reservation res, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reports/transactions_by_reservation" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "booking_id", res.getReservationId() ),
                 new NameValuePair( "options", "{\"filters\":{\"from\":\"\",\"to\":\"\",\"filter\":\"\",\"user\":\"all\",\"posted\":[\"1\"],\"description\":[]},\"group\":{\"main\":\"\",\"sub\":\"\"},\"sort\":{\"column\":\"datetime_transaction\",\"order\":\"desc\"},\"loaded_filter\":1}" ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
@@ -880,19 +963,22 @@ public class CloudbedsJsonRequestFactory {
      * Retrieves all transactions that are refundable for a booking.
      *
      * @param reservationId cloudbeds reservation
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createGetTransactionsForRefundModalRequest( String reservationId, String csrf, String billingPortalId ) throws IOException {
+    public WebRequest createGetTransactionsForRefundModalRequest( String reservationId, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reports/transactions_for_refund_modal" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "booking_id", reservationId ),
                 new NameValuePair( "suppress_client_errors", "true" ),
-                new NameValuePair( "csrf_accessa", csrf ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
                 new NameValuePair( "billing_portal_id", billingPortalId ),
                 new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
@@ -902,16 +988,23 @@ public class CloudbedsJsonRequestFactory {
      * 
      * @param reservationId ID of reservation (as it appears in the URL)
      * @param note note to be added
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createAddNoteRequest( String reservationId, String note ) throws IOException {
+    public WebRequest createAddNoteRequest( String reservationId, String note, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/notes/add_reservation_note" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "reservation_id", reservationId ),
                 new NameValuePair( "notes", note ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
@@ -921,16 +1014,23 @@ public class CloudbedsJsonRequestFactory {
      * 
      * @param reservationId ID of reservation (as it appears in the URL)
      * @param noteId note to be archived
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createArchiveNoteRequest( String reservationId, String noteId ) throws IOException {
+    public WebRequest createArchiveNoteRequest( String reservationId, String noteId, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/notes/archive_reservation_note" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "reservation_id", reservationId ),
                 new NameValuePair( "note_id", noteId ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
@@ -968,27 +1068,34 @@ public class CloudbedsJsonRequestFactory {
 
     /**
      * Returns the source id for the given source name (used for searching).
-     * 
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createReservationSourceLookupRequest() throws IOException {
+    public WebRequest createReservationSourceLookupRequest( String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/associations/loader/sources" );
         webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }
 
     /**
      * Retrieves the email log for a reservation.
-     * 
+     *
      * @param reservationId ID of reservation (as it appears in the URL)
+     * @param billingPortalId
+     * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetEmailDeliveryLogRequest( String reservationId ) throws IOException {
+    public WebRequest createGetEmailDeliveryLogRequest( String reservationId, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/emails/get_email_delivery_log" );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "sEcho", "1" ),
@@ -1019,8 +1126,12 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "iSortingCols", "1" ),
                 new NameValuePair( "booking_id", reservationId ),
                 new NameValuePair( "email_status", "all" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
         return webRequest;
     }

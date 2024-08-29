@@ -85,7 +85,7 @@ public class CloudbedsScraper {
     // the last version numbers
     private static JsonObject remoteEntries;
 
-    private static LoadingCache<String, EmailTemplateInfo> emailTemplateCache = CacheBuilder.newBuilder()
+    private static final LoadingCache<String, EmailTemplateInfo> emailTemplateCache = CacheBuilder.newBuilder()
             .build( new CacheLoader<String, EmailTemplateInfo>() {
                 @Override
                 public EmailTemplateInfo load( String templateId ) {
@@ -200,7 +200,8 @@ public class CloudbedsScraper {
      */
     public Reservation getReservation( WebClient webClient, String reservationId ) throws IOException {
 
-        Reservation r = doRequestErrorOnFailure( webClient, jsonRequestFactory.createGetReservationRequest( reservationId, dao.getCsrfToken() ), Reservation.class,
+        Reservation r = doRequestErrorOnFailure( webClient, jsonRequestFactory.createGetReservationRequest(
+                reservationId, getBillingPortalId( webClient ), getFrontVersion( webClient ) ), Reservation.class,
                 ( resv, jsonResponse ) -> {
                     // need to parse the credit_cards object manually to check for presence
                     JsonObject rootElem = fromJson( jsonResponse, JsonObject.class );
@@ -276,7 +277,7 @@ public class CloudbedsScraper {
      */
     public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByStayDate(
-                stayDateStart, stayDateEnd ) );
+                stayDateStart, stayDateEnd, getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
     }
 
     /**
@@ -317,7 +318,8 @@ public class CloudbedsScraper {
                                            LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate checkoutDateStart, LocalDate checkoutDateEnd,
                                            LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( stayDateStart, stayDateEnd,
-                checkinDateStart, checkinDateEnd, checkoutDateStart, checkoutDateEnd, bookingDateStart, bookingDateEnd, statuses ) );
+                checkinDateStart, checkinDateEnd, checkoutDateStart, checkoutDateEnd, bookingDateStart, bookingDateEnd,
+                statuses, getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
     }
 
     /**
@@ -331,7 +333,7 @@ public class CloudbedsScraper {
      */
     public List<Customer> getReservationsByCheckinDate( WebClient webClient, LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByCheckinDate(
-                checkinDateStart, checkinDateEnd ) );
+                checkinDateStart, checkinDateEnd, getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
     }
 
     /**
@@ -347,7 +349,8 @@ public class CloudbedsScraper {
     public List<Customer> getReservationsByBookingDate( WebClient webClient,
             LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest(
-                null, null, null, null, null, null, bookingDateStart, bookingDateEnd, statuses ) );
+                null, null, null, null, null, null,
+                bookingDateStart, bookingDateEnd, statuses, getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
     }
 
     /**
@@ -359,7 +362,8 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<Customer> getReservations( WebClient webClient, String query ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( query, dao.getCsrfToken() ) );
+        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( query,
+                getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
     }
 
     /**
@@ -390,7 +394,7 @@ public class CloudbedsScraper {
      */
     public boolean isExistsPaymentWithVendorTxCode( WebClient webClient, Reservation res, String vendorTxCode ) throws IOException {
         
-        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res );
+        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         JsonObject rpt = doRequest( webClient, requestSettings );
 
         // look for the existence of a payment record with matching vendor tx code
@@ -417,7 +421,8 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public TransactionRecord getStripeTransaction( WebClient webClient, Reservation res, String id ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res );
+        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest(
+                res, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         JsonObject rpt = doRequest( webClient, requestSettings );
 
         // look for a charge id for the matching transaction
@@ -442,7 +447,8 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<TransactionRecord> getTransactionsForRefund( WebClient webClient, String reservationId ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsForRefundModalRequest( reservationId, dao.getCsrfToken(), getBillingPortalId( webClient ) );
+        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsForRefundModalRequest(
+                reservationId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         JsonObject rpt = doRequest( webClient, requestSettings );
         return StreamSupport.stream( rpt.get( "records" ).getAsJsonArray().spliterator(), false )
                 .map( r -> gson.fromJson( r, TransactionRecord.class ) )
@@ -459,7 +465,8 @@ public class CloudbedsScraper {
      */
     public boolean isExistsRefund( WebClient webClient, Reservation res ) throws IOException {
         
-        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest( res );
+        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest(
+                res, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         JsonObject rpt = doRequest( webClient, requestSettings );
 
         // look for the existence of a refund payment record
@@ -492,7 +499,8 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public JsonObject getRoomAssignmentsReport( WebClient webClient, LocalDate stayDateFrom, LocalDate stayDateTo ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createGetRoomAssignmentsReport( stayDateFrom, stayDateTo );
+        WebRequest requestSettings = jsonRequestFactory.createGetRoomAssignmentsReport( stayDateFrom, stayDateTo,
+                getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         LOGGER.info( "Fetching staff allocations for " + stayDateFrom.format( DateTimeFormatter.ISO_LOCAL_DATE )
                 + " to " + stayDateTo.format( DateTimeFormatter.ISO_LOCAL_DATE ) );
         return doRequest( webClient, requestSettings );
@@ -520,7 +528,7 @@ public class CloudbedsScraper {
         BookingRoom bookingRoom = res.getBookingRooms().get( 0 );
         WebRequest requestSettings = jsonRequestFactory.createAddNewPaymentRequest(
                 res.getReservationId(), bookingRoom.getId(), bookingRoom.getGuestId(), amount, description,
-                dao.getCsrfToken(), getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+                getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
@@ -545,8 +553,8 @@ public class CloudbedsScraper {
         // just take the first one
         String bookingRoomId = res.getBookingRooms().get( 0 ).getId();
         WebRequest requestSettings = jsonRequestFactory.createAddRefundRequest(
-                res.getReservationId(), bookingRoomId, amount, description,
-                dao.getCsrfToken(), getBillingPortalId( webClient ) );
+                bookingRoomId, amount, description,
+                getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
@@ -561,7 +569,7 @@ public class CloudbedsScraper {
      */
     public void processRefund( WebClient webClient, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessRefundRequest(
-                authTxn, amount, description, dao.getCsrfToken(), getBillingPortalId( webClient ) );
+                authTxn, amount, description, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
@@ -574,7 +582,8 @@ public class CloudbedsScraper {
      * @throws IOException on page load failure
      */
     public void addNote( WebClient webClient, String reservationId, String note ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createAddNoteRequest( reservationId, note );
+        WebRequest requestSettings = jsonRequestFactory.createAddNoteRequest(
+                reservationId, note, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         LOGGER.info( "Adding note: " + note + " to reservation " + reservationId );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
@@ -589,7 +598,8 @@ public class CloudbedsScraper {
      * @throws IOException on page load failure
      */
     public void addNote( WebClient webClient, String reservationId, String note, BiConsumer<AddNoteResponse, String> fnOnSuccess ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createAddNoteRequest( reservationId, note );
+        WebRequest requestSettings = jsonRequestFactory.createAddNoteRequest(
+                reservationId, note, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         LOGGER.info( "Adding note: " + note + " to reservation " + reservationId );
         doRequestErrorOnFailure( webClient, requestSettings, AddNoteResponse.class, fnOnSuccess );
     }
@@ -604,7 +614,8 @@ public class CloudbedsScraper {
      * @throws IOException on page load failure
      */
     public void archiveNote( WebClient webClient, String reservationId, String noteId ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createArchiveNoteRequest( reservationId, noteId );
+        WebRequest requestSettings = jsonRequestFactory.createArchiveNoteRequest(
+                reservationId, noteId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         LOGGER.info( "Archiving note " + noteId + " for reservation " + reservationId );
         doRequest( webClient, requestSettings, CloudbedsJsonResponse.class, null, ( resp, jsonResp ) -> {
             LOGGER.error( "Failed to archive note: " + jsonResp );
@@ -639,7 +650,8 @@ public class CloudbedsScraper {
      * @throws IOException on page load failure
      */
     public void cancelBooking( WebClient webClient, String reservationId ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createCancelReservationRequest( reservationId );
+        WebRequest requestSettings = jsonRequestFactory.createCancelReservationRequest( reservationId,
+                getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         LOGGER.info( "Canceling reservation " + reservationId );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
@@ -667,7 +679,7 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public String lookupBookingSourceIds( WebClient webClient, String... sourceNames ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createReservationSourceLookupRequest();
+        WebRequest requestSettings = jsonRequestFactory.createReservationSourceLookupRequest( getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         JsonObject jobject = doRequest( webClient, requestSettings );
         
         // drill down to each of the 3rd party OTAs matching the given source(s)
@@ -706,7 +718,8 @@ public class CloudbedsScraper {
             LocalDate bookedDateStart, LocalDate bookedDateEnd, String ... sourceNames ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByBookingSource(
                 checkinDateStart, checkinDateEnd, bookedDateStart, bookedDateEnd,
-                lookupBookingSourceIds( webClient, sourceNames ) ) )
+                lookupBookingSourceIds( webClient, sourceNames ),
+                getBillingPortalId( webClient ), getFrontVersion( webClient ) ) )
                         .stream()
                         .map( c -> getReservationRetry( webClient, c.getId() ) )
                         .collect( Collectors.toList() );
@@ -729,7 +742,8 @@ public class CloudbedsScraper {
             LocalDate cancelDateEnd, String ... sourceNames ) throws IOException {
         return getCustomers( webClient, jsonRequestFactory.createGetCancelledReservationsRequestByBookingSource(
                 checkinDateStart, checkinDateEnd, cancelDateStart, cancelDateEnd,
-                lookupBookingSourceIds( webClient, sourceNames ) ) )
+                lookupBookingSourceIds( webClient, sourceNames ),
+                getBillingPortalId( webClient ), getFrontVersion( webClient ) ) )
                         .stream()
                         .map( c -> getReservationRetry( webClient, c.getId() ) )
                         .collect( Collectors.toList() );
@@ -794,7 +808,7 @@ public class CloudbedsScraper {
             throws IOException, PaymentPendingException, RecordPaymentFailedException {
         LOGGER.info( "Begin PROCESS CHARGE for reservation " + res.getReservationId()  + " for " + getCurrencyFormat().format( amount ) );
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessPaymentRequest( res.getReservationId(), res.getBookingRooms().get( 0 ).getId(),
-                res.getCreditCardId(), amount, "Autocharging -RONBOT", dao.getCsrfToken(), getBillingPortalId( webClient ) );
+                res.getCreditCardId(), amount, "Autocharging -RONBOT", getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         doRequest( webClient, requestSettings, CloudbedsJsonResponse.class, 
                 (resp, jsonResp) -> {
                     // 2021-03-19: success when charge from Stripe is incomplete??
@@ -925,7 +939,7 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<ActivityLogEntry> getActivityLog( WebClient webClient, String identifier ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createGetActivityLog( identifier );
+        WebRequest requestSettings = jsonRequestFactory.createGetActivityLog( identifier, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         JsonObject jobject = doRequest( webClient, requestSettings );
 
         final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a" );
@@ -953,7 +967,7 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public EmailTemplateInfo getEmailTemplate( WebClient webClient, String templateId ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createGetEmailTemplate( templateId );
+        WebRequest requestSettings = jsonRequestFactory.createGetEmailTemplate( templateId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         JsonObject jobject = doRequest( webClient, requestSettings );
 
         EmailTemplateInfo template = new EmailTemplateInfo();
@@ -1166,7 +1180,7 @@ public class CloudbedsScraper {
      */
     public Optional<LocalDateTime> getEmailLastSentDate( WebClient webClient, String reservationId, String templateName ) throws IOException {
 
-        WebRequest requestSettings = jsonRequestFactory.createGetEmailDeliveryLogRequest( reservationId );
+        WebRequest requestSettings = jsonRequestFactory.createGetEmailDeliveryLogRequest( reservationId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         JsonObject jobject = doRequest( webClient, requestSettings );
 
         final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a" );
