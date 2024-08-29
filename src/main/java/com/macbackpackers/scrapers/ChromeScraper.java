@@ -1,7 +1,6 @@
 
 package com.macbackpackers.scrapers;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.GuestDetails;
 import com.macbackpackers.dao.WordPressDAO;
@@ -11,6 +10,7 @@ import com.macbackpackers.services.AuthenticationService;
 import com.macbackpackers.services.GmailService;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.htmlunit.WebClient;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Cookie;
 import org.openqa.selenium.JavascriptExecutor;

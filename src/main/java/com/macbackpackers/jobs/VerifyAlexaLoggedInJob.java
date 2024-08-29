@@ -8,15 +8,15 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.apache.commons.lang3.StringUtils;
+import org.htmlunit.AbstractPage;
+import org.htmlunit.HttpMethod;
+import org.htmlunit.WebClient;
+import org.htmlunit.WebRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
-import com.gargoylesoftware.htmlunit.AbstractPage;
-import com.gargoylesoftware.htmlunit.HttpMethod;
-import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.WebRequest;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.macbackpackers.services.GmailService;

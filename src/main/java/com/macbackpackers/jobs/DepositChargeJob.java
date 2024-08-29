@@ -9,10 +9,10 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.services.PaymentProcessorService;
 
@@ -36,7 +36,7 @@ public class DepositChargeJob extends AbstractJob {
     public void processJob() throws Exception {
 
         if ( dao.isCloudbeds() ) {
-            try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+            try ( WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
                 paymentProcessor.processDepositPayment( webClient, String.valueOf( getReservationId() ) );
             }
         }

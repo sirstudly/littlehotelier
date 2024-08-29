@@ -1,19 +1,6 @@
 
 package com.macbackpackers.scrapers;
 
-import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.WebWindow;
-import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
-import com.gargoylesoftware.htmlunit.html.HtmlButton;
-import com.gargoylesoftware.htmlunit.html.HtmlElement;
-import com.gargoylesoftware.htmlunit.html.HtmlOption;
-import com.gargoylesoftware.htmlunit.html.HtmlPage;
-import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
-import com.gargoylesoftware.htmlunit.html.HtmlSelect;
-import com.gargoylesoftware.htmlunit.html.HtmlSpan;
-import com.gargoylesoftware.htmlunit.html.HtmlTableCell;
-import com.gargoylesoftware.htmlunit.html.HtmlTableRow;
-import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.bdc.BookingComRefundRequest;
 import com.macbackpackers.dao.WordPressDAO;
@@ -23,6 +10,19 @@ import com.macbackpackers.services.BasicCardMask;
 import com.macbackpackers.services.FileService;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.htmlunit.WebClient;
+import org.htmlunit.WebWindow;
+import org.htmlunit.html.HtmlAnchor;
+import org.htmlunit.html.HtmlButton;
+import org.htmlunit.html.HtmlElement;
+import org.htmlunit.html.HtmlOption;
+import org.htmlunit.html.HtmlPage;
+import org.htmlunit.html.HtmlPasswordInput;
+import org.htmlunit.html.HtmlSelect;
+import org.htmlunit.html.HtmlSpan;
+import org.htmlunit.html.HtmlTableCell;
+import org.htmlunit.html.HtmlTableRow;
+import org.htmlunit.html.HtmlTextInput;
 import org.openqa.selenium.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -495,7 +495,7 @@ public class BookingComScraper {
         LOGGER.info( "Virtual cards to charge..." );
         List<HtmlTableRow> reservationRows = currentPage.getByXPath( "//div[div/h2/span/text()='Virtual cards to charge']/div/div/table/tbody/tr" );
         return reservationRows.stream()
-                .filter(r -> com.macbackpackers.services.PaymentProcessorService.isChargeableAmount(HtmlTableCell.class.cast(r.getFirstByXPath("td[@data-heading='Amount']")).getVisibleText()))
+                .filter(r -> com.macbackpackers.services.PaymentProcessorService.isChargeableAmount( HtmlTableCell.class.cast(r.getFirstByXPath("td[@data-heading='Amount']")).getVisibleText()))
                 .map(r -> HtmlAnchor.class.cast(r.getFirstByXPath("th/span/a")).getVisibleText())
                 .collect(Collectors.toList());
     }

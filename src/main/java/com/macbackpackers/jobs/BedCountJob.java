@@ -11,10 +11,10 @@ import javax.persistence.Entity;
 import javax.persistence.Transient;
 
 import com.macbackpackers.beans.JobStatus;
+import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.services.CloudbedsService;
 

@@ -7,11 +7,11 @@ import javax.persistence.Transient;
 
 import com.google.gson.Gson;
 import org.apache.commons.lang3.StringUtils;
+import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationContext;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.services.CloudbedsService;
 
 import java.util.Collections;

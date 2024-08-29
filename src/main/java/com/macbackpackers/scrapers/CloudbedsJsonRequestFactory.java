@@ -19,14 +19,14 @@ import java.util.stream.Collectors;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.htmlunit.HttpMethod;
+import org.htmlunit.WebRequest;
+import org.htmlunit.util.NameValuePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.gargoylesoftware.htmlunit.HttpMethod;
-import com.gargoylesoftware.htmlunit.WebRequest;
-import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;

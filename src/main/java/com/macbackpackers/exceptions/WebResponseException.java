@@ -1,9 +1,9 @@
 
 package com.macbackpackers.exceptions;
 
-import java.io.IOException;
+import org.htmlunit.WebResponse;
 
-import com.gargoylesoftware.htmlunit.WebResponse;
+import java.io.IOException;
 
 /**
  * An unexpected response happened.

@@ -7,11 +7,11 @@ import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.Transient;
 
+import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 
