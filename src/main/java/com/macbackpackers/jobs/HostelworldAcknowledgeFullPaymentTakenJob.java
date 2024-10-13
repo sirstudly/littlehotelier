@@ -11,6 +11,7 @@ import javax.persistence.Transient;
 
 /**
  * Acknowledges full payment has been taken on the Hostelworld portal.
+ * @deprecated this doesn't work anymore; no need for it really
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.HostelworldAcknowledgeFullPaymentTakenJob" )

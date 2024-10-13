@@ -20,7 +20,6 @@ import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.ArchiveAllTransactionNotesJob;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
-import com.macbackpackers.jobs.HostelworldAcknowledgeFullPaymentTakenJob;
 import com.macbackpackers.jobs.SendDepositChargeDeclinedEmailJob;
 import com.macbackpackers.jobs.SendDepositChargeSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendHostelworldLateCancellationEmailJob;
@@ -680,12 +679,12 @@ public class PaymentProcessorService {
                     + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) + " successfully charged." );
 
             // mark booking as fully paid in Hostelworld
-            if ( Arrays.asList( "Hostelworld & Hostelbookers", "Hostelworld" ).contains( cbReservation.getSourceName() ) ) {
-                HostelworldAcknowledgeFullPaymentTakenJob ackJob = new HostelworldAcknowledgeFullPaymentTakenJob();
-                ackJob.setHostelworldBookingRef( cbReservation.getThirdPartyIdentifier() );
-                ackJob.setStatus( JobStatus.submitted );
-                wordpressDAO.insertJob( ackJob );
-            }
+//            if ( Arrays.asList( "Hostelworld & Hostelbookers", "Hostelworld" ).contains( cbReservation.getSourceName() ) ) {
+//                HostelworldAcknowledgeFullPaymentTakenJob ackJob = new HostelworldAcknowledgeFullPaymentTakenJob();
+//                ackJob.setHostelworldBookingRef( cbReservation.getThirdPartyIdentifier() );
+//                ackJob.setStatus( JobStatus.submitted );
+//                wordpressDAO.insertJob( ackJob );
+//            }
 
             // send email if successful
             SendNonRefundableSuccessfulEmailJob job = new SendNonRefundableSuccessfulEmailJob();
