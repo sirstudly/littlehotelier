@@ -5,6 +5,7 @@ import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.Transient;
 
+import com.macbackpackers.exceptions.PaymentPendingException;
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -42,6 +43,10 @@ public class ChargeHostelworldLateCancellationJob extends AbstractJob {
     public void processJob() throws Exception {
         try {
             paymentProcessor.processHostelworldLateCancellationCharge( cbWebClient, getReservationId() );
+        }
+        catch ( PaymentPendingException ex ) {
+            LOGGER.info( ex.getMessage() );
+            numRetriesOverride = 1;
         }
         catch ( RecordPaymentFailedException ex ) {
             LOGGER.info( "Payment not authorized. Lowering retry count on job to 1 to avoid spamming card" );
