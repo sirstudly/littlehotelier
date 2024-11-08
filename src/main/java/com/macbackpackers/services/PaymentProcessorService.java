@@ -672,7 +672,13 @@ public class PaymentProcessorService {
             }
         }
 
+        final String WILL_POST_AUTOMATICALLY = " will post automatically when customer confirms via email.";
         try {
+            if ( cbReservation.containsNote( WILL_POST_AUTOMATICALLY ) ) {
+                LOGGER.info( "We've already been thru this before; yet there is still a balance owing..." );
+                throw new RecordPaymentFailedException( "Payment previously attempted but was never charged successfully..." );
+            }
+
             // should have credit card details at this point; attempt autocharge
             cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
             cloudbedsScraper.addArchivedNote( webClient, reservationId, "Outstanding balance of "
@@ -697,7 +703,7 @@ public class PaymentProcessorService {
             LOGGER.info( ex.getMessage() );
             cloudbedsScraper.addNote( webClient, reservationId,
                     "Non-refundable amount of £" + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() )
-                            + " will post automatically when customer confirms via email." );
+                            + WILL_POST_AUTOMATICALLY );
         }
         catch ( RecordPaymentFailedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
