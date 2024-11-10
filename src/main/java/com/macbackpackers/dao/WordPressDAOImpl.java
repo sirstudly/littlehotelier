@@ -550,6 +550,11 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .executeUpdate();
         LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from wp_lh_jobs" );
 
+        rowsDeleted = em
+                .createNativeQuery( "DELETE FROM wp_booking_lookup_key WHERE created_date < DATE_SUB(NOW(), INTERVAL 2 YEAR)" )
+                .executeUpdate();
+        LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from wp_booking_lookup_key older than 2 years" );
+
 // need to keep old records from migration
 //        rowsDeleted = em
 //                // doesn't take into the date; just deletes all guest comments that
