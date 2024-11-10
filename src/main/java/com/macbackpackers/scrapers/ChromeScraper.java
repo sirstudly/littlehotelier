@@ -251,9 +251,6 @@ public class ChromeScraper {
                         scaCode.sendKeys( otp );
                     }
 
-                    WebElement rememberDevice = driver.findElement( By.xpath( "//label[@data-se-for-name='rememberDevice']" ) );
-                    rememberDevice.click();
-
                     nextButton = driver.findElement( By.xpath( "//input[@data-type='save']" ) );
                     nextButton.click();
                 }
