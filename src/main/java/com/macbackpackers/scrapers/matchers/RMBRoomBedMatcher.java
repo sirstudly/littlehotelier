@@ -11,7 +11,7 @@ public class RMBRoomBedMatcher implements RoomBedMatcher {
      * start with one of these...
      */
     private static final String ROOM_NAMES[] = {
-            "LM", "T", "LB", "*", "GC", "HW", "SW"
+            "LM", "T", "HAW", "*", "GC", "HW", "SW"
     };
 
     @Override
