@@ -1,6 +1,25 @@
 
 package com.macbackpackers.services;
 
+import com.macbackpackers.beans.JobParameter;
+import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.jobs.AbstractJob;
+import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
+import com.macbackpackers.scrapers.CloudbedsScraper;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.htmlunit.WebClient;
+import org.openqa.selenium.WebDriver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -10,24 +29,6 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
-import com.macbackpackers.beans.JobParameter;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
-import org.apache.commons.pool2.impl.GenericObjectPool;
-import org.openqa.selenium.WebDriver;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
-import org.springframework.stereotype.Service;
-
-import com.macbackpackers.beans.JobStatus;
-import com.macbackpackers.dao.WordPressDAO;
-import com.macbackpackers.jobs.AbstractJob;
-import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
 
 @Service
 public class ProcessorService {
@@ -42,6 +43,9 @@ public class ProcessorService {
 
     @Autowired
     private WordPressDAO dao;
+
+    @Autowired
+    private ApplicationContext context;
 
     @Autowired
     private AutowireCapableBeanFactory autowireBeanFactory;
@@ -143,6 +147,41 @@ public class ProcessorService {
     }
 
     /**
+     * Make sure we can connect to Cloudbeds (if applicable). Email support if 3 failed logins in a
+     * row.
+     *
+     * @throws Exception if unable to establish cloudbeds session
+     */
+    public void initCloudbeds() throws Exception {
+        // if cloudbeds, check if we can connect first
+        // this will fail-fast if not
+        if ( dao.isCloudbeds() ) {
+            processCloudbedsResetLoginJobs();
+            String failedLoginCountStr = dao.getOption( "hbo_failed_logins" );
+            int failedLoginCount = failedLoginCountStr == null ? 0 : Integer.parseInt( failedLoginCountStr );
+            if ( failedLoginCount == 3 ) {
+                createAndRunResetCloudbedsLoginJob();
+            }
+            else if ( failedLoginCount == 5 ) {
+                String supportEmail = dao.getOption( "hbo_support_email" );
+                if ( supportEmail != null ) {
+                    GmailService gmail = context.getBean( GmailService.class );
+                    gmail.sendEmail( supportEmail, null, "Login Failed", "Help! I'm no longer able to login to Cloudbeds!! -RONBOT" );
+                }
+            }
+            try ( WebClient c = context.getBean( "webClientForCloudbeds", WebClient.class )) {
+                CloudbedsScraper cloudbedsScraper = context.getBean( CloudbedsScraper.class );
+                cloudbedsScraper.getReservations( c, "999999999" ); // keep session alive
+                dao.setOption( "hbo_failed_logins", "0" ); // reset
+            }
+            catch ( Exception ex ) {
+                dao.setOption( "hbo_failed_logins", String.valueOf( ++failedLoginCount ) ); // increment
+                throw ex;
+            }
+        }
+    }
+
+    /**
      * Process all jobs. If no jobs are available to be run, then pause for a configured period
      * before checking again.
      * 
@@ -153,6 +192,12 @@ public class ProcessorService {
         CyclicBarrier barrier = new CyclicBarrier( threadCount );
         
         while ( true ) {
+            try {
+                initCloudbeds();
+            }
+            catch ( Throwable th ) {
+                LOGGER.error( "Failed to initialise cloudbeds.. Have we been logged out?", th );
+            }
             try {
                 createOverdueScheduledJobs();
             }
@@ -165,6 +210,7 @@ public class ProcessorService {
                 executor.execute( th );
             }
             try {
+                LOGGER.info( "Waiting for {} seconds before checking again for new jobs", repeatIntervalMillis / 1000 );
                 Thread.sleep( repeatIntervalMillis ); // wait then repeat loop
             }
             catch ( InterruptedException e ) {

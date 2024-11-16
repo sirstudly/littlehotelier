@@ -1,34 +1,27 @@
 
 package com.macbackpackers;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.channels.FileLock;
-import java.util.Date;
-import java.util.TimeZone;
-
+import com.macbackpackers.config.LittleHotelierConfig;
+import com.macbackpackers.exceptions.ShutdownException;
+import com.macbackpackers.services.FileService;
+import com.macbackpackers.services.ProcessorService;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.htmlunit.WebClient;
-import org.quartz.SchedulerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.stereotype.Component;
 
-import com.macbackpackers.config.LittleHotelierConfig;
-import com.macbackpackers.dao.WordPressDAO;
-import com.macbackpackers.exceptions.ShutdownException;
-import com.macbackpackers.scrapers.CloudbedsScraper;
-import com.macbackpackers.services.FileService;
-import com.macbackpackers.services.GmailService;
-import com.macbackpackers.services.ProcessorService;
+import java.io.File;
+import java.io.IOException;
+import java.nio.channels.FileLock;
+import java.util.Date;
+import java.util.TimeZone;
 
 /**
  * The main bootstrap for running all available jobs.
@@ -44,12 +37,6 @@ public class RunProcessor
 
     @Autowired
     private FileService fileService;
-
-    @Autowired
-    private WordPressDAO dao;
-    
-    @Autowired
-    private ApplicationContext context;
 
     // exclusive-file lock so only ever one instance of the processor is running
     private FileLock processorLock;
@@ -88,11 +75,9 @@ public class RunProcessor
      * Runs this process in server-mode periodically polling the jobs table and executing any that
      * are outstanding.
      * 
-     * @throws IOException
-     * @throws ShutdownException
-     * @throws SchedulerException
+     * @throws Exception
      */
-    public void runInServerMode() throws IOException, ShutdownException, SchedulerException {
+    public void runInServerMode() throws Exception {
         acquireLock();
 //        dao.resetAllProcessingJobsToFailed();
 //        scheduler.reloadScheduledJobs(); // load and start the scheduler
@@ -101,12 +86,11 @@ public class RunProcessor
 
     /**
      * Run the processor once executing any outstanding jobs.
-     * @throws IOException
-     * @throws ShutdownException
-     * @throws SchedulerException
+     * @throws Exception
      */
-    public void runInStandardMode() throws IOException, ShutdownException, SchedulerException {
+    public void runInStandardMode() throws Exception {
         acquireLock();
+        processorService.initCloudbeds();
 //        dao.resetAllProcessingJobsToFailed();
         processorService.createOverdueScheduledJobs();
 
@@ -126,41 +110,6 @@ public class RunProcessor
     public void releaseExclusivityLock() throws IOException {
         if ( processorLock != null ) {
             processorLock.release();
-        }
-    }
-
-    /**
-     * Make sure we can connect to Cloudbeds (if applicable). Email support if 3 failed logins in a
-     * row.
-     * 
-     * @throws Exception if unable to establish cloudbeds session
-     */
-    public void initCloudbeds() throws Exception {
-        // if cloudbeds, check if we can connect first
-        // this will fail-fast if not
-        if ( dao.isCloudbeds() ) {
-            processorService.processCloudbedsResetLoginJobs();
-            String failedLoginCountStr = dao.getOption( "hbo_failed_logins" );
-            int failedLoginCount = failedLoginCountStr == null ? 0 : Integer.parseInt( failedLoginCountStr );
-            if ( failedLoginCount == 3 ) {
-                processorService.createAndRunResetCloudbedsLoginJob();
-            }
-            else if ( failedLoginCount == 5 ) {
-                String supportEmail = dao.getOption( "hbo_support_email" );
-                if ( supportEmail != null ) {
-                    GmailService gmail = context.getBean( GmailService.class );
-                    gmail.sendEmail( supportEmail, null, "Login Failed", "Help! I'm no longer able to login to Cloudbeds!! -RONBOT" );
-                }
-            }
-            try (WebClient c = context.getBean( "webClientForCloudbeds", WebClient.class )) {
-                CloudbedsScraper cloudbedsScraper = context.getBean( CloudbedsScraper.class );
-                cloudbedsScraper.getReservations( c, "999999999" ); // keep session alive
-                dao.setOption( "hbo_failed_logins", "0" ); // reset
-            }
-            catch ( Exception ex ) {
-                dao.setOption( "hbo_failed_logins", String.valueOf( ++failedLoginCount ) ); // increment
-                throw ex;
-            }
         }
     }
 
@@ -203,8 +152,6 @@ public class RunProcessor
         }
 
         try {
-            processor.initCloudbeds();
-
             // server-mode: keep the processor running
             if ( line.hasOption( "S" ) ) {
                 LOGGER.info( "Running in server-mode" );
