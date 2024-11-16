@@ -65,6 +65,9 @@ public class ChromeScraper {
     @Autowired
     private WordPressDAO dao;
 
+    @Autowired
+    private CloudbedsJsonRequestFactory jsonRequestFactory;
+
     class AutocloseableWebDriver implements AutoCloseable {
 
         private WebDriver driver;
@@ -268,11 +271,11 @@ public class ChromeScraper {
             LOGGER.info( "PROPERTY NAME is: " + URLDecoder.decode( hc.getValue(), "UTF-8" ) );
 
             // save credentials to disk so we don't need to do this again
-            dao.setOption( "hbo_cloudbeds_cookies",
+            jsonRequestFactory.setCookies(
                     driver.manage().getCookies().stream()
                             .map( c -> c.getName() + "=" + c.getValue() )
                             .collect( Collectors.joining( ";" ) ) );
-            dao.setOption( "hbo_cloudbeds_useragent",
+            jsonRequestFactory.setUserAgent(
                     (String) ( (JavascriptExecutor) driver ).executeScript( "return navigator.userAgent;" ) );
         }
     }

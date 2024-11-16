@@ -132,6 +132,16 @@ public class CloudbedsJsonRequestFactory {
         return cookies;
     }
 
+    public synchronized void setCookies( String newCookies ) {
+        dao.setOption( "hbo_cloudbeds_cookies", newCookies );
+        cookies = newCookies;
+    }
+
+    public synchronized void setUserAgent( String newUserAgent ) {
+        dao.setOption( "hbo_cloudbeds_useragent", newUserAgent );
+        userAgent = newUserAgent;
+    }
+
     /**
      * Sets the cloudbeds version to use for all future requests.
      * 

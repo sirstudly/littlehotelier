@@ -32,6 +32,7 @@ import com.macbackpackers.jobs.SendGroupBookingPaymentReminderEmailJob;
 import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
+import com.macbackpackers.scrapers.CloudbedsJsonRequestFactory;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
@@ -109,7 +110,10 @@ public class CloudbedsService {
     
     @Autowired
     private CloudbedsScraper scraper;
-    
+
+    @Autowired
+    private CloudbedsJsonRequestFactory jsonRequestFactory;
+
     @Autowired
     private BookingComScraper bdcScraper;
 
@@ -1712,11 +1716,11 @@ public class CloudbedsService {
         LOGGER.info( "PROPERTY NAME is: " + URLDecoder.decode( hc.getValue(), "UTF-8" ) );
 
         // save credentials to disk so we don't need to do this again
-        dao.setOption( "hbo_cloudbeds_cookies",
+        jsonRequestFactory.setCookies(
                 webClient.getCookieManager().getCookies().stream()
                         .map( c -> c.getName() + "=" + c.getValue() )
                         .collect( Collectors.joining( ";" ) ) );
-        dao.setOption( "hbo_cloudbeds_useragent",
+        jsonRequestFactory.setUserAgent(
                 webClient.getBrowserVersion().getUserAgent() );
     }
 
