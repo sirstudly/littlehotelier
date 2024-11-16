@@ -262,7 +262,7 @@ public class ProcessorService {
      */
     private synchronized void copyJobLogToRemoteHost( int jobId ) throws InterruptedException, IOException {
 
-        if ( false == SystemUtils.IS_OS_WINDOWS && StringUtils.isNotBlank( destinationLogLocation ) ) {
+        if ( StringUtils.isNotBlank( destinationLogLocation ) ) {
             LOGGER.info( "Compressing log file" );
             ProcessBuilder pb = new ProcessBuilder( "gzip" );
             pb.redirectInput( new File( localLogDirectory + "/job-" + jobId + ".log" ) );

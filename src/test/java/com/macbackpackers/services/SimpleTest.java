@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Properties;
@@ -197,7 +198,7 @@ public class SimpleTest {
     @Test
     public void testGetActivityLog() throws Exception {
 
-        final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a" );
+        final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a", new Locale("en") );
         String json = StreamUtils.copyToString( getClass().getClassLoader().getResourceAsStream(
                 "activity_log.json" ), StandardCharsets.UTF_8 );
         JsonElement rootElem = gson.fromJson( json, JsonElement.class );

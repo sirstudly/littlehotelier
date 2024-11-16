@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.Callable;
@@ -942,7 +943,7 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createGetActivityLog( identifier, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         JsonObject jobject = doRequest( webClient, requestSettings );
 
-        final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a" );
+        final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a", new Locale( "en" ) );
         List<ActivityLogEntry> logEntries = new ArrayList<ActivityLogEntry>();
         jobject.get( "aaData" ).getAsJsonArray().forEach( e -> {
             ActivityLogEntry ent = new ActivityLogEntry();
