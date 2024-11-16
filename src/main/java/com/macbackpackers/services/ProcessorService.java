@@ -20,6 +20,7 @@ import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
+import javax.mail.MessagingException;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -165,8 +166,13 @@ public class ProcessorService {
             else if ( failedLoginCount == 5 ) {
                 String supportEmail = dao.getOption( "hbo_support_email" );
                 if ( supportEmail != null ) {
-                    GmailService gmail = context.getBean( GmailService.class );
-                    gmail.sendEmail( supportEmail, null, "Login Failed", "Help! I'm no longer able to login to Cloudbeds!! -RONBOT" );
+                    try {
+                        GmailService gmail = context.getBean( GmailService.class );
+                        gmail.sendEmail( supportEmail, null, "Login Failed", "Help! I'm no longer able to login to Cloudbeds!! -RONBOT" );
+                    }
+                    catch ( MessagingException | IOException ex ) {
+                        LOGGER.error( "Failed to send login failed email" );
+                    }
                 }
             }
             try ( WebClient c = context.getBean( "webClientForCloudbeds", WebClient.class )) {
