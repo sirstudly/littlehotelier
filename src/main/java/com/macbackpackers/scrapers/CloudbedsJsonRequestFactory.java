@@ -49,26 +49,15 @@ public class CloudbedsJsonRequestFactory {
     // a default version which we'll probably get prompted to update
     private static final String DEFAULT_VERSION = "https://front.cloudbeds.com/mfd-root/app.js";
 
-    // the cloudbeds property id
-    private String propertyId;
-    // the current cloudbeds version we're using
-    private String version;
-    // the currently loaded user agent (cached)
-    private String userAgent;
-    // the cookies in use (cached)
-    private String cookies;
-
     /**
      * Retrieves the current Cloudbeds property ID.
      * 
      * @return non-null property ID
      */
     public String getPropertyId() {
+        String propertyId = dao.getOption( "hbo_cloudbeds_property_id" );
         if ( propertyId == null ) {
-            propertyId = dao.getOption( "hbo_cloudbeds_property_id" );
-            if ( propertyId == null ) {
-                throw new MissingUserDataException( "Missing Cloudbeds property ID" );
-            }
+            throw new MissingUserDataException( "Missing Cloudbeds property ID" );
         }
         return propertyId;
     }
@@ -79,11 +68,8 @@ public class CloudbedsJsonRequestFactory {
      * @return non-null version
      */
     public synchronized String getVersion() {
-        if ( version == null ) {
-            String currentVersion = dao.getOption( "hbo_cloudbeds_version" );
-            version = StringUtils.isNotBlank( currentVersion ) ? currentVersion : DEFAULT_VERSION;
-        }
-        return version;
+        String currentVersion = dao.getOption( "hbo_cloudbeds_version" );
+        return StringUtils.isNotBlank( currentVersion ) ? currentVersion : DEFAULT_VERSION;
     }
 
     /**
@@ -108,13 +94,15 @@ public class CloudbedsJsonRequestFactory {
      * @return non-null user agent
      */
     public String getUserAgent() {
+        String userAgent = dao.getOption( "hbo_cloudbeds_useragent" );
         if ( userAgent == null ) {
-            userAgent = dao.getOption( "hbo_cloudbeds_useragent" );
-            if ( userAgent == null ) {
-                throw new MissingUserDataException( "Missing Cloudbeds session (user-agent)" );
-            }
+            throw new MissingUserDataException( "Missing Cloudbeds session (user-agent)" );
         }
         return userAgent;
+    }
+
+    public synchronized void setUserAgent( String userAgent ) {
+        dao.setOption( "hbo_cloudbeds_useragent", userAgent );
     }
 
     /**
@@ -123,33 +111,24 @@ public class CloudbedsJsonRequestFactory {
      * @return non-null cookies
      */
     public String getCookies() {
-        if( cookies == null ) {
-            cookies = dao.getOption( "hbo_cloudbeds_cookies" );
-            if ( cookies == null ) {
-                throw new MissingUserDataException( "Missing Cloudbeds session cookies" );
-            }
+        String cookies = dao.getOption( "hbo_cloudbeds_cookies" );
+        if ( cookies == null ) {
+            throw new MissingUserDataException( "Missing Cloudbeds session cookies" );
         }
         return cookies;
     }
 
-    public synchronized void setCookies( String newCookies ) {
-        dao.setOption( "hbo_cloudbeds_cookies", newCookies );
-        cookies = newCookies;
-    }
-
-    public synchronized void setUserAgent( String newUserAgent ) {
-        dao.setOption( "hbo_cloudbeds_useragent", newUserAgent );
-        userAgent = newUserAgent;
+    public synchronized void setCookies( String cookies ) {
+        dao.setOption( "hbo_cloudbeds_cookies", cookies );
     }
 
     /**
      * Sets the cloudbeds version to use for all future requests.
      * 
-     * @param newVersion non-null version
+     * @param version non-null version
      */
-    public synchronized void setVersion( String newVersion ) {
-        dao.setOption( "hbo_cloudbeds_version", newVersion );
-        version = newVersion;
+    public synchronized void setVersion( String version ) {
+        dao.setOption( "hbo_cloudbeds_version", version );
     }
 
     /**

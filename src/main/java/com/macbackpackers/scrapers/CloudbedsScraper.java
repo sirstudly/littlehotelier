@@ -1329,12 +1329,12 @@ public class CloudbedsScraper {
 
         JsonElement jelement = fromJson( redirectPage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( null == jelement ) {
-            throw new UnrecoverableFault( "Failed operation on: " + req.getUrl() );
+            throw new UnrecoverableFault( "Failed operation on: " + req.getUrl() + " with status code " + redirectPage.getWebResponse().getStatusCode() );
         }
 
         JsonObject jobject = jelement.getAsJsonObject();
         if ( null == jobject ) {
-            throw new UnrecoverableFault( "Failed operation on: " + req.getUrl() );
+            throw new UnrecoverableFault( "Failed operation on: " + req.getUrl() + " with status code " + redirectPage.getWebResponse().getStatusCode() );
         }
 
         if ( jobject.get( "success" ) != null && false == jobject.get( "success" ).getAsBoolean() ) {
