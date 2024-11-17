@@ -158,7 +158,7 @@ public class ProcessorService {
         // this will fail-fast if not
         if ( dao.isCloudbeds() ) {
             processCloudbedsResetLoginJobs();
-            String failedLoginCountStr = dao.getOption( "hbo_failed_logins" );
+            String failedLoginCountStr = dao.getOptionNoCache( "hbo_failed_logins" );
             int failedLoginCount = failedLoginCountStr == null ? 0 : Integer.parseInt( failedLoginCountStr );
             if ( failedLoginCount == 3 ) {
                 createAndRunResetCloudbedsLoginJob();
