@@ -10,6 +10,8 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.openqa.selenium.WebDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +39,9 @@ public class RunProcessor
 
     @Autowired
     private FileService fileService;
+
+    @Autowired
+    private GenericObjectPool<WebDriver> webDriverObjectPool;
 
     // exclusive-file lock so only ever one instance of the processor is running
     private FileLock processorLock;
@@ -114,6 +119,19 @@ public class RunProcessor
     }
 
     /**
+     * Cleanup any resources before shutting down.
+     */
+    public void shutdown() {
+        LOGGER.info( "Shutting down... Closing WebDriver pool." );
+        try {
+            webDriverObjectPool.close(); // This ensures all objects in the pool are destroyed
+        }
+        catch ( Exception ex ) {
+            LOGGER.error( "Error attempting to shutdown webdriver pool.", ex );
+        }
+    }
+
+    /**
      * Runs the processor.
      * 
      * @param args no arguments expected
@@ -152,6 +170,9 @@ public class RunProcessor
         }
 
         try {
+            // Add a shutdown hook to clean up any open resources
+            Runtime.getRuntime().addShutdownHook( new Thread( () -> processor.shutdown() ) );
+
             // server-mode: keep the processor running
             if ( line.hasOption( "S" ) ) {
                 LOGGER.info( "Running in server-mode" );
