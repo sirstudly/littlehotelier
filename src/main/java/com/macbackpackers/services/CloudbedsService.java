@@ -154,22 +154,15 @@ public class CloudbedsService {
      * @throws IOException on read/write error
      */
     public void dumpAllocationsFrom( WebClient webClient, int jobId, LocalDate startDate, LocalDate endDate ) throws IOException {
-        AllocationList allocations = new AllocationList();
-        List<Reservation> reservations = scraper.getReservations( webClient, startDate, endDate ).stream()
+        AllocationList allocations = new AllocationList(); // converted reservations to allocations
+        List<GuestCommentReportEntry> guestComments = scraper.getReservations( webClient, startDate, endDate ).stream()
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
-                .collect( Collectors.toList() );
-        reservations.stream()
-                .map( r -> reservationToAllocation( jobId, r ) )
-                .forEach( a -> allocations.addAll( a ) );
-        dao.insertAllocations( allocations );
-
-        // now update the comments
-        List<GuestCommentReportEntry> guestComments = reservations.stream()
+                .peek( r -> allocations.addAll( reservationToAllocation( jobId, r ) ) )
                 .filter( r -> StringUtils.isNotBlank( r.getSpecialRequests() ) )
-                .map( r -> new GuestCommentReportEntry(
-                        Integer.parseInt( r.getReservationId() ),
-                        r.getSpecialRequests() ) )
+                .map( r -> new GuestCommentReportEntry( Integer.parseInt( r.getReservationId() ), r.getSpecialRequests() ) )
                 .collect( Collectors.toList() );
+
+        dao.insertAllocations( allocations );
         dao.updateGuestCommentsForReservations( guestComments );
 
         // finally, add any staff allocations
