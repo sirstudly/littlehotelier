@@ -1,5 +1,41 @@
 package com.macbackpackers.scrapers;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.RateLimiter;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
+import com.macbackpackers.beans.cloudbeds.responses.AddNoteResponse;
+import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
+import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
+import com.macbackpackers.beans.cloudbeds.responses.Customer;
+import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
+import com.macbackpackers.beans.cloudbeds.responses.Guest;
+import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
+import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
+import com.macbackpackers.exceptions.PaymentPendingException;
+import com.macbackpackers.exceptions.RecordPaymentFailedException;
+import com.macbackpackers.exceptions.UnrecoverableFault;
+import org.apache.commons.lang3.StringUtils;
+import org.htmlunit.Page;
+import org.htmlunit.WebClient;
+import org.htmlunit.WebRequest;
+import org.htmlunit.html.HtmlPage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
@@ -24,42 +60,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import org.apache.commons.lang3.StringUtils;
-import org.htmlunit.Page;
-import org.htmlunit.WebClient;
-import org.htmlunit.WebRequest;
-import org.htmlunit.html.HtmlPage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.macbackpackers.beans.CardDetails;
-import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
-import com.macbackpackers.beans.cloudbeds.responses.AddNoteResponse;
-import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
-import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
-import com.macbackpackers.beans.cloudbeds.responses.Customer;
-import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
-import com.macbackpackers.beans.cloudbeds.responses.Guest;
-import com.macbackpackers.beans.cloudbeds.responses.Reservation;
-import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
-import com.macbackpackers.dao.WordPressDAO;
-import com.macbackpackers.exceptions.MissingUserDataException;
-import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
-import com.macbackpackers.exceptions.PaymentPendingException;
-import com.macbackpackers.exceptions.RecordPaymentFailedException;
-import com.macbackpackers.exceptions.UnrecoverableFault;
-
 @Component
 public class CloudbedsScraper {
     
@@ -80,6 +80,7 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED = "Group Booking Approval Required";
     public static final String TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED_PREPAID = "Group Booking Approval Required PREPAID";
     public static final String TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER = "Group Booking Payment Reminder";
+    public static final double DEFAULT_RATE_LIMIT = 1.0; // requests per second
 
     // the last result of getPropertyContent() as it's an expensive operation
     private static JsonObject propertyContent;
@@ -111,6 +112,8 @@ public class CloudbedsScraper {
     @Value( "${process.jobs.retries:3}" )
     private int MAX_RETRY;
 
+    private RateLimiter rateLimiter;
+
     /**
      * Retrieves the current Cloudbeds property ID.
      * 
@@ -127,6 +130,22 @@ public class CloudbedsScraper {
      */
     public DecimalFormat getCurrencyFormat() {
         return new DecimalFormat( "###0.00" );
+    }
+
+    /**
+     * Returns the request rate limiter for cloudbeds. This can be overridden with the DB option {@code hbo_cloudbeds_rate_limit},
+     * otherwise the default {@link #DEFAULT_RATE_LIMIT} will be used.
+     *
+     * @return non null rate limiter
+     */
+    private RateLimiter getRateLimiter() {
+
+        // initialise on first use
+        if ( rateLimiter == null ) {
+            String rateLimit = dao.getOption( "hbo_cloudbeds_rate_limit" );
+            rateLimiter = RateLimiter.create( rateLimit == null ? DEFAULT_RATE_LIMIT : Double.valueOf( rateLimit ) );
+        }
+        return rateLimiter;
     }
 
     /**
@@ -1324,6 +1343,7 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     private JsonObject doRequest( WebClient webClient, WebRequest req ) throws IOException {
+        getRateLimiter().acquire();
         Page redirectPage = webClient.getPage( req );
         LOGGER.debug( redirectPage.getWebResponse().getContentAsString() );
 

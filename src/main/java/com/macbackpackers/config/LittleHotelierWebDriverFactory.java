@@ -23,9 +23,6 @@ import java.util.List;
 @Component
 public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebDriver> {
 
-    @Value( "${lilhotelier.propertyid}" )
-    private String lhPropertyId;
-
     @Value( "${chromescraper.maxwait.seconds:60}" )
     private int maxWaitSeconds;
 
