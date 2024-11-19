@@ -70,6 +70,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -154,15 +155,15 @@ public class CloudbedsService {
      * @throws IOException on read/write error
      */
     public void dumpAllocationsFrom( WebClient webClient, int jobId, LocalDate startDate, LocalDate endDate ) throws IOException {
-        AllocationList allocations = new AllocationList(); // converted reservations to allocations
-        List<GuestCommentReportEntry> guestComments = scraper.getReservations( webClient, startDate, endDate ).stream()
+        List<Allocation> allocations = Collections.synchronizedList( new ArrayList<>() ); // converted reservations to allocations
+        List<GuestCommentReportEntry> guestComments = scraper.getReservations( webClient, startDate, endDate ).parallelStream()
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .peek( r -> allocations.addAll( reservationToAllocation( jobId, r ) ) )
                 .filter( r -> StringUtils.isNotBlank( r.getSpecialRequests() ) )
                 .map( r -> new GuestCommentReportEntry( Integer.parseInt( r.getReservationId() ), r.getSpecialRequests() ) )
                 .collect( Collectors.toList() );
 
-        dao.insertAllocations( allocations );
+        dao.insertAllocations( new AllocationList( allocations ) );
         dao.updateGuestCommentsForReservations( guestComments );
 
         // finally, add any staff allocations
