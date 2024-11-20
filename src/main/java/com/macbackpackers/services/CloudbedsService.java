@@ -36,6 +36,7 @@ import com.macbackpackers.scrapers.CloudbedsJsonRequestFactory;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
+import com.macbackpackers.utils.MDCUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -157,7 +158,7 @@ public class CloudbedsService {
     public void dumpAllocationsFrom( WebClient webClient, int jobId, LocalDate startDate, LocalDate endDate ) throws IOException {
         List<Allocation> allocations = Collections.synchronizedList( new ArrayList<>() ); // converted reservations to allocations
         List<GuestCommentReportEntry> guestComments = scraper.getReservations( webClient, startDate, endDate ).parallelStream()
-                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .map( c -> MDCUtils.wrapWithMDC( () -> scraper.getReservationRetry( webClient, c.getId() ) ).get() )
                 .peek( r -> allocations.addAll( reservationToAllocation( jobId, r ) ) )
                 .filter( r -> StringUtils.isNotBlank( r.getSpecialRequests() ) )
                 .map( r -> new GuestCommentReportEntry( Integer.parseInt( r.getReservationId() ), r.getSpecialRequests() ) )
