@@ -51,6 +51,7 @@ import org.htmlunit.html.HtmlTextInput;
 import org.htmlunit.util.Cookie;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -156,16 +157,23 @@ public class CloudbedsService {
      * @throws IOException on read/write error
      */
     public void dumpAllocationsFrom( WebClient webClient, int jobId, LocalDate startDate, LocalDate endDate ) throws IOException {
-        List<Allocation> allocations = Collections.synchronizedList( new ArrayList<>() ); // converted reservations to allocations
-        List<GuestCommentReportEntry> guestComments = scraper.getReservations( webClient, startDate, endDate ).parallelStream()
-                .map( c -> MDCUtils.wrapWithMDC( () -> scraper.getReservationRetry( webClient, c.getId() ) ).get() )
-                .peek( r -> allocations.addAll( reservationToAllocation( jobId, r ) ) )
-                .filter( r -> StringUtils.isNotBlank( r.getSpecialRequests() ) )
-                .map( r -> new GuestCommentReportEntry( Integer.parseInt( r.getReservationId() ), r.getSpecialRequests() ) )
-                .collect( Collectors.toList() );
+        var mdcContext = MDC.getCopyOfContextMap();
+        try {
+            List<Allocation> allocations = Collections.synchronizedList( new ArrayList<>() ); // converted reservations to allocations
+            List<GuestCommentReportEntry> guestComments = scraper.getReservations( webClient, startDate, endDate ).parallelStream()
+                    .map( MDCUtils.wrapWithMDC( c -> scraper.getReservationRetry( webClient, c.getId() ) ) )
+                    .peek( r -> allocations.addAll( reservationToAllocation( jobId, r ) ) )
+                    .filter( r -> StringUtils.isNotBlank( r.getSpecialRequests() ) )
+                    .map( r -> new GuestCommentReportEntry( Integer.parseInt( r.getReservationId() ), r.getSpecialRequests() ) )
+                    .collect( Collectors.toList() );
 
-        dao.insertAllocations( new AllocationList( allocations ) );
-        dao.updateGuestCommentsForReservations( guestComments );
+            dao.insertAllocations( new AllocationList( allocations ) );
+            dao.updateGuestCommentsForReservations( guestComments );
+        }
+        finally {
+            // MDC lost as side-effect of calling MDCUtils.wrapWithMDC
+            MDC.setContextMap( mdcContext );
+        }
 
         // finally, add any staff allocations
         AllocationList staffAllocations = new AllocationList( getAllStaffAllocations( webClient, startDate ) );
