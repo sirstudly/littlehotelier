@@ -944,7 +944,6 @@ public class PaymentProcessorService {
             LOGGER.info( "Already attempted to charge booking. Not attempting to try again." );
             return;
         }
-        cloudbedsScraper.addArchivedNote( webClient, reservationId, CHARGE_REMAINING_BALANCE_NOTE );
 
         if( BigDecimal.ZERO.compareTo( cbReservation.getBalanceDue() ) >= 0 ) {
             LOGGER.info( "Nothing to do. Booking has an outstanding balance of " + cbReservation.getBalanceDue() );
@@ -955,18 +954,19 @@ public class PaymentProcessorService {
             throw new UnrecoverableFault( "Booking is at unsupported status " + cbReservation.getStatus() );
         }
 
-        // check if card details exist in CB
-        if( false == cbReservation.isCardDetailsPresent() ) {
-            throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
-        }
-
-        // should have credit card details at this point
         try {
+            // check if card details exist in CB
+            if( false == cbReservation.isCardDetailsPresent() ) {
+                throw new MissingUserDataException( "Missing card details found for reservation " + cbReservation.getReservationId() + ". Unable to continue." );
+            }
+
+            // should have credit card details at this point
+            cloudbedsScraper.addArchivedNote( webClient, reservationId, CHARGE_REMAINING_BALANCE_NOTE );
             cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
             cloudbedsScraper.addArchivedNote( webClient, reservationId, "Successfully charged £"
                     + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) );
         }
-        catch( RecordPaymentFailedException | PaymentPendingException ex ) {
+        catch( RecordPaymentFailedException | PaymentPendingException | MissingUserDataException ex ) {
             SendTemplatedEmailJob job = new SendTemplatedEmailJob();
             autowireBeanFactory.autowireBean( job );
             Map<String, String> replaceMap = new HashMap<>();
