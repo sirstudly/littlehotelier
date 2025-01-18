@@ -32,7 +32,7 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
     @Override
     public WebDriver create() throws Exception {
         System.setProperty( "webdriver.chrome.driver", getClass().getClassLoader().getResource(
-                SystemUtils.IS_OS_WINDOWS ? "chromedriver.exe" : "chromedriver" ).getPath() );
+                SystemUtils.IS_OS_WINDOWS ? "chromedriver.exe" : "chromedriver" ).getPath().replace("/C:", "") ); // hack to remove drive designation on windows
 
         ChromeOptions options = new ChromeOptions();
         List<String> optionValues = new ArrayList<>(Arrays.asList(chromeOptions.split( " " )));
