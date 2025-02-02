@@ -868,12 +868,12 @@ public class WordPressDAOImpl implements WordPressDAO {
             blacklistEntries.stream()
                     .forEach( e -> {
                         if( StringUtils.isNotBlank( e.getFirstName() ) && StringUtils.isNotBlank( e.getLastName() ) ) {
-                            sqlClauses.add( "c.guestName = ?" + (sqlClauses.size() + 1) );
-                            params.add( e.getFirstName() + " " + e.getLastName() );
+                            sqlClauses.add( "LOWER(c.guestName) = ?" + (sqlClauses.size() + 1) );
+                            params.add( (e.getFirstName() + " " + e.getLastName()).toLowerCase() );
                         }
                         if( StringUtils.isNotBlank( e.getEmail() ) ) {
-                            sqlClauses.add( "c.email = ?" + (sqlClauses.size() + 1) );
-                            params.add( e.getEmail() );
+                            sqlClauses.add( "LOWER(c.email) = ?" + (sqlClauses.size() + 1) );
+                            params.add( e.getEmail().toLowerCase() );
                         }
                     } );
             TypedQuery<Allocation> query = em.createQuery( "FROM Allocation c "
