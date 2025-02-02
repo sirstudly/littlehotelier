@@ -8,7 +8,10 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.RoomBed;
+import com.macbackpackers.beans.RoomType;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.AddNoteResponse;
 import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
@@ -978,7 +981,67 @@ public class CloudbedsScraper {
         } );
         return logEntries;
     }
-    
+
+    /**
+     * Returns all room types for this property.
+     *
+     * @param webClient
+     * @return non-null list of room types
+     * @throws IOException
+     */
+    public List<RoomType> getRoomTypes( WebClient webClient ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createFindRoomType( getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        return gson.fromJson( doRequest( webClient, requestSettings ).get( "data" ).getAsJsonArray(), new TypeToken<List<RoomType>>() {}.getType() );
+    }
+
+    /**
+     * Gets all rooms of type roomTypeId as a JsonArray.
+     *
+     * @param webClient
+     * @param roomTypeId
+     * @return non-null json array
+     */
+    public JsonArray getRoomsOfType( WebClient webClient, String roomTypeId ) {
+        try {
+            WebRequest requestSettings = jsonRequestFactory.createFindRoomsOfType( getBillingPortalId( webClient ), getFrontVersion( webClient ), roomTypeId );
+            JsonObject jobject = doRequest( webClient, requestSettings );
+            if ( false == jobject.has( "data" ) || false == jobject.get( "data" ).getAsJsonObject().has( "accommodation_names" ) ) {
+                throw new UnrecoverableFault( "accommodation_names missing from getRoomsOfType response?" );
+            }
+            return jobject.get( "data" ).getAsJsonObject().get( "accommodation_names" ).getAsJsonArray();
+        }
+        catch ( IOException e ) {
+            throw new UnrecoverableFault( "Failed to get rooms of type " + roomTypeId, e );
+        }
+    }
+
+    /**
+     * Returns all room/bed assignments for this property.
+     *
+     * @param webClient
+     * @return non-null room/beds
+     * @throws IOException
+     */
+    public List<RoomBed> getAllRooms( WebClient webClient) throws IOException {
+        List<RoomBed> roomBeds = new ArrayList<>();
+        getRoomTypes( webClient ).parallelStream().forEach( roomType -> {
+            getRoomsOfType( webClient, roomType.getId() )
+                    .forEach( room -> {
+                        JsonObject rm = (JsonObject) room;
+                        RoomBed roomBed = new RoomBed();
+                        roomBed.setRoom( roomType.getTitle() );
+                        roomBed.setId( rm.get( "id" ).getAsString() );
+                        roomBed.setBedName( rm.get( "name" ).getAsString() );
+                        roomBed.setRoomType( roomType );
+                        roomBed.setRoomTypeId( rm.get( "room_type_id" ).getAsInt() );
+                        roomBed.setActive( "Y" );
+                        roomBed.setCapacity( Integer.parseInt( roomType.getRoomCapacity() ) );
+                        roomBeds.add( roomBed );
+                    } );
+        } );
+        return roomBeds;
+    }
+
     /**
      * Retrieves the given email template.
      * @param webClient web client instance to use

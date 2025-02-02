@@ -84,6 +84,49 @@ public class RoomBed {
         this.roomType = roomType;
     }
 
+    public void setRoomType(RoomType roomType) {
+        if ( "LTM".equalsIgnoreCase( roomType.getShortTitle() ) || "LTF".equalsIgnoreCase( roomType.getShortTitle() ) ) {
+            if ( "MA".equals( roomType.getGender() ) ) {
+                setRoomType( "LT_MALE" );
+            }
+            else if ( "FE".equals( roomType.getGender() ) ) {
+                setRoomType( "LT_FEMALE" );
+            }
+            else if ( "MI".equals( roomType.getGender() ) ) {
+                setRoomType( "LT_MIXED" );
+            }
+            else {
+                setRoomType( "LT_UNKNOWN" );
+            }
+        }
+        else if ( "DBL".equalsIgnoreCase( roomType.getShortTitle() ) ) {
+            setRoomType( "DBL" );
+        }
+        else if ( "QUD".equalsIgnoreCase( roomType.getShortTitle() ) ) {
+            setRoomType( "QUAD" );
+        }
+        else if ( "TRP".equalsIgnoreCase( roomType.getShortTitle() ) ) {
+            setRoomType( "TRIPLE" );
+        }
+        else if ( "PB(".equalsIgnoreCase( roomType.getShortTitle() ) ) {
+            setRoomType( "PAID BEDS" );
+        }
+        else {
+            if ( "MA".equals( roomType.getGender() ) ) {
+                setRoomType( "M" );
+            }
+            else if ( "FE".equals( roomType.getGender() ) ) {
+                setRoomType( "F" );
+            }
+            else if ( "MI".equals( roomType.getGender() ) ) {
+                setRoomType( "MX" );
+            }
+            else {
+                setRoomType( "UNKNOWN" );
+            }
+        }
+    }
+
     public String getActive() {
         return active;
     }

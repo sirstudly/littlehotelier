@@ -568,6 +568,52 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Retrieves all room types for the property.
+     *
+     * @param billingPortalId
+     * @param frontVersion
+     * @return web request
+     * @throws IOException
+     */
+    public WebRequest createFindRoomType( String billingPortalId, String frontVersion ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/roomtypes/find" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Retrieves all rooms for a given room type.
+     *
+     * @param billingPortalId
+     * @param frontVersion
+     * @param roomTypeId
+     * @return web request
+     * @throws IOException
+     */
+    public WebRequest createFindRoomsOfType( String billingPortalId, String frontVersion, String roomTypeId ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/roomtypes/find_one" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "roomTypeId", roomTypeId ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    /**
      * Retrieves an existing email template.
      * 
      * @param templateId the email template id

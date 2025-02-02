@@ -484,4 +484,15 @@ public class CloudbedsScraperTest {
         cloudbedsScraper.chargeCardForBooking( webClient, r, new BigDecimal( "37.26" ) );
     }
 
+    @Test
+    public void testGetRoomTypes() throws Exception {
+        cloudbedsScraper.getRoomTypes( webClient )
+                .forEach( roomType -> LOGGER.info( ToStringBuilder.reflectionToString( roomType ) ) );
+    }
+
+    @Test
+    public void testGetRooms() throws Exception {
+        cloudbedsScraper.getAllRooms( webClient )
+                .forEach( room -> LOGGER.info( ToStringBuilder.reflectionToString( room ) ) );
+    }
 }
