@@ -1445,7 +1445,7 @@ public class PaymentProcessorService {
             String chargeId, refundDescription;
 
             // Stripe transaction was done through Cloudbeds
-            if( authTxn.getGatewayAuthorization() != null ) {
+            if ( StringUtils.isNotBlank( authTxn.getGatewayAuthorization() ) ) {
                 chargeId = authTxn.getGatewayAuthorization();
                 refundDescription = refundTxnId + " (" + authTxn.getGatewayAuthorization() + "): " 
                         + authTxn.getOriginalDescription() + " x" + authTxn.getCardNumber();
