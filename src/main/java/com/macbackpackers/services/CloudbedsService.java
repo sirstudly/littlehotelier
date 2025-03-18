@@ -1545,8 +1545,8 @@ public class CloudbedsService {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                     template.getSubject().replace( "[conf number]", res.getIdentifier() ),
                     IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
+                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() == null ? "0" : template.getTopImageAlign() )
+                            .replace( "__IMG_SRC__", template.getTopImageSrc() == null ? "about:blank" : template.getTopImageSrc() )
                             .replace( "__EMAIL_CONTENT__", template.getEmailBody() ),
                     b -> replaceMap.keySet().stream().reduce( b.replace( "[first name]", res.getFirstName() ),
                             ( str, key ) -> str.replaceAll( key, replaceMap.get( key ) ) ) );
