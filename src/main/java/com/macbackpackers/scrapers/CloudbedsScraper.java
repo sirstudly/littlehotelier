@@ -999,7 +999,7 @@ public class CloudbedsScraper {
         template.setSendFromAddress( elem.get( "send_from" ).getAsString() );
         template.setSubject( elem.get( "subject" ).getAsString() );
         template.setEmailBody( elem.get( "email_body" ).getAsString() );
-        if ( elem.get( "top_image" ) != null ) {
+        if ( ! elem.get( "top_image" ).isJsonNull() ) {
             elem = elem.get( "top_image" ).getAsJsonObject();
             template.setTopImageId( elem.get( "original_id" ).getAsString() );
             template.setTopImageSrc( elem.get( "original_src" ).getAsString() );
