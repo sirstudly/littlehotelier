@@ -398,7 +398,9 @@ public class Reservation extends CloudbedsJsonResponse {
         }
         StringBuffer result = new StringBuffer();
         for ( BookingNote note : getNotes() ) {
-            result.append( note.toString() ).append( "\n" );
+            if ( !note.isArchived() ) {
+                result.append( note ).append( "\n" );
+            }
         }
         return result.toString();
     }
