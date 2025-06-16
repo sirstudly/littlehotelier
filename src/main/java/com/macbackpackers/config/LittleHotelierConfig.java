@@ -2,7 +2,10 @@
 package com.macbackpackers.config;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 
+import com.macbackpackers.dao.WordPressDAO;
+import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.htmlunit.BrowserVersion;
 import org.htmlunit.FailingHttpStatusCodeException;
@@ -15,7 +18,6 @@ import org.htmlunit.WebWindowListener;
 import org.openqa.selenium.WebDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -41,8 +43,7 @@ public class LittleHotelierConfig {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
-    @Value( "${lilhotelier.bedmatcher.classname}" )
-    private String lhBedMatcherClassName;
+    public static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
 
     @Bean( name = "reportsSQL" )
     public PropertiesFactoryBean getSqlReports() {
@@ -121,7 +122,7 @@ public class LittleHotelierConfig {
 
     @Bean( name = "webClientForCloudbeds" )
     @Scope( "prototype" )
-    public WebClient getCloudbedsWebClient() throws IOException {
+    public WebClient getCloudbedsWebClient() {
         WebClient webClient = new WebClient( BrowserVersion.CHROME ) {
             private static final long serialVersionUID = 3571378018703618188L;
             @Override
@@ -184,14 +185,6 @@ public class LittleHotelierConfig {
                 .create();
     }
 
-    @Bean( name = "gsonForSagepay" )
-    public Gson getGsonForSagepay() {
-        // these are thread safe
-        return new GsonBuilder()
-                .setPrettyPrinting()
-                .create();
-    }
-
     @Bean( name = "gsonForExternalWebService" )
     public Gson getGsonForExternalWebService() {
         // these are thread safe
@@ -201,9 +194,9 @@ public class LittleHotelierConfig {
     }
 
     @Bean
-    public RoomBedMatcher getRoomBedMatcher()
-            throws InstantiationException, IllegalAccessException, ClassNotFoundException {
-        return RoomBedMatcher.class.cast( Class.forName( lhBedMatcherClassName ).newInstance() );
+    public RoomBedMatcher getRoomBedMatcher( WordPressDAO dao )
+            throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
+        return (RoomBedMatcher) Class.forName( dao.getMandatoryOption( "hbo_bedmatcher_classname" ) ).getDeclaredConstructor().newInstance();
     }
 
     @Bean

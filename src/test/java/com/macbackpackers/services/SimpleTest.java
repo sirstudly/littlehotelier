@@ -368,4 +368,40 @@ public class SimpleTest {
         }
         return result.toArray( new JsonObject[0] );
     }
+
+    @Test
+    public void testRandom() throws Exception {
+        String style = "width:422px; left: -336px";
+        Pattern left = Pattern.compile( "; left: ([\\-0-9]*)px;" );
+        Matcher m = left.matcher( style );
+        if ( m.find() ) {
+            String leftOffset = m.group( 1 );
+            LOGGER.info( "offset is " + leftOffset );
+            if ( Integer.parseInt( leftOffset ) < 0 ) {
+                LOGGER.warn( "offset off screen, skipping " );
+            }
+        }
+        else {
+            LOGGER.warn( "pattern not found" );
+        }
+    }
+
+    @Test
+    public void testPatternMatching() throws Exception {
+        String value = "12-06 Touchy-Feely";
+
+        Pattern p = Pattern.compile( "([^\\-]*)-(.*)$" ); // anything but dash for room #, everything else for bed
+        Matcher m = p.matcher( value );
+        String room = null, bed = null;
+        if ( m.find() == false ) {
+            LOGGER.warn( "Couldn't determine bed name from '" + value + "'. Is it a private?" );
+            room = value;
+        }
+        else {
+            room = m.group( 1 );
+            bed = m.group( 2 );
+        }
+        Assert.assertEquals( "12", room );
+        Assert.assertEquals( "06 Touchy-Feely", bed );
+    }
 }

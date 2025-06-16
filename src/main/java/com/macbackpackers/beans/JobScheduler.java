@@ -171,7 +171,7 @@ public class JobScheduler {
     public Job createNewJob() throws ReflectiveOperationException {
 
         // now create a Job with a copy of the parameters from the scheduled job (making substitutions when necessary)
-        Job j = Job.class.cast( Class.forName( getClassname() ).newInstance() );
+        Job j = (Job) Class.forName( getClassname() ).getDeclaredConstructor().newInstance();
         j.setStatus( JobStatus.submitted );
 
         // now copy the parameters from the scheduled job to the actual job we're creating

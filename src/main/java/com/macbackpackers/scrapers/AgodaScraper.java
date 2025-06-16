@@ -20,7 +20,6 @@ import org.htmlunit.html.HtmlTextInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.google.gson.JsonArray;
@@ -51,14 +50,8 @@ public class AgodaScraper {
     @Autowired
     private GmailService gmailService;
 
-    @Value( "${agoda.property.id}" )
-    private String agodaPropertyId;
-
     private static final Pattern CARD_EXPIRY_PATTERN = Pattern.compile( "(\\d{2})/\\d{2}(\\d{2})" );
     
-    public static final String NO_CHARGE_NOTE = "AGODA BOOKING DO NOT CHARGE GUEST - RONBOT";
-    public static final String CHARGE_NOTE = "PROPERTY COLLECT. CHARGE GUEST IN FULL. - RONBOT";
-
     /**
      * Logs into Agoda providing the necessary credentials.
      * 
@@ -165,6 +158,7 @@ public class AgodaScraper {
             throws IOException, MissingUserDataException {
 
         // this will load cookies and login to Agoda if we aren't already
+        final String agodaPropertyId = wordPressDAO.getOption( "hbo_agoda_property_id" );
         String referrerUrl = "https://ycs.agoda.com/en-us/HotelBookings/Index/" + agodaPropertyId + "?";
         gotoPage( webClient, referrerUrl );
 

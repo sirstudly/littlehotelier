@@ -3,18 +3,17 @@ package com.macbackpackers.jobs;
 
 import java.text.ParseException;
 import java.time.LocalDate;
-import java.util.Calendar;
 import java.util.Date;
 
 import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.Transient;
 
+import com.macbackpackers.config.LittleHotelierConfig;
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
-import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.services.CloudbedsService;
 
 /**
@@ -24,10 +23,6 @@ import com.macbackpackers.services.CloudbedsService;
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.HousekeepingJob" )
 public class HousekeepingJob extends AbstractJob {
-
-    @Autowired
-    @Transient
-    private AllocationsPageScraper allocationScraper;
 
     @Autowired
     @Transient
@@ -52,15 +47,6 @@ public class HousekeepingJob extends AbstractJob {
             cloudbedsService.dumpAllocationsFrom( getWebClient(),
                     getId(), selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
         }
-        else {
-            // we just need to scrape new data for the given date (and previous day)
-            // the PHP form will do the rest
-            Date selectedDate = getSelectedDate();
-            Calendar dayBefore = Calendar.getInstance();
-            dayBefore.setTime( selectedDate );
-            dayBefore.add( Calendar.DATE, -1 );
-            allocationScraper.dumpAllocationsFrom( getWebClient(), getId(), dayBefore.getTime() );
-        }
     }
 
     @Override
@@ -75,7 +61,7 @@ public class HousekeepingJob extends AbstractJob {
      * @throws ParseException
      */
     private Date getSelectedDate() throws ParseException {
-        return AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "selected_date" ) );
+        return LittleHotelierConfig.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "selected_date" ) );
     }
 
     /**

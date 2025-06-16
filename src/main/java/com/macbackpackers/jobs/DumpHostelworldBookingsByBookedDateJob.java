@@ -8,11 +8,11 @@ import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.Transient;
 
+import com.macbackpackers.config.LittleHotelierConfig;
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
-import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.scrapers.HostelworldScraper;
 
 /**
@@ -52,7 +52,7 @@ public class DumpHostelworldBookingsByBookedDateJob extends AbstractJob {
      * @throws ParseException
      */
     public Date getBookedDate() throws ParseException {
-        return AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "booked_date" ) );
+        return LittleHotelierConfig.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "booked_date" ) );
     }
 
     /**
@@ -61,7 +61,7 @@ public class DumpHostelworldBookingsByBookedDateJob extends AbstractJob {
      * @param bookedDate the booked date in YYYY-MM-DD format
      */
     public void setBookedDate( Date bookedDate ) {
-        setParameter( "booked_date", AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( bookedDate ) );
+        setParameter( "booked_date", LittleHotelierConfig.DATE_FORMAT_YYYY_MM_DD.format( bookedDate ) );
     }
 
 }

@@ -32,7 +32,7 @@ public class RegexMatchTest {
     }
 
     @Test
-    public void testPxPostLoginMask() throws Exception {
+    public void testLoginRegexMask() throws Exception {
         String input = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Txn><PostUsername>MyPostUser</PostUsername><PostPassword>MyP05tPa55w0rd</PostPassword><CardHolderName>Joe Bloggs</CardHolderName><CardNumber>444433........11</CardNumber><Amount>14.30</Amount><DateExpiry>1119</DateExpiry><Cvc2>...</Cvc2><Cvc2Presence>1</Cvc2Presence><InputCurrency>GBP</InputCurrency><TxnType>Purchase</TxnType><TxnId>7717717</TxnId><MerchantReference>EXP-98765432</MerchantReference></Txn>";
         RegexMask mask = new RegexMask(
                 "(<PostUsername>)(.*)(</PostUsername>)", m -> {

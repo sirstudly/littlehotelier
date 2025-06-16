@@ -21,11 +21,8 @@ import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobScheduler;
 import com.macbackpackers.beans.JobStatus;
-import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
-import com.macbackpackers.beans.SagepayRefund;
-import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.StripeRefund;
@@ -47,13 +44,6 @@ public interface WordPressDAO {
      * @return true if cloudbeds, false if not.
      */
     boolean isCloudbeds();
-
-    /**
-     * Returns whether the property manager is Little Hotelier.
-     * 
-     * @return true if lilho, false if not.
-     */
-    boolean isLittleHotelier();
 
     /**
      * Format for use when parsing whole dates (e.g. checkin/checkout dates, etc.)
@@ -467,16 +457,6 @@ public interface WordPressDAO {
     Integer getLastCompletedAllocationScraperJobId();
 
     /**
-     * Returns the HW booking references which don't appear in the calendar table for the given
-     * jobId.
-     * 
-     * @param jobId ID of (DiffBooking) job in HW dump/calendar tables that we're comparing
-     * @param checkinDate date for which the report is being run
-     * @return non-null list of HW booking references 
-     */
-    List<String> findMissingHwBookingRefs( int jobId, Date checkinDate );
-
-    /**
      * Inserts/updates the table for guest comments with a block of guest comments.
      * {@code reservationId} and {@code comments} must be populated.
      * 
@@ -491,6 +471,15 @@ public interface WordPressDAO {
      * @return option value or null if key doesn't exist
      */
     String getOption( String property );
+
+    /**
+     * Retrieves the default option based on the given property and default value.
+     *
+     * @param property the property key to search for the option
+     * @param defaultValue the value to return if the property is not found
+     * @return the option associated with the property key or the provided default value if the property is unavailable
+     */
+    String getDefaultOption(String property, String defaultValue);
 
     /**
      * Returns the wordpress option for the given property reading from the DB.
@@ -546,37 +535,6 @@ public interface WordPressDAO {
     void setOption( String property, String value );
     
     /**
-     * Fetch px post transaction record by primary key.
-     * 
-     * @param txnId unique transaction ID
-     * @return non-null transaction
-     */
-    PxPostTransaction fetchPxPostTransaction( int txnId );
-
-    /**
-     * Fetch Sagepay transaction record by primary key.
-     * 
-     * @param id unique PK on wp_sagepay_tx_auth
-     * @return non-null transaction
-     */
-    SagepayTransaction fetchSagepayTransaction( int id );
-
-    /**
-     * Fetch Sagepay transaction record by vendorTxCode with auth status of OK.
-     * 
-     * @param vendorTxCode
-     * @return non-null transaction
-     */
-    SagepayTransaction fetchSagepayTransaction( String vendorTxCode );
-
-    /**
-     * Sets the processed/last updated date on the transaction record to now.
-     * 
-     * @param id unique PK on wp_sagepay_tx_auth
-     */
-    void updateSagepayTransactionProcessedDate( int id );
-
-    /**
      * Sets the auth details on a stripe transaction.
      * 
      * @param id unique PK on wp_stripe_transaction
@@ -588,26 +546,6 @@ public interface WordPressDAO {
      * @param last4Digits last 4 digits of card used as payment
      */
     void updateStripeTransaction( int id, String paymentStatus, String authStatus, String authStatusDetail, String chargeId, String cardType, String last4Digits );
-
-    /**
-     * Reads a record to the sagepay refund table.
-     * 
-     * @return refund object
-     */
-    SagepayRefund fetchSagepayRefund( int id );
-
-    /**
-     * Updates the sagepay refund table after attempting a refund.
-     * 
-     * @param id primary key on stripe refund table
-     * @param refVendorTxCode vendor tx code for this refund
-     * @param response sagepay refund response (JSON)
-     * @param status sagepay status
-     * @param statusDetail status detail
-     * @param transactionId sagepay txn id
-     * @param status sagepay status of refund
-     */
-    void updateSagepayRefund( int id, String refVendorTxCode, String response, String status, String statusDetail, String transactionId );
 
     /**
      * Reads a record from the stripe transaction table.
@@ -649,58 +587,6 @@ public interface WordPressDAO {
      */
     void insertBookingLookupKey( String reservationId, String key, BigDecimal paymentRequested );
 
-    /**
-     * Returns the last px post transaction for a given booking reference.
-     * 
-     * @param bookingReference the LH booking reference
-     * @return the last px post transaction entry or null if not found
-     */
-    PxPostTransaction getLastPxPost( String bookingReference );
-
-    /**
-     * Updates the status XML for the given record.
-     * 
-     * @param txnId unique transaction id
-     * @param maskedCardNumber the card used for the transaction
-     * @param successful whether the payment successful
-     * @param statusXml status XML
-     */
-    void updatePxPostStatus( int txnId, String maskedCardNumber, boolean successful, String statusXml );
-
-    /**
-     * Inserts a new transaction into the PX Post table.
-     * 
-     * @param jobId current job id
-     * @param bookingRef the booking reference
-     * @param amountToPay amount being charged
-     * @return unique transaction id
-     */
-    int insertNewPxPostTransaction( int jobId, String bookingRef, BigDecimal amountToPay );
-
-    /**
-     * Updates the transaction after sending to the payment gateway.
-     * 
-     * @param txnId unique ID for the transaction
-     * @param maskedCardNumber the masked card number
-     * @param requestXML the XML sent to the payment gateway
-     * @param httpStatus the response HTTP code
-     * @param responseXML the response XML received from the payment gateway
-     * @param successful whether this transaction was successful or not
-     * @param helpText failure text (if applicable)
-     */
-    void updatePxPostTransaction( int txnId, String maskedCardNumber, String requestXML, int httpStatus,
-            String responseXML, boolean successful, String helpText );
-
-    /**
-     * Returns the number of failed transactions for the given booking reference and (masked) card
-     * number.
-     * 
-     * @param bookingRef e.g. BDC-123456789
-     * @param maskedCardNumber the partial card number to match
-     * @return number of failed payment attempts
-     */
-    int getPreviousNumberOfFailedTxns( String bookingRef, String maskedCardNumber );
-    
     /**
      * Checks whether we've already sent an email (or are ready to send) an email to the
      * given address.

@@ -1,13 +1,9 @@
 
 package com.macbackpackers.jobs;
 
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.text.ParseException;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 
@@ -20,8 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
 import com.macbackpackers.beans.JobStatus;
-import com.macbackpackers.beans.UnpaidDepositReportEntry;
-import com.macbackpackers.scrapers.BookingsPageScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 
 /**
@@ -43,11 +37,6 @@ public class CreateDepositChargeJob extends AbstractJob {
                 jobs.addAll( collectNewlyBookedDepositJobsForCloudbeds( webClient ) );
                 jobs.addAll( collectUpcomingBDCDepositJobsForCloudbeds( webClient ) );
                 jobs.stream().forEach( j -> dao.insertJob( j ) );
-            }
-        }
-        else {
-            try (WebClient webClient = appContext.getBean( "webClient", WebClient.class )) {
-                processJobForLittleHotelier( webClient );
             }
         }
     }
@@ -117,38 +106,6 @@ public class CreateDepositChargeJob extends AbstractJob {
                     jobs.add( chargeJob );
                 } );
         return jobs;
-    }
-
-    private void processJobForLittleHotelier( WebClient webClient ) throws Exception {
-        Calendar c = Calendar.getInstance();
-        Date toDate = c.getTime();
-        c.add( Calendar.DATE, getDaysBack() * -1 );
-        Date fromDate = c.getTime();
-        BookingsPageScraper scraper = appContext.getBean( BookingsPageScraper.class );
-        createDepositChargeJobs( scraper.getUnpaidReservations( webClient, "BDC", fromDate, toDate ) );
-        createDepositChargeJobs( scraper.getUnpaidReservations( webClient, "EXP", fromDate, toDate ) );
-    }
-
-    /**
-     * Creates DepositChargeJobs for all unpaid deposits within the given dates.
-     * 
-     * @param webClient LH web client
-     * @param bookingType type of booking ref to match (e.g. BDC, EXP)
-     * @param fromDate start range of booked date
-     * @param toDate end range of booked date
-     * @throws IOException
-     * @throws ParseException
-     */
-    private void createDepositChargeJobs( List<UnpaidDepositReportEntry> records ) throws IOException, ParseException {
-        LOGGER.info( records.size() + " records found" );
-        for ( UnpaidDepositReportEntry entry : records ) {
-            LOGGER.info( "Creating a DepositChargeJob for booking " + entry.getBookingRef() + " on " + entry.getBookedDate() );
-            DepositChargeJob depositJob = new DepositChargeJob();
-            depositJob.setStatus( JobStatus.submitted );
-            depositJob.setBookingRef( entry.getBookingRef() );
-            depositJob.setBookingDate( entry.getBookedDate() );
-            dao.insertJob( depositJob );
-        }
     }
 
     /**

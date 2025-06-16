@@ -36,7 +36,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
@@ -74,15 +73,6 @@ public class HostelworldScraper {
     @Autowired
     private WordPressDAO wordPressDAO;
 
-    @Value( "${hostelworld.url.login}" )
-    private String loginUrl;
-
-    @Value( "${hostelworld.hostelnumber}" )
-    private String hostelNumber;
-
-    @Value( "${hostelworld.url.bookings}" )
-    private String bookingsUrl;
-
     @Autowired
     @Qualifier( "gsonForHostelworld" )
     private Gson gson;
@@ -111,7 +101,7 @@ public class HostelworldScraper {
      */
     public HtmlPage doLogin( WebClient webClient, String username, String password ) throws IOException {
         LOGGER.info( "Logging into Hostelworld" );
-        HtmlPage loginPage = webClient.getPage( loginUrl );
+        HtmlPage loginPage = webClient.getPage( wordPressDAO.getMandatoryOption( "hbo_hw_url_login" ) );
         HtmlForm form = loginPage.getFormByName( "loginForm" );
 
         HtmlTextInput hostelNumberField = form.getInputByName( "HostelNumber" );
@@ -119,7 +109,7 @@ public class HostelworldScraper {
         HtmlPasswordInput passwordField = form.getInputByName( "Password" );
 
         // Change the value of the text fields
-        hostelNumberField.setValueAttribute( hostelNumber );
+        hostelNumberField.setValueAttribute( wordPressDAO.getMandatoryOption( "hbo_hw_hostelnumber" ) );
         usernameField.setValueAttribute( username );
         passwordField.setValueAttribute( password );
         HtmlSubmitInput loginLink = loginPage.getFirstByXPath( "//input[@type='submit' and @value='Login']" );
@@ -374,7 +364,7 @@ public class HostelworldScraper {
      * @throws IOException
      */
     public synchronized CardDetails getCardDetails( WebClient webClient, String bookingRef ) throws ParseException, IOException {
-        Pattern p = Pattern.compile( "HWL-" + hostelNumber + "-([\\d]+)" );
+        Pattern p = Pattern.compile( "HWL-" + wordPressDAO.getMandatoryOption( "hbo_hw_hostelnumber" ) + "-([\\d]+)" );
         Matcher m = p.matcher( bookingRef );
         if ( false == m.find() ) {
             throw new ParseException( "WTF kind of booking is this? " + bookingRef, 0 );
@@ -434,7 +424,7 @@ public class HostelworldScraper {
 
         // strip property id if provided
         String hwlBookingId = bookingRef;
-        Pattern p = Pattern.compile( hostelNumber + "-([\\d]+)" );
+        Pattern p = Pattern.compile( wordPressDAO.getMandatoryOption( "hbo_hw_hostelnumber" ) + "-([\\d]+)" );
         Matcher m = p.matcher( bookingRef );
         if ( m.find() ) {
             hwlBookingId = m.group( 1 );
@@ -516,7 +506,8 @@ public class HostelworldScraper {
      * @return URL of bookings arriving on this date
      */
     private String getBookingsURLForArrivalsByDate( Date date ) {
-        return bookingsUrl.replaceAll( "__DATE__", DATE_FORMAT_YYYY_MM_DD.format( date ) )
+        return wordPressDAO.getMandatoryOption( "hbo_hw_url_bookings" )
+                .replaceAll( "__DATE__", DATE_FORMAT_YYYY_MM_DD.format( date ) )
                 .replaceAll( "__DATE_TYPE__", "arrivaldate" );
     }
     
@@ -527,7 +518,8 @@ public class HostelworldScraper {
      * @return URL of bookings booked on this date
      */
     private String getBookingsURLForBookedByDate( Date date ) {
-        return bookingsUrl.replaceAll( "__DATE__", DATE_FORMAT_YYYY_MM_DD.format( date ) )
+        return wordPressDAO.getMandatoryOption( "hbo_hw_url_bookings" )
+                .replaceAll( "__DATE__", DATE_FORMAT_YYYY_MM_DD.format( date ) )
                 .replaceAll( "__DATE_TYPE__", "bookeddate" );
     }
 

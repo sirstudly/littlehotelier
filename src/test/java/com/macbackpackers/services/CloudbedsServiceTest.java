@@ -19,7 +19,6 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
-import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -79,12 +78,6 @@ public class CloudbedsServiceTest {
     public void testCreateChargeHostelworldLateCancellationForAugustJobs() throws Exception {
         cloudbedsService.createChargeHostelworldLateCancellationJobsForAugust(
                 webClient, LocalDate.now().minusDays( 7 ), LocalDate.now() );
-    }
-
-    @Test
-    public void testSendSagepayPaymentConfirmationEmail() throws Exception {
-        SagepayTransaction txn = dao.fetchSagepayTransaction( 192 );
-        cloudbedsService.sendSagepayPaymentConfirmationGmail( webClient, txn.getReservationId(), 192 );
     }
 
     @Test

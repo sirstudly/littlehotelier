@@ -20,7 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
@@ -38,16 +37,6 @@ public class AuthenticationServiceTest {
     @Autowired
     @Qualifier( "webClient" )
     private WebClient webClient;
-    
-    @Value( "${lilhotelier.url.login}" )
-    private String loginUrl;
-
-    @Test
-    public void testDoLogin() throws Exception {
-        authService.doLogin( webClient );
-        HtmlPage page = authService.goToPage( "https://app.littlehotelier.com/extranet/reports/summary?property_id=526", webClient );
-        LOGGER.debug( page.asXml() );
-    }
     
     @Test
     public void testLogin() throws Exception {

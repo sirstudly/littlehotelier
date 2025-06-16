@@ -1,12 +1,12 @@
 
 package com.macbackpackers.services;
 
-import java.io.IOException;
 import java.util.Arrays;
 
+import com.macbackpackers.dao.WordPressDAO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -37,19 +37,9 @@ public class ExpediaApiService {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
-    /** The service URL */
-    @Value( "${expedia.url}" )
-    private String postUrl;
+    @Autowired
+    private WordPressDAO dao;
 
-    @Value( "${expedia.username}" )
-    private String postUsername;
-
-    @Value( "${expedia.password}" )
-    private String postPassword;
-    
-    @Value( "${expedia.hotelid}" )
-    private String hotelId;
-    
     /**
      * Constructs the POST request object for a given expedia booking ref.
      * 
@@ -73,11 +63,10 @@ public class ExpediaApiService {
      * 
      * @param bookingRef expedia booking, e.g. EXP-123456789
      * @return deposit payment and matched card details for booking
-     * @throws IOException on lookup error
      * @throws MissingUserDataException if card details are missing from response
      */
     public synchronized Payment returnCardDetailsForBooking( String bookingRef ) 
-            throws IOException, MissingUserDataException {
+            throws MissingUserDataException {
         String expediaId = bookingRef.startsWith( "EXP-" ) ? bookingRef.substring( 4 ) : bookingRef;
         
         CaptureHttpRequest paymentRequest = new CaptureHttpRequest();
@@ -153,22 +142,22 @@ public class ExpediaApiService {
 
     
     public String getPostUrl() {
-        return postUrl;
+        return dao.getMandatoryOption("hbo_expedia_url");
     }
 
     
     public String getPostUsername() {
-        return postUsername;
+        return dao.getMandatoryOption("hbo_expedia_username");
     }
 
     
     public String getPostPassword() {
-        return postPassword;
+        return dao.getMandatoryOption("hbo_expedia_password");
     }
 
     
     public String getHotelId() {
-        return hotelId;
+        return dao.getMandatoryOption("hbo_expedia_hotelid");
     }
 
 }

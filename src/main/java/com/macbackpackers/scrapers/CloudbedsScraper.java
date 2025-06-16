@@ -45,7 +45,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -68,7 +67,6 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_HWL_CANCELLATION_CHARGE = "Hostelworld Cancellation Charge";
     public static final String TEMPLATE_NON_REFUNDABLE_CHARGE_SUCCESSFUL = "Non-Refundable Charge Successful";
     public static final String TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED = "Non-Refundable Charge Declined";
-    public static final String TEMPLATE_SAGEPAY_PAYMENT_CONFIRMATION = "Sagepay Payment Confirmation";
     public static final String TEMPLATE_STRIPE_PAYMENT_CONFIRMATION = "Stripe Payment Confirmation";
     public static final String TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL = "Deposit Charge Successful";
     public static final String TEMPLATE_DEPOSIT_CHARGE_DECLINED = "Deposit Charge Declined";
@@ -911,46 +909,6 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Attempts to find the CB booking based on either the bookingRef or guest name. Throws
-     * UnrecoverableFault if booking could not be resolved.
-     * 
-     * @param webClient web client instance to use
-     * @param bookingRef LH booking reference
-     * @param guestName name of guest
-     * @return non-null reservation
-     * @throws IOException on i/o error
-     */
-    public Reservation findBookingByLHBookingRef( WebClient webClient, String bookingRef, Date checkinDate, String guestName ) throws IOException {
-
-        // first try to search by booking ref
-        Pattern p = Pattern.compile( "\\D*(\\d+)$" );
-        Matcher m = p.matcher( bookingRef );
-        if ( m.find() ) {
-            List<Customer> reservations = getReservations( webClient, m.group( 1 ) );
-            if ( reservations.size() > 1 ) {
-                throw new UnrecoverableFault( "More than one CB booking found for " + bookingRef );
-            }
-            else if ( reservations.size() == 1 ) {
-                return getReservationRetry( webClient, reservations.get( 0 ).getId() );
-            }
-        }
-
-        // could not find booking by booking ref; try with guest name
-        List<Customer> reservations = getReservations( webClient, guestName ).stream()
-                .peek( c -> LOGGER.info( "Matched reservation " + c.getId() + " for "
-                        + c.getFirstName() + " " + c.getLastName() + " with checkin date " + c.getCheckinDate() ) )
-                .filter( c -> AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( checkinDate ).equals( c.getCheckinDate() ) )
-                .collect( Collectors.toList() );
-        if ( reservations.size() > 1 ) {
-            throw new UnrecoverableFault( "More than one CB booking found for " + bookingRef + ": " + guestName );
-        }
-        else if ( reservations.size() == 1 ) {
-            return getReservationRetry( webClient, reservations.get( 0 ).getId() );
-        }
-        throw new UnrecoverableFault( "No CB bookings found for " + bookingRef + ": " + guestName );
-    }
-
-    /**
      * Returns the activity log for the given reservation.
      * 
      * @param webClient web client instance to use
@@ -1041,17 +999,6 @@ public class CloudbedsScraper {
         return fetchEmailTemplate( webClient, TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED );
     }
 
-    /**
-     * Retrieves the Sagepay confirmation email template.
-     * 
-     * @param webClient web client instance to use
-     * @return non-null email template
-     * @throws IOException
-     */
-    public EmailTemplateInfo getSagepayPaymentConfirmationEmailTemplate( WebClient webClient ) throws IOException {
-        return fetchEmailTemplate( webClient, TEMPLATE_SAGEPAY_PAYMENT_CONFIRMATION );
-    }
-    
     /**
      * Retrieves the Stripe confirmation email template.
      * 

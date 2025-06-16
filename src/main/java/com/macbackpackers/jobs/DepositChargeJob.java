@@ -8,12 +8,12 @@ import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 import javax.persistence.Transient;
 
+import com.macbackpackers.config.LittleHotelierConfig;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
-import com.macbackpackers.scrapers.AllocationsPageScraper;
 import com.macbackpackers.services.PaymentProcessorService;
 
 /**
@@ -38,11 +38,6 @@ public class DepositChargeJob extends AbstractJob {
         if ( dao.isCloudbeds() ) {
             try ( WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
                 paymentProcessor.processDepositPayment( webClient, String.valueOf( getReservationId() ) );
-            }
-        }
-        else { // LittleHotelier
-            try (WebClient webClient = appContext.getBean( "webClient", WebClient.class )) {
-                paymentProcessor.processDepositPayment( webClient, getId(), getBookingRef(), getBookingDate() );
             }
         }
     }
@@ -90,7 +85,7 @@ public class DepositChargeJob extends AbstractJob {
      * @throws ParseException on parse error
      */
     public Date getBookingDate() throws ParseException {
-        return AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "booking_date" ) );
+        return LittleHotelierConfig.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "booking_date" ) );
     }
 
     /**
@@ -99,7 +94,7 @@ public class DepositChargeJob extends AbstractJob {
      * @param bookingDate date to set
      */
     public void setBookingDate( Date bookingDate ) {
-        setParameter( "booking_date", AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( bookingDate ) );
+        setParameter( "booking_date", LittleHotelierConfig.DATE_FORMAT_YYYY_MM_DD.format( bookingDate ) );
     }
     
     @Override
@@ -120,7 +115,7 @@ public class DepositChargeJob extends AbstractJob {
 
     @Override
     public int hashCode() {
-        return new Integer( getReservationId() ).hashCode();
+        return Integer.valueOf( getReservationId() ).hashCode();
     }
 
 }

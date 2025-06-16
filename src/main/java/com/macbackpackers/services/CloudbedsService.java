@@ -9,7 +9,6 @@ import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
-import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.StripeTransaction;
 import com.macbackpackers.beans.bdc.BookingComRefundRequest;
 import com.macbackpackers.beans.cloudbeds.requests.CustomerInfo;
@@ -134,9 +133,6 @@ public class CloudbedsService {
 
     @Autowired
     AutowireCapableBeanFactory autowireBeanFactory;
-
-    @Value( "${chromescraper.maxwait.seconds:60}" )
-    private int maxWaitSeconds;
 
     @Value( "${hostelworld.latecancellation.hours:48}" )
     private int HWL_LATE_CANCEL_HOURS;
@@ -962,66 +958,6 @@ public class CloudbedsService {
                 return a;
             } )
             .collect( Collectors.toList() );
-    }
-
-    /**
-     * Sends an email to the guest for a successful payment.
-     * 
-     * @param webClient web client instance to use
-     * @param reservationId associated reservation
-     * @param sagepayTxnId successful transaction
-     * @throws IOException
-     */
-    public void sendSagepayPaymentConfirmationEmail( WebClient webClient, String reservationId, int sagepayTxnId ) throws IOException {
-
-        EmailTemplateInfo template = scraper.getSagepayPaymentConfirmationEmailTemplate( webClient );
-        Reservation res = scraper.getReservationRetry( webClient, reservationId );
-        final String note = template.getTemplateName() + " email sent for txn " + sagepayTxnId;
-
-        if ( res.containsNote( note ) ) {
-            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
-        }
-        else {
-            SagepayTransaction txn = dao.fetchSagepayTransaction( sagepayTxnId );
-            sendEmailFromTemplate( webClient, template, res, txn.getEmail(),
-                b -> b.replace( "[vendor tx code]", txn.getVendorTxCode() )
-                    .replace( "[payment total]", scraper.getCurrencyFormat().format( txn.getPaymentAmount() ) )
-                    .replace( "[card type]", txn.getCardType() )
-                    .replace( "[last 4 digits]", txn.getLastFourDigits() ) );
-            scraper.addNote( webClient, reservationId, note );
-        }
-    }
-    
-    /**
-     * Sends a payment confirmation email using the given template, reservation and transaction.
-     * 
-     * @param webClient web client instance to use
-     * @param reservationId reservation ID
-     * @param sagepayTxnId successful sagepay transaction
-     * @throws IOException 
-     * @throws MessagingException 
-     */
-    public void sendSagepayPaymentConfirmationGmail( WebClient webClient, String reservationId, int sagepayTxnId ) throws IOException, MessagingException {
-        EmailTemplateInfo template = scraper.getSagepayPaymentConfirmationEmailTemplate( webClient );
-        Reservation res = scraper.getReservationRetry( webClient, reservationId );
-        final String note = template.getTemplateName() + " email sent for txn " + sagepayTxnId;
-
-        if ( res.containsNote( note ) ) {
-            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
-        }
-        else {
-            SagepayTransaction txn = dao.fetchSagepayTransaction( sagepayTxnId );
-            gmailService.sendEmail( txn.getEmail(), txn.getFirstName() + " " + txn.getLastName(), template.getSubject(),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
-                                    .replace( "[vendor tx code]", txn.getVendorTxCode() )
-                                    .replace( "[payment total]", scraper.getCurrencyFormat().format( txn.getPaymentAmount() ) )
-                                    .replace( "[card type]", txn.getCardType() )
-                                    .replace( "[last 4 digits]", txn.getLastFourDigits() ) ) );
-            scraper.addNote( webClient, res.getReservationId(), note );
-        }
     }
 
     /**

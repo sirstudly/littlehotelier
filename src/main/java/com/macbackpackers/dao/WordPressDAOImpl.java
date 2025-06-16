@@ -12,11 +12,8 @@ import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobScheduler;
 import com.macbackpackers.beans.JobStatus;
-import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
-import com.macbackpackers.beans.SagepayRefund;
-import com.macbackpackers.beans.SagepayTransaction;
 import com.macbackpackers.beans.ScheduledJob;
 import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.StripeRefund;
@@ -74,14 +71,8 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Qualifier( "reportsSQL" )
     private Properties sql;
 
-    @Value( "${hostelworld.hostelnumber}" )
-    private String hostelNumber;
-
     @Value( "${processor.id}" )
     private String processorId;
-
-    @Value( "${wordpress.db.prefix}" )
-    private String wordpressPrefix;
 
     // cached
     private static String CSRF_TOKEN = null;
@@ -91,11 +82,6 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     public boolean isCloudbeds() {
         return "cloudbeds".equalsIgnoreCase( getOption( "hbo_property_manager" ) );
-    }
-
-    @Override
-    public boolean isLittleHotelier() {
-        return false == isCloudbeds();
     }
 
     @Override
@@ -597,29 +583,6 @@ public class WordPressDAOImpl implements WordPressDAO {
     public void insertHostelworldBooking( HostelworldBooking booking ) {
         em.persist( booking );
     }
-    
-    @Override
-    @SuppressWarnings( "unchecked" )
-    public List<String> findMissingHwBookingRefs( int jobId, Date checkinDate ) {
-        return em.createNativeQuery(
-                "           SELECT CONCAT('HWL-" + hostelNumber + "-', b.booking_reference) "
-                        + "   FROM "
-                        + "       (SELECT * FROM wp_hw_booking b "
-                        + "         WHERE (SELECT MIN(d.booked_date) "
-                        + "                  FROM wp_hw_booking_dates d "
-                        + "                 WHERE b.id = d.hw_booking_id) = :checkinDate ) b "
-                        + "   LEFT OUTER JOIN "
-                        + "       (SELECT guest_name, booking_reference "
-                        + "          FROM wp_lh_calendar "
-                        + "         WHERE booking_source = 'Hostelworld Group' "
-                        + "           AND job_id = :jobId "
-                        + "         GROUP BY guest_name, booking_reference ) c "
-                        + "     ON CONCAT('HWL-" + hostelNumber + "-', b.booking_reference) = c.booking_reference "
-                        + "  WHERE c.booking_reference IS NULL" )
-                .setParameter( "checkinDate", checkinDate )
-                .setParameter( "jobId", jobId )
-                .getResultList();
-    }
 
     @Override
     @SuppressWarnings( "unchecked" )
@@ -992,9 +955,9 @@ public class WordPressDAOImpl implements WordPressDAO {
             synchronized ( WP_OPTIONS ) {
                 List<Object[]> nvpList = em.createNativeQuery(
                                 "       SELECT option_name, option_value"
-                                        + "  FROM " + wordpressPrefix + "options" )
+                                        + "  FROM wp_options" )
                         .getResultList();
-                LOGGER.info( "Caching " + nvpList.size() + " records from " + wordpressPrefix + "options" );
+                LOGGER.info( "Caching " + nvpList.size() + " records from wp_options" );
                 nvpList.stream().forEach( nvp -> WP_OPTIONS.put( nvp[0].toString(), nvp[1].toString() ) );
             }
         }
@@ -1010,13 +973,19 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public String getDefaultOption( String property, String defaultValue ) {
+        String option = getOption( property );
+        return option == null ? defaultValue : option;
+    }
+
+    @Override
     @SuppressWarnings( "unchecked" )
     @Transactional( readOnly = true )
     public String getOptionNoCache( String property ) {
         verifyOptionsCacheIsInitialised();
         List<String> sqlResult = em.createNativeQuery(
                         "          SELECT option_value"
-                                + "  FROM " + wordpressPrefix + "options"
+                                + "  FROM wp_options"
                                 + " WHERE option_name = :optionName " )
                 .setParameter( "optionName", property )
                 .getResultList();
@@ -1078,7 +1047,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     public void setOption( String property, String value ) {
         em.createNativeQuery(
-                "   INSERT INTO " + wordpressPrefix + "options(option_name, option_value) "
+                "   INSERT INTO wp_options(option_name, option_value) "
                 + " VALUES (:name, :value) "
                 + " ON DUPLICATE KEY "
                 + " UPDATE option_name = :name, option_value = :value")
@@ -1089,75 +1058,6 @@ public class WordPressDAOImpl implements WordPressDAO {
         synchronized ( WP_OPTIONS ) {
             WP_OPTIONS.put( property, value );
         }
-    }
-
-    @Override
-    @SuppressWarnings( "unchecked" )
-    public PxPostTransaction getLastPxPost( String bookingReference ) {
-        List<PxPostTransaction> results = em.createQuery(
-                    "FROM PxPostTransaction px "
-                        + "  WHERE px.id IN ("
-                        + "        SELECT MAX(px2.id) "
-                        + "          FROM PxPostTransaction px2 "
-                        + "         WHERE px2.bookingReference = :bookingRef)" )
-                .setParameter( "bookingRef", bookingReference )
-                .getResultList();
-        return results.isEmpty() ? null : results.get( 0 );
-    }
-
-    @Override
-    public PxPostTransaction fetchPxPostTransaction( int txnId ) {
-        PxPostTransaction txn = em.find( PxPostTransaction.class, txnId );
-        if ( txn == null ) {
-            throw new EmptyResultDataAccessException( "Unable to find PxPostTransaction with ID " + txn, 1 );
-        }
-        return txn;
-    }
-
-    @Override
-    public SagepayTransaction fetchSagepayTransaction( int id ) {
-        SagepayTransaction txn = em.find( SagepayTransaction.class, id );
-        if ( txn == null ) {
-            throw new EmptyResultDataAccessException( "Unable to find SagepayTransaction with ID " + id, 1 );
-        }
-        return txn;
-    }
-
-    @Override
-    public SagepayTransaction fetchSagepayTransaction( String vendorTxCode ) {
-        return em.createQuery(
-                "FROM SagepayTransaction WHERE vendorTxCode = :vendorTxCode AND authStatus = 'OK'", SagepayTransaction.class )
-                .setParameter( "vendorTxCode", vendorTxCode )
-                .getSingleResult();
-    }
-
-    @Override
-    public void updateSagepayTransactionProcessedDate( int id ) {
-        em.createNativeQuery( "UPDATE wp_sagepay_tx_auth "
-                + "SET processed_date = NOW(), last_updated_date = NOW() "
-                + "WHERE id = :id" )
-                .setParameter( "id", id )
-                .executeUpdate();
-    }
-
-    @Override
-    public SagepayRefund fetchSagepayRefund( int id ) {
-        SagepayRefund txn = em.find( SagepayRefund.class, id );
-        if ( txn == null ) {
-            throw new EmptyResultDataAccessException( "Unable to find SagepayRefund with ID " + id, 1 );
-        }
-        return txn;
-    }
-
-    @Override
-    public void updateSagepayRefund( int id, String refVendorTxCode, String response, String status, String statusDetail, String transactionId ) {
-        SagepayRefund refund = fetchSagepayRefund( id );
-        refund.setVendorTxCode( refVendorTxCode );
-        refund.setResponse( response );
-        refund.setStatus( status );
-        refund.setStatusDetail( statusDetail );
-        refund.setTransactionId( transactionId );
-        refund.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
     }
 
     @Override
@@ -1229,64 +1129,6 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( 2, key )
                 .setParameter( 3, paymentRequested )
                 .executeUpdate();
-    }
-
-    @Override
-    public void updatePxPostStatus( int txnId, String maskedCardNumber, boolean successful, String statusXml ) {
-        PxPostTransaction txn = fetchPxPostTransaction( txnId );
-        if( maskedCardNumber != null ) {
-            txn.setMaskedCardNumber( maskedCardNumber );
-        }
-        txn.setSuccessful( successful );
-        txn.setPaymentStatusResponseXml( statusXml );
-        txn.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
-    }
-
-    @Override
-    public int insertNewPxPostTransaction( int jobId, String bookingRef, BigDecimal amountToPay ) {
-        
-        if ( StringUtils.isBlank( bookingRef ) ) {
-            throw new IllegalArgumentException( "Booking Reference must not be null!" );
-        }
-
-        // amount must be present and positive
-        if ( amountToPay == null || amountToPay.compareTo( new BigDecimal( "0" ) ) <= 0 ) {
-            throw new IllegalArgumentException( "Invalid amount " + amountToPay );
-        }
-
-        PxPostTransaction pxpost = new PxPostTransaction();
-        pxpost.setJobId( jobId );
-        pxpost.setBookingReference( bookingRef );
-        pxpost.setPaymentAmount( amountToPay );
-        em.persist( pxpost );
-        return pxpost.getId();
-    }
-    
-    @Override
-    public void updatePxPostTransaction( int txnId, String maskedCardNumber, String requestXML, 
-            int httpStatus, String responseXML, boolean successful, String helpText ) {
-        PxPostTransaction txn = fetchPxPostTransaction( txnId );
-        txn.setMaskedCardNumber( maskedCardNumber );
-        txn.setPaymentRequestXml( requestXML );
-        txn.setPaymentResponseHttpCode( httpStatus );
-        txn.setPaymentResponseXml( responseXML );
-        txn.setSuccessful( successful );
-        txn.setHelpText( helpText );
-        txn.setPostDate( new Timestamp( System.currentTimeMillis() ) );
-        txn.setLastUpdatedDate( new Timestamp( System.currentTimeMillis() ) );
-    }
-
-    @Override
-    public int getPreviousNumberOfFailedTxns( String bookingRef, String maskedCardNumber ) {
-        return em.createQuery( "SELECT COUNT(*) FROM PxPostTransaction "
-                        + "     WHERE bookingReference = :bookingRef "
-                        + "       AND maskedCardNumber = :maskedCardNumber "
-                        + "       AND successful = :successful ", Number.class )
-                .setParameter( "bookingRef", bookingRef )
-                .setParameter( "maskedCardNumber", maskedCardNumber )
-                .setParameter( "successful", Boolean.FALSE )
-                .getSingleResult()
-                .intValue();
     }
 
     @Override

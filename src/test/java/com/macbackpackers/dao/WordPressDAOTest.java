@@ -33,17 +33,13 @@ import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
-import com.macbackpackers.beans.PxPostTransaction;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
-import com.macbackpackers.beans.SagepayRefund;
 import com.macbackpackers.beans.StripeRefund;
 import com.macbackpackers.beans.StripeTransaction;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.jobs.AllocationScraperJob;
-import com.macbackpackers.jobs.BookingScraperJob;
-import com.macbackpackers.jobs.ConfirmDepositAmountsJob;
 import com.macbackpackers.jobs.HousekeepingJob;
 import com.macbackpackers.jobs.UnpaidDepositReportJob;
 
@@ -193,27 +189,6 @@ public class WordPressDAOTest {
         Assert.assertNotNull( "last updated date not null", jobView.getLastUpdatedDate() );
         Assert.assertEquals( "start_date", j.getParameter( "start_date" ), jobView.getParameter( "start_date" ) );
         Assert.assertEquals( "end_date", j.getParameter( "end_date" ), jobView.getParameter( "end_date" ) );
-    }
-
-    @Test
-    public void testCreateBookingScraperJob() throws Exception {
-        Job j = new BookingScraperJob();
-        j.setStatus( JobStatus.submitted );
-        j.setParameter( "checkin_date", "2015-05-29 00:00:00" );
-        j.setParameter( "allocation_scraper_job_id", "12" );
-        int jobId = dao.insertJob( j );
-
-        Assert.assertEquals( "Job id not updated: " + jobId, true, jobId > 0 );
-
-        // now verify the results
-        Job jobView = dao.fetchJobById( jobId );
-        Assert.assertEquals( BookingScraperJob.class, jobView.getClass() );
-        Assert.assertEquals( jobId, jobView.getId() );
-        Assert.assertEquals( j.getStatus(), jobView.getStatus() );
-        Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
-        Assert.assertNotNull( "last updated date not null", jobView.getLastUpdatedDate() );
-        Assert.assertEquals( "checkin_date", j.getParameter( "checkin_date" ), jobView.getParameter( "checkin_date" ) );
-        Assert.assertEquals( "allocation_scraper_job_id", j.getParameter( "allocation_scraper_job_id" ), jobView.getParameter( "allocation_scraper_job_id" ) );
     }
 
     @Test
@@ -393,7 +368,7 @@ public class WordPressDAOTest {
         job2.setStatus( JobStatus.processing );
         dao.insertJob( job2 );
 
-        Job job3 = new ConfirmDepositAmountsJob();
+        Job job3 = new HousekeepingJob();
         job3.setStatus( JobStatus.completed );
         dao.insertJob( job3 );
 
@@ -427,19 +402,19 @@ public class WordPressDAOTest {
 
     @Test
     public void testGetRoomTypeIdForHostelworldLabel() throws Exception {
-        Assert.assertEquals( new Integer(2964), dao.getRoomTypeIdForHostelworldLabel( "Basic Double Bed Private (Shared Bathroom)" ) );
-        Assert.assertEquals( new Integer(2965), dao.getRoomTypeIdForHostelworldLabel( "Basic 3 Bed Private (Shared Bathroom)" ) );
-        Assert.assertEquals( new Integer(2966), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Private (Shared Bathroom)" ) );
-        Assert.assertEquals( new Integer(2973), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Mixed Dorm" ) );
-        Assert.assertEquals( new Integer(2974), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Female Dorm" ) );
-        Assert.assertEquals( new Integer(2972), dao.getRoomTypeIdForHostelworldLabel( "6 Bed Mixed Dorm" ) );
-        Assert.assertEquals( new Integer(2971), dao.getRoomTypeIdForHostelworldLabel( "8 Bed Mixed Dorm" ) );
-        Assert.assertEquals( new Integer(2970), dao.getRoomTypeIdForHostelworldLabel( "10 Bed Mixed Dorm" ) );
-        Assert.assertEquals( new Integer(2969), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Male Dorm" ) );
-        Assert.assertEquals( new Integer(2968), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Female Dorm" ) );
-        Assert.assertEquals( new Integer(2967), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Mixed Dormitory" ) );
-        Assert.assertEquals( new Integer(5152), dao.getRoomTypeIdForHostelworldLabel( "14 Bed Mixed Dorm" ) );
-        Assert.assertEquals( new Integer(5112), dao.getRoomTypeIdForHostelworldLabel( "16 Bed Mixed Dormitory" ) );
+        Assert.assertEquals( Integer.valueOf(2964), dao.getRoomTypeIdForHostelworldLabel( "Basic Double Bed Private (Shared Bathroom)" ) );
+        Assert.assertEquals( Integer.valueOf(2965), dao.getRoomTypeIdForHostelworldLabel( "Basic 3 Bed Private (Shared Bathroom)" ) );
+        Assert.assertEquals( Integer.valueOf(2966), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Private (Shared Bathroom)" ) );
+        Assert.assertEquals( Integer.valueOf(2973), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Mixed Dorm" ) );
+        Assert.assertEquals( Integer.valueOf(2974), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Female Dorm" ) );
+        Assert.assertEquals( Integer.valueOf(2972), dao.getRoomTypeIdForHostelworldLabel( "6 Bed Mixed Dorm" ) );
+        Assert.assertEquals( Integer.valueOf(2971), dao.getRoomTypeIdForHostelworldLabel( "8 Bed Mixed Dorm" ) );
+        Assert.assertEquals( Integer.valueOf(2970), dao.getRoomTypeIdForHostelworldLabel( "10 Bed Mixed Dorm" ) );
+        Assert.assertEquals( Integer.valueOf(2969), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Male Dorm" ) );
+        Assert.assertEquals( Integer.valueOf(2968), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Female Dorm" ) );
+        Assert.assertEquals( Integer.valueOf(2967), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Mixed Dormitory" ) );
+        Assert.assertEquals( Integer.valueOf(5152), dao.getRoomTypeIdForHostelworldLabel( "14 Bed Mixed Dorm" ) );
+        Assert.assertEquals( Integer.valueOf(5112), dao.getRoomTypeIdForHostelworldLabel( "16 Bed Mixed Dormitory" ) );
         Assert.assertEquals( null, dao.getRoomTypeIdForHostelworldLabel( "1 Bed Mixed Dormitory" ) );
     }
 
@@ -573,55 +548,6 @@ public class WordPressDAOTest {
     }
 
     @Test
-    public void testGetPreviousNumberOfFailedTxns() {
-        Assert.assertEquals( 1, dao.getPreviousNumberOfFailedTxns( "BDC-12345680", "123456........89" ));
-        Assert.assertEquals( 0, dao.getPreviousNumberOfFailedTxns( "BDC-12345680", "123456........99" ));
-        Assert.assertEquals( 0, dao.getPreviousNumberOfFailedTxns( "BDC-12345681", "123456........89" ));
-        Assert.assertEquals( 0, dao.getPreviousNumberOfFailedTxns( "BDC-12345679", "123456........89" ));
-    }
-    
-    @Test
-    public void testPxPost() {
-        String bookingRef = "BDC-12345680";
-        PxPostTransaction txn = dao.getLastPxPost( bookingRef );
-        Assert.assertEquals( null, txn );
-
-        int txnId = dao.insertNewPxPostTransaction( 0, bookingRef, new BigDecimal( "14.22" ) );
-        Assert.assertEquals( true, txnId > 0 );
-        
-        txn = dao.getLastPxPost( bookingRef );
-        Assert.assertEquals( bookingRef, txn.getBookingReference() );
-        Assert.assertEquals( new BigDecimal( "14.22" ), txn.getPaymentAmount() );
-        Assert.assertEquals( true, txn.getCreatedDate() != null );
-        Assert.assertEquals( txnId, txn.getId() );
-        
-        // update the record
-        dao.updatePxPostTransaction( txnId, "123456........89", 
-                "<Request>Test</Request>", 200, "<Response>Answered</Response>", 
-                true, "Help me!" );
-        
-        txn = dao.fetchPxPostTransaction( txnId );
-        Assert.assertEquals( txnId, txn.getId() );
-        Assert.assertEquals( bookingRef, txn.getBookingReference() );
-        Assert.assertEquals( "123456........89", txn.getMaskedCardNumber() );
-        Assert.assertEquals( new BigDecimal( "14.22" ), txn.getPaymentAmount() );
-        Assert.assertEquals( "<Request>Test</Request>", txn.getPaymentRequestXml() );
-        Assert.assertEquals( new Integer( 200 ), txn.getPaymentResponseHttpCode() );
-        Assert.assertEquals( "<Response>Answered</Response>", txn.getPaymentResponseXml() );
-        Assert.assertEquals( true, txn.getSuccessful() );
-        Assert.assertEquals( true, txn.getPostDate() != null );
-        Assert.assertEquals( "Help me!", txn.getHelpText() );
-        
-        // update using status
-        dao.updatePxPostStatus(txnId, null, false, "<Status>");
-        txn = dao.fetchPxPostTransaction( txnId );
-        Assert.assertEquals( txnId, txn.getId() );
-        Assert.assertEquals( bookingRef, txn.getBookingReference() );
-        Assert.assertEquals( "<Status>", txn.getPaymentStatusResponseXml() );
-        Assert.assertEquals( false, txn.getSuccessful() );
-    }
-
-    @Test
     public void testFetchAgodaBookingsMissingNoChargeNote() {
         final AtomicInteger counter = new AtomicInteger( 0 );
         dao.fetchAgodaBookingsMissingNoChargeNote()
@@ -679,12 +605,6 @@ public class WordPressDAOTest {
     public void testFetchStripeTransaction() throws Exception {
         StripeTransaction txn = dao.fetchStripeTransaction( "CRH-318007765345-4GYB" );
         LOGGER.info( ToStringBuilder.reflectionToString( txn ) );
-    }
-
-    @Test
-    public void testFetchSagepayRefund() throws Exception {
-        SagepayRefund refund = dao.fetchSagepayRefund( 3 );
-        LOGGER.info( ToStringBuilder.reflectionToString( refund ) );
     }
 
     @Test

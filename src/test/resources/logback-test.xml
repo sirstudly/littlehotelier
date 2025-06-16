@@ -27,9 +27,12 @@
 
     </appender>
 
-	<logger name="org.hibernate" level="DEBUG" />
+	<logger name="org.hibernate" level="INFO" />
     <logger name="org.quartz" level="INFO" />
-	<root level="debug">
+    <logger name="com.macbackpackers" level="INFO" />
+    <logger name="com.gargoylesoftware.htmlunit" level="INFO" />
+
+	<root level="INFO">
 		<appender-ref ref="STDOUT" />
         <appender-ref ref="FILE" />
 	</root>

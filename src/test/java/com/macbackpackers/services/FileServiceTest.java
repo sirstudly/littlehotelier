@@ -54,7 +54,7 @@ public class FileServiceTest {
     public void testSerializeDeserializeToFromFile() throws Exception {
         Integer i = 2015;
         fs.serializeObjectToFile( i, "test.object" );
-        Assert.assertEquals( new Integer( 2015 ), fs.deserializeObjectFromFile( "test.object", Integer.class ) );
+        Assert.assertEquals( Integer.valueOf( 2015 ), fs.deserializeObjectFromFile( "test.object", Integer.class ) );
     }
     
     @Test

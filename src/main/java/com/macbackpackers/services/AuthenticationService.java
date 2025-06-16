@@ -2,15 +2,10 @@
 package com.macbackpackers.services;
 
 import java.io.IOException;
-import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.htmlunit.WebClient;
-import org.htmlunit.html.HtmlButton;
-import org.htmlunit.html.HtmlForm;
 import org.htmlunit.html.HtmlPage;
-import org.htmlunit.html.HtmlPasswordInput;
-import org.htmlunit.html.HtmlTextInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,54 +63,6 @@ public class AuthenticationService {
             throw new UnrecoverableFault( "Unable to login using existing credentials. Has the password changed?" );
         }
         return nextPage;
-    }
-
-    /**
-     * Logs into the application and writes the credentials to file so we don't have to do it again.
-     * 
-     * @param webClient web client
-     * @param username the username to use
-     * @param password the password to use
-     * @throws IOException on write error
-     * @throws UnrecoverableFault if unable to login; cookie file not updated in this case
-     */
-    public void doLogin( WebClient webClient, String username, String password ) throws IOException {
-
-        HtmlPage loginPage = webClient.getPage( env.getProperty( "lilhotelier.url.login" ) );
-
-        // The form doesn't have a name so just take the only one on the page
-        List<HtmlForm> forms = loginPage.getForms();
-        HtmlForm form = forms.iterator().next();
-
-        HtmlTextInput usernameField = form.getInputByName( "username" );
-        usernameField.setValueAttribute( username );
-        HtmlPasswordInput passwordField = form.getInputByName( "password" );
-        passwordField.setValueAttribute( password );
-
-        HtmlButton button = HtmlButton.class.cast( loginPage.getElementById( "login-btn" ) );
-        HtmlPage nextPage = button.click();
-
-        if ( nextPage.getFirstByXPath( "//a[@class='login-button']" ) != null ) {
-            throw new UnrecoverableFault( "Unable to login. Password incorrect. " + nextPage.getUrl() );
-        }
-
-        LOGGER.info( "Finished logging in" );
-        LOGGER.debug( nextPage.asXml() );
-        fileService.writeCookiesToFile( webClient );
-    }
-
-    /**
-     * Logs into the application using the environment properties and writes the credentials to file
-     * so we don't have to do it again.
-     * 
-     * @param webClient web client
-     * @throws IOException on write error
-     * @throws UnrecoverableFault if unable to login; cookie file not updated in this case
-     */
-    public void doLogin( WebClient webClient ) throws IOException {
-        doLogin( webClient,
-                wordpressDAO.getOption( "hbo_lilho_username" ),
-                wordpressDAO.getOption( "hbo_lilho_password" ) );
     }
 
     /**

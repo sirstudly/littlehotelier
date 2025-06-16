@@ -11,11 +11,11 @@ import java.util.List;
 import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 
+import com.macbackpackers.config.LittleHotelierConfig;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
-import com.macbackpackers.scrapers.AllocationsPageScraper;
 
 /**
  * Job that initiates all allocation scraper jobs for a particular date range.
@@ -28,31 +28,7 @@ public class AllocationScraperJob extends AbstractJob {
     @Override
     @Transactional // no re-run on this job; all must go thru or nothing
     public void processJob() throws Exception {
-        // dump calendar page(s)
-        insertCreateReportsJob( dao.isCloudbeds() ? insertCloudbedsAllocationScraperWorkerJobs() : insertAllocationScraperWorkerJobs() );
-    }
-
-    /**
-     * Create jobs to scrape the calendar page(s) from start date to end date.
-     * 
-     * @return List of created AllocationScraperWorkerJob
-     * @throws ParseException on date parse error from parameters
-     */
-    private List<AllocationScraperWorkerJob> insertAllocationScraperWorkerJobs() throws ParseException {
-        Calendar currentDate = Calendar.getInstance();
-        currentDate.setTime( getStartDate() );
-        List<AllocationScraperWorkerJob> jobs = new ArrayList<AllocationScraperWorkerJob>();
-
-        while ( currentDate.getTime().before( getEndDate() ) ) {
-            AllocationScraperWorkerJob workerJob = new AllocationScraperWorkerJob();
-            workerJob.setStatus( JobStatus.submitted );
-            workerJob.setAllocationScraperJobId( getId() );
-            workerJob.setStartDate( currentDate.getTime() );
-            int jobId = dao.insertJob( workerJob );
-            jobs.add( AllocationScraperWorkerJob.class.cast( dao.fetchJobById( jobId ) ) );
-            currentDate.add( Calendar.DATE, 14 ); // calendar page shows 2 weeks at a time
-        }
-        return jobs;
+        insertCreateReportsJob( insertCloudbedsAllocationScraperWorkerJobs() );
     }
 
     /**
@@ -99,7 +75,7 @@ public class AllocationScraperJob extends AbstractJob {
      * @throws ParseException
      */
     public Date getStartDate() throws ParseException {
-        return AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "start_date" ) );
+        return LittleHotelierConfig.DATE_FORMAT_YYYY_MM_DD.parse( getParameter( "start_date" ) );
     }
 
     /**
@@ -108,7 +84,7 @@ public class AllocationScraperJob extends AbstractJob {
      * @param startDate non-null date parameter
      */
     public void setStartDate( Date startDate ) {
-        setParameter( "start_date", AllocationsPageScraper.DATE_FORMAT_YYYY_MM_DD.format( startDate ) );
+        setParameter( "start_date", LittleHotelierConfig.DATE_FORMAT_YYYY_MM_DD.format( startDate ) );
     }
 
     /**

@@ -1,10 +1,6 @@
 
 package com.macbackpackers.jobs;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-
 import javax.persistence.DiscriminatorValue;
 import javax.persistence.Entity;
 
@@ -14,7 +10,7 @@ import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 
 /**
- * Job that creates {@link BookingScraperJob} and all dependent report instances for all allocation
+ * Job that creates all dependent report instances for all allocation
  * records from a previous {@link AllocationScraperJob}.
  *
  */
@@ -28,131 +24,55 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         // first we consolidate results from all AllocationScraperWorkerJobs
         for ( Job dependentJob : getDependentJobs() ) {
             // remap the worker id to the parent AllocationScraperJob id (for consolidating results)
-            if ( dependentJob instanceof AllocationScraperWorkerJob ||
-                    dependentJob instanceof CloudbedsAllocationScraperWorkerJob ) {
+            if ( dependentJob instanceof CloudbedsAllocationScraperWorkerJob ) {
                 dao.updateAllocationJobId( dependentJob.getId(), getAllocationScraperJobId() );
             }
         }
 
-        // update allocation rows with missing data (from AllocationScraperWorkerJobs)
-        List<BookingScraperJob> bookingScraperJobs = insertBookingsScraperJobs();
-
         // insert jobs to create any reports
-        insertSplitRoomReportJob( bookingScraperJobs );
-        insertUnpaidDepositReportJob( bookingScraperJobs );
-        insertGroupBookingsReportJob( bookingScraperJobs );
-        insertHostelworldHostelBookersConfirmDepositJob();
-        insertCreateAgodaNoChargeNoteJob( bookingScraperJobs );
-        insertBlacklistEmailJob( bookingScraperJobs );
-    }
-
-    /**
-     * We need additional jobs to update some fields by scraping the bookings pages and any reports
-     * that use this data. Create these jobs now.
-     * 
-     * @return List of created BookingScraperJob
-     */
-    private List<BookingScraperJob> insertBookingsScraperJobs() {
-
-        // only applicable for Little Hotelier
-        if( dao.isLittleHotelier() ) {
-            // create a separate job for each checkin_date for the given allocation records
-            // this will make it easier to re-run if any date fails
-            List<BookingScraperJob> jobs = new ArrayList<BookingScraperJob>();
-            for ( Date checkinDate : dao.getCheckinDatesForAllocationScraperJobId( getAllocationScraperJobId() ) ) {
-                BookingScraperJob bookingScraperJob = new BookingScraperJob();
-                bookingScraperJob.setStatus( JobStatus.submitted );
-                bookingScraperJob.setAllocationScraperJobId( getAllocationScraperJobId() );
-                bookingScraperJob.setCheckinDate( checkinDate );
-                int jobId = dao.insertJob( bookingScraperJob );
-                jobs.add( BookingScraperJob.class.cast( dao.fetchJobById( jobId ) ) );
-            }
-            return jobs;
-        }
-        return new ArrayList<>();
+        insertSplitRoomReportJob();
+        insertUnpaidDepositReportJob();
+        insertGroupBookingsReportJob();
+        insertBlacklistEmailJob();
     }
 
     /**
      * Creates an additional job to run the split room report.
-     * 
-     * @param dependentJobs the jobs which need to complete successfully before running the jobs
-     *            being created
      */
-    private void insertSplitRoomReportJob( List<? extends Job> dependentJobs ) {
+    private void insertSplitRoomReportJob() {
         SplitRoomReservationReportJob splitRoomReportJob = new SplitRoomReservationReportJob();
         splitRoomReportJob.setStatus( JobStatus.submitted );
         splitRoomReportJob.setAllocationScraperJobId( getAllocationScraperJobId() );
-        splitRoomReportJob.getDependentJobs().addAll( dependentJobs );
         dao.insertJob( splitRoomReportJob );
     }
 
     /**
      * Creates an additional job to run the unpaid deposit report.
-     * 
-     * @param dependentJobs the jobs which need to complete successfully before running the jobs
-     *            being created
      */
-    private void insertUnpaidDepositReportJob( List<? extends Job> dependentJobs ) {
+    private void insertUnpaidDepositReportJob() {
         UnpaidDepositReportJob unpaidDepositRptJob = new UnpaidDepositReportJob();
         unpaidDepositRptJob.setStatus( JobStatus.submitted );
         unpaidDepositRptJob.setAllocationScraperJobId( getAllocationScraperJobId() );
-        unpaidDepositRptJob.getDependentJobs().addAll( dependentJobs );
         dao.insertJob( unpaidDepositRptJob );
     }
 
     /**
      * Creates an additional job to run the group bookings report.
-     * 
-     * @param dependentJobs the jobs which need to complete successfully before running the jobs
-     *            being created
      */
-    private void insertGroupBookingsReportJob( List<? extends Job> dependentJobs ) {
+    private void insertGroupBookingsReportJob() {
         GroupBookingsReportJob groupBookingRptJob = new GroupBookingsReportJob();
         groupBookingRptJob.setStatus( JobStatus.submitted );
         groupBookingRptJob.setAllocationScraperJobId( getAllocationScraperJobId() );
-        groupBookingRptJob.getDependentJobs().addAll( dependentJobs );
         dao.insertJob( groupBookingRptJob );
     }
 
     /**
-     * Creates additional jobs to tick off any unpaid deposits for HW/HB.
-     * 
-     */
-    private void insertHostelworldHostelBookersConfirmDepositJob() {
-        if ( dao.isLittleHotelier() ) {
-            CreateConfirmDepositAmountsJob j = new CreateConfirmDepositAmountsJob();
-            j.setStatus( JobStatus.submitted );
-            j.setAllocationScraperJobId( getAllocationScraperJobId() );
-            dao.insertJob( j );
-        }
-    }
-
-    /**
-     * Creates jobs to add a no-charge note to all Agoda bookings.
-     * 
-     * @param dependentJobs the jobs which need to complete successfully before running the jobs
-     *            being created
-     */
-    private void insertCreateAgodaNoChargeNoteJob( List<? extends Job> dependentJobs ) {
-        if( dao.isLittleHotelier() ) {
-            CreateAgodaNoChargeNoteJob j = new CreateAgodaNoChargeNoteJob();
-            j.getDependentJobs().addAll( dependentJobs );
-            j.setStatus( JobStatus.submitted );
-            dao.insertJob( j );
-        }
-    }
-
-    /**
      * Creates an additional job identifying any bookings in the blacklist.
-     *
-     * @param dependentJobs the jobs which need to complete successfully before running the jobs
-     *            being created
      */
-    private void insertBlacklistEmailJob( List<? extends Job> dependentJobs ) {
+    private void insertBlacklistEmailJob() {
         CheckNewBookingsOnBlacklistJob blacklistJob = new CheckNewBookingsOnBlacklistJob();
         blacklistJob.setStatus( JobStatus.submitted );
         blacklistJob.setAllocationScraperJobId( getAllocationScraperJobId() );
-        blacklistJob.getDependentJobs().addAll( dependentJobs );
         dao.insertJob( blacklistJob );
     }
 
