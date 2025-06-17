@@ -63,9 +63,6 @@ public class ProcessorService {
     @Value( "${processor.job.log.localdir}" )
     private String localLogDirectory; // current log directory
 
-    @Value( "${processor.job.log.copyto:}" )
-    private String destinationLogLocation; // where to copy log files (optional)
-
     @Autowired
     private GenericObjectPool<WebDriver> driverFactory;
 
@@ -314,6 +311,7 @@ public class ProcessorService {
      */
     private synchronized void copyJobLogToRemoteHost( int jobId ) throws InterruptedException, IOException {
 
+        String destinationLogLocation = dao.getOption( "hbo_processor_copy_job_log_to" );
         if ( StringUtils.isNotBlank( destinationLogLocation ) ) {
             LOGGER.info( "Compressing log file" );
             ProcessBuilder pb = new ProcessBuilder( "gzip" );

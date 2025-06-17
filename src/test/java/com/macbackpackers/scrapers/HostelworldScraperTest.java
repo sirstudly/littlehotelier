@@ -1,22 +1,23 @@
-
 package com.macbackpackers.scrapers;
 
 import java.util.Calendar;
 
-import javax.persistence.Transient;
+import jakarta.persistence.Transient;
 
 import org.htmlunit.WebClient;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 
-@RunWith( SpringJUnit4ClassRunner.class )
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+@ExtendWith( SpringExtension.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class HostelworldScraperTest {
 
@@ -40,9 +41,11 @@ public class HostelworldScraperTest {
         scraper.doLogin( webClient );
     }
 
-    @Test( expected = UnrecoverableFault.class )
-    public void testLoginFailure() throws Exception {
-        scraper.doLogin( webClient, "guest", "testpassword" );
+    @Test
+    public void testLoginFailure() {
+        assertThrows( UnrecoverableFault.class, () -> {
+            scraper.doLogin( webClient, "guest", "testpassword" );
+        } );
     }
 
     @Test

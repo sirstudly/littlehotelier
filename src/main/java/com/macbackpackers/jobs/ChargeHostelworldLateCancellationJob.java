@@ -1,9 +1,9 @@
 
 package com.macbackpackers.jobs;
 
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
-import javax.persistence.Transient;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Transient;
 
 import com.macbackpackers.exceptions.PaymentPendingException;
 import org.htmlunit.WebClient;

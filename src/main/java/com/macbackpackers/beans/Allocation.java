@@ -12,18 +12,19 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
+import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.time.FastDateFormat;
-import org.hibernate.annotations.Type;
+import org.hibernate.type.YesNoConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,7 +113,7 @@ public class Allocation {
     private String comments;
 
     @Column( name = "viewed_yn" )
-    @Type( type = "yes_no" )
+    @Convert(converter = YesNoConverter.class)
     private boolean viewed;
 
     @Column( name = "created_date" )
@@ -417,13 +418,7 @@ public class Allocation {
                 // include only those with column annotations which are not the Id
                 if ( annotation instanceof Column && field.getDeclaredAnnotation( Id.class ) == null ) {
                     try {
-                        Type typeAnnotation = field.getDeclaredAnnotation( Type.class );
-                        if ( typeAnnotation != null && "yes_no".equals( typeAnnotation.type() ) ) {
-                            params.add( Boolean.TRUE.equals( field.get( this ) ) ? "Y" : "N" );
-                        }
-                        else {
-                            params.add( field.get( this ) );
-                        }
+                        params.add( field.get( this ) );
                     }
                     catch ( IllegalArgumentException | IllegalAccessException e ) {
                         throw new UnrecoverableFault( e );

@@ -6,15 +6,15 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.hibernate.annotations.Cascade;
@@ -67,7 +67,7 @@ public class HostelworldBooking {
     @Column( name = "created_date" )
     private Timestamp createdDate;
 
-    @OneToMany( cascade = javax.persistence.CascadeType.ALL, fetch = FetchType.EAGER )
+    @OneToMany( cascade = jakarta.persistence.CascadeType.ALL, fetch = FetchType.EAGER )
     @JoinColumn( name = "hw_booking_id" )
     @Cascade( { CascadeType.SAVE_UPDATE, CascadeType.DELETE } )
     private List<HostelworldBookingDate> bookedDates = new ArrayList<HostelworldBookingDate>();

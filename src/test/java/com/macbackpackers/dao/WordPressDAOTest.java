@@ -1,5 +1,11 @@
-
 package com.macbackpackers.dao;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -16,16 +22,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.time.FastDateFormat;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
@@ -43,8 +49,14 @@ import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.HousekeepingJob;
 import com.macbackpackers.jobs.UnpaidDepositReportJob;
 
-@RunWith( SpringJUnit4ClassRunner.class )
+/**
+ * This class currently errors out with: Could not resolve placeholder 'sm@db_username_crh' in value "${sm@db_username_crh}" <-- "${db.username}"
+ * This is because we need to register AnyByteStringToStringConverter into the test framework before anything else.
+ * Haven't figured out a way to cleanly fix this.
+ */
+@ExtendWith( SpringExtension.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
+@ActiveProfiles( "crh" )
 public class WordPressDAOTest {
 
     final Logger LOGGER = LoggerFactory.getLogger( getClass() );
@@ -60,7 +72,7 @@ public class WordPressDAOTest {
 
     static final FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd" );
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         //testDAO.deleteAllTransactionalData(); // clear out data
     }
@@ -71,11 +83,11 @@ public class WordPressDAOTest {
         Allocation alloc = createNewAllocation();
 
         dao.insertAllocation( alloc );
-        Assert.assertTrue( "ID not assigned", alloc.getId() > 0 );
+        assertTrue( alloc.getId() > 0, "ID not assigned" );
 
         Allocation allocView = dao.fetchAllocation( alloc.getId() );
-        Assert.assertEquals( "ETA", alloc.getEta(), allocView.getEta() );
-        Assert.assertEquals( "viewed", alloc.isViewed(), allocView.isViewed() );
+        assertEquals( alloc.getEta(), allocView.getEta(), "ETA" );
+        assertEquals( alloc.isViewed(), allocView.isViewed(), "viewed" );
     }
 
     @Test
@@ -87,7 +99,7 @@ public class WordPressDAOTest {
         alloc.setJobId( 2 );
         alloc.setRoom( "new room2" );
         al.add( alloc );
-        
+
         dao.insertAllocations( al );
     }
 
@@ -135,9 +147,9 @@ public class WordPressDAOTest {
 
         // view it again
         allocView = dao.fetchAllocation( alloc.getId() );
-        Assert.assertEquals( "checkin date", "2014-04-26", DATE_FORMAT_YYYY_MM_DD.format( allocView.getCheckinDate() ) );
-        Assert.assertEquals( "bed name", "Updated bed name", allocView.getBedName() );
-        Assert.assertEquals( "notes", "Updated notes", allocView.getNotes() );
+        assertEquals( "2014-04-26", DATE_FORMAT_YYYY_MM_DD.format( allocView.getCheckinDate() ), "checkin date" );
+        assertEquals( "Updated bed name", allocView.getBedName(), "bed name" );
+        assertEquals( "Updated notes", allocView.getNotes(), "notes" );
     }
 
     @Test
@@ -157,17 +169,17 @@ public class WordPressDAOTest {
         j.setParameter( "end_date", "2015-06-14 00:00:00" );
         int jobId = dao.insertJob( j );
 
-        Assert.assertEquals( true, jobId > 0 );
+        assertTrue( jobId > 0 );
 
         // now verify the results
         Job jobView = dao.fetchJobById( jobId );
-        Assert.assertEquals( AllocationScraperJob.class, jobView.getClass() );
-        Assert.assertEquals( jobId, jobView.getId() );
-        Assert.assertEquals( j.getStatus(), jobView.getStatus() );
-        Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
-        Assert.assertNotNull( "last updated date not null", jobView.getLastUpdatedDate() );
-        Assert.assertEquals( "start_date", j.getParameter( "start_date" ), jobView.getParameter( "start_date" ) );
-        Assert.assertEquals( "end_date", j.getParameter( "end_date" ), jobView.getParameter( "end_date" ) );
+        assertEquals( AllocationScraperJob.class, jobView.getClass() );
+        assertEquals( jobId, jobView.getId() );
+        assertEquals( j.getStatus(), jobView.getStatus() );
+        assertNotNull( jobView.getCreatedDate(), "create date not found" );
+        assertNotNull( jobView.getLastUpdatedDate(), "last updated date not null" );
+        assertEquals( j.getParameter( "start_date" ), jobView.getParameter( "start_date" ), "start_date" );
+        assertEquals( j.getParameter( "end_date" ), jobView.getParameter( "end_date" ), "end_date" );
     }
 
     @Test
@@ -178,17 +190,17 @@ public class WordPressDAOTest {
         j.setParameter( "end_date", "2015-06-14 00:00:00" );
         int jobId = dao.insertJob( j );
 
-        Assert.assertEquals( "Job id not updated: " + jobId, true, jobId > 0 );
+        assertTrue( jobId > 0, "Job id not updated: " + jobId );
 
         // now verify the results
         Job jobView = dao.fetchJobById( jobId );
-        Assert.assertEquals( AllocationScraperJob.class, jobView.getClass() );
-        Assert.assertEquals( jobId, jobView.getId() );
-        Assert.assertEquals( j.getStatus(), jobView.getStatus() );
-        Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
-        Assert.assertNotNull( "last updated date not null", jobView.getLastUpdatedDate() );
-        Assert.assertEquals( "start_date", j.getParameter( "start_date" ), jobView.getParameter( "start_date" ) );
-        Assert.assertEquals( "end_date", j.getParameter( "end_date" ), jobView.getParameter( "end_date" ) );
+        assertEquals( AllocationScraperJob.class, jobView.getClass() );
+        assertEquals( jobId, jobView.getId() );
+        assertEquals( j.getStatus(), jobView.getStatus() );
+        assertNotNull( jobView.getCreatedDate(), "create date not found" );
+        assertNotNull( jobView.getLastUpdatedDate(), "last updated date not null" );
+        assertEquals( j.getParameter( "start_date" ), jobView.getParameter( "start_date" ), "start_date" );
+        assertEquals( j.getParameter( "end_date" ), jobView.getParameter( "end_date" ), "end_date" );
     }
 
     @Test
@@ -196,25 +208,25 @@ public class WordPressDAOTest {
         Job j1 = new AllocationScraperJob();
         j1.setStatus( JobStatus.submitted );
         int jobId1 = dao.insertJob( j1 );
-        Assert.assertEquals( true, jobId1 > 0 );
+        assertTrue( jobId1 > 0 );
 
         Job jobView1 = dao.fetchJobById( jobId1 );
-        Assert.assertEquals( AllocationScraperJob.class, jobView1.getClass() );
-        Assert.assertEquals( jobId1, jobView1.getId() );
+        assertEquals( AllocationScraperJob.class, jobView1.getClass() );
+        assertEquals( jobId1, jobView1.getId() );
 
         // create an identical job to the first
         Job j2 = new AllocationScraperJob();
         j2.setStatus( JobStatus.submitted );
         int jobId2 = dao.insertJob( j2 );
-        Assert.assertEquals( true, jobId2 > 0 );
-        Assert.assertNotEquals( jobId1, jobId2 );
+        assertTrue( jobId2 > 0 );
+        assertNotEquals( jobId1, jobId2 );
 
         Job jobView2 = dao.fetchJobById( jobId2 );
-        Assert.assertEquals( AllocationScraperJob.class, jobView1.getClass() );
-        Assert.assertEquals( jobId2, jobView2.getId() );
+        assertEquals( AllocationScraperJob.class, jobView1.getClass() );
+        assertEquals( jobId2, jobView2.getId() );
 
         // verify we actually have different objects
-        Assert.assertNotEquals( jobView1.getId(), jobView2.getId() );
+        assertNotEquals( jobView1.getId(), jobView2.getId() );
     }
 
     @Test
@@ -225,7 +237,7 @@ public class WordPressDAOTest {
         int jobId = dao.insertJob( j );
 
         LOGGER.info( "created job " + jobId );
-        Assert.assertEquals( true, jobId > 0 );
+        assertTrue( jobId > 0 );
 
         // create a job that isn't complete
         Job j2 = new AllocationScraperJob();
@@ -237,11 +249,11 @@ public class WordPressDAOTest {
         // returns the first job created
         Job jobView = dao.getNextJobToProcess();
 
-        Assert.assertEquals( HousekeepingJob.class, jobView.getClass() );
-        Assert.assertEquals( jobId, jobView.getId() );
-        Assert.assertEquals( JobStatus.processing, jobView.getStatus() );
-        Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
-        Assert.assertNotNull( "last updated date not null", jobView.getLastUpdatedDate() );
+        assertEquals( HousekeepingJob.class, jobView.getClass() );
+        assertEquals( jobId, jobView.getId() );
+        assertEquals( JobStatus.processing, jobView.getStatus() );
+        assertNotNull( jobView.getCreatedDate(), "create date not found" );
+        assertNotNull( jobView.getLastUpdatedDate(), "last updated date not null" );
     }
 
     @Test
@@ -249,12 +261,12 @@ public class WordPressDAOTest {
         Job nextJob = dao.getNextJobToProcess();
         LOGGER.info( ToStringBuilder.reflectionToString( nextJob ) );
     }
-    
+
     @Test
     public void testFetchAllRoomBeds() throws Exception {
         Map<RoomBedLookup, RoomBed> roomBeds = dao.fetchAllRoomBeds();
-        roomBeds.forEach( (x, y) ->  
-            LOGGER.info( x + " -> " + y.getRoom() + ": " + y.getBedName() ) );
+        roomBeds.forEach( ( x, y ) ->
+                LOGGER.info( x + " -> " + y.getRoom() + ": " + y.getBedName() ) );
         LOGGER.info( "Listed " + roomBeds.size() + " entries." );
     }
 
@@ -269,11 +281,11 @@ public class WordPressDAOTest {
 
         // now verify the results
         Job jobView = dao.fetchJobById( jobId );
-        Assert.assertEquals( HousekeepingJob.class, jobView.getClass() );
-        Assert.assertEquals( jobId, jobView.getId() );
-        Assert.assertEquals( JobStatus.processing, jobView.getStatus() );
-        Assert.assertNotNull( "create date not found", jobView.getCreatedDate() );
-        Assert.assertNotNull( "last updated date not found", jobView.getLastUpdatedDate() );
+        assertEquals( HousekeepingJob.class, jobView.getClass() );
+        assertEquals( jobId, jobView.getId() );
+        assertEquals( JobStatus.processing, jobView.getStatus() );
+        assertNotNull( jobView.getCreatedDate(), "create date not found" );
+        assertNotNull( jobView.getLastUpdatedDate(), "last updated date not found" );
     }
 
     @Test
@@ -291,9 +303,9 @@ public class WordPressDAOTest {
         // execute
         List<BookingByCheckinDate> reservations = dao.getHostelworldHostelBookersUnpaidDepositReservations( 3 );
         reservations.stream().forEach( p ->
-            LOGGER.info( ToStringBuilder.reflectionToString( p ) ) );
+                LOGGER.info( ToStringBuilder.reflectionToString( p ) ) );
 
-        Assert.assertEquals( "size", 2, reservations.size() );
+        assertEquals( 2, reservations.size(), "size" );
     }
 
     @Test
@@ -308,29 +320,29 @@ public class WordPressDAOTest {
         insertTestAllocation( 3, 16, "guest F" );
 
         // execute
-        Assert.assertEquals( "empty list", 0, dao.queryAllocationsByJobIdAndReservationId( 2, 10 ).size() );
-        Assert.assertEquals( "empty list", 0, dao.queryAllocationsByJobIdAndReservationId( 3, 19 ).size() );
+        assertEquals( 0, dao.queryAllocationsByJobIdAndReservationId( 2, 10 ).size(), "empty list" );
+        assertEquals( 0, dao.queryAllocationsByJobIdAndReservationId( 3, 19 ).size(), "empty list" );
 
         // execute returned list of size 1
         List<Allocation> allocs = dao.queryAllocationsByJobIdAndReservationId( 2, 11 );
-        Assert.assertEquals( "size", 1, allocs.size() );
-        Assert.assertEquals( "allocation name", "guest B", allocs.get( 0 ).getGuestName() );
-        Assert.assertEquals( "reservation ID", 11, allocs.get( 0 ).getReservationId() );
-        Assert.assertEquals( "job ID", 2, allocs.get( 0 ).getJobId() );
+        assertEquals( 1, allocs.size(), "size" );
+        assertEquals( "guest B", allocs.get( 0 ).getGuestName(), "allocation name" );
+        assertEquals( 11, allocs.get( 0 ).getReservationId(), "reservation ID" );
+        assertEquals( 2, allocs.get( 0 ).getJobId(), "job ID" );
 
         // execute returned list of size 3
         allocs = dao.queryAllocationsByJobIdAndReservationId( 3, 10 );
-        Assert.assertEquals( "size", 3, allocs.size() );
+        assertEquals( 3, allocs.size(), "size" );
         for ( Allocation alloc : allocs ) {
-            Assert.assertEquals( "reservation ID", 10, alloc.getReservationId() );
-            Assert.assertEquals( "job ID", 3, alloc.getJobId() );
+            assertEquals( 10, alloc.getReservationId(), "reservation ID" );
+            assertEquals( 3, alloc.getJobId(), "job ID" );
         }
-        Assert.assertEquals( "allocation names",
+        assertEquals(
                 new HashSet<String>( Arrays.asList( "guest A", "guest C", "guest E" ) ),
                 new HashSet<String>( Arrays.asList(
                         allocs.get( 0 ).getGuestName(),
                         allocs.get( 1 ).getGuestName(),
-                        allocs.get( 2 ).getGuestName() ) ) );
+                        allocs.get( 2 ).getGuestName() ) ), "allocation names" );
     }
 
     @Test
@@ -340,7 +352,7 @@ public class WordPressDAOTest {
         int jobId = dao.insertJob( job );
 
         job = dao.getLastCompletedJobOfType( HousekeepingJob.class );
-        Assert.assertEquals( "job id", jobId, job.getId() );
+        assertEquals( jobId, job.getId(), "job id" );
     }
 
     @Test
@@ -353,9 +365,9 @@ public class WordPressDAOTest {
 
         // execute and verify
         List<Date> dates = dao.getCheckinDatesForAllocationScraperJobId( 3 );
-        Assert.assertEquals( "number of dates", 2, dates.size() );
-        Assert.assertEquals( "first date", "2014-04-20", DATE_FORMAT_YYYY_MM_DD.format( dates.get( 0 ) ) );
-        Assert.assertEquals( "second date", "2014-05-03", DATE_FORMAT_YYYY_MM_DD.format( dates.get( 1 ) ) );
+        assertEquals( 2, dates.size(), "number of dates" );
+        assertEquals( "2014-04-20", DATE_FORMAT_YYYY_MM_DD.format( dates.get( 0 ) ), "first date" );
+        assertEquals( "2014-05-03", DATE_FORMAT_YYYY_MM_DD.format( dates.get( 1 ) ), "second date" );
     }
 
     @Test
@@ -374,9 +386,9 @@ public class WordPressDAOTest {
 
         // execute
         dao.resetAllProcessingJobsToFailed();
-        Assert.assertEquals( "job1 status", JobStatus.submitted, dao.fetchJobById( job1.getId() ).getStatus() );
-        Assert.assertEquals( "job2 status", JobStatus.failed, dao.fetchJobById( job2.getId() ).getStatus() );
-        Assert.assertEquals( "job3 status", JobStatus.completed, dao.fetchJobById( job3.getId() ).getStatus() );
+        assertEquals( JobStatus.submitted, dao.fetchJobById( job1.getId() ).getStatus(), "job1 status" );
+        assertEquals( JobStatus.failed, dao.fetchJobById( job2.getId() ).getStatus(), "job2 status" );
+        assertEquals( JobStatus.completed, dao.fetchJobById( job3.getId() ).getStatus(), "job3 status" );
     }
 
     @Test
@@ -402,25 +414,27 @@ public class WordPressDAOTest {
 
     @Test
     public void testGetRoomTypeIdForHostelworldLabel() throws Exception {
-        Assert.assertEquals( Integer.valueOf(2964), dao.getRoomTypeIdForHostelworldLabel( "Basic Double Bed Private (Shared Bathroom)" ) );
-        Assert.assertEquals( Integer.valueOf(2965), dao.getRoomTypeIdForHostelworldLabel( "Basic 3 Bed Private (Shared Bathroom)" ) );
-        Assert.assertEquals( Integer.valueOf(2966), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Private (Shared Bathroom)" ) );
-        Assert.assertEquals( Integer.valueOf(2973), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Mixed Dorm" ) );
-        Assert.assertEquals( Integer.valueOf(2974), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Female Dorm" ) );
-        Assert.assertEquals( Integer.valueOf(2972), dao.getRoomTypeIdForHostelworldLabel( "6 Bed Mixed Dorm" ) );
-        Assert.assertEquals( Integer.valueOf(2971), dao.getRoomTypeIdForHostelworldLabel( "8 Bed Mixed Dorm" ) );
-        Assert.assertEquals( Integer.valueOf(2970), dao.getRoomTypeIdForHostelworldLabel( "10 Bed Mixed Dorm" ) );
-        Assert.assertEquals( Integer.valueOf(2969), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Male Dorm" ) );
-        Assert.assertEquals( Integer.valueOf(2968), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Female Dorm" ) );
-        Assert.assertEquals( Integer.valueOf(2967), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Mixed Dormitory" ) );
-        Assert.assertEquals( Integer.valueOf(5152), dao.getRoomTypeIdForHostelworldLabel( "14 Bed Mixed Dorm" ) );
-        Assert.assertEquals( Integer.valueOf(5112), dao.getRoomTypeIdForHostelworldLabel( "16 Bed Mixed Dormitory" ) );
-        Assert.assertEquals( null, dao.getRoomTypeIdForHostelworldLabel( "1 Bed Mixed Dormitory" ) );
+        assertEquals( Integer.valueOf( 2964 ), dao.getRoomTypeIdForHostelworldLabel( "Basic Double Bed Private (Shared Bathroom)" ) );
+        assertEquals( Integer.valueOf( 2965 ), dao.getRoomTypeIdForHostelworldLabel( "Basic 3 Bed Private (Shared Bathroom)" ) );
+        assertEquals( Integer.valueOf( 2966 ), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Private (Shared Bathroom)" ) );
+        assertEquals( Integer.valueOf( 2973 ), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Mixed Dorm" ) );
+        assertEquals( Integer.valueOf( 2974 ), dao.getRoomTypeIdForHostelworldLabel( "4 Bed Female Dorm" ) );
+        assertEquals( Integer.valueOf( 2972 ), dao.getRoomTypeIdForHostelworldLabel( "6 Bed Mixed Dorm" ) );
+        assertEquals( Integer.valueOf( 2971 ), dao.getRoomTypeIdForHostelworldLabel( "8 Bed Mixed Dorm" ) );
+        assertEquals( Integer.valueOf( 2970 ), dao.getRoomTypeIdForHostelworldLabel( "10 Bed Mixed Dorm" ) );
+        assertEquals( Integer.valueOf( 2969 ), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Male Dorm" ) );
+        assertEquals( Integer.valueOf( 2968 ), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Female Dorm" ) );
+        assertEquals( Integer.valueOf( 2967 ), dao.getRoomTypeIdForHostelworldLabel( "12 Bed Mixed Dormitory" ) );
+        assertEquals( Integer.valueOf( 5152 ), dao.getRoomTypeIdForHostelworldLabel( "14 Bed Mixed Dorm" ) );
+        assertEquals( Integer.valueOf( 5112 ), dao.getRoomTypeIdForHostelworldLabel( "16 Bed Mixed Dormitory" ) );
+        assertEquals( null, dao.getRoomTypeIdForHostelworldLabel( "1 Bed Mixed Dormitory" ) );
     }
 
-    @Test( expected = EmptyResultDataAccessException.class )
+    @Test
     public void testGetRoomTypeIdForHostelworldLabelThrowsException() throws Exception {
-        dao.getRoomTypeIdForHostelworldLabel( "7 Bed Mixed Dorm" );
+        assertThrows( EmptyResultDataAccessException.class, () -> {
+            dao.getRoomTypeIdForHostelworldLabel( "7 Bed Mixed Dorm" );
+        } );
     }
 
     @Test
@@ -446,7 +460,7 @@ public class WordPressDAOTest {
     private Allocation insertTestAllocation( int jobId, Date checkinDate, String bookingSource ) throws Exception {
         Allocation alloc = createTestAllocation( jobId, checkinDate, bookingSource );
         dao.insertAllocation( alloc );
-        Assert.assertTrue( "ID not assigned", alloc.getId() > 0 );
+        assertTrue( alloc.getId() > 0, "ID not assigned" );
         return alloc;
     }
 
@@ -455,7 +469,7 @@ public class WordPressDAOTest {
         alloc.setReservationId( reservationId );
         alloc.setGuestName( guestName );
         dao.insertAllocation( alloc );
-        Assert.assertTrue( "ID not assigned", alloc.getId() > 0 );
+        assertTrue( alloc.getId() > 0, "ID not assigned" );
         return alloc;
     }
 
@@ -465,16 +479,16 @@ public class WordPressDAOTest {
         alloc.setPaymentTotal( paymentTotal );
         alloc.setPaymentOutstanding( paymentOutstanding );
         dao.insertAllocation( alloc );
-        Assert.assertTrue( "ID not assigned", alloc.getId() > 0 );
+        assertTrue( alloc.getId() > 0, "ID not assigned" );
         return alloc;
     }
 
     @Test
     public void testGetOption() {
-        Assert.assertEquals( "Just another WordPress site", dao.getOption( "blogdescription" ) );
-        Assert.assertEquals( null, dao.getOption( "non.existent.key" ) );
+        assertEquals( "Just another WordPress site", dao.getOption( "blogdescription" ) );
+        assertEquals( null, dao.getOption( "non.existent.key" ) );
     }
-    
+
     @Test
     public void testDeleteAllocations() {
         dao.deleteAllocations( 109 );
@@ -483,21 +497,21 @@ public class WordPressDAOTest {
     @Test
     public void testSetOption() {
         dao.setOption( "tmp_del_me", "balls" );
-        Assert.assertEquals( dao.getOption( "tmp_del_me" ), "balls" );
+        assertEquals( "balls", dao.getOption( "tmp_del_me" ) );
         dao.setOption( "tmp_del_me", "sticks" );
-        Assert.assertEquals( dao.getOption( "tmp_del_me" ), "sticks" );
+        assertEquals( "sticks", dao.getOption( "tmp_del_me" ) );
     }
-    
+
     @Test
     public void testFetchUnpaidDepositReport() {
-        List<UnpaidDepositReportEntry> report = dao.fetchUnpaidDepositReport(136564);
+        List<UnpaidDepositReportEntry> report = dao.fetchUnpaidDepositReport( 136564 );
         LOGGER.info( "records found: " + report.size() );
-        for(UnpaidDepositReportEntry row : report) {
-            LOGGER.info( ToStringBuilder.reflectionToString( row ));
+        for ( UnpaidDepositReportEntry row : report ) {
+            LOGGER.info( ToStringBuilder.reflectionToString( row ) );
             LOGGER.info( "Reservation " + row.getReservationId() );
         }
     }
-    
+
     @Test
     public void testFetchPrepaidBDCBookingsWithOutstandingBalance() {
         // find all BDC bookings with unpaid deposits that use a virtual CC
@@ -507,20 +521,20 @@ public class WordPressDAOTest {
                 // include bookings that are about to arrive (in case we couldn't charge them yet)
                 .filter( p -> p.isChargeableDateInPast() || p.isCheckinDateTodayOrTomorrow() )
                 .forEach( a -> {
-                    LOGGER.info( "Booking " + a.getBookingReference() 
+                    LOGGER.info( "Booking " + a.getBookingReference()
                             + " is chargeable on " + a.getEarliestChargeDate() );
                     LOGGER.info( ToStringBuilder.reflectionToString( a ) );
                 } );
     }
-    
+
     @Test
     public void testFetchGuestComments() throws Exception {
-        LOGGER.info( ToStringBuilder.reflectionToString( dao.fetchGuestComments( 10372722 ) ) );   
+        LOGGER.info( ToStringBuilder.reflectionToString( dao.fetchGuestComments( 10372722 ) ) );
     }
 
     @Test
     public void testRunGroupBookingsReport() {
-        dao.runGroupBookingsReport( 137652 );   
+        dao.runGroupBookingsReport( 137652 );
     }
 
     @Test
@@ -533,7 +547,7 @@ public class WordPressDAOTest {
         Calendar c = Calendar.getInstance();
         dao.deleteHostelworldBookingsWithBookedDate( c.getTime() );
     }
-    
+
     @Test
     public void testGetLastJobOfType() {
         UnpaidDepositReportJob j = dao.getLastJobOfType( UnpaidDepositReportJob.class );
@@ -558,7 +572,7 @@ public class WordPressDAOTest {
                 } );
         LOGGER.info( "Found " + counter + " records" );
     }
-    
+
     @Test
     public void testFetchActiveJobSchedules() {
         dao.fetchActiveJobSchedules()
@@ -575,17 +589,17 @@ public class WordPressDAOTest {
                     }
                 } );
     }
-    
+
     @Test
     public void testIsJobCurrentlyPending() {
-        LOGGER.info( "pending: " + dao.isJobCurrentlyPending( "com.macbackpackers.jobs.ConfirmDepositAmountsJob" ) );        
+        LOGGER.info( "pending: " + dao.isJobCurrentlyPending( "com.macbackpackers.jobs.ConfirmDepositAmountsJob" ) );
     }
 
     @Test
     public void testInsertBookingLookupKey() {
         dao.insertBookingLookupKey( "12345678", "ABCDEFG", null );
-        dao.insertBookingLookupKey( "12345678", "BCDEFGH", new BigDecimal("2.3") );
-        dao.insertBookingLookupKey( "12345678", "CDEFGHI", new BigDecimal("12.34") );
+        dao.insertBookingLookupKey( "12345678", "BCDEFGH", new BigDecimal( "2.3" ) );
+        dao.insertBookingLookupKey( "12345678", "CDEFGHI", new BigDecimal( "12.34" ) );
     }
 
     @Test
@@ -615,7 +629,7 @@ public class WordPressDAOTest {
 
     @Test
     public void testFetchBookingsMatchingBlacklist() {
-        List<Allocation> allocations = dao.fetchBookingsMatchingBlacklist(453596, sharedDao.fetchBlacklistEntries() );
+        List<Allocation> allocations = dao.fetchBookingsMatchingBlacklist( 453596, sharedDao.fetchBlacklistEntries() );
         LOGGER.info( "Found {} records.", allocations.size() );
     }
 }

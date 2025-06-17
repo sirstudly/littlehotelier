@@ -1,8 +1,8 @@
 
 package com.macbackpackers.jobs;
 
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
 
 /**
  * Creates a report with all bookings with more than 5 people using data from a previous

@@ -1,9 +1,10 @@
-
 package com.macbackpackers.beans;
 
-import org.hamcrest.Matchers;
-import org.junit.Assert;
-import org.junit.Test;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import org.junit.jupiter.api.Test;
 
 public class CardDetailsTest {
 
@@ -38,18 +39,12 @@ public class CardDetailsTest {
     private static void assertCardType( String cardnum, String cardtype ) {
         CardDetails cd = new CardDetails();
         cd.setCardNumber( cardnum );
-        Assert.assertThat( cd.getCloudbedsCardTypeFromBinRange(), Matchers.is( cardtype ) );
+        assertThat( cd.getCloudbedsCardTypeFromBinRange(), is( cardtype ) );
     }
 
     private static void assertCardTypeThrowsException( String cardnum ) {
         CardDetails cd = new CardDetails();
         cd.setCardNumber( cardnum );
-        try {
-            String cardType = cd.getCloudbedsCardTypeFromBinRange();
-            Assert.fail( "Expected exception, observed " + cardType );
-        }
-        catch ( IllegalArgumentException ex ) {
-            // expected
-        }
+        assertThrows( IllegalArgumentException.class, () -> cd.getCloudbedsCardTypeFromBinRange() );
     }
 }

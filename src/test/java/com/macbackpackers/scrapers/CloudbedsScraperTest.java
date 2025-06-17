@@ -21,19 +21,19 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
 import org.htmlunit.Page;
 import org.htmlunit.WebClient;
 import org.htmlunit.html.HtmlPage;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -49,8 +49,12 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.CancelBookingJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 
-@RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(classes = LittleHotelierConfig.class)
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+
+@ExtendWith( SpringExtension.class )
+@ContextConfiguration( classes = LittleHotelierConfig.class )
 public class CloudbedsScraperTest {
     
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
@@ -93,42 +97,42 @@ public class CloudbedsScraperTest {
     @Test
     public void testGetTransactionsByReservation() throws Exception {
         Reservation r = cloudbedsScraper.getReservation( webClient, "10569063" );
-        Assert.assertThat( cloudbedsScraper.isExistsPaymentWithVendorTxCode( webClient, r, "x" ), Matchers.is( false ) );
-        Assert.assertThat( cloudbedsScraper.isExistsPaymentWithVendorTxCode( webClient, r, "CASTLE-ROCK-7878681082-1548474047" ), Matchers.is( true ) );
+        assertThat( cloudbedsScraper.isExistsPaymentWithVendorTxCode( webClient, r, "x" ), is( false ) );
+        assertThat( cloudbedsScraper.isExistsPaymentWithVendorTxCode( webClient, r, "CASTLE-ROCK-7878681082-1548474047" ), is( true ) );
     }
 
     @Test
     public void testIsExistsRefund() throws Exception {
         Reservation r = cloudbedsScraper.getReservation( webClient, "34321814" );
-        Assert.assertThat( cloudbedsScraper.isExistsRefund( webClient, r ), Matchers.is( true ) );
+        assertThat( cloudbedsScraper.isExistsRefund( webClient, r ), is( true ) );
     }
 
     @Test
     public void testGetTransactionsForRefund() throws Exception {
-        List<TransactionRecord> recs = cloudbedsScraper.getTransactionsForRefund(webClient, "53004499");
-        LOGGER.info("Found " + recs.size() + " records.");
-        recs.stream().forEach(r -> LOGGER.info(ToStringBuilder.reflectionToString(r)));
+        List<TransactionRecord> recs = cloudbedsScraper.getTransactionsForRefund( webClient, "53004499" );
+        LOGGER.info( "Found " + recs.size() + " records." );
+        recs.forEach( r -> LOGGER.info( ToStringBuilder.reflectionToString( r ) ) );
     }
 
     @Test
     public void testGetCustomers() throws Exception {
         List<Customer> results = cloudbedsScraper.getCustomers( webClient, 
                 LocalDate.now().withDayOfMonth( 4 ), LocalDate.now().withDayOfMonth( 5 ) );
-        results.stream().forEach( t -> LOGGER.info( t.toString() ) );
+        results.forEach( t -> LOGGER.info( t.toString() ) );
     }
 
     @Test
     public void testGetReservations() throws Exception {
         List<Customer> results = cloudbedsScraper.getReservations( webClient, 
                 LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 2 ) );
-        results.stream().forEach( t -> LOGGER.info( t.toString() ) );
+        results.forEach( t -> LOGGER.info( t.toString() ) );
         LOGGER.info( "Found " + results.size() + " entries" );
     }
 
     @Test
     public void testGetReservationsByQuery() throws Exception {
         List<Customer> results = cloudbedsScraper.getReservations( webClient, "999999999" );
-        results.stream().forEach( t -> LOGGER.info( t.toString() ) );
+        results.forEach( t -> LOGGER.info( t.toString() ) );
         LOGGER.info( "Found " + results.size() + " entries" );
     }
 
@@ -138,7 +142,7 @@ public class CloudbedsScraperTest {
                 LocalDate.parse( "2019-05-30" ),
                 LocalDate.parse( "2019-05-30" ),
                 "Hostelworld & Hostelbookers", "Agoda (Channel Collect Booking)" );
-        results.stream().forEach( t -> LOGGER.info( t.getIdentifier() + " (" + t.getStatus() + ") - "
+        results.forEach( t -> LOGGER.info( t.getIdentifier() + " (" + t.getStatus() + ") - "
                 + t.isCardDetailsPresent() + "," + t.getThirdPartyIdentifier() + ": " +
                 t.getFirstName() + " " + t.getLastName() ) );
         LOGGER.info( "Found " + results.size() + " entries" );
@@ -152,7 +156,7 @@ public class CloudbedsScraperTest {
                 LocalDate.parse( "2019-01-16" ), // cancel start
                 LocalDate.parse( "2019-01-21" ), // cancel end
                 "Hostelworld & Hostelbookers" );
-        results.stream().forEach( t -> LOGGER.info( t.getIdentifier() + " (" + t.getStatus() + ") - "
+        results.forEach( t -> LOGGER.info( t.getIdentifier() + " (" + t.getStatus() + ") - "
                 + t.isCardDetailsPresent() + "," + t.getThirdPartyIdentifier() + ": " +
                 t.getFirstName() + " " + t.getLastName() + " cancelled on " + t.getCancellationDate() ) );
         LOGGER.info( "Found " + results.size() + " entries" );
@@ -167,7 +171,7 @@ public class CloudbedsScraperTest {
                 .stream()
                 .map( c -> cloudbedsScraper.getReservationRetry( webClient, c.getId() ) )
                 .collect( Collectors.toList() );
-        results.stream().forEach( t -> LOGGER.info( t.getIdentifier() + " (" + t.getStatus() + ") - "
+        results.forEach( t -> LOGGER.info( t.getIdentifier() + " (" + t.getStatus() + ") - "
                 + t.isCardDetailsPresent() + "," + t.getThirdPartyIdentifier() + ": " +
                 t.getFirstName() + " " + t.getLastName() ) );
         LOGGER.info( "Found " + results.size() + " entries" );
@@ -238,7 +242,7 @@ public class CloudbedsScraperTest {
     @Test
     public void testGetActivityLog() throws Exception {
         cloudbedsScraper.getActivityLog( webClient, "6810494609" )
-            .stream().forEach( t -> LOGGER.info( ToStringBuilder.reflectionToString( t ) ) );
+            .forEach( t -> LOGGER.info( ToStringBuilder.reflectionToString( t ) ) );
     }
 
     @Test
@@ -263,12 +267,12 @@ public class CloudbedsScraperTest {
         // first find the reservation on CB using the BDC reference
         List<Customer> c = cloudbedsScraper.getReservations( webClient, 
                 bookingReference.startsWith( "BDC-" ) ? bookingReference.substring( 4 ) : bookingReference );
-        Assert.assertThat( "Only 1 reservation expected", c.size(), Matchers.is( 1 ) );
+        assertThat( "Only 1 reservation expected", c.size(), is( 1 ) );
         Reservation r = cloudbedsScraper.getReservation( webClient, c.get( 0 ).getId() );
         
         // now get the comment we want to copy using the OLD reservation ID
         String comment = dao.fetchGuestComments( lhReservationId ).getComments();
-        Assert.assertThat( comment, Matchers.notNullValue() );
+        assertThat( comment, notNullValue() );
         cloudbedsScraper.addNote( webClient, r.getReservationId(), "Booking.com agent to be charged at check-in. Do NOT charge guest! \n" + comment );
     }
 
@@ -314,14 +318,13 @@ public class CloudbedsScraperTest {
                 } );
     }
 
-
     @Test
     public void createCovid19CancelBookingJobsAug() throws Exception {
         cloudbedsScraper.getReservations( webClient, 
                 null, // stay date start
                 null, // stay date end
-                LocalDate.parse("2020-08-01"), // checkin date start
-                LocalDate.parse("2020-08-14"), // checkin date end
+                LocalDate.parse( "2020-08-01" ), // checkin date start
+                LocalDate.parse( "2020-08-14" ), // checkin date end
                 "confirmed" ).stream()
                 .filter( res -> false == "34541998".equals( res.getId() ) ) // maintenance
                 .forEach( res -> { 
@@ -342,24 +345,23 @@ public class CloudbedsScraperTest {
 
     @Test
     public void createCancellationRefundsSheetApri2020() throws Exception {
-        
         Workbook workbook = new XSSFWorkbook();
         
-        Sheet sheet = workbook.createSheet("Sheet 1");
-        Row header = sheet.createRow(0);
+        Sheet sheet = workbook.createSheet( "Sheet 1" );
+        Row header = sheet.createRow( 0 );
          
         final CellStyle HEADER_STYLE = workbook.createCellStyle();
         HEADER_STYLE.setLocked( true );
          
         final Font HEADER_FONT = workbook.createFont();
-        HEADER_FONT.setFontName("Arial");
-        HEADER_FONT.setFontHeightInPoints((short) 10);
-        HEADER_FONT.setBold(true);
-        HEADER_STYLE.setFont(HEADER_FONT);
+        HEADER_FONT.setFontName( "Arial" );
+        HEADER_FONT.setFontHeightInPoints( (short) 10 );
+        HEADER_FONT.setBold( true );
+        HEADER_STYLE.setFont( HEADER_FONT );
 
         final Font DEFAULT_BODY_FONT = workbook.createFont();
-        DEFAULT_BODY_FONT.setFontName("Arial");
-        DEFAULT_BODY_FONT.setFontHeightInPoints((short) 10);
+        DEFAULT_BODY_FONT.setFontName( "Arial" );
+        DEFAULT_BODY_FONT.setFontHeightInPoints( (short) 10 );
         
         final String[] HEADERS = {
                 "Name", "Email", "Reservation", "3rd Party Reservation", "Booking Source", "Channel Collect", "Non-Refundable", 
@@ -369,7 +371,7 @@ public class CloudbedsScraperTest {
                 6000, 8000, 3500, 5000, 7000, 5000, 5000,
                 3500, 3500, 3000, 3000, 3000, 3000, 4000
         };
-        for ( int i = 0 ; i < HEADERS.length ; i++ ) {
+        for ( int i = 0; i < HEADERS.length; i++ ) {
             Cell headerCell = header.createCell( i );
             headerCell.setCellValue( HEADERS[i] );
             headerCell.setCellStyle( HEADER_STYLE );
@@ -380,11 +382,11 @@ public class CloudbedsScraperTest {
         DEFAULT_STYLE.setFont( DEFAULT_BODY_FONT );
 
         final CellStyle DATE_STYLE = workbook.createCellStyle();
-        DATE_STYLE.setDataFormat(workbook.createDataFormat().getFormat( "yyyy-mm-dd" ));
+        DATE_STYLE.setDataFormat( workbook.createDataFormat().getFormat( "yyyy-mm-dd" ) );
         DATE_STYLE.setFont( DEFAULT_BODY_FONT );
         
         final CellStyle CURRENCY_STYLE = workbook.createCellStyle();
-        CURRENCY_STYLE.setDataFormat(workbook.createDataFormat().getFormat( "#,##0.00" ));
+        CURRENCY_STYLE.setDataFormat( workbook.createDataFormat().getFormat( "#,##0.00" ) );
         CURRENCY_STYLE.setFont( DEFAULT_BODY_FONT );
 
         AtomicInteger rowNum = new AtomicInteger( 1 );
@@ -483,5 +485,4 @@ public class CloudbedsScraperTest {
         Reservation r = cloudbedsScraper.getReservation( webClient, "43994808" );
         cloudbedsScraper.chargeCardForBooking( webClient, r, new BigDecimal( "37.26" ) );
     }
-
 }

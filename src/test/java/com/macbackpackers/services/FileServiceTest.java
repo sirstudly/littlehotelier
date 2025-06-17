@@ -1,24 +1,25 @@
-
 package com.macbackpackers.services;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileLock;
 
 import org.htmlunit.WebClient;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.config.LittleHotelierConfig;
 
-@RunWith( SpringJUnit4ClassRunner.class )
+@ExtendWith( SpringExtension.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class FileServiceTest {
 
@@ -34,8 +35,8 @@ public class FileServiceTest {
     @Test
     public void testLockFileSingleProcess() throws Exception {
         FileLock lock = fs.lockFile( new File( "test.lock" ) );
-        Assert.assertEquals( "Expecting lock to be valid", true, lock.isValid() );
-        Assert.assertEquals( "Expecting exclusive lock", false, lock.isShared() );
+        assertTrue( lock.isValid(), "Expecting lock to be valid" );
+        assertTrue( !lock.isShared(), "Expecting exclusive lock" );
     }
 
     @Test
@@ -44,19 +45,19 @@ public class FileServiceTest {
         sleep( 2000 );
 
         Process p2 = Runtime.getRuntime().exec( "runFileServiceTest.cmd" );
-        Assert.assertEquals( "Expected second process to exit immediately", 1, p2.waitFor() );
+        assertEquals( 1, p2.waitFor(), "Expected second process to exit immediately" );
 
         int exitCode = p1.waitFor();
-        Assert.assertEquals( "Expected first process to exit normally", 0, exitCode );
+        assertEquals( 0, exitCode, "Expected first process to exit normally" );
     }
-    
+
     @Test
     public void testSerializeDeserializeToFromFile() throws Exception {
         Integer i = 2015;
         fs.serializeObjectToFile( i, "test.object" );
-        Assert.assertEquals( Integer.valueOf( 2015 ), fs.deserializeObjectFromFile( "test.object", Integer.class ) );
+        assertEquals( Integer.valueOf( 2015 ), fs.deserializeObjectFromFile( "test.object", Integer.class ) );
     }
-    
+
     @Test
     public void dumpLHSessionId() throws IOException {
         fs.loadCookiesFromFile( webClient );
@@ -77,7 +78,7 @@ public class FileServiceTest {
 
     /**
      * Needed so we can create multiple processes for this test.
-     * 
+     *
      * @param argv no args req'd
      */
     public static void main( String argv[] ) throws Exception {

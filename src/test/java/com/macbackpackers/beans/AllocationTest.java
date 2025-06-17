@@ -4,13 +4,13 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 
-import javax.persistence.Column;
-import javax.persistence.Id;
-import javax.persistence.Table;
+import jakarta.persistence.Column;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.time.FastDateFormat;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,15 +21,15 @@ public class AllocationTest {
 
     @Test
     public void testGetClassAnnotations() throws Exception {
-        
-        for( Annotation ann : Allocation.class.getAnnotations() ) {
-            if(ann instanceof Table){
+
+        for ( Annotation ann : Allocation.class.getAnnotations() ) {
+            if ( ann instanceof Table ) {
                 Table tableAnnotation = (Table) ann;
-                LOGGER.info("table name: " + tableAnnotation.name());
-            }        
+                LOGGER.info( "table name: " + tableAnnotation.name() );
+            }
         }
     }
-    
+
     @Test
     public void testGetFieldAnnotations() throws Exception {
         for ( Field field : Allocation.class.getDeclaredFields() ) {
@@ -41,7 +41,7 @@ public class AllocationTest {
             }
         }
     }
-    
+
     @Test
     public void testGetParameters() throws Exception {
         Allocation alloc = new Allocation();
@@ -57,8 +57,8 @@ public class AllocationTest {
         alloc.setCheckoutDate( DATE_FORMAT_YYYY_MM_DD.parse( "2014-05-03" ) );
         alloc.setBookingSource( "MyAllocator" );
         alloc.setGuestName( "Rick Sanchez" );
-        alloc.setPaymentOutstanding( new BigDecimal("14.22" ) );
-        alloc.setPaymentTotal( new BigDecimal("28.81" ) );
+        alloc.setPaymentOutstanding( new BigDecimal( "14.22" ) );
+        alloc.setPaymentTotal( new BigDecimal( "28.81" ) );
         alloc.setViewed( true );
         LOGGER.info( alloc.getAsParameters().length + " parameters." );
         LOGGER.info( ToStringBuilder.reflectionToString( alloc.getAsParameters() ) );

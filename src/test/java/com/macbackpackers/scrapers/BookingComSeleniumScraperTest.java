@@ -2,28 +2,30 @@ package com.macbackpackers.scrapers;
 
 import com.macbackpackers.config.LittleHotelierConfig;
 import org.apache.commons.pool2.impl.GenericObjectPool;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import java.time.Duration;
 import java.util.List;
 
-@RunWith( SpringJUnit4ClassRunner.class )
+@ExtendWith( SpringExtension.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class BookingComSeleniumScraperTest {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
-    /** maximum time to wait when navigating web requests */
+    /**
+     * maximum time to wait when navigating web requests
+     */
     private static final int MAX_WAIT_SECONDS = 60;
 
     @Autowired
@@ -35,13 +37,13 @@ public class BookingComSeleniumScraperTest {
     private WebDriver driver;
     private WebDriverWait wait;
 
-    @Before
+    @BeforeEach
     public void setup() throws Exception {
         driver = driverFactory.borrowObject();
-        wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_WAIT_SECONDS));
+        wait = new WebDriverWait( driver, Duration.ofSeconds( MAX_WAIT_SECONDS ) );
     }
 
-    @After
+    @AfterEach
     public void teardown() throws Exception {
         driverFactory.returnObject( driver );
     }
@@ -75,6 +77,6 @@ public class BookingComSeleniumScraperTest {
     public void testGetAllVCCBookingsThatCanBeCharged() throws Exception {
         List<String> bookingRefs = scraper.getAllVCCBookingsThatCanBeCharged( driver, wait );
         LOGGER.info( "Found {} bookings", bookingRefs.size() );
-        bookingRefs.stream().forEach( b -> LOGGER.info( b ) );
+        bookingRefs.forEach( b -> LOGGER.info( b ) );
     }
 }

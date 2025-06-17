@@ -1,14 +1,13 @@
-
 package com.macbackpackers.beans;
 
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 
 import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 
-import org.hamcrest.Matchers;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class JobSchedulerTest {
 
@@ -23,11 +22,11 @@ public class JobSchedulerTest {
         js.setRepeatDailyAt( repeatTimeInPast );
         Timestamp twoHoursAgo = Timestamp.valueOf( now.minusHours( 2 ) );
         js.setLastRunDate( twoHoursAgo );
-        assertThat( js.isOverdue(), Matchers.is( true ) );
+        assertThat( js.isOverdue(), is( true ) );
 
         String repeatTimeInFuture = getHourAndMinute( now.plusMinutes( 2 ) );
         js.setRepeatDailyAt( repeatTimeInFuture );
-        assertThat( js.isOverdue(), Matchers.is( false ) );
+        assertThat( js.isOverdue(), is( false ) );
     }
 
     @Test
@@ -36,7 +35,7 @@ public class JobSchedulerTest {
         js.setRepeatDailyAt( getHourAndMinute( LocalDateTime.now().plusMinutes( 2 ) ) );
         Timestamp yesterday = Timestamp.valueOf( LocalDateTime.now().minusHours( 25 ) );
         js.setLastRunDate( yesterday );
-        assertThat( js.isOverdue(), Matchers.is( true ) );
+        assertThat( js.isOverdue(), is( true ) );
     }
 
     private String getHourAndMinute( LocalDateTime time ) {

@@ -1,17 +1,16 @@
-
 package com.macbackpackers.services;
 
 import org.htmlunit.WebClient;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.config.LittleHotelierConfig;
 
-@RunWith( SpringJUnit4ClassRunner.class )
+@ExtendWith( SpringExtension.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class CaptchaSolverServiceTest {
 
@@ -29,5 +28,4 @@ public class CaptchaSolverServiceTest {
         service.recaptchaReportGood( webClient, "62077286515" );
         service.recaptchaReportGood( webClient, "62077265076" );
     }
-    
- }
+}

@@ -1,16 +1,15 @@
-
 package com.macbackpackers.services;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.htmlunit.WebClient;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.stripe.Stripe;
@@ -22,7 +21,7 @@ import com.stripe.param.ChargeCreateParams;
 import com.stripe.param.RefundCreateParams;
 import com.stripe.param.TokenCreateParams;
 
-@RunWith( SpringJUnit4ClassRunner.class )
+@ExtendWith( SpringExtension.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class PaymentProcessorServiceTest {
 
@@ -48,7 +47,7 @@ public class PaymentProcessorServiceTest {
     public void testChargeNonRefundableBooking() throws Exception {
         paymentService.chargeNonRefundableBooking( cbWebClient, "11068108" );
     }
-    
+
     @Test
     public void testProcessPrepaidBooking() throws Exception {
         paymentService.processPrepaidBooking( cbWebClient, "22970476" );
@@ -56,7 +55,6 @@ public class PaymentProcessorServiceTest {
 
     @Test
     public void testProcessStripeRefund() throws Exception {
-
         Stripe.apiKey = "sk_test_4eC39HqLyjWDarjtT1zdp7dc";
 
         Token token = Token.create( TokenCreateParams.builder()
@@ -71,12 +69,17 @@ public class PaymentProcessorServiceTest {
         Charge charge = Charge.create( ChargeCreateParams.builder()
                 .setSource( token.getId() )
                 .setCurrency( "usd" )
-                .setAmount( 1099L ).build() );
+                .setAmount( 1099L )
+                .build() );
         LOGGER.info( "Charge: " + charge.toJson() );
 
-        Refund refund = Refund.create( RefundCreateParams.builder().setCharge( charge.getId() ).build(),
+        Refund refund = Refund.create( RefundCreateParams.builder()
+                        .setCharge( charge.getId() )
+                        .build(),
                 // set idempotency key so we can re-run safely in case of previous failure
-                new RequestOptionsBuilder().setIdempotencyKey( token.getId() ).build() );
+                new RequestOptionsBuilder()
+                        .setIdempotencyKey( token.getId() )
+                        .build() );
         LOGGER.info( "Refund: " + refund.toJson() );
     }
 

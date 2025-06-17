@@ -1,17 +1,17 @@
 package com.macbackpackers.scrapers;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.config.LittleHotelierConfig;
 
-@RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(classes = LittleHotelierConfig.class)
+@ExtendWith( SpringExtension.class )
+@ContextConfiguration( classes = LittleHotelierConfig.class )
 public class ChromeScraperTest {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );

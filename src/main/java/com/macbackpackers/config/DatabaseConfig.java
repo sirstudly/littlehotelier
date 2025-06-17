@@ -6,15 +6,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
-import javax.persistence.EntityManagerFactory;
+import jakarta.persistence.EntityManagerFactory;
+
 import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.PropertySource;
-import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.jpa.JpaTransactionManager;
@@ -24,16 +23,16 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.macbackpackers.exceptions.UnrecoverableFault;
-import com.mchange.v2.c3p0.ComboPooledDataSource;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 @Configuration
 @EnableTransactionManagement
-@PropertySource( "classpath:config.properties" )
 public class DatabaseConfig {
 
     @Value( "${db.maxidletime}" )
     private int maxIdleTime;
-    
+
     @Value( "${db.idle.connection.test.period}" )
     private int idleConnectionTestPeriod;
 
@@ -42,11 +41,6 @@ public class DatabaseConfig {
 
     @Value( "${db.driverclass}" )
     private String driverClass;
-    
-    @Bean
-    public static PropertySourcesPlaceholderConfigurer getPlaceHolderConfigurer() {
-        return new PropertySourcesPlaceholderConfigurer();
-    }
 
     @Bean( name = "txnDataSource" )
     public DataSource getDataSource(
@@ -69,23 +63,15 @@ public class DatabaseConfig {
     }
 
     private DataSource createDataSource( String dbUrl, String user, String pass, int minPoolSize, int maxPoolSize ) throws PropertyVetoException {
-        ComboPooledDataSource ds = new ComboPooledDataSource();
-        ds.setJdbcUrl( dbUrl );
-        ds.setDriverClass( driverClass );
-// uncomment following to check for db connection leaks
-// http://www.mchange.com/projects/c3p0/#unreturnedConnectionTimeout
-//        ds.setUnreturnedConnectionTimeout( 600 ); // in seconds
-//        ds.setDebugUnreturnedConnectionStackTraces( true );
-        ds.setUser( user );
-        ds.setPassword( pass );
-        ds.setMinPoolSize( minPoolSize );
-        ds.setMaxPoolSize( maxPoolSize );
-        ds.setMaxIdleTime( maxIdleTime );
-        ds.setIdleConnectionTestPeriod( idleConnectionTestPeriod );
-        ds.setMaxIdleTimeExcessConnections( maxIdleTimeExcessConnections );
-        ds.setTestConnectionOnCheckout( true );
-        ds.setPreferredTestQuery( "SELECT 1" );
-        return ds;
+        HikariConfig config = new HikariConfig();
+        config.setDriverClassName( driverClass );
+        config.setJdbcUrl( dbUrl );
+        config.setUsername( user );
+        config.setPassword( pass );
+        config.setMaximumPoolSize( maxPoolSize );
+        config.setMinimumIdle( minPoolSize );
+        config.setConnectionTestQuery( "SELECT 1" );
+        return new HikariDataSource( config );
     }
 
     @Bean( name = "sharedJdbcTemplate" )
@@ -107,7 +93,7 @@ public class DatabaseConfig {
         emf.setJpaProperties( getHibernateProperties() );
         return emf;
     }
-    
+
     @Bean( name = "transactionManager" )
     public PlatformTransactionManager getTransactionManager( @Qualifier( "txnDataSource" ) DataSource dataSource, EntityManagerFactory emf ) {
         JpaTransactionManager tm = new JpaTransactionManager();
@@ -116,7 +102,7 @@ public class DatabaseConfig {
         tm.setDefaultTimeout( 60 );
         return tm;
     }
-    
+
     @Bean
     public Properties getHibernateProperties() throws IOException {
         Properties props = new Properties();

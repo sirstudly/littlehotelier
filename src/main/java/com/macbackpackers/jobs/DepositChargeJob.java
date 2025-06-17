@@ -4,9 +4,9 @@ package com.macbackpackers.jobs;
 import java.text.ParseException;
 import java.util.Date;
 
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
-import javax.persistence.Transient;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Transient;
 
 import com.macbackpackers.config.LittleHotelierConfig;
 import org.apache.commons.lang3.builder.EqualsBuilder;

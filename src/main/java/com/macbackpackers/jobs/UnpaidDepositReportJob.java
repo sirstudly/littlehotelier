@@ -1,8 +1,8 @@
 
 package com.macbackpackers.jobs;
 
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
 
 /**
  * Creates a report with all bookings that have not yet paid a deposit using data from a previous

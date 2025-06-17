@@ -1,8 +1,8 @@
 
 package com.macbackpackers.jobs;
 
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
 
 /**
  * Creates the split room reservation report using data from a previous AllocationScraperJob.

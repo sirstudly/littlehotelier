@@ -5,9 +5,9 @@ import java.text.ParseException;
 import java.time.LocalDate;
 import java.util.Date;
 
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
-import javax.persistence.Transient;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Transient;
 
 import com.macbackpackers.config.LittleHotelierConfig;
 import org.htmlunit.WebClient;

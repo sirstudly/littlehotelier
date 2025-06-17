@@ -1,8 +1,7 @@
-
 package com.macbackpackers.scrapers.matchers;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class HSHRoomBedMatcherTest {
 
@@ -28,7 +27,7 @@ public class HSHRoomBedMatcherTest {
 
     private void assertRoomAndBed( String label, String expectedRoom, String expectedBed ) {
         BedAssignment matcher = new HSHRoomBedMatcher().parse( label );
-        Assert.assertEquals( "room not matched", expectedRoom, matcher.getRoom() );
-        Assert.assertEquals( "bed not matched", expectedBed, matcher.getBedName() );
+        Assertions.assertEquals( "room not matched", expectedRoom, matcher.getRoom() );
+        Assertions.assertEquals( "bed not matched", expectedBed, matcher.getBedName() );
     }
 }

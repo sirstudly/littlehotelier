@@ -5,6 +5,7 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
@@ -75,8 +76,8 @@ public class LoggingRequestInterceptor implements ClientHttpRequestInterceptor {
         LOGGER.debug( "=======================response end=================================================" );
 
         if ( responseListener != null ) {
-            responseListener.traceResponse( response.getStatusCode(), 
-                    response.getStatusText(), response.getHeaders(), new String( body, "UTF-8" )  );
+            responseListener.traceResponse( HttpStatus.valueOf( response.getStatusCode().value() ),
+                    response.getStatusText(), response.getHeaders(), new String( body, "UTF-8" ) );
         }
     }
 

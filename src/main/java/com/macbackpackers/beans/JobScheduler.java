@@ -1,4 +1,3 @@
-
 package com.macbackpackers.beans;
 
 import java.sql.Timestamp;
@@ -12,18 +11,19 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
 import org.apache.commons.lang3.time.FastDateFormat;
-import org.hibernate.annotations.Type;
+import org.hibernate.type.YesNoConverter;
 
 @Entity
 @Table( name = "job_scheduler" )
@@ -46,7 +46,7 @@ public class JobScheduler {
     private String repeatDailyAt;
 
     @Column( name = "active_yn" )
-    @Type( type = "yes_no" )
+    @Convert(converter = YesNoConverter.class)
     private boolean active;
 
     @Column( name = "last_run_date" )

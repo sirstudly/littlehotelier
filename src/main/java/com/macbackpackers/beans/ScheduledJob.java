@@ -9,20 +9,21 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
+import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.hibernate.annotations.Cascade;
 import org.hibernate.annotations.CascadeType;
-import org.hibernate.annotations.Type;
+import org.hibernate.type.YesNoConverter;
 
 /**
  * A scheduled job will merely insert a "submitted" record into the job table. The ProcessorService
@@ -48,7 +49,7 @@ public class ScheduledJob {
     private String cronSchedule;
 
     @Column( name = "active_yn" )
-    @Type( type = "yes_no" )
+    @Convert(converter = YesNoConverter.class)
     private boolean active;
 
     @Column( name = "last_scheduled_date" )
@@ -57,7 +58,7 @@ public class ScheduledJob {
     @Column( name = "last_updated_date" )
     private Timestamp lastUpdatedDate;
 
-    @OneToMany( cascade = javax.persistence.CascadeType.ALL, fetch = FetchType.EAGER )
+    @OneToMany( cascade = jakarta.persistence.CascadeType.ALL, fetch = FetchType.EAGER )
     @JoinColumn( name = "job_id" )
     @Cascade( { CascadeType.SAVE_UPDATE, CascadeType.DELETE } )
     private Set<ScheduledJobParameter> parameters = new HashSet<ScheduledJobParameter>();

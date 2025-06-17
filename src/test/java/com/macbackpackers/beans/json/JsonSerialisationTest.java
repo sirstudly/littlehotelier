@@ -1,4 +1,3 @@
-
 package com.macbackpackers.beans.json;
 
 import java.io.File;
@@ -8,8 +7,7 @@ import java.nio.charset.Charset;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +17,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class JsonSerialisationTest {
 
@@ -60,10 +61,10 @@ public class JsonSerialisationTest {
     public void testVerifyErrorObject() throws Exception {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         JsonObject responseObj = gson.fromJson( "{\"message\":\"Validation failed: Payment card number card is not accepted\",\"errors\":{\"payment_card_number\":[\"card is not accepted\"],\"payment_card_type\":[],\"reservation_room_types\":[{}],\"reservation_extras\":[],\"reservation_guests\":{\"70349797745040\":{}}}}", JsonElement.class ).getAsJsonObject();
-        Assert.assertFalse( "One or more errors found in response", responseObj.get( "errors" ).getAsJsonObject().entrySet().isEmpty() );
+        assertFalse( responseObj.get( "errors" ).getAsJsonObject().entrySet().isEmpty(), "One or more errors found in response" );
 
         responseObj = gson.fromJson( FileUtils.readFileToString( new File( "test_load_page.json" ), "UTF-8" ), JsonElement.class ).getAsJsonObject();
-        Assert.assertNull( "No errors found", responseObj.get( "errors" ) );
+        assertNull( responseObj.get( "errors" ), "No errors found" );
     }
 
     @Test
@@ -150,5 +151,4 @@ public class JsonSerialisationTest {
                 "{\"message\":\"Validation failed: Payment card number card is not accepted\",\"errors\":{\"payment_card_number\":[\"card is not accepted\"],\"payment_card_type\":[],\"reservation_room_types\":[{}],\"reservation_extras\":[],\"reservation_guests\":{\"70044389994800\":{}}}}", JsonElement.class ).getAsJsonObject();
         LOGGER.info( messageRoot.get( "errors" ).getAsJsonObject().get( "payment_card_number" ).getAsJsonArray().get( 0 ).getAsString() );
     }
-
 }

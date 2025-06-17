@@ -1,4 +1,3 @@
-
 package com.macbackpackers.services;
 
 import java.math.BigDecimal;
@@ -8,22 +7,21 @@ import java.util.List;
 import java.util.Map;
 
 import org.htmlunit.WebClient;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
-import com.macbackpackers.scrapers.CloudbedsScraper;
 
-@RunWith( SpringJUnit4ClassRunner.class )
+@ExtendWith( SpringExtension.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class CloudbedsServiceTest {
 
@@ -31,9 +29,6 @@ public class CloudbedsServiceTest {
 
     @Autowired
     CloudbedsService cloudbedsService;
-
-    @Autowired
-    CloudbedsScraper cloudbedsScraper;
 
     @Autowired
     WordPressDAO dao;
@@ -47,13 +42,13 @@ public class CloudbedsServiceTest {
         cloudbedsService.dumpAllocationsFrom( webClient, 9042,
                 LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 30 ) );
     }
-    
+
     @Test
     public void testGetAllStaffAllocationsDaily() throws Exception {
-        LocalDate currentDate = LocalDate.parse("2018-05-25");
+        LocalDate currentDate = LocalDate.parse( "2018-05-25" );
         LocalDate endDate = LocalDate.parse( "2018-10-13" );
         while ( currentDate.isBefore( endDate ) ) {
-            AllocationList staffAllocations = new AllocationList( 
+            AllocationList staffAllocations = new AllocationList(
                     cloudbedsService.getAllStaffAllocationsDaily( webClient, currentDate ) );
             staffAllocations.forEach( a -> a.setJobId( 440052 ) );
             LOGGER.info( "Inserting {} staff allocations.", staffAllocations.size() );
@@ -65,12 +60,12 @@ public class CloudbedsServiceTest {
     @Test
     public void testGetAllStaffAllocations() throws Exception {
         List<Allocation> alloc = cloudbedsService.getAllStaffAllocations( webClient, LocalDate.now().minusDays( 1 ) );
-        alloc.stream().forEach( a -> LOGGER.info( a.getRoom() + ": " + a.getBedName() + " -> " + a.getCheckinDate() + " to " + a.getCheckoutDate() ) );
+        alloc.forEach( a -> LOGGER.info( a.getRoom() + ": " + a.getBedName() + " -> " + a.getCheckinDate() + " to " + a.getCheckoutDate() ) );
     }
 
     @Test
     public void testCreateChargeHostelworldLateCancellationJobs() throws Exception {
-        cloudbedsService.createChargeHostelworldLateCancellationJobs( 
+        cloudbedsService.createChargeHostelworldLateCancellationJobs(
                 webClient, LocalDate.now().minusDays( 1 ), LocalDate.now() );
     }
 
@@ -89,7 +84,7 @@ public class CloudbedsServiceTest {
     public void testSendHostelworldLateCancellationEmail() throws Exception {
         cloudbedsService.sendHostelworldLateCancellationEmail( webClient, "10568885", BigDecimal.ONE );
     }
-    
+
     @Test
     public void testMarkCreditCardInvalidOnBDC() throws Exception {
         cloudbedsService.markCreditCardInvalidOnBDC( "25201392" );
@@ -115,15 +110,14 @@ public class CloudbedsServiceTest {
 
     @Test
     public void testCreateCanceledPrepaidBDCBookingsChargeJobs() throws Exception {
-        cloudbedsService.createCanceledPrepaidBDCBookingsChargeJobs( webClient, 
+        cloudbedsService.createCanceledPrepaidBDCBookingsChargeJobs( webClient,
                 LocalDate.now().withMonth( 8 ).withDayOfMonth( 31 ),
-                LocalDate.now().withMonth( 11 ).withDayOfMonth( 16 ));
+                LocalDate.now().withMonth( 11 ).withDayOfMonth( 16 ) );
     }
 
     @Test
     public void testGetAllVCCBookingsThatCanBeCharged() throws Exception {
         cloudbedsService.getAllVCCBookingsThatCanBeCharged()
-                .stream()
                 .forEach( r -> LOGGER.info( "Found reservation {}", r ) );
     }
 
@@ -131,7 +125,7 @@ public class CloudbedsServiceTest {
     public void testCreateSendCovidPrestayEmailJobs() throws Exception {
         cloudbedsService.createSendCovidPrestayEmailJobs( webClient, LocalDate.now().plusDays( 1 ) );
     }
-    
+
     @Test
     public void testCreateSendGroupBookingApprovalRequiredEmailJobs() throws Exception {
         cloudbedsService.createSendGroupBookingApprovalRequiredEmailJobs( webClient, LocalDate.now().plusDays( -5 ), LocalDate.now() );
@@ -141,7 +135,7 @@ public class CloudbedsServiceTest {
     public void testSendGroupBookingApprovalRequiredGmail() throws Exception {
         cloudbedsService.sendGroupBookingApprovalRequiredGmail( webClient, "41696492" );
     }
-    
+
     @Test
     public void testCreateSendGroupBookingPaymentReminderEmailJobs() throws Exception {
         cloudbedsService.createSendGroupBookingPaymentReminderEmailJobs( webClient, LocalDate.now().plusDays( 1 ), LocalDate.now().plusDays( 7 ) );
@@ -170,13 +164,12 @@ public class CloudbedsServiceTest {
         cloudbedsService.createFixedRateReservation( webClient, "38059840",
                 LocalDate.parse( "2021-01-04" ), LocalDate.parse( "2021-01-11" ), new BigDecimal( "10" ) );
     }
-    
+
     @Test
     public void testCreateFixedRateLongTermReservations() throws Exception {
         cloudbedsService.createFixedRateLongTermReservations( webClient, LocalDate.parse( "2021-01-04" ), 7, new BigDecimal( 10 ) );
     }
 
-    
     @Test
     public void testSendStripePaymentConfirmationGmail() throws Exception {
         cloudbedsService.sendStripePaymentConfirmationGmail( webClient, "CRH-INV-ABCDEFG-SDQE" );

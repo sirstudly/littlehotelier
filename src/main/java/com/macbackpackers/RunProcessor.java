@@ -1,10 +1,10 @@
 
 package com.macbackpackers;
 
-import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.exceptions.ShutdownException;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.ProcessorService;
+import com.macbackpackers.utils.AnyByteStringToStringConverter;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -15,9 +15,10 @@ import org.openqa.selenium.WebDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.support.AbstractApplicationContext;
-import org.springframework.stereotype.Component;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.convert.support.DefaultConversionService;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,7 +30,7 @@ import java.util.TimeZone;
  * The main bootstrap for running all available jobs.
  *
  */
-@Component
+@SpringBootApplication
 public class RunProcessor
 {
     private static final Logger LOGGER =  LoggerFactory.getLogger( RunProcessor.class );
@@ -157,10 +158,15 @@ public class RunProcessor
             formatter.printHelp( RunProcessor.class.getName(), options );
             return;
         }
-        
+
+        // The problem is that most likely, autoconfiguration happens early on, before
+        // GcpSecretManagerEnvironmentPostProcessor had a chance to run and introduce ByteString converters.
+        // See https://stackoverflow.com/a/71226714
+        ( (DefaultConversionService) DefaultConversionService.getSharedInstance() ).addConverter( new AnyByteStringToStringConverter() );
+
         TimeZone.setDefault( TimeZone.getTimeZone( "Europe/London" ) );
         LOGGER.info( "Starting processor... " + new Date() );
-        AbstractApplicationContext context = new AnnotationConfigApplicationContext( LittleHotelierConfig.class );
+        ConfigurableApplicationContext context = SpringApplication.run( RunProcessor.class, args );
 
         // make sure there is only ever one process running
         RunProcessor processor = context.getBean( RunProcessor.class );

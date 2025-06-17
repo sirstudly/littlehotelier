@@ -1,4 +1,3 @@
-
 package com.macbackpackers.services;
 
 import java.math.BigDecimal;
@@ -16,17 +15,16 @@ import com.macbackpackers.jobs.BedCountReportJob;
 import com.macbackpackers.jobs.CreatePrepaidRefundJob;
 import com.macbackpackers.jobs.PrepaidRefundJob;
 import org.apache.commons.io.IOUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
@@ -69,9 +67,12 @@ import com.macbackpackers.jobs.VerifyGoogleAssistantLoggedInJob;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_DECLINED;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 @SuppressWarnings( "deprecation" )
-@RunWith( SpringJUnit4ClassRunner.class )
+@ExtendWith( SpringExtension.class )
 @ContextConfiguration( classes = LittleHotelierConfig.class )
 public class ProcessorServiceTest {
 
@@ -86,7 +87,7 @@ public class ProcessorServiceTest {
     @Autowired
     AutowireCapableBeanFactory autowireBeanFactory;
     
-    @Before
+    @BeforeEach
     public void setUp() {
 //        LOGGER.info( "deleting test data" );
 //        testDAO.deleteAllTransactionalData();
@@ -94,7 +95,6 @@ public class ProcessorServiceTest {
 
     @Test
     public void testAllocationScraperJob() throws Exception {
-
         // setup a job to scrape allocation info
         AllocationScraperJob j = new AllocationScraperJob();
         j.setStatus( JobStatus.submitted );
@@ -107,12 +107,11 @@ public class ProcessorServiceTest {
 
         // verify that the job completed successfully
         Job jobVerify = dao.fetchJobById( jobId );
-        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+        assertEquals( JobStatus.completed, jobVerify.getStatus() );
     }
 
     @Test
     public void testUnpaidDepositReportJob() throws Exception {
-
         // setup the dependent job (no data)
         Job allocScraperJob = new AllocationScraperJob();
         allocScraperJob.setStatus( JobStatus.completed );
@@ -129,12 +128,11 @@ public class ProcessorServiceTest {
 
         // verify that the job completed successfully
         Job jobVerify = dao.fetchJobById( jobId );
-        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+        assertEquals( JobStatus.completed, jobVerify.getStatus() );
     }
 
     @Test
     public void testGroupBookingsReportJob() throws Exception {
-
         // setup the dependent job (no data)
         Job allocJob = new AllocationScraperJob();
         allocJob.setStatus( JobStatus.completed );
@@ -151,12 +149,11 @@ public class ProcessorServiceTest {
 
         // verify that the job completed successfully
         Job jobVerify = dao.fetchJobById( jobId );
-        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+        assertEquals( JobStatus.completed, jobVerify.getStatus() );
     }
 
     @Test
     public void testSplitRoomReservationReportJob() throws Exception {
-
         // setup the dependent job (no data)
         Job allocJob = new AllocationScraperJob();
         allocJob.setStatus( JobStatus.completed );
@@ -173,7 +170,7 @@ public class ProcessorServiceTest {
 
         // verify that the job completed successfully
         Job jobVerify = dao.fetchJobById( jobId );
-        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+        assertEquals( JobStatus.completed, jobVerify.getStatus() );
     }
 
     @Test
@@ -203,20 +200,15 @@ public class ProcessorServiceTest {
 
         // verify that the job completed successfully
         Job jobVerify = dao.fetchJobById( jobId );
-        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+        assertEquals( JobStatus.completed, jobVerify.getStatus() );
 
-        try {
+        assertThrows( EmptyResultDataAccessException.class, () -> {
             dao.fetchJobById( oldJobId ); // this should've been deleted
-            Assert.fail( "exception expected" );
-        }
-        catch ( EmptyResultDataAccessException ex ) {
-            // expected exception
-        }
+        } );
     }
     
     @Test
     public void testCreateDepositChargeJob() throws Exception {
-
         CreateDepositChargeJob j = new CreateDepositChargeJob();
         j.setStatus( JobStatus.submitted );
         j.setDaysBack( 3 );
@@ -264,7 +256,7 @@ public class ProcessorServiceTest {
     public void testDumpHostelworldBookingsByArrivalDateJob() throws Exception {
         Calendar checkinDate = Calendar.getInstance();
         checkinDate.add( Calendar.DATE, 12 );
-        for(int i = 0; i < 120; i++) {
+        for ( int i = 0; i < 120; i++ ) {
             DumpHostelworldBookingsByArrivalDateJob j = new DumpHostelworldBookingsByArrivalDateJob();
             j.setCheckinDate( checkinDate.getTime() );
             j.setStatus( JobStatus.submitted );
@@ -294,7 +286,6 @@ public class ProcessorServiceTest {
         j.setBookedDate( bookedDate.getTime() );
         j.setStatus( JobStatus.submitted );
         dao.insertJob( j );
-        
     }
 
     @Test
@@ -350,8 +341,8 @@ public class ProcessorServiceTest {
         PrepaidRefundJob j = new PrepaidRefundJob();
         j.setStatus( JobStatus.submitted );
         j.setReservationId( "70953983" );
-        j.setReason("Waived fees");
-        j.setAmount(new BigDecimal("91.08"));
+        j.setReason( "Waived fees" );
+        j.setAmount( new BigDecimal( "91.08" ) );
         dao.insertJob( j );
     }
 
@@ -400,7 +391,7 @@ public class ProcessorServiceTest {
     @Test
     public void testCreateAllocationScraperWorkerJob() throws Exception {
         // dumps all bookings between date range
-        LocalDate currentDate = LocalDate.parse("2018-05-25");
+        LocalDate currentDate = LocalDate.parse( "2018-05-25" );
         LocalDate endDate = LocalDate.parse( "2018-10-06" );
         while ( currentDate.isBefore( endDate ) ) {
             CloudbedsAllocationScraperWorkerJob workerJob = new CloudbedsAllocationScraperWorkerJob();
@@ -416,7 +407,7 @@ public class ProcessorServiceTest {
     @Test
     public void testCreateBookingReportJob() throws Exception {
         // dumps all bookings between date range
-        LocalDate currentDate = LocalDate.parse("2018-05-28");
+        LocalDate currentDate = LocalDate.parse( "2018-05-28" );
         LocalDate endDate = LocalDate.parse( "2018-10-23" );
         while ( currentDate.isBefore( endDate ) ) {
             BookingReportJob workerJob = new BookingReportJob();
@@ -482,8 +473,8 @@ public class ProcessorServiceTest {
         j.setReservationId( "10568885" );
         j.setEmailTemplate( CloudbedsScraper.TEMPLATE_COVID19_CLOSING );
         j.setReplacementMap( replaceMap );
-        Assert.assertEquals( "12.09", j.getReplacementMap().get( "\\[charge_amount\\]" ) );
-        Assert.assertEquals( "https://pay.here.now/CLKF285", j.getReplacementMap().get( "\\[payment URL\\]" ) );
+        assertEquals( "12.09", j.getReplacementMap().get( "\\[charge_amount\\]" ) );
+        assertEquals( "https://pay.here.now/CLKF285", j.getReplacementMap().get( "\\[payment URL\\]" ) );
         dao.insertJob( j );
     }
 
@@ -559,13 +550,12 @@ public class ProcessorServiceTest {
 
     @Test
     public void testCreateFixedRateReservationJob() throws Exception {
-
         // setup the job
         CreateFixedRateReservationJob j = new CreateFixedRateReservationJob();
         j.setStatus( JobStatus.submitted );
         j.setReservationId( "38059779" );
-        j.setCheckinDate( LocalDate.parse("2021-01-11") );
-        j.setCheckoutDate( LocalDate.parse("2021-01-18") );
+        j.setCheckinDate( LocalDate.parse( "2021-01-11" ) );
+        j.setCheckoutDate( LocalDate.parse( "2021-01-18" ) );
         j.setRatePerDay( new BigDecimal( 10 ) );
         int jobId = dao.insertJob( j );
 
@@ -574,7 +564,7 @@ public class ProcessorServiceTest {
 
         // verify that the job completed successfully
         Job jobVerify = dao.fetchJobById( jobId );
-        Assert.assertEquals( JobStatus.completed, jobVerify.getStatus() );
+        assertEquals( JobStatus.completed, jobVerify.getStatus() );
     }
 
     @Test
@@ -619,5 +609,4 @@ public class ProcessorServiceTest {
 //        j.setStatus( JobStatus.submitted );
 //        dao.insertJob( j );
 //    }
-//
 }

@@ -1,0 +1,132 @@
+services:
+  # Castle Rock Hostel
+  crh-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crh-processor
+    restart: unless-stopped
+    environment:
+      - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0
+      - SE_SCREEN_WIDTH=1920
+      - SE_SCREEN_HEIGHT=1080
+      - DISPLAY=:99
+      - SPRING_PROFILES_ACTIVE=crh
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
+    volumes:
+      - ./logs/crh:/app/logs
+      - ./credentials/crh_gmail:/app/credentials/gmail
+      - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
+    networks:
+      - macbackpackers-network
+    ulimits:
+      nofile:
+        soft: 32768
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "ps", "aux", "|", "grep", "java", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # High Street Hostel
+  hsh-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hsh-processor
+    restart: unless-stopped
+    environment:
+      - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0
+      - SE_SCREEN_WIDTH=1920
+      - SE_SCREEN_HEIGHT=1080
+      - DISPLAY=:99
+      - SPRING_PROFILES_ACTIVE=hsh
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
+    volumes:
+      - ./logs/hsh:/app/logs
+      - ./credentials/hsh_gmail:/app/credentials/gmail
+      - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
+    networks:
+      - macbackpackers-network
+    ulimits:
+      nofile:
+        soft: 32768
+        hard: 65536
+    healthcheck:
+      test: [ "CMD", "ps", "aux", "|", "grep", "java", "||", "exit", "1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Royal Mile Backpackers
+  rmb-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rmb-processor
+    restart: unless-stopped
+    environment:
+      - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0
+      - SE_SCREEN_WIDTH=1920
+      - SE_SCREEN_HEIGHT=1080
+      - DISPLAY=:99
+      - SPRING_PROFILES_ACTIVE=rmb
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
+    volumes:
+      - ./logs/rmb:/app/logs
+      - ./credentials/rmb_gmail:/app/credentials/gmail
+      - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
+    networks:
+      - macbackpackers-network
+    ulimits:
+      nofile:
+        soft: 32768
+        hard: 65536
+    healthcheck:
+      test: [ "CMD", "ps", "aux", "|", "grep", "java", "||", "exit", "1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Lochside Hostel
+  lsh-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lsh-processor
+    restart: unless-stopped
+    environment:
+      - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0
+      - SE_SCREEN_WIDTH=1920
+      - SE_SCREEN_HEIGHT=1080
+      - DISPLAY=:99
+      - SPRING_PROFILES_ACTIVE=lsh
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
+    volumes:
+      - ./logs/lsh:/app/logs
+      - ./credentials/rmb_gmail:/app/credentials/gmail
+      - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
+    networks:
+      - macbackpackers-network
+    ulimits:
+      nofile:
+        soft: 32768
+        hard: 65536
+    healthcheck:
+      test: [ "CMD", "ps", "aux", "|", "grep", "java", "||", "exit", "1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  macbackpackers-network:
+    driver: bridge

@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.time.FastDateFormat;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,12 +28,12 @@ public class AllocationListTest {
         alloc.setCheckoutDate( DATE_FORMAT_YYYY_MM_DD.parse( "2014-05-03" ) );
         alloc.setBookingSource( "MyAllocator" );
         alloc.setGuestName( "Rick Sanchez" );
-        alloc.setPaymentOutstanding( new BigDecimal("14.22" ) );
-        alloc.setPaymentTotal( new BigDecimal("28.81" ) );
+        alloc.setPaymentOutstanding( new BigDecimal( "14.22" ) );
+        alloc.setPaymentTotal( new BigDecimal( "28.81" ) );
         alloc.setViewed( true );
         LOGGER.info( alloc.getAsParameters().length + " parameters." );
         LOGGER.info( ToStringBuilder.reflectionToString( alloc.getAsParameters() ) );
-        
+
         AllocationList al = new AllocationList();
         al.add( alloc );
         al.add( alloc );

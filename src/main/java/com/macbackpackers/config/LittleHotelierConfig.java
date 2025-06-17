@@ -7,6 +7,7 @@ import java.lang.reflect.InvocationTargetException;
 import com.macbackpackers.dao.WordPressDAO;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.htmlunit.BrowserVersion;
 import org.htmlunit.FailingHttpStatusCodeException;
 import org.htmlunit.NicelyResynchronizingAjaxController;
@@ -38,7 +39,8 @@ import com.macbackpackers.services.BasicCardMask;
 @EnableTransactionManagement
 @ComponentScan( "com.macbackpackers" )
 @Import( DatabaseConfig.class )
-@PropertySource( "classpath:config.properties" )
+@PropertySource("classpath:application.properties")
+@PropertySource(value = "classpath:application-${spring.profiles.active}.properties")
 public class LittleHotelierConfig {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
@@ -201,7 +203,9 @@ public class LittleHotelierConfig {
 
     @Bean
     public GenericObjectPool<WebDriver> getWebDriverPool( LittleHotelierWebDriverFactory driverFactory ) {
-        GenericObjectPool<WebDriver> objectPool = new GenericObjectPool<WebDriver>( driverFactory );
+        GenericObjectPoolConfig config = new GenericObjectPoolConfig();
+        config.setJmxEnabled( false ); // avoid registering multiple beans with the same JMX name (GenericObjectPool); we don't use JMX anyways
+        GenericObjectPool<WebDriver> objectPool = new GenericObjectPool<>( driverFactory, config );
         objectPool.setBlockWhenExhausted( true );
         objectPool.setMaxTotal( 1 ); // only keep one around for now
         return objectPool;

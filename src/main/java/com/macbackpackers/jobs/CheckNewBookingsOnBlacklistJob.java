@@ -4,9 +4,9 @@ package com.macbackpackers.jobs;
 import com.macbackpackers.services.CloudbedsService;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import javax.persistence.DiscriminatorValue;
-import javax.persistence.Entity;
-import javax.persistence.Transient;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Transient;
 
 /**
  * Job that verifies if any new bookings are from guests on the blacklist and emails reception if so.
