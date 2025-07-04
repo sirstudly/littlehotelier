@@ -22,9 +22,9 @@ FROM selenium/standalone-chrome:latest
 # Switch to root to install Java and make system changes
 USER root
 
-# Install OpenJDK 17
+# Install OpenJDK 17 and SSH client
 RUN apt-get update && \
-    apt-get install -y openjdk-17-jre-headless && \
+    apt-get install -y openjdk-17-jre-headless openssh-client && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -37,11 +37,12 @@ WORKDIR /app
 # Copy the built JAR from the builder stage
 COPY --from=builder /app/target/lilhotelier.jar lilhotelier.jar
 
-# Create logs directory
-RUN mkdir -p logs
+# Create SSH directory structure for seluser
+RUN mkdir -p /home/seluser/.ssh && \
+    chmod 700 /home/seluser/.ssh
 
 # Change ownership to the selenium user
-RUN chown -R seluser:seluser /app
+RUN chown -R seluser:seluser /app /home/seluser/.ssh
 
 # Switch back to selenium user for security
 USER seluser
@@ -54,8 +55,11 @@ ENV DISPLAY=:99
 ENV SE_SCREEN_WIDTH=1920
 ENV SE_SCREEN_HEIGHT=1080
 
+# Set SSH key permissions (this will be done at runtime after volume mount)
+ENV SSH_KEY_PERMISSIONS_SET=false
+
 # Debug entry point - uncomment for debugging (sleep for 1 hour)
 #CMD ["sleep", "3600"]
 
 # Run the application with config directory and processor ID from environment
-CMD ["sh", "-c", "java -server $JAVA_OPTS -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE} -jar lilhotelier.jar com.macbackpackers.RunProcessor -S"]
+CMD ["sh", "-c", "chmod 600 /home/seluser/.ssh/mediatemple.net_rsa && java -server $JAVA_OPTS -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE} -jar lilhotelier.jar com.macbackpackers.RunProcessor -S"]
