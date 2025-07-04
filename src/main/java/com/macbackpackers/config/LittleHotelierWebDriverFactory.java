@@ -1,7 +1,7 @@
 
 package com.macbackpackers.config;
 
-import org.apache.commons.lang3.SystemUtils;
+import io.github.bonigarcia.wdm.WebDriverManager;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
@@ -31,13 +31,18 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
 
     @Override
     public WebDriver create() throws Exception {
-        System.setProperty( "webdriver.chrome.driver", getClass().getClassLoader().getResource(
-                SystemUtils.IS_OS_WINDOWS ? "chromedriver.exe" : "chromedriver" ).getPath().replace("/C:", "") ); // hack to remove drive designation on windows
+        // Use Chrome for Testing - WebDriverManager will automatically download and manage the correct ChromeDriver version
+        WebDriverManager.chromedriver().setup();
 
         ChromeOptions options = new ChromeOptions();
         List<String> optionValues = new ArrayList<>(Arrays.asList(chromeOptions.split( " " )));
         options.addArguments( optionValues.toArray(new String[optionValues.size()]) );
-//        options.setExperimentalOption("debuggerAddress", "127.0.0.1:9222");
+
+        // Use Chrome for Testing binary if specified
+        String chromeBinaryPath = System.getProperty("chrome.binary.path");
+        if (chromeBinaryPath != null && !chromeBinaryPath.isEmpty()) {
+            options.setBinary(chromeBinaryPath);
+        }
 
         ChromeDriver driver = new ChromeDriver( options );
 

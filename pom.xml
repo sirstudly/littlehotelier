@@ -69,7 +69,7 @@
         <dependency>
             <groupId>org.seleniumhq.selenium</groupId>
             <artifactId>selenium-java</artifactId>
-            <version>4.26.0</version>
+            <version>4.34.0</version>
         </dependency>
 
         <!-- only required for selenium 4 https://stackoverflow.com/a/71174201 -->
@@ -77,6 +77,13 @@
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>32.1.3-jre</version>
+        </dependency>
+
+        <!-- Chrome for Testing dependency -->
+        <dependency>
+            <groupId>io.github.bonigarcia</groupId>
+            <artifactId>webdrivermanager</artifactId>
+            <version>6.1.0</version>
         </dependency>
 
         <dependency>

@@ -38,7 +38,7 @@ import com.macbackpackers.services.BasicCardMask;
 @Configuration
 @EnableTransactionManagement
 @ComponentScan( "com.macbackpackers" )
-@Import( DatabaseConfig.class )
+@Import( { DatabaseConfig.class, ChromeForTestingConfig.class } )
 @PropertySource("classpath:application.properties")
 @PropertySource(value = "classpath:application-${spring.profiles.active}.properties")
 public class LittleHotelierConfig {
