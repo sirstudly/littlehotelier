@@ -22,7 +22,7 @@ import com.stripe.model.PaymentIntent;
 public class StripeTransaction {
 
     @Id
-    @GeneratedValue( strategy = GenerationType.AUTO )
+    @GeneratedValue( strategy = GenerationType.IDENTITY )
     @Column( name = "id", nullable = false )
     private int id;
 

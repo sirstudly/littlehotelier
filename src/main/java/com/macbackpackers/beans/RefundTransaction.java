@@ -18,7 +18,7 @@ import jakarta.persistence.Table;
 public class RefundTransaction {
 
     @Id
-    @GeneratedValue( strategy = GenerationType.AUTO )
+    @GeneratedValue( strategy = GenerationType.IDENTITY )
     @Column( name = "id", nullable = false )
     private int id;
 

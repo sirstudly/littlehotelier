@@ -15,7 +15,7 @@ import jakarta.persistence.Table;
 public class GuestCommentReportEntry {
 
     @Id
-    @GeneratedValue( strategy = GenerationType.AUTO )
+    @GeneratedValue( strategy = GenerationType.IDENTITY )
     @Column( name = "id", nullable = false )
     private int id;
 

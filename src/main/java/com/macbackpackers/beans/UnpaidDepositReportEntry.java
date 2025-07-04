@@ -21,7 +21,7 @@ public class UnpaidDepositReportEntry {
     private static final Pattern DATA_HREF_PATTERN = Pattern.compile( "reservations/(\\d*)/edit" );
     
     @Id
-    @GeneratedValue( strategy = GenerationType.AUTO )
+    @GeneratedValue( strategy = GenerationType.IDENTITY )
     @Column( name = "id", nullable = false )
     private int id;
 
