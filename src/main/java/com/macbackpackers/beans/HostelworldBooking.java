@@ -27,7 +27,7 @@ public class HostelworldBooking {
     public static final FastDateFormat DATE_FORMAT_BOOKED_DATE = FastDateFormat.getInstance( "dd MMM yyyy" );
 
     @Id
-    @GeneratedValue( strategy = GenerationType.AUTO )
+    @GeneratedValue( strategy = GenerationType.IDENTITY )
     @Column( name = "id", nullable = false )
     private int id;
 
