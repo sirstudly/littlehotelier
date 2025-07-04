@@ -34,9 +34,9 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
@@ -490,12 +490,10 @@ public class GmailService {
      */
     public GoogleClientSecrets getGmailClientSecret() throws IOException {
         // Load client secrets.
-        InputStream in = getClass().getClassLoader().getResourceAsStream( oauthClientIdFile );
-        if( in == null ) {
+        File file = new File( oauthClientIdFile );
+        if( !file.exists() ) {
             throw new FileNotFoundException( "Unable to find OAuth client id file: " + oauthClientIdFile );
         }
-        GoogleClientSecrets clientSecrets =
-                GoogleClientSecrets.load( JSON_FACTORY, new InputStreamReader( in ) );
-        return clientSecrets;
+        return GoogleClientSecrets.load( JSON_FACTORY, new InputStreamReader( new FileInputStream( file ) ) );
     }
 }
