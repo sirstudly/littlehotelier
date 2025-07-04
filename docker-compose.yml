@@ -17,8 +17,8 @@ services:
       - ./logs/crh:/app/logs
       - ./credentials/crh_gmail:/app/credentials/gmail
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
-      - ./credentials/ssh/config:/home/seluser/.ssh/config:ro
-      - ./credentials/ssh/mediatemple.net_rsa:/home/seluser/.ssh/mediatemple.net_rsa:ro
+      - ./credentials/ssh/config:/home/seluser/.ssh/config
+      - ./credentials/ssh/mediatemple.net_rsa:/home/seluser/.ssh/mediatemple.net_rsa
     networks:
       - macbackpackers-network
     ulimits:
@@ -50,8 +50,8 @@ services:
       - ./logs/hsh:/app/logs
       - ./credentials/hsh_gmail:/app/credentials/gmail
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
-      - ./credentials/ssh/config:/home/seluser/.ssh/config:ro
-      - ./credentials/ssh/mediatemple.net_rsa:/home/seluser/.ssh/mediatemple.net_rsa:ro
+      - ./credentials/ssh/config:/home/seluser/.ssh/config
+      - ./credentials/ssh/mediatemple.net_rsa:/home/seluser/.ssh/mediatemple.net_rsa
     networks:
       - macbackpackers-network
     ulimits:
@@ -83,8 +83,8 @@ services:
       - ./logs/rmb:/app/logs
       - ./credentials/rmb_gmail:/app/credentials/gmail
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
-      - ./credentials/ssh/config:/home/seluser/.ssh/config:ro
-      - ./credentials/ssh/mediatemple.net_rsa:/home/seluser/.ssh/mediatemple.net_rsa:ro
+      - ./credentials/ssh/config:/home/seluser/.ssh/config
+      - ./credentials/ssh/mediatemple.net_rsa:/home/seluser/.ssh/mediatemple.net_rsa
     networks:
       - macbackpackers-network
     ulimits:
@@ -116,8 +116,8 @@ services:
       - ./logs/lsh:/app/logs
       - ./credentials/rmb_gmail:/app/credentials/gmail
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
-      - ./credentials/ssh/config:/home/seluser/.ssh/config:ro
-      - ./credentials/ssh/mediatemple.net_rsa:/home/seluser/.ssh/mediatemple.net_rsa:ro
+      - ./credentials/ssh/config:/home/seluser/.ssh/config
+      - ./credentials/ssh/mediatemple.net_rsa:/home/seluser/.ssh/mediatemple.net_rsa
     networks:
       - macbackpackers-network
     ulimits:

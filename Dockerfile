@@ -62,4 +62,4 @@ ENV SSH_KEY_PERMISSIONS_SET=false
 #CMD ["sleep", "3600"]
 
 # Run the application with config directory and processor ID from environment
-CMD ["sh", "-c", "chmod 600 /home/seluser/.ssh/mediatemple.net_rsa && java -server $JAVA_OPTS -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE} -jar lilhotelier.jar com.macbackpackers.RunProcessor -S"]
+CMD ["sh", "-c", "chown seluser:seluser /home/seluser/.ssh/* && java -server $JAVA_OPTS -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE} -jar lilhotelier.jar com.macbackpackers.RunProcessor -S"]
