@@ -19,7 +19,6 @@ services:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
-      - /dev/shm:/dev/shm
     networks:
       - macbackpackers-network
     deploy:
@@ -59,7 +58,6 @@ services:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
-      - /dev/shm:/dev/shm
     networks:
       - macbackpackers-network
     deploy:
@@ -99,7 +97,6 @@ services:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
-      - /dev/shm:/dev/shm
     networks:
       - macbackpackers-network
     deploy:
@@ -139,7 +136,6 @@ services:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
-      - /dev/shm:/dev/shm
     networks:
       - macbackpackers-network
     deploy:

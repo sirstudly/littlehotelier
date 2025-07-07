@@ -76,9 +76,6 @@ ENV SSH_KEY_PERMISSIONS_SET=false
 # Set Chrome for Testing binary path
 ENV CHROME_BINARY_PATH=/usr/bin/google-chrome-stable
 
-# Create tmpfs mount point for Chrome shared memory
-RUN mkdir -p /dev/shm && chmod 1777 /dev/shm
-
 # Debug entry point - uncomment for debugging (sleep for 1 hour)
 #CMD ["sleep", "3600"]
 
