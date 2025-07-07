@@ -19,8 +19,15 @@ services:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
+      - /dev/shm:/dev/shm
     networks:
       - macbackpackers-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
     ulimits:
       nofile:
         soft: 32768
@@ -52,8 +59,15 @@ services:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
+      - /dev/shm:/dev/shm
     networks:
       - macbackpackers-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
     ulimits:
       nofile:
         soft: 32768
@@ -85,8 +99,15 @@ services:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
+      - /dev/shm:/dev/shm
     networks:
       - macbackpackers-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
     ulimits:
       nofile:
         soft: 32768
@@ -118,8 +139,15 @@ services:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
+      - /dev/shm:/dev/shm
     networks:
       - macbackpackers-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
     ulimits:
       nofile:
         soft: 32768
