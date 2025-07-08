@@ -3,6 +3,10 @@ package com.macbackpackers.config;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import com.macbackpackers.dao.WordPressDAO;
 import org.apache.commons.lang3.time.FastDateFormat;
@@ -28,6 +32,7 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.context.annotation.Scope;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
@@ -211,4 +216,35 @@ public class LittleHotelierConfig {
         return objectPool;
     }
 
+    /**
+     * Shared thread pool for I/O-bound operations like HTTP requests.
+     * This pool is optimized for network operations and is reused across
+     * multiple service calls.
+     */
+    @Bean( name = "ioThreadPool" )
+    public ExecutorService getIoThreadPool( @Value( "${io.thread.pool.size:8}" ) int poolSize ) {
+        // Use a fixed thread pool with configurable size
+        // For I/O-bound operations, we can have more threads than CPU cores
+        ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool( poolSize );
+
+        // Configure the thread pool for better performance
+        executor.setKeepAliveTime( 60, TimeUnit.SECONDS );
+
+        // Add shutdown hook to properly close the thread pool
+        Runtime.getRuntime().addShutdownHook( new Thread( () -> {
+            LOGGER.info( "Shutting down I/O thread pool..." );
+            executor.shutdown();
+            try {
+                if ( !executor.awaitTermination( 30, TimeUnit.SECONDS ) ) {
+                    executor.shutdownNow();
+                }
+            }
+            catch ( InterruptedException e ) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        } ) );
+
+        return executor;
+    }
 }

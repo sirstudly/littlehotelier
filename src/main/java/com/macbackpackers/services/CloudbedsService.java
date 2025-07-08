@@ -35,7 +35,6 @@ import com.macbackpackers.scrapers.CloudbedsJsonRequestFactory;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
-import com.macbackpackers.utils.MDCUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -79,11 +78,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
 
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED;
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER;
@@ -134,8 +138,15 @@ public class CloudbedsService {
     @Autowired
     AutowireCapableBeanFactory autowireBeanFactory;
 
+    @Autowired
+    @Qualifier("ioThreadPool")
+    private ExecutorService ioThreadPool;
+
     @Value( "${hostelworld.latecancellation.hours:48}" )
     private int HWL_LATE_CANCEL_HOURS;
+
+    @Value( "${cloudbeds.request.timeout:30}" )
+    private int requestTimeout;
 
     private final DateTimeFormatter DD_MMM_YYYY = DateTimeFormatter.ofPattern( "dd-MMM-yyyy" );
 
@@ -155,13 +166,31 @@ public class CloudbedsService {
     public void dumpAllocationsFrom( WebClient webClient, int jobId, LocalDate startDate, LocalDate endDate ) throws IOException {
         var mdcContext = MDC.getCopyOfContextMap();
         try {
-            List<Allocation> allocations = Collections.synchronizedList( new ArrayList<>() ); // converted reservations to allocations
-            List<GuestCommentReportEntry> guestComments = scraper.getReservations( webClient, startDate, endDate ).parallelStream()
-                    .map( MDCUtils.wrapWithMDC( c -> scraper.getReservationRetry( webClient, c.getId() ) ) )
-                    .peek( r -> allocations.addAll( reservationToAllocation( jobId, r ) ) )
-                    .filter( r -> StringUtils.isNotBlank( r.getSpecialRequests() ) )
-                    .map( r -> new GuestCommentReportEntry( Integer.parseInt( r.getReservationId() ), r.getSpecialRequests() ) )
-                    .collect( Collectors.toList() );
+            List<Allocation> allocations = Collections.synchronizedList( new ArrayList<>() );
+            List<GuestCommentReportEntry> guestComments = Collections.synchronizedList( new ArrayList<>() );
+
+            // Get reservations list for parallel processing
+            List<Future<List<Allocation>>> futures = scraper.getReservations( webClient, startDate, endDate ).stream()
+                    .map( customer -> ioThreadPool.submit( () -> {
+                        Reservation reservation = scraper.getReservationRetry( webClient, customer.getId() );
+                        return reservationToAllocation( jobId, reservation );
+                    } ) )
+                    .toList();
+
+            // Collect results - if ANY fail, the entire operation fails
+            for ( Future<List<Allocation>> future : futures ) {
+                try {
+                    List<Allocation> result = future.get( requestTimeout, TimeUnit.SECONDS ); // Configurable timeout per request
+                    allocations.addAll( result );
+                    result.stream()
+                            .filter( a -> StringUtils.isNotBlank( a.getComments() ) )
+                            .forEach( a -> guestComments.add( new GuestCommentReportEntry( a.getReservationId(), a.getComments() ) ) );
+                }
+                catch ( TimeoutException | InterruptedException | ExecutionException e ) {
+                    LOGGER.error( "Error retrieving reservation", e );
+                    throw new IOException( "Error retrieving reservation", e );
+                }
+            }
 
             dao.insertAllocations( new AllocationList( allocations ) );
             dao.updateGuestCommentsForReservations( guestComments );
