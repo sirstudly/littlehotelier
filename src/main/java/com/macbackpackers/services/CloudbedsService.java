@@ -146,7 +146,7 @@ public class CloudbedsService {
     @Value( "${hostelworld.latecancellation.hours:48}" )
     private int HWL_LATE_CANCEL_HOURS;
 
-    @Value( "${cloudbeds.request.timeout:30}" )
+    @Value( "${cloudbeds.request.timeout:60}" )
     private int requestTimeout;
 
     private final DateTimeFormatter DD_MMM_YYYY = DateTimeFormatter.ofPattern( "dd-MMM-yyyy" );
