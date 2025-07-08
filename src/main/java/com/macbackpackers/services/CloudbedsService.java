@@ -95,6 +95,7 @@ import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_NON_REFUNDAB
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_DECLINED;
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_LINK;
 import static com.macbackpackers.services.PaymentProcessorService.CHARGE_REMAINING_BALANCE_NOTE;
+import static com.macbackpackers.utils.MDCUtils.wrapWithMDC;
 
 @Service
 public class CloudbedsService {
@@ -171,10 +172,10 @@ public class CloudbedsService {
 
             // Get reservations list for parallel processing
             List<Future<List<Allocation>>> futures = scraper.getReservations( webClient, startDate, endDate ).stream()
-                    .map( customer -> ioThreadPool.submit( () -> {
+                    .map( customer -> ioThreadPool.submit( wrapWithMDC( mdcContext, () -> {
                         Reservation reservation = scraper.getReservationRetry( webClient, customer.getId() );
                         return reservationToAllocation( jobId, reservation );
-                    } ) )
+                    } ) ) )
                     .toList();
 
             // Collect results - if ANY fail, the entire operation fails

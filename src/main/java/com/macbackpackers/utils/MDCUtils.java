@@ -2,6 +2,7 @@ package com.macbackpackers.utils;
 
 import org.slf4j.MDC;
 
+import java.util.Map;
 import java.util.function.Function;
 
 public class MDCUtils {
@@ -27,6 +28,26 @@ public class MDCUtils {
             }
             finally {
                 MDC.clear(); // Clear MDC context after execution
+            }
+        };
+    }
+
+    /**
+     * Wraps a task with MDC context propagation for thread pool execution.
+     * This ensures that logging in child threads includes the parent thread's MDC context.
+     *
+     * @param mdcContext the MDC context to propagate
+     * @param task       the task to execute
+     * @return the wrapped task
+     */
+    public static <T> java.util.concurrent.Callable<T> wrapWithMDC( Map<String, String> mdcContext, java.util.concurrent.Callable<T> task ) {
+        return () -> {
+            MDC.setContextMap( mdcContext );
+            try {
+                return task.call();
+            }
+            finally {
+                MDC.clear();
             }
         };
     }
