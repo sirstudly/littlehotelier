@@ -179,6 +179,7 @@ public class CloudbedsService {
                     .toList();
 
             // Collect results - if ANY fail, the entire operation fails
+            boolean hasError = false;
             for ( Future<List<Allocation>> future : futures ) {
                 try {
                     List<Allocation> result = future.get( requestTimeout, TimeUnit.SECONDS ); // Configurable timeout per request
@@ -189,8 +190,19 @@ public class CloudbedsService {
                 }
                 catch ( TimeoutException | InterruptedException | ExecutionException e ) {
                     LOGGER.error( "Error retrieving reservation", e );
-                    throw new IOException( "Error retrieving reservation", e );
+                    hasError = true;
+                    break; // Exit the loop on first error
                 }
+            }
+
+            // If there was an error, cancel all remaining futures and throw exception
+            if ( hasError ) {
+                for ( Future<List<Allocation>> future : futures ) {
+                    if ( !future.isDone() ) {
+                        future.cancel( true ); // Cancel running tasks
+                    }
+                }
+                throw new IOException( "Error retrieving reservation - operation rolled back" );
             }
 
             dao.insertAllocations( new AllocationList( allocations ) );
