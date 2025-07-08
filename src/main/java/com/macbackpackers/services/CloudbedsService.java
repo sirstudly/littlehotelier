@@ -146,9 +146,6 @@ public class CloudbedsService {
     @Value( "${hostelworld.latecancellation.hours:48}" )
     private int HWL_LATE_CANCEL_HOURS;
 
-    @Value( "${cloudbeds.request.timeout:60}" )
-    private int requestTimeout;
-
     private final DateTimeFormatter DD_MMM_YYYY = DateTimeFormatter.ofPattern( "dd-MMM-yyyy" );
 
     // all allowable characters for lookup key
@@ -182,6 +179,7 @@ public class CloudbedsService {
             boolean hasError = false;
             for ( Future<List<Allocation>> future : futures ) {
                 try {
+                    int requestTimeout = Integer.parseInt( dao.getDefaultOption( "hbo_cloudbeds_request_timeout", "300" ) );
                     List<Allocation> result = future.get( requestTimeout, TimeUnit.SECONDS ); // Configurable timeout per request
                     allocations.addAll( result );
                     result.stream()
