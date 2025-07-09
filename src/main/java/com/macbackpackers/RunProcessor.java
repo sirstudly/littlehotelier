@@ -165,7 +165,6 @@ public class RunProcessor
         ( (DefaultConversionService) DefaultConversionService.getSharedInstance() ).addConverter( new AnyByteStringToStringConverter() );
 
         TimeZone.setDefault( TimeZone.getTimeZone( "Europe/London" ) );
-        System.setProperty( "jsse.enableSNIExtension", "false" ); // ignore SNI (enabled by default) javax.net.ssl.SSLProtocolException: handshake alert:  unrecognized_name
         LOGGER.info( "Starting processor... " + new Date() );
         ConfigurableApplicationContext context = SpringApplication.run( RunProcessor.class, args );
 
