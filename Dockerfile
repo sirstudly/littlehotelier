@@ -63,7 +63,7 @@ RUN chown -R appuser:appuser /app /home/appuser/.ssh
 USER appuser
 
 # Set JVM options for containerized environment
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 
 # Selenium configuration for headless Chrome
 ENV DISPLAY=:99
