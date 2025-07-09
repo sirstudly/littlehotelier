@@ -63,7 +63,7 @@ RUN chown -R appuser:appuser /app /home/appuser/.ssh
 USER appuser
 
 # Set JVM options for containerized environment
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+OptimizeStringConcat -XX:+UseCompressedOops -XX:+UseCompressedClassPointers -Djsse.enableSNIExtension=false -Dhttps.protocols=TLSv1.2,TLSv1.3 -Djavax.net.ssl.sessionCacheSize=0"
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0
 
 # Selenium configuration for headless Chrome
 ENV DISPLAY=:99
@@ -80,4 +80,4 @@ ENV CHROME_BINARY_PATH=/usr/bin/google-chrome-stable
 #CMD ["sleep", "3600"]
 
 # Run the application with config directory and processor ID from environment
-CMD ["sh", "-c", "java -server $JAVA_OPTS -Dchrome.binary.path=$CHROME_BINARY_PATH -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE} -jar lilhotelier.jar com.macbackpackers.RunProcessor -S"]
+CMD ["sh", "-c", "java -server $JAVA_OPTS -Dchrome.binary.path=$CHROME_BINARY_PATH -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE} -Djsse.enableSNIExtension=false -jar lilhotelier.jar com.macbackpackers.RunProcessor -S"]
