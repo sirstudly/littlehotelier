@@ -80,4 +80,4 @@ ENV CHROME_BINARY_PATH=/usr/bin/google-chrome-stable
 #CMD ["sleep", "3600"]
 
 # Run the application with config directory and processor ID from environment
-CMD ["sh", "-c", "java -server $JAVA_OPTS -Dchrome.binary.path=$CHROME_BINARY_PATH -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE} -Djsse.enableSNIExtension=false -jar lilhotelier.jar com.macbackpackers.RunProcessor -S"]
+CMD ["sh", "-c", "java -server $JAVA_OPTS -Dchrome.binary.path=$CHROME_BINARY_PATH -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE} -jar lilhotelier.jar com.macbackpackers.RunProcessor -S"]
