@@ -69,6 +69,7 @@ public class LittleHotelierConfig {
         webClient.getOptions().setCssEnabled( false );
         webClient.getOptions().setRedirectEnabled( true );
         webClient.getOptions().setUseInsecureSSL( true );
+        webClient.getOptions().setSSLInsecureProtocol( "TLSv1.2" ); // Set SSL options that help with handshake issues
         webClient.setAjaxController( new NicelyResynchronizingAjaxController() );
         webClient.getOptions().setTimeout( 60000 );
         webClient.setJavaScriptTimeout( 60000 );
@@ -86,6 +87,7 @@ public class LittleHotelierConfig {
         webClient.getOptions().setThrowExceptionOnScriptError( false );
         webClient.getOptions().setCssEnabled( true );
         webClient.getOptions().setUseInsecureSSL( true );
+        webClient.getOptions().setSSLInsecureProtocol( "TLSv1.2" );
         webClient.setAjaxController( new NicelyResynchronizingAjaxController() );
         webClient.addWebWindowListener( new WebWindowListener() {
             @Override
@@ -124,6 +126,7 @@ public class LittleHotelierConfig {
         webClient.getOptions().setThrowExceptionOnScriptError( false );
         webClient.getOptions().setCssEnabled( false );
         webClient.getOptions().setUseInsecureSSL( true );
+        webClient.getOptions().setSSLInsecureProtocol( "TLSv1.2" );
         return webClient;
     }
 
@@ -155,6 +158,7 @@ public class LittleHotelierConfig {
         webClient.getOptions().setCssEnabled( false );
         webClient.getOptions().setUseInsecureSSL( true );
         webClient.getOptions().setFetchPolyfillEnabled( true );
+        webClient.getOptions().setSSLInsecureProtocol( "TLSv1.2" );
         return webClient;
     }
 
