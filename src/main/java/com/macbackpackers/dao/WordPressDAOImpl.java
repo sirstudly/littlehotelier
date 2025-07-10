@@ -318,7 +318,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "   AND processedBy LIKE :processedBy" )
                 .setParameter( "submitted", JobStatus.submitted )
                 .setParameter( "processing", JobStatus.processing )
-                .setParameter( "processedBy", this.processorId + "%" )
+                .setParameter( "processedBy", this.processorId + "-%" )
                 .setParameter( "now", new Timestamp( System.currentTimeMillis() ) )
                 .executeUpdate();
     }
