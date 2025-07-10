@@ -196,6 +196,11 @@ public interface WordPressDAO {
     void resetAllProcessingJobsToFailed();
 
     /**
+     * Updates all job statuses of 'processing' to 'submitted' for this processorId.
+     */
+    void resetAllProcessingJobsToSubmitted();
+
+    /**
      * Returns the first job with a state of 'submitted' and by virtue of having selecting it, sets
      * the status to 'processing'. Additional side effect: when picking up the next job to process;
      * if it is dependent on another job at failed/aborted, it will set the status of this job to

@@ -309,6 +309,21 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public void resetAllProcessingJobsToSubmitted() {
+        em.createQuery(
+                "UPDATE AbstractJob "
+                        + "   SET status = :submitted, "
+                        + "       lastUpdatedDate = :now"
+                        + " WHERE status = :processing "
+                        + "   AND processedBy LIKE :processedBy" )
+                .setParameter( "submitted", JobStatus.submitted )
+                .setParameter( "processing", JobStatus.processing )
+                .setParameter( "processedBy", this.processorId + "%" )
+                .setParameter( "now", new Timestamp( System.currentTimeMillis() ) )
+                .executeUpdate();
+    }
+
+    @Override
     public synchronized AbstractJob getNextJobToProcess() {
         // shutdown job has priority if present
         // include any jobs that have been tagged as processing by us

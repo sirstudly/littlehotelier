@@ -1,6 +1,7 @@
 
 package com.macbackpackers;
 
+import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.ShutdownException;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.ProcessorService;
@@ -40,6 +41,9 @@ public class RunProcessor
 
     @Autowired
     private FileService fileService;
+
+    @Autowired
+    private WordPressDAO dao;
 
     @Autowired
     private GenericObjectPool<WebDriver> webDriverObjectPool;
@@ -85,7 +89,7 @@ public class RunProcessor
      */
     public void runInServerMode() throws Exception {
         acquireLock();
-//        dao.resetAllProcessingJobsToFailed();
+        dao.resetAllProcessingJobsToSubmitted();
 //        scheduler.reloadScheduledJobs(); // load and start the scheduler
         processorService.processJobsLoopIndefinitely();
     }
@@ -97,7 +101,7 @@ public class RunProcessor
     public void runInStandardMode() throws Exception {
         acquireLock();
         processorService.initCloudbeds();
-//        dao.resetAllProcessingJobsToFailed();
+        dao.resetAllProcessingJobsToSubmitted();
         processorService.createOverdueScheduledJobs();
 
         try {
