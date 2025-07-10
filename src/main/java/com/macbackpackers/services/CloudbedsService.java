@@ -180,7 +180,7 @@ public class CloudbedsService {
             for ( Future<List<Allocation>> future : futures ) {
                 try {
                     // we need a fairly long timeout; cloudbeds could take a while when multiple requests are sent off at the same time
-                    int requestTimeout = Integer.parseInt( dao.getDefaultOption( "hbo_cloudbeds_request_timeout", "600" ) );
+                    int requestTimeout = Integer.parseInt( dao.getDefaultOption( "hbo_cloudbeds_request_timeout", "900" ) );
                     List<Allocation> result = future.get( requestTimeout, TimeUnit.SECONDS ); // Configurable timeout per request
                     allocations.addAll( result );
                     result.stream()
