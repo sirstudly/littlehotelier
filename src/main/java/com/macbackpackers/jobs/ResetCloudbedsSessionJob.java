@@ -23,10 +23,4 @@ public class ResetCloudbedsSessionJob extends AbstractJob {
     public void processJob() throws Exception {
         scraper.loginToCloudbedsAndSaveSession();
     }
-
-    @Override
-    public int getRetryCount() {
-        return 1;
-    }
-
 }

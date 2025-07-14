@@ -255,6 +255,32 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public void updateJobStatusToRetry( int jobId ) {
+        AbstractJob job = fetchJobById( jobId );
+        if ( JobStatus.processing != job.getStatus() ) {
+            throw new IncorrectNumberOfRecordsUpdatedException(
+                    "Previous job " + jobId + " status is " + job.getStatus() + " when attempting to set to retry" );
+        }
+
+        String retryCount = job.getParameter( "retry_count_remaining" );
+        if ( retryCount == null ) {
+            // set default number of retries to 5
+            job.setParameter( "retry_count_remaining", "5" );
+            updateJobStatus( job, JobStatus.retry );
+        }
+        else {
+            int retries = Integer.parseInt( retryCount ) - 1;
+            if ( retries < 0 ) {
+                updateJobStatus( job, JobStatus.failed );
+            }
+            else {
+                job.setParameter( "retry_count_remaining", Integer.toString( retries ) );
+            }
+        }
+        updateJobStatus( job, JobStatus.retry );
+    }
+
+    @Override
     @Deprecated
     public boolean updateJobStatusToProcessing( int jobId ) {
         // there should only be 1 row updated
@@ -332,12 +358,13 @@ public class WordPressDAOImpl implements WordPressDAO {
         LOGGER.info( "Getting next job for " + thisProcessorId );
         List<Integer> jobs = em
                 .createQuery( "SELECT id FROM AbstractJob "
-                        + "     WHERE status = :submittedStatus "
+                        + "     WHERE status IN (:submittedStatus, :retryStatus) "
                         + "        OR (status = :processingStatus AND processedBy = :processedBy)"
                         + "     ORDER BY CASE WHEN classname = 'com.macbackpackers.jobs.ShutdownJob' THEN 0 ELSE 1 END, id",
                         Integer.class )
                 .setParameter( "submittedStatus", JobStatus.submitted )
                 .setParameter( "processingStatus", JobStatus.processing )
+                .setParameter( "retryStatus", JobStatus.retry )
                 // processedBy includes name of current thread
                 // if we terminated the job prematurely (and are now re-running it)
                 // this will eventually be picked up by the same thread and be run again
@@ -350,6 +377,7 @@ public class WordPressDAOImpl implements WordPressDAO {
             for ( Job dependentJob : job.getDependentJobs() ) {
                 switch ( dependentJob.getStatus() ) {
                     case submitted:
+                    case retry:
                     case processing:
                         continue forAllJobs; // need to wait until parent job finishes
                     case failed:

@@ -25,11 +25,14 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.sql.Timestamp;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
 public class ProcessorService {
@@ -157,10 +160,10 @@ public class ProcessorService {
             processCloudbedsResetLoginJobs();
             String failedLoginCountStr = dao.getOptionNoCache( "hbo_failed_logins" );
             int failedLoginCount = failedLoginCountStr == null ? 0 : Integer.parseInt( failedLoginCountStr );
-            if ( failedLoginCount == 3 ) {
+            if ( failedLoginCount == 10 ) {
                 createAndRunResetCloudbedsLoginJob();
             }
-            else if ( failedLoginCount == 5 ) {
+            else if ( failedLoginCount == 20 ) {
                 String supportEmail = dao.getOption( "hbo_support_email" );
                 if ( supportEmail != null ) {
                     try {
@@ -239,6 +242,11 @@ public class ProcessorService {
                 LOGGER.info( "Finished job " + job.getId() );
                 dao.updateJobStatus( job.getId(), JobStatus.completed, JobStatus.processing );
                 break; // break out of retry loop
+            }
+            catch ( SocketException | TimeoutException | UnknownHostException ex ) {
+                // catch SNI errors and random connection errors and retry later
+                LOGGER.info( "Connection error on job " + job.getId() + ". Setting status to RETRY" );
+                dao.updateJobStatusToRetry( job.getId() );
             }
             catch ( Throwable ex ) {
                 LOGGER.error( "Error occurred when running " + getClass().getSimpleName() + " id: " + job.getId(), ex );

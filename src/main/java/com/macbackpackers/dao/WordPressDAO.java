@@ -177,7 +177,14 @@ public interface WordPressDAO {
      * @throws EmptyResultDataAccessException if record not found
      */
     void updateJobStatus( int jobId, JobStatus status ) throws EmptyResultDataAccessException;
-    
+
+    /**
+     * Updates the status of the given job to 'retry' or 'failed' if the number of retries is exceeded.
+     * 
+     * @param jobId PK of job
+     */
+    void updateJobStatusToRetry( int jobId );
+
     /**
      * Updates the given job from 'submitted' to 'processing' and sets the jobStartDate and
      * jobEndDate. If the job is already at processing and the "processedBy" field matches this
