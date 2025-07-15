@@ -19,6 +19,7 @@ import com.macbackpackers.beans.cloudbeds.responses.Guest;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.exceptions.IORuntimeException;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.exceptions.PaymentPendingException;
@@ -58,6 +59,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+import java.util.Objects;
 
 @Component
 public class CloudbedsScraper {
@@ -254,7 +256,7 @@ public class CloudbedsScraper {
         for ( int i = 0 ; i < MAX_RETRY ; i++ ) {
             try {
                 Reservation r = getReservation( webClient, reservationId );
-                LOGGER.info( StringUtils.defaultString( r.getThirdPartyIdentifier(), r.getIdentifier() ) + ": " + r.getFirstName() + " " + r.getLastName() );
+                LOGGER.info( Objects.toString( r.getThirdPartyIdentifier(), r.getIdentifier() ) + ": " + r.getFirstName() + " " + r.getLastName() );
                 LOGGER.info( "Source: " + r.getSourceName() );
                 LOGGER.info( "Status: " + r.getStatus() );
                 LOGGER.info( "Checkin: " + r.getCheckinDate() );
@@ -267,7 +269,7 @@ public class CloudbedsScraper {
                 LOGGER.error( "Failed to retrieve reservation " + reservationId, ex );
             }
         }
-        throw new UnrecoverableFault( "Max attempts made to retrieve reservation " + reservationId );
+        throw new IORuntimeException( "Max attempts made to retrieve reservation " + reservationId );
     }
 
     /**

@@ -75,6 +75,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -1820,7 +1821,7 @@ public class CloudbedsService {
         String newReservationData = IOUtils.toString( CloudbedsService.class.getClassLoader()
                 .getResourceAsStream( "add_reservation_data.json" ), StandardCharsets.UTF_8 )
                 .replace( "__SOURCE_ID__", r.getSelectedSource().getId() )
-                .replace( "__SOURCE_NAME__", StringUtils.defaultString( r.getSelectedSource().getName(), r.getSelectedSource().getSubSource() ) )
+                .replace( "__SOURCE_NAME__", Objects.toString( r.getSelectedSource().getName(), r.getSelectedSource().getSubSource() ) )
                 .replace( "__IS_ROOT_SOURCE__", r.getIsRootSource() )
                 .replace( "__ORIGINAL_SOURCE_ID__", String.valueOf( r.getSelectedSource().getOriginalId() ) )
                 .replace( "__SOURCE_PARENT_ID__", String.valueOf( r.getSelectedSource().getParentId() ) )

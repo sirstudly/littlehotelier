@@ -4,6 +4,7 @@ package com.macbackpackers.services;
 import com.macbackpackers.beans.JobParameter;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.exceptions.IORuntimeException;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -25,8 +26,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.sql.Timestamp;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -243,7 +242,7 @@ public class ProcessorService {
                 dao.updateJobStatus( job.getId(), JobStatus.completed, JobStatus.processing );
                 break; // break out of retry loop
             }
-            catch ( SocketException | TimeoutException | UnknownHostException ex ) {
+            catch ( IOException | TimeoutException | IORuntimeException ex ) {
                 // catch SNI errors and random connection errors and retry later
                 LOGGER.info( "Connection error on job " + job.getId() + ". Setting status to RETRY" );
                 dao.updateJobStatusToRetry( job.getId() );
