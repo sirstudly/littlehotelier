@@ -275,9 +275,9 @@ public class WordPressDAOImpl implements WordPressDAO {
             }
             else {
                 job.setParameter( "retry_count_remaining", Integer.toString( retries ) );
+                updateJobStatus( job, JobStatus.retry );
             }
         }
-        updateJobStatus( job, JobStatus.retry );
     }
 
     @Override

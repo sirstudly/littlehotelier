@@ -242,19 +242,22 @@ public class ProcessorService {
                 dao.updateJobStatus( job.getId(), JobStatus.completed, JobStatus.processing );
                 break; // break out of retry loop
             }
-            catch ( IOException | TimeoutException | IORuntimeException ex ) {
-                // catch SNI errors and random connection errors and retry later
-                LOGGER.info( "Connection error on job " + job.getId() + ". Setting status to RETRY" );
-                dao.updateJobStatusToRetry( job.getId() );
-            }
             catch ( Throwable ex ) {
                 LOGGER.error( "Error occurred when running " + getClass().getSimpleName() + " id: " + job.getId(), ex );
 
                 // if we're on our last retry, fail this job
                 if ( i == job.getRetryCount() - 1 ) {
-                    LOGGER.error( "Maximum number of attempts reached. Job " + job.getId() + " failed" );
-                    dao.updateJobStatus( job.getId(), JobStatus.failed, JobStatus.processing );
-                    emailJobFailureToSupport( job, ex );
+
+                    // catch SNI errors and random connection errors and retry later
+                    if ( ex instanceof IOException || ex instanceof TimeoutException || ex instanceof IORuntimeException ) {
+                        LOGGER.info( "Maximum number of attempts reached. Connection error on job " + job.getId() + ". Setting status to RETRY" );
+                        dao.updateJobStatusToRetry( job.getId() );
+                    }
+                    else {
+                        LOGGER.error( "Maximum number of attempts reached. Job " + job.getId() + " failed" );
+                        dao.updateJobStatus( job.getId(), JobStatus.failed, JobStatus.processing );
+                        emailJobFailureToSupport( job, ex );
+                    }
                 }
                 else { // wait a bit and try again
                     try {
