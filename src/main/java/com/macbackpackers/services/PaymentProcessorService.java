@@ -73,6 +73,7 @@ public class PaymentProcessorService {
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     public static final String CHARGE_REMAINING_BALANCE_NOTE = "Attempting to charge remaining balance for booking.";
+    public static final String MANUAL_CHARGE_NOTE = "Attempting to manually charge for ";
     public static final BigDecimal MINIMUM_CHARGE_AMOUNT = new BigDecimal( "0.3" );
 
     @Autowired
@@ -636,6 +637,40 @@ public class PaymentProcessorService {
         job.setNoteArchived( true );
         job.setStatus( JobStatus.submitted );
         wordpressDAO.insertJob( job );
+    }
+
+    /**
+     * Attempts to charge the balance due for the given booking. If successful, send confirmation email.
+     * If unsuccessful, send payment declined email (with payment link).
+     *
+     * @param webClient
+     * @param reservationId reservation id for booking
+     * @param amount       amount to charge
+     * @throws IOException
+     */
+    public synchronized void processManualChargeForBooking( WebClient webClient, String reservationId, BigDecimal amount ) throws IOException {
+        LOGGER.info( "Processing manual charge for booking id: " + reservationId );
+        Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+
+        String chargeAmount = "£" + cloudbedsScraper.getCurrencyFormat().format( amount );
+        if ( cbReservation.containsNote( MANUAL_CHARGE_NOTE + chargeAmount ) ) {
+            LOGGER.info( "Already attempted to manually charge booking for " + chargeAmount + ". Not attempting to try again." );
+            return;
+        }
+
+        if ( BigDecimal.ZERO.compareTo( cbReservation.getBalanceDue() ) >= 0 ) {
+            LOGGER.warn( "Booking does not have an outstanding balance. We will attempt to charge anyways!" );
+        }
+
+        // check if card details exist in CB
+        if ( false == cbReservation.isCardDetailsPresent() ) {
+            throw new MissingUserDataException( "Missing card details found for reservation " + reservationId + ". Unable to continue." );
+        }
+
+        // should have credit card details at this point
+        cloudbedsScraper.addArchivedNote( webClient, reservationId, MANUAL_CHARGE_NOTE + chargeAmount );
+        cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, amount );
+        cloudbedsScraper.addArchivedNote( webClient, reservationId, "Successfully charged " + chargeAmount );
     }
 
     /**

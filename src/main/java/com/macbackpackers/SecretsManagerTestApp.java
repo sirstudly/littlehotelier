@@ -10,7 +10,6 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.core.convert.support.DefaultConversionService;
 
 @SpringBootApplication
-@Profile( "test" )
 public class SecretsManagerTestApp implements CommandLineRunner {
 
     @Value( "${db.username:NOT_FOUND}" )

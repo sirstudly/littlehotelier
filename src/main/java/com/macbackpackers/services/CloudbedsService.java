@@ -537,7 +537,7 @@ public class CloudbedsService {
      * @param bdcReference Booking.com reference
      * @return matched cloudbeds reservation if found
      */
-    private Optional<Reservation> getReservationForBDC( String bdcReference ) {
+    public Optional<Reservation> getReservationForBDC( String bdcReference ) {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
             return scraper.getReservations( webClient, bdcReference ).stream()
                     .filter( p -> p.getSourceName().contains( "Booking.com" ) ) // just in case

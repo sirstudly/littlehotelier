@@ -1,11 +1,18 @@
 package com.macbackpackers.services;
 
 import java.math.BigDecimal;
+import java.nio.charset.Charset;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.jobs.ChargeCustomAmountForBookingJob;
+import com.macbackpackers.utils.AnyByteStringToStringConverter;
+import org.apache.commons.io.IOUtils;
 import org.htmlunit.WebClient;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,19 +20,50 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.test.context.ContextConfiguration;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.convert.support.DefaultConversionService;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
+import com.macbackpackers.SecretsManagerTestApp;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
-import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 
+/**
+ * Test configuration for Secret Manager integration testing.
+ * <p>
+ * This test uses @SpringBootTest to create a proper Spring Boot application context
+ * that properly initializes Spring Cloud GCP Secret Manager. This is the recommended
+ * approach for testing with Secret Manager.
+ * <p>
+ * It requires:
+ * - GOOGLE_APPLICATION_CREDENTIALS environment variable to be set to the service account JSON file path
+ * - Access to Google Cloud Secret Manager
+ * - The secrets "db_url_crh", "db_username_crh", "db_password_crh" to exist in Secret Manager
+ */
 @ExtendWith( SpringExtension.class )
-@ContextConfiguration( classes = LittleHotelierConfig.class )
+@SpringBootTest( classes = SecretsManagerTestApp.class )
+@TestPropertySource( properties = {
+        "spring.profiles.active=lsh"
+} )
 public class CloudbedsServiceTest {
 
+    static {
+        // Register the ByteString converter before Spring tries to resolve Secret Manager placeholders
+        // This is essential for proper Secret Manager integration in tests
+        ( (DefaultConversionService) DefaultConversionService.getSharedInstance() ).addConverter( new AnyByteStringToStringConverter() );
+    }
+
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+
+    @Value( "${db.username:NOT_FOUND}" )
+    private String dbUsername;
+
+    @Value( "${db.password:NOT_FOUND}" )
+    private String dbPassword;
 
     @Autowired
     CloudbedsService cloudbedsService;
@@ -188,5 +226,34 @@ public class CloudbedsServiceTest {
     @Test
     public void testArchiveAllTransactionNotes() {
         cloudbedsService.archiveAllTransactionNotes( webClient, "87742801" );
+    }
+
+    @Test
+    public void testVerifyDatabaseLogins() {
+        LOGGER.info( "db.username = " + dbUsername );
+        LOGGER.info( "db.password = " + dbPassword );
+    }
+
+    @Test
+    public void testCreateBdcManualChargeJobs() throws Exception {
+        // read each line in file
+        IOUtils.readLines( this.getClass().getResourceAsStream( "/bdc_reservations_import.csv" ), Charset.defaultCharset() )
+                .stream()
+                .forEach( line -> {
+                    LOGGER.info( line );
+                    String cols[] = line.split( "," );
+                    LOGGER.info( "Creating ChargeCustomAmountForBookingJob for BDC " + cols[0] + " and amount " + cols[2] );
+                    Optional<Reservation> r = cloudbedsService.getReservationForBDC( cols[0] );
+                    if ( r.isPresent() ) {
+                        ChargeCustomAmountForBookingJob job = new ChargeCustomAmountForBookingJob();
+                        job.setReservationId( r.get().getReservationId() );
+                        job.setAmount( new BigDecimal( cols[2].replace( "£", "" ) ) );
+                        job.setStatus( JobStatus.aborted );
+                        dao.insertJob( job );
+                    }
+                    else {
+                        LOGGER.error( "No reservation found for booking " + cols[0] );
+                    }
+                } );
     }
 }
