@@ -361,7 +361,7 @@ public class CloudbedsService {
         //                             then would charge if checkin on wednesday but not thursday
         List<Reservation> cxlRes = scraper.getCancelledReservationsForBookingSources( webClient, 
                 cancelDateStart.minusDays( 1 ), cancelDateEnd.plusDays( 1 ), 
-                cancelDateStart, cancelDateEnd, "Hostelworld & Hostelbookers", "Hostelworld (Hotel Collect Booking)" );
+                cancelDateStart, cancelDateEnd, "Hostelworld & Hostelbookers (Hotel Collect Booking)", "Hostelworld (Hotel Collect Booking)" );
         
         cxlRes.stream()
             .peek( r -> LOGGER.info( "Res #" + r.getReservationId() + " (" + r.getThirdPartyIdentifier() 
@@ -409,7 +409,7 @@ public class CloudbedsService {
         //                             then would charge if checkin on wednesday but not thursday
         List<Reservation> cxlRes = scraper.getCancelledReservationsForBookingSources( webClient, 
                 cancelDateStart.minusDays( 1 ), cancelDateEnd.plusDays( 1 + CANCEL_PERIOD_DAYS ), 
-                cancelDateStart, cancelDateEnd, "Hostelworld & Hostelbookers", "Hostelworld (Hotel Collect Booking)" );
+                cancelDateStart, cancelDateEnd, "Hostelworld & Hostelbookers (Hotel Collect Booking)", "Hostelworld (Hotel Collect Booking)" );
         
         cxlRes.stream()
             .peek( r -> LOGGER.info( "Res #" + r.getReservationId() + " (" + r.getThirdPartyIdentifier() 

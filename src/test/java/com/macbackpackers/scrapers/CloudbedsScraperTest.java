@@ -10,7 +10,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import com.macbackpackers.SecretsManagerTestApp;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
+import com.macbackpackers.utils.AnyByteStringToStringConverter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -21,8 +23,6 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.hamcrest.MatcherAssert;
-import org.hamcrest.Matchers;
 import org.htmlunit.Page;
 import org.htmlunit.WebClient;
 import org.htmlunit.html.HtmlPage;
@@ -32,7 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.test.context.ContextConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.convert.support.DefaultConversionService;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.google.gson.Gson;
@@ -44,7 +46,6 @@ import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Guest;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
-import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.CancelBookingJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
@@ -54,10 +55,19 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 
 @ExtendWith( SpringExtension.class )
-@ContextConfiguration( classes = LittleHotelierConfig.class )
+@SpringBootTest( classes = SecretsManagerTestApp.class )
+@TestPropertySource( properties = {
+        "spring.profiles.active=crh"
+} )
 public class CloudbedsScraperTest {
     
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+
+    static {
+        // Register the ByteString converter before Spring tries to resolve Secret Manager placeholders
+        // This is essential for proper Secret Manager integration in tests
+        ( (DefaultConversionService) DefaultConversionService.getSharedInstance() ).addConverter( new AnyByteStringToStringConverter() );
+    }
 
     @Autowired
     CloudbedsScraper cloudbedsScraper;
@@ -236,7 +246,7 @@ public class CloudbedsScraperTest {
     @Test
     public void testLookupBookingSourceId() throws Exception {
         LOGGER.info( cloudbedsScraper.lookupBookingSourceIds( webClient, 
-                "Hostelworld & Hostelbookers", "Booking.com (Channel Collect Booking)" ) );
+                "Hostelworld & Hostelbookers (Hotel Collect Booking)", "Hostelworld (Hotel Collect Booking)" ) );
     }
 
     @Test
