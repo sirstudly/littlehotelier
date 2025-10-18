@@ -114,7 +114,7 @@ public class Allocation {
 
     @Column( name = "viewed_yn" )
     @Convert(converter = YesNoConverter.class)
-    private boolean viewed;
+    private Boolean viewed;
 
     @Column( name = "created_date" )
     private Timestamp createdDate;
@@ -340,11 +340,11 @@ public class Allocation {
         this.eta = eta;
     }
 
-    public boolean isViewed() {
+    public Boolean isViewed() {
         return viewed;
     }
 
-    public void setViewed( boolean viewed ) {
+    public void setViewed( Boolean viewed ) {
         this.viewed = viewed;
     }
 
