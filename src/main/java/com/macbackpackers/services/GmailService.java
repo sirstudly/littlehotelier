@@ -284,6 +284,9 @@ public class GmailService {
      */
     public synchronized void sendEmail( String toAddress, String toName, String subject, String bodyText ) 
             throws MessagingException, IOException {
+        if ( StringUtils.isBlank( toAddress ) || toAddress.contains( "@" ) == false ) {
+            throw new MessagingException( "Invalid email address: " + toAddress );
+        }
         Message message = createMessageWithEmail( createEmail( toAddress, toName, null, subject, bodyText ) );
         message = connectAsClient().users().messages().send( GMAIL_USER, message ).execute();
         LOGGER.info( "Sent message " + message.getId() + ": " + message.toPrettyString() );
