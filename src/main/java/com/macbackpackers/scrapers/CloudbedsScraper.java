@@ -11,6 +11,7 @@ import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.AddNoteResponse;
+import com.macbackpackers.beans.cloudbeds.responses.AddPaymentResponse;
 import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
 import com.macbackpackers.beans.cloudbeds.responses.CloudbedsJsonResponse;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
@@ -829,17 +830,14 @@ public class CloudbedsScraper {
         LOGGER.info( "Begin PROCESS CHARGE for reservation " + res.getReservationId()  + " for " + getCurrencyFormat().format( amount ) );
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessPaymentRequest( res.getReservationId(), res.getBookingRooms().get( 0 ).getId(),
                 res.getCreditCardId(), amount, "Autocharging -RONBOT", getBillingPortalId( webClient ), getFrontVersion( webClient ) );
-        doRequest( webClient, requestSettings, CloudbedsJsonResponse.class, 
+        doRequest( webClient, requestSettings, AddPaymentResponse.class,
                 (resp, jsonResp) -> {
                     // 2021-03-19: success when charge from Stripe is incomplete??
                     LOGGER.info( "Cloudbeds says successfully charged booking. " + jsonResp );
-                    LOGGER.info( "Confirming reservation balance to see if anything has changed..." );
-                    Reservation updatedRes = getReservationRetry( webClient, res.getReservationId() );
-                    if ( updatedRes.getPaidValue().equals( res.getPaidValue() ) ) {
-                        LOGGER.info( "Balance hasn't changed.. Assuming pending payment." );
-                        throw new PaymentPendingException( "Attempt to charge but paid amount remains the same. Is this payment pending?" );
+                    if ( false == "successful".equals( resp.getData().getStatus() ) || Boolean.TRUE.equals( resp.getData().getRequiresAuthentication() ) ) {
+                        throw new PaymentPendingException( "Attempt to charge but status is not successful or requires authentication." );
                     }
-                }, 
+                },
                 (resp, jsonResp) -> {
                     LOGGER.error( "Failed to charge booking. " + jsonResp );
                     try {
