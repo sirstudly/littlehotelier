@@ -47,6 +47,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String channelPaymentType;
     private String isHotelCollectBooking;
     private BigDecimal paidValue;
+    private BigDecimal roomsTotal;
     private List<BookingRoom> bookingRooms;
     private List<BookingNote> notes;
     private String creditCardId;
@@ -369,6 +370,14 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setPaidValue( BigDecimal paidValue ) {
         this.paidValue = paidValue;
+    }
+
+    public BigDecimal getRoomsTotal() {
+        return roomsTotal;
+    }
+
+    public void setRoomsTotal( BigDecimal roomsTotal ) {
+        this.roomsTotal = roomsTotal;
     }
 
     public List<BookingRoom> getBookingRooms() {

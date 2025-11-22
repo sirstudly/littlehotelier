@@ -566,8 +566,8 @@ public class PaymentProcessorService {
         if ( firstNightAmount.compareTo( BigDecimal.ZERO ) <= 0 ) {
             throw new IllegalStateException( "Some weirdness here. First night amount must be greater than 0." );
         }
-        if ( firstNightAmount.compareTo( cbReservation.getBalanceDue() ) > 0 ) {
-            throw new IllegalStateException( "Some weirdness here. First night amount exceeds balance due." );
+        if ( firstNightAmount.compareTo( cbReservation.getRoomsTotal() ) > 0 ) {
+            throw new IllegalStateException( "Some weirdness here. First night amount exceeds total for accommodation." );
         }
         return firstNightAmount;
     }

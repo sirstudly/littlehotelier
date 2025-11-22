@@ -371,6 +371,7 @@ public class CloudbedsService {
             .filter( r -> r.isLateCancellation( HWL_LATE_CANCEL_HOURS ) )
             .filter( r -> isCancellationDoneBySystem( webClient, r.getIdentifier() ) )
             .filter( r -> false == isExistsRefund( webClient, r ) )
+            .filter( r -> false == "157523247".equals( r.getReservationId() ) ) // TODO: temporarily ignore ** TO BE REMOVED **
             .forEach( r -> {
                 LOGGER.info( "Creating ChargeHostelworldLateCancellationJob for " + r.getReservationId() + ": " + r.getFirstName() + " " + r.getLastName() );
                 ChargeHostelworldLateCancellationJob j = new ChargeHostelworldLateCancellationJob();
