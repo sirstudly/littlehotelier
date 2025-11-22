@@ -833,7 +833,7 @@ public class CloudbedsScraper {
         doRequest( webClient, requestSettings, AddPaymentResponse.class,
                 (resp, jsonResp) -> {
                     // 2021-03-19: success when charge from Stripe is incomplete??
-                    LOGGER.info( "Cloudbeds says successfully charged booking. " + jsonResp );
+                    LOGGER.info( "Cloudbeds response: " + jsonResp );
                     if ( false == "successful".equals( resp.getData().getStatus() ) || Boolean.TRUE.equals( resp.getData().getRequiresAuthentication() ) ) {
                         throw new PaymentPendingException( "Attempt to charge but status is not successful or requires authentication." );
                     }
