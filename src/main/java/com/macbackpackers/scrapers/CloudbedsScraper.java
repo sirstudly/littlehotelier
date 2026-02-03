@@ -54,6 +54,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -83,12 +84,16 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER = "Group Booking Payment Reminder";
     public static final double DEFAULT_RATE_LIMIT = 1.0; // requests per second
 
+    /** Expire email template cache entries after this many minutes without access. */
+    private static final long EMAIL_TEMPLATE_CACHE_TIMEOUT_MINUTES = 5;
+
     // the last result of getPropertyContent() as it's an expensive operation
     private static JsonObject propertyContent;
     // the last version numbers
     private static JsonObject remoteEntries;
 
     private static final LoadingCache<String, EmailTemplateInfo> emailTemplateCache = CacheBuilder.newBuilder()
+            .expireAfterAccess( EMAIL_TEMPLATE_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES )
             .build( new CacheLoader<String, EmailTemplateInfo>() {
                 @Override
                 public EmailTemplateInfo load( String templateId ) {
@@ -1109,7 +1114,7 @@ public class CloudbedsScraper {
     public EmailTemplateInfo fetchEmailTemplate( WebClient webClient, String templateName ) throws IOException {
 
         try {
-            // retrieve email template only if this is the first time we've done it
+            // retrieve from cache; entry expires after 5 minutes without access
             return emailTemplateCache.get( templateName, new Callable<EmailTemplateInfo>() {
                 @Override
                 public EmailTemplateInfo call() throws Exception {
