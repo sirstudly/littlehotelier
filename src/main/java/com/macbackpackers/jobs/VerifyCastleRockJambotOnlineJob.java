@@ -7,9 +7,9 @@ import jakarta.persistence.Transient;
 
 import java.io.IOException;
 
-import org.htmlunit.AbstractPage;
 import org.htmlunit.WebClient;
 import org.htmlunit.WebResponse;
+import org.htmlunit.html.HtmlPage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -75,7 +75,7 @@ public class VerifyCastleRockJambotOnlineJob extends AbstractJob {
      */
     private void queryJambot() throws IOException {
         LOGGER.info( "Querying " + JAMBOT_URL );
-        AbstractPage statusPage = webClient.getPage( JAMBOT_URL );
+        HtmlPage statusPage = webClient.getPage( JAMBOT_URL );
         WebResponse response = statusPage.getWebResponse();
         int statusCode = response.getStatusCode();
 
