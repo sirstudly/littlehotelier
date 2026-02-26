@@ -53,6 +53,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -77,7 +82,11 @@ public class WordPressDAOImpl implements WordPressDAO {
     // cached
     private static String CSRF_TOKEN = null;
 
-    private static Map<String, String> WP_OPTIONS = null;
+    private static final long WP_OPTIONS_CACHE_TIMEOUT_MINUTES = 5;
+
+    private static final Cache<String, Map<String, String>> WP_OPTIONS_CACHE = CacheBuilder.newBuilder()
+            .expireAfterAccess( WP_OPTIONS_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES )
+            .build();
 
     @Override
     public boolean isCloudbeds() {
@@ -992,27 +1001,28 @@ public class WordPressDAOImpl implements WordPressDAO {
         }
     }
 
-    private void verifyOptionsCacheIsInitialised() {
-        if ( WP_OPTIONS == null ) {
-            WP_OPTIONS = new HashMap<>();
-            synchronized ( WP_OPTIONS ) {
+    @SuppressWarnings( "unchecked" )
+    private Map<String, String> getOptionsMap() {
+        try {
+            return WP_OPTIONS_CACHE.get( "options", () -> {
                 List<Object[]> nvpList = em.createNativeQuery(
                                 "       SELECT option_name, option_value"
                                         + "  FROM wp_options" )
                         .getResultList();
                 LOGGER.info( "Caching " + nvpList.size() + " records from wp_options" );
-                nvpList.stream().forEach( nvp -> WP_OPTIONS.put( nvp[0].toString(), nvp[1].toString() ) );
-            }
+                Map<String, String> options = new ConcurrentHashMap<>();
+                nvpList.stream().forEach( nvp -> options.put( nvp[0].toString(), nvp[1].toString() ) );
+                return options;
+            } );
+        } catch ( Exception e ) {
+            throw new RuntimeException( e );
         }
     }
 
     @Override
-    @SuppressWarnings( "unchecked" )
     @Transactional( readOnly = true )
     public String getOption( String property ) {
-        verifyOptionsCacheIsInitialised();
-        // key doesn't exist; just return null
-        return WP_OPTIONS.get( property );
+        return getOptionsMap().get( property );
     }
 
     @Override
@@ -1022,10 +1032,8 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    @SuppressWarnings( "unchecked" )
     @Transactional( readOnly = true )
     public String getOptionNoCache( String property ) {
-        verifyOptionsCacheIsInitialised();
         List<String> sqlResult = em.createNativeQuery(
                         "          SELECT option_value"
                                 + "  FROM wp_options"
@@ -1033,17 +1041,14 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( "optionName", property )
                 .getResultList();
 
-        // key doesn't exist; just return null
+        Map<String, String> options = getOptionsMap();
         if ( sqlResult.isEmpty() ) {
-            synchronized ( WP_OPTIONS ) {
-                WP_OPTIONS.remove( property );
-            }
+            options.remove( property );
             return null;
         }
-        synchronized ( WP_OPTIONS ) {
-            WP_OPTIONS.put( property, sqlResult.get( 0 ) );
-        }
-        return sqlResult.get( 0 );
+        String value = sqlResult.get( 0 );
+        options.put( property, value );
+        return value;
     }
 
     @Override
@@ -1097,10 +1102,7 @@ public class WordPressDAOImpl implements WordPressDAO {
             .setParameter( "name", property )
             .setParameter( "value", value )
             .executeUpdate();
-        verifyOptionsCacheIsInitialised();
-        synchronized ( WP_OPTIONS ) {
-            WP_OPTIONS.put( property, value );
-        }
+        getOptionsMap().put( property, value );
     }
 
     @Override
