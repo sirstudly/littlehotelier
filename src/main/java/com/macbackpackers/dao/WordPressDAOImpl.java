@@ -1077,7 +1077,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     @Transactional( readOnly = true )
     public int getGroupBookingSize() {
-        return Integer.parseInt( getOption( "hbo_group_booking_size" ) );
+        return Integer.parseInt( getOptionNoCache( "hbo_group_booking_size" ) );
     }
 
     @Override
