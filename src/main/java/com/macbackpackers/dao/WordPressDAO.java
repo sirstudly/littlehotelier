@@ -545,7 +545,13 @@ public interface WordPressDAO {
      * @param value value to set
      */
     void setOption( String property, String value );
-    
+
+    /**
+     * Invalidates the options cache so that the next {@link #getOption(String)} (or related) call
+     * will reload all options from the database.
+     */
+    void invalidateOptionsCache();
+
     /**
      * Sets the auth details on a stripe transaction.
      * 

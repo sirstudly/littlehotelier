@@ -1106,6 +1106,12 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public void invalidateOptionsCache() {
+        WP_OPTIONS_CACHE.invalidate( "options" );
+        LOGGER.info( "Options cache invalidated." );
+    }
+
+    @Override
     public StripeRefund fetchStripeRefund( int id ) {
         StripeRefund txn = em.find( StripeRefund.class, id );
         if ( txn == null ) {

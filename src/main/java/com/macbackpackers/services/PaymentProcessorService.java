@@ -403,7 +403,7 @@ public class PaymentProcessorService {
 
         // should have credit card details at this point; attempt AUTHORIZE/CAPTURE
         // if we have BDC login details, try to get the VCC balance to charge
-        if ( wordpressDAO.getOption( "hbo_bdc_username" ) != null ) {
+        if ( wordpressDAO.getOptionNoCache( "hbo_bdc_username" ) != null ) {
             if ( cbReservation.containsNote( "VCC has been charged for the full amount" ) ) {
                 LOGGER.info( "I think this has already been charged... Nothing to do." );
                 return;
