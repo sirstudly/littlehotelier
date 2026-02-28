@@ -53,7 +53,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.cache.Cache;
@@ -84,7 +83,7 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     private static final long WP_OPTIONS_CACHE_TIMEOUT_MINUTES = 5;
 
-    private static final Cache<String, Map<String, String>> WP_OPTIONS_CACHE = CacheBuilder.newBuilder()
+    private static final Cache<String, String> WP_OPTIONS_CACHE = CacheBuilder.newBuilder()
             .expireAfterAccess( WP_OPTIONS_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES )
             .build();
 
@@ -1002,27 +1001,28 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @SuppressWarnings( "unchecked" )
-    private Map<String, String> getOptionsMap() {
-        try {
-            return WP_OPTIONS_CACHE.get( "options", () -> {
-                List<Object[]> nvpList = em.createNativeQuery(
-                                "       SELECT option_name, option_value"
-                                        + "  FROM wp_options" )
-                        .getResultList();
-                LOGGER.info( "Caching " + nvpList.size() + " records from wp_options" );
-                Map<String, String> options = new ConcurrentHashMap<>();
-                nvpList.stream().forEach( nvp -> options.put( nvp[0].toString(), nvp[1].toString() ) );
-                return options;
-            } );
-        } catch ( Exception e ) {
-            throw new RuntimeException( e );
-        }
+    private String loadOptionFromDb( String property ) {
+        List<String> sqlResult = em.createNativeQuery(
+                        "          SELECT option_value"
+                                + "  FROM wp_options"
+                                + " WHERE option_name = :optionName " )
+                .setParameter( "optionName", property )
+                .getResultList();
+        return sqlResult.isEmpty() ? null : sqlResult.get( 0 );
     }
 
     @Override
     @Transactional( readOnly = true )
     public String getOption( String property ) {
-        return getOptionsMap().get( property );
+        String cached = WP_OPTIONS_CACHE.getIfPresent( property );
+        if ( cached != null ) {
+            return cached;
+        }
+        String fromDb = loadOptionFromDb( property );
+        if ( fromDb != null ) {
+            WP_OPTIONS_CACHE.put( property, fromDb );
+        }
+        return fromDb;
     }
 
     @Override
@@ -1034,20 +1034,12 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     @Transactional( readOnly = true )
     public String getOptionNoCache( String property ) {
-        List<String> sqlResult = em.createNativeQuery(
-                        "          SELECT option_value"
-                                + "  FROM wp_options"
-                                + " WHERE option_name = :optionName " )
-                .setParameter( "optionName", property )
-                .getResultList();
-
-        Map<String, String> options = getOptionsMap();
-        if ( sqlResult.isEmpty() ) {
-            options.remove( property );
-            return null;
+        String value = loadOptionFromDb( property );
+        if ( value != null ) {
+            WP_OPTIONS_CACHE.put( property, value );
+        } else {
+            WP_OPTIONS_CACHE.invalidate( property );
         }
-        String value = sqlResult.get( 0 );
-        options.put( property, value );
         return value;
     }
 
@@ -1102,12 +1094,12 @@ public class WordPressDAOImpl implements WordPressDAO {
             .setParameter( "name", property )
             .setParameter( "value", value )
             .executeUpdate();
-        getOptionsMap().put( property, value );
+        WP_OPTIONS_CACHE.put( property, value );
     }
 
     @Override
     public void invalidateOptionsCache() {
-        WP_OPTIONS_CACHE.invalidate( "options" );
+        WP_OPTIONS_CACHE.invalidateAll();
         LOGGER.info( "Options cache invalidated." );
     }
 
