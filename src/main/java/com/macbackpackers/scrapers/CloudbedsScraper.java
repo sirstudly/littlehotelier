@@ -87,8 +87,10 @@ public class CloudbedsScraper {
     /** Expire email template cache entries after this many minutes without access. */
     private static final long EMAIL_TEMPLATE_CACHE_TIMEOUT_MINUTES = 5;
 
-    // the last result of getPropertyContent() as it's an expensive operation
-    private static JsonObject propertyContent;
+    // the last result of getPropertyContent() as it's an expensive operation; refreshed after cache timeout
+    private static volatile JsonObject propertyContent;
+    private static volatile long propertyContentLoadedAtMs;
+    private static final Object propertyContentLock = new Object();
     // the last version numbers
     private static JsonObject remoteEntries;
 
@@ -1192,8 +1194,16 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public JsonObject getPropertyContent( WebClient webClient ) throws IOException {
-        if ( propertyContent == null ) {
-            propertyContent = doRequest( webClient, jsonRequestFactory.createGetPropertyContent() );
+        long now = System.currentTimeMillis();
+        long timeoutMs = TimeUnit.MINUTES.toMillis( EMAIL_TEMPLATE_CACHE_TIMEOUT_MINUTES );
+        if ( propertyContent == null || ( now - propertyContentLoadedAtMs ) > timeoutMs ) {
+            synchronized ( propertyContentLock ) {
+                now = System.currentTimeMillis();
+                if ( propertyContent == null || ( now - propertyContentLoadedAtMs ) > timeoutMs ) {
+                    propertyContent = doRequest( webClient, jsonRequestFactory.createGetPropertyContent() );
+                    propertyContentLoadedAtMs = System.currentTimeMillis();
+                }
+            }
         }
         return propertyContent;
     }
