@@ -82,6 +82,7 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED = "Group Booking Approval Required";
     public static final String TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED_PREPAID = "Group Booking Approval Required PREPAID";
     public static final String TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER = "Group Booking Payment Reminder";
+    public static final String TEMPLATE_GUEST_REGISTRATION_REQUEST = "Guest Registration Request";
     public static final double DEFAULT_RATE_LIMIT = 1.0; // requests per second
 
     /** Expire email template cache entries after this many minutes without access. */
@@ -1081,6 +1082,17 @@ public class CloudbedsScraper {
      */
     public EmailTemplateInfo getGroupBookingPaymentReminderEmailTemplate( WebClient webClient ) throws IOException {
         return fetchEmailTemplate( webClient, TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER );
+    }
+
+    /**
+     * Retrieves the guest registration request email template.
+     *
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getGuestRegistrationRequestEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_GUEST_REGISTRATION_REQUEST );
     }
 
     /**

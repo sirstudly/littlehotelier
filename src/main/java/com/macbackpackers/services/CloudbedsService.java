@@ -28,6 +28,7 @@ import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
 import com.macbackpackers.jobs.SendGmailJob;
 import com.macbackpackers.jobs.SendGroupBookingApprovalRequiredEmailJob;
 import com.macbackpackers.jobs.SendGroupBookingPaymentReminderEmailJob;
+import com.macbackpackers.jobs.SendGuestRegistrationJob;
 import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
@@ -711,6 +712,34 @@ public class CloudbedsService {
     }
 
     /**
+     * Creates send email jobs for all bookings on the given booking date that fall within the given
+     * guest count range.
+     *
+     * @param webClient
+     * @param bookingDate booking date to search on (inclusive)
+     * @param minGuests minimum number of guests (inclusive)
+     * @param maxGuests maximum number of guests (inclusive)
+     * @throws IOException
+     */
+    public void createSendGuestRegistrationJobs( WebClient webClient, LocalDate bookingDate, int minGuests, int maxGuests ) throws IOException {
+
+        scraper.getReservationsByBookingDate( webClient, bookingDate, bookingDate, "confirmed,not_confirmed" ).stream()
+                .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GUEST_REGISTRATION_REQUEST ) )
+                .filter( r -> r.getEmail().contains( "@" ) )
+                .filter( r -> r.getNumberOfGuests() >= minGuests && r.getNumberOfGuests() <= maxGuests )
+                .forEach( r -> {
+                    LOGGER.info( "Creating SendGuestRegistrationJob for Res #" + r.getReservationId()
+                            + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
+                    SendGuestRegistrationJob j = new SendGuestRegistrationJob();
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( r.getReservationId() );
+                    dao.insertJob( j );
+                } );
+    }
+
+    /**
      * Creates send email jobs for all group bookings between the given booking dates.
      * 
      * @param webClient
@@ -1368,6 +1397,38 @@ public class CloudbedsService {
      */
     public void sendGroupBookingPaymentReminderGmail( WebClient webClient, String reservationId ) throws IOException, MessagingException {
         sendGroupBookingGmail( webClient, reservationId, scraper.getGroupBookingPaymentReminderEmailTemplate( webClient ) );
+    }
+
+    /**
+     * Sends the guest registration request email via Gmail.
+     *
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @throws IOException
+     * @throws MessagingException
+     */
+    public void sendGuestRegistrationGmail( WebClient webClient, String reservationId ) throws IOException, MessagingException {
+
+        EmailTemplateInfo template = scraper.getGuestRegistrationRequestEmailTemplate( webClient );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            String lookupKey = generateUniqueBookingKey( reservationId );
+            String bookingURL = dao.getBookingsURL() + lookupKey;
+            gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
+                    template.getSubject().replace( "[conf number]", res.getIdentifier() ),
+                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
+                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
+                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
+                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                                    .replace( "[first name]", res.getFirstName() )
+                                    .replace( "[booking URL]", "<a href='" + bookingURL + "'>" + bookingURL + "</a>" ) ) );
+            scraper.addNote( webClient, reservationId, note );
+        }
     }
 
     private void sendGroupBookingGmail( WebClient webClient, String reservationId, EmailTemplateInfo template ) throws IOException, MessagingException {
