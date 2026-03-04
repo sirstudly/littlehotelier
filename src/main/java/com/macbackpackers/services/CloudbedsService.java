@@ -1427,7 +1427,7 @@ public class CloudbedsService {
                             .replace( "__EMAIL_CONTENT__", template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[booking URL]", "<a href='" + bookingURL + "'>" + bookingURL + "</a>" ) ) );
-            scraper.addNote( webClient, reservationId, note );
+            scraper.addArchivedNote( webClient, reservationId, note );
         }
     }
 
