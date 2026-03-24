@@ -566,9 +566,10 @@ public class PaymentProcessorService {
         if ( firstNightAmount.compareTo( BigDecimal.ZERO ) <= 0 ) {
             throw new IllegalStateException( "Some weirdness here. First night amount must be greater than 0." );
         }
-        if ( firstNightAmount.compareTo( cbReservation.getRoomsTotal() ) > 0 ) {
-            throw new IllegalStateException( "Some weirdness here. First night amount exceeds total for accommodation." );
-        }
+        // 2026-03-24: Cloudbeds no longer keeps the balance due for cancellations; so amount due could be 0.
+//        if ( firstNightAmount.compareTo( cbReservation.getRoomsTotal() ) > 0 ) {
+//            throw new IllegalStateException( "Some weirdness here. First night amount exceeds total for accommodation." );
+//        }
         return firstNightAmount;
     }
 
