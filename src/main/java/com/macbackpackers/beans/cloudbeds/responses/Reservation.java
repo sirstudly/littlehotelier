@@ -54,6 +54,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String creditCardType;
     private String creditCardLast4Digits;
     private BookingSource selectedSource;
+    private String documentNumber;
 
     public String getReservationId() {
         return reservationId;
@@ -448,6 +449,14 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setSelectedSource( BookingSource selectedSource ) {
         this.selectedSource = selectedSource;
+    }
+
+    public String getDocumentNumber() {
+        return documentNumber;
+    }
+
+    public void setDocumentNumber( String documentNumber ) {
+        this.documentNumber = documentNumber;
     }
 
     /**

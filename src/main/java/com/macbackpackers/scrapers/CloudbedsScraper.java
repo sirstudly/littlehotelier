@@ -346,9 +346,28 @@ public class CloudbedsScraper {
     public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd,
                                            LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate checkoutDateStart, LocalDate checkoutDateEnd,
                                            LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( stayDateStart, stayDateEnd,
-                checkinDateStart, checkinDateEnd, checkoutDateStart, checkoutDateEnd, bookingDateStart, bookingDateEnd,
-                statuses, getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
+        return getReservations( webClient, stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd,
+                checkoutDateStart, checkoutDateEnd, bookingDateStart, bookingDateEnd, statuses, null );
+    }
+
+    /**
+     * Same as {@link #getReservations(WebClient, LocalDate, LocalDate, LocalDate, LocalDate, LocalDate, LocalDate, LocalDate, LocalDate, String)}
+     * with optional Cloudbeds booking source names (OTA display names). When {@code bookingSourceNames} is null or empty,
+     * source filtering is not applied.
+     */
+    public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate checkoutDateStart, LocalDate checkoutDateEnd,
+            LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses, String[] bookingSourceNames ) throws IOException {
+        if ( bookingSourceNames == null || bookingSourceNames.length == 0 ) {
+            return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( stayDateStart, stayDateEnd,
+                    checkinDateStart, checkinDateEnd, checkoutDateStart, checkoutDateEnd, bookingDateStart, bookingDateEnd,
+                    statuses, getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
+        }
+        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByBookingSource(
+                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, checkoutDateStart, checkoutDateEnd,
+                bookingDateStart, bookingDateEnd, statuses,
+                lookupBookingSourceIds( webClient, bookingSourceNames ),
+                getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
     }
 
     /**

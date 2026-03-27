@@ -11,6 +11,8 @@ import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Transient;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Job that creates individual jobs for sending out emails to guests.
@@ -34,6 +36,7 @@ public class CreateSendBulkEmailJob extends AbstractJob {
                     getEmailTemplate(), getStayDateStart(), getStayDateEnd(),
                     getCheckinDateStart(), getCheckinDateEnd(),
                     getBookingDateStart(), getBookingDateEnd(), getStatuses(),
+                    getBookingSources(),
                     null, null );
         }
     }
@@ -102,6 +105,30 @@ public class CreateSendBulkEmailJob extends AbstractJob {
 
     public void setStatuses( String statuses ) {
         setParameter( "statuses", statuses );
+    }
+
+    /**
+     * Optional comma-delimited Cloudbeds booking source names (OTA display names). Whitespace around
+     * names is trimmed. Returns null when the parameter is unset or only whitespace/commas.
+     */
+    public String[] getBookingSources() {
+        String raw = getParameter( "booking_sources" );
+        if ( StringUtils.isBlank( raw ) ) {
+            return null;
+        }
+        String[] parts = raw.split( "," );
+        List<String> names = new ArrayList<>();
+        for ( String p : parts ) {
+            String trimmed = p.trim();
+            if ( !trimmed.isEmpty() ) {
+                names.add( trimmed );
+            }
+        }
+        return names.isEmpty() ? null : names.toArray( new String[0] );
+    }
+
+    public void setBookingSources( String commaDelimited ) {
+        setParameter( "booking_sources", commaDelimited );
     }
 
     public String getEmailTemplate() {

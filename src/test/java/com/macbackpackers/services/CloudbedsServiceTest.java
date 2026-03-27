@@ -59,6 +59,9 @@ public class CloudbedsServiceTest {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
+    @Value( "${db.url:NOT_FOUND}" )
+    private String dbUrl;
+
     @Value( "${db.username:NOT_FOUND}" )
     private String dbUsername;
 
@@ -183,7 +186,7 @@ public class CloudbedsServiceTest {
     public void testCreateSendTemplatedEmailJobs() throws Exception {
         cloudbedsService.createSendTemplatedEmailJobs( webClient, "COVID-19 Guidance Update", null, null,
                 LocalDate.parse( "2021-12-03" ), LocalDate.parse( "2021-12-04" ), null, null,
-                "confirmed,not_confirmed", null, null );
+                "confirmed,not_confirmed", null, null, null );
     }
 
     @Test
@@ -230,6 +233,7 @@ public class CloudbedsServiceTest {
 
     @Test
     public void testVerifyDatabaseLogins() {
+        LOGGER.info( "db.url = " + dbUrl );
         LOGGER.info( "db.username = " + dbUsername );
         LOGGER.info( "db.password = " + dbPassword );
     }

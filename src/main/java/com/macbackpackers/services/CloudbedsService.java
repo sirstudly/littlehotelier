@@ -619,6 +619,7 @@ public class CloudbedsService {
      * @param bookingDateStart (optional)
      * @param bookingDateEnd (optional)
      * @param statuses comma-delimited list of statuses to apply for
+     * @param bookingSourceNames Cloudbeds OTA source display names to restrict to (optional)
      * @param reservationFilterFn apply filter to the given reservation (optional)
      * @param replacementFn apply any replacements for the given reservation (optional)
      * @throws IOException
@@ -626,11 +627,12 @@ public class CloudbedsService {
     public void createSendTemplatedEmailJobs( WebClient webClient, String emailTemplate, LocalDate stayDateStart, LocalDate stayDateEnd,
                                               LocalDate checkinDateStart, LocalDate checkinDateEnd,
                                               LocalDate bookingDateStart, LocalDate bookingDateEnd,
-                                              String statuses, Function<Reservation, Boolean> reservationFilterFn,
+                                              String statuses, String[] bookingSourceNames,
+                                              Function<Reservation, Boolean> reservationFilterFn,
                                               Function<Reservation, Map<String, String>> replacementFn ) throws IOException {
         scraper.fetchEmailTemplate( webClient, emailTemplate ); // check if it exists before creating a bunch of jobs
         scraper.getReservations( webClient, stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, null, null,
-                        bookingDateStart, bookingDateEnd, statuses ).stream()
+                        bookingDateStart, bookingDateEnd, statuses, bookingSourceNames ).stream()
                 .filter( c -> false == c.isLongTermer() )
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.containsNote( emailTemplate + " email sent." ) )
@@ -1025,7 +1027,7 @@ public class CloudbedsService {
                 a.setRoomId( br.getRoomId() );
                 a.setRoomTypeId( Integer.parseInt( br.getRoomTypeId() ) );
                 a.setStatus( r.getStatus() );
-                a.setViewed( true );
+                a.setViewed( StringUtils.isNotBlank( r.getDocumentNumber() ) ); // hijacking this field to flag whether PII is visible
                 a.setNotes( r.getNotesAsString() );
                 a.setComments( r.getSpecialRequests() );
                 a.setRatePlanName( r.getUsedRoomTypes() );
