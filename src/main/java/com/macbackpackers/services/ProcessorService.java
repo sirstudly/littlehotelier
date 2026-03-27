@@ -1,6 +1,7 @@
 
 package com.macbackpackers.services;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.macbackpackers.beans.JobParameter;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.WordPressDAO;
@@ -249,7 +250,7 @@ public class ProcessorService {
                 if ( i == job.getRetryCount() - 1 ) {
 
                     // catch SNI errors and random connection errors and retry later
-                    if ( ex instanceof IOException || ex instanceof TimeoutException || ex instanceof IORuntimeException ) {
+                    if ( !( ex instanceof GoogleJsonResponseException ) && ( ex instanceof IOException || ex instanceof TimeoutException || ex instanceof IORuntimeException ) ) {
                         LOGGER.info( "Maximum number of attempts reached. Connection error on job " + job.getId() + ". Setting status to RETRY" );
                         dao.updateJobStatusToRetry( job.getId() );
                     }
