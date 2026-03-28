@@ -9,11 +9,13 @@ import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.macbackpackers.SecretsManagerTestApp;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.ArchiveAllTransactionNotesJob;
 import com.macbackpackers.jobs.BedCountReportJob;
 import com.macbackpackers.jobs.CreatePrepaidRefundJob;
 import com.macbackpackers.jobs.PrepaidRefundJob;
+import com.macbackpackers.utils.AnyByteStringToStringConverter;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,13 +24,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
-import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
@@ -69,12 +72,19 @@ import com.macbackpackers.scrapers.CloudbedsScraper;
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_DECLINED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 
-@SuppressWarnings( "deprecation" )
 @ExtendWith( SpringExtension.class )
-@ContextConfiguration( classes = LittleHotelierConfig.class )
+@SpringBootTest( classes = SecretsManagerTestApp.class )
+@TestPropertySource( properties = {
+        "spring.profiles.active=crh"
+} )
 public class ProcessorServiceTest {
+
+    static {
+        // Register the ByteString converter before Spring tries to resolve Secret Manager placeholders
+        // This is essential for proper Secret Manager integration in tests
+        ( (DefaultConversionService) DefaultConversionService.getSharedInstance() ).addConverter( new AnyByteStringToStringConverter() );
+    }
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 

@@ -1,19 +1,33 @@
 package com.macbackpackers.services;
 
+import com.macbackpackers.SecretsManagerTestApp;
+import com.macbackpackers.utils.AnyByteStringToStringConverter;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.config.LittleHotelierConfig;
 
 @ExtendWith( SpringExtension.class )
-@ContextConfiguration( classes = LittleHotelierConfig.class )
+@SpringBootTest( classes = SecretsManagerTestApp.class )
+@TestPropertySource( properties = {
+        "spring.profiles.active=lsh"
+} )
 public class GmailServiceTest {
+
+    static {
+        // Register the ByteString converter before Spring tries to resolve Secret Manager placeholders
+        // This is essential for proper Secret Manager integration in tests
+        ( (DefaultConversionService) DefaultConversionService.getSharedInstance() ).addConverter( new AnyByteStringToStringConverter() );
+    }
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
