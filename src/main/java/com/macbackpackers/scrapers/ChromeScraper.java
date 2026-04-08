@@ -23,11 +23,11 @@ import org.springframework.stereotype.Component;
 
 import java.net.URLDecoder;
 import java.time.Duration;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.openqa.selenium.support.ui.ExpectedConditions.presenceOfElementLocated;
 import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
-import static org.openqa.selenium.support.ui.ExpectedConditions.urlContains;
 
 @Component
 public class ChromeScraper {
@@ -94,28 +94,34 @@ public class ChromeScraper {
             LOGGER.info( "Current URL is " + driver.getCurrentUrl() );
             if ( false == driver.getCurrentUrl().contains( "/connect/" ) ) { // will redirect to dashboard if we're already logged in
                 LOGGER.info( "Current URL is " + driver.getCurrentUrl() );
-                WebElement emailInput = driver.findElement( By.id( "email" ) );
+                // Okta Identity Engine (IDX) widget: /idp/idx/identify uses JSON field "identifier"
+                WebElement emailInput = driver.findElement( By.name( "identifier" ) );
                 emailInput.sendKeys( username );
 
-                WebElement nextButton = driver.findElement( By.xpath( "//button[@type='submit']" ) );
+                WebElement nextButton = driver.findElement( By.cssSelector( "input[type='submit'].button-primary, button[type='submit'].button-primary" ) );
                 nextButton.click();
 
-                wait.until( presenceOfElementLocated( By.id( "okta-signin-password" ) ) );
-                WebElement passwordInput = driver.findElement( By.id( "okta-signin-password" ) );
+                wait.until( presenceOfElementLocated( By.cssSelector( "input[name='credentials.passcode'][type='password']" ) ) );
+                WebElement passwordInput = driver.findElement( By.cssSelector( "input[name='credentials.passcode'][type='password']" ) );
                 passwordInput.sendKeys( password );
 
-                WebElement rememberMe = driver.findElement( By.xpath( "//label[@data-se-for-name='remember']" ) );
-                rememberMe.click();
+                List<WebElement> rememberCheckboxes = driver.findElements( By.cssSelector( "input[type='checkbox'][name='remember']" ) );
+                if ( !rememberCheckboxes.isEmpty() ) {
+                    rememberCheckboxes.get( 0 ).click();
+                }
 
-                nextButton = driver.findElement( By.id( "okta-signin-submit" ) );
+                nextButton = driver.findElement( By.cssSelector( "input[type='submit'].button-primary, button[type='submit'].button-primary" ) );
                 nextButton.click();
 
                 wait.until( stalenessOf( nextButton ) );
 
                 if ( false == driver.getCurrentUrl().contains( "/connect/" ) ) {
-                    wait.until( urlContains( "/signin/verify/google" ) ); // assumes always google authenticator
+                    // IDX keeps the OAuth authorize URL; MFA step still POSTs credentials.passcode (HAR: /idp/idx/challenge/answer)
+                    wait.until( presenceOfElementLocated(
+                            By.xpath( "//input[@name='credentials.passcode' and not(@type='password')]" ) ) );
 
-                    WebElement scaCode = driver.findElement( By.name( "answer" ) );
+                    WebElement scaCode = driver.findElement(
+                            By.xpath( "//input[@name='credentials.passcode' and not(@type='password')]" ) );
                     String googleAuth2faCode = authService.fetchCloudbedsGoogleAuth2faCode();
                     if ( StringUtils.isNotBlank( googleAuth2faCode ) ) {
                         LOGGER.info( "Attempting TOTP verification: " + googleAuth2faCode );
@@ -126,7 +132,7 @@ public class ChromeScraper {
                         scaCode.sendKeys( otp );
                     }
 
-                    nextButton = driver.findElement( By.xpath( "//input[@data-type='save']" ) );
+                    nextButton = driver.findElement( By.cssSelector( "input[type='submit'].button-primary, button[type='submit'].button-primary" ) );
                     nextButton.click();
                 }
             }
