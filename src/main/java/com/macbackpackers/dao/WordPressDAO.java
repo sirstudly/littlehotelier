@@ -462,6 +462,13 @@ public interface WordPressDAO {
     Map<RoomBedLookup, RoomBed> fetchAllRoomBeds();
 
     /**
+     * Replaces Cloudbeds bed mappings in wp_lh_rooms. Rows with {@code room = 'Unallocated'} are not removed.
+     *
+     * @param roomBeds full snapshot built from Cloudbeds (may be empty to clear non-Unallocated rows only)
+     */
+    void replaceAllRoomBeds( List<RoomBed> roomBeds );
+
+    /**
      * Returns the ID of the last completed allocation scraper job.
      * 
      * @return job ID or null if none exist

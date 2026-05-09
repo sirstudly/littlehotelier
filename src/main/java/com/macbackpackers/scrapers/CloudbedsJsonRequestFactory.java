@@ -184,6 +184,45 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Lists all room types for the property (summary rows; use {@link #createRoomTypesFindOneRequest} for beds).
+     *
+     * @return POST request for {@code /connect/roomtypes/find}
+     * @throws IOException invalid URL
+     */
+    public WebRequest createRoomTypesFindRequest() throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/roomtypes/find" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Full detail for one room type, including {@code accommodation_names} (per-bed labels).
+     *
+     * @param roomTypeId Cloudbeds room type id (string, as returned by find)
+     * @param billingPortalId
+     * @param frontVersion
+     * @return POST request for {@code /connect/roomtypes/find_one}
+     * @throws IOException invalid URL
+     */
+    public WebRequest createRoomTypesFindOneRequest( String roomTypeId, String billingPortalId, String frontVersion ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/roomtypes/find_one" );
+//        webRequest.setAdditionalHeader( "Cookie", "__OVERRIDE_USING_COOKIES_WITH_REQUISITE_PERMISSIONS__" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "roomTypeId", roomTypeId ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "frontVersion", frontVersion ) ) );
+        return webRequest;
+    }
+
+    /**
      * Ping responds with pong. Doesn't require a login.
      * 
      * @return web request

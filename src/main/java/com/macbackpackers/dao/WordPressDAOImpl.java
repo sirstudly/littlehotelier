@@ -804,6 +804,16 @@ public class WordPressDAOImpl implements WordPressDAO {
         return roomBedMap;
     }
 
+    @Override
+    public void replaceAllRoomBeds( List<RoomBed> roomBeds ) {
+        int deleted = em.createQuery( "DELETE FROM RoomBed rb WHERE rb.room <> 'Unallocated'" ).executeUpdate();
+        LOGGER.info( "replaceAllRoomBeds: cleared {} wp_lh_rooms row(s)", deleted );
+        for ( RoomBed rb : roomBeds ) {
+            em.persist( rb );
+        }
+        em.flush();
+    }
+
     /////////////////////////////////////////////////////////////////////
     //    REPORTING SPECIFIC
     /////////////////////////////////////////////////////////////////////

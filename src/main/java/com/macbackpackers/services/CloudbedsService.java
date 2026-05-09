@@ -1,6 +1,8 @@
 package com.macbackpackers.services;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
@@ -33,6 +35,7 @@ import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
 import com.macbackpackers.scrapers.CloudbedsJsonRequestFactory;
+import com.macbackpackers.scrapers.CloudbedsRoomBedSyncMapper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
@@ -255,55 +258,27 @@ public class CloudbedsService {
 
         LocalDate stayDatePlus1 = stayDate.plusDays( 1 );
         LocalDate stayDatePlus2 = stayDate.plusDays( 2 );
-        JsonObject rpt = scraper.getRoomAssignmentsReport( webClient, stayDate );
 
+        JsonObject rpt = scraper.getRoomAssignmentsReport( webClient, stayDate );
         List<String> staffBedsBefore = extractStaffBedsFromRoomAssignmentReport( rpt, stayDate );
         List<String> staffBedsAfter = extractStaffBedsFromRoomAssignmentReport( rpt, stayDatePlus1 );
-        
         Map<RoomBedLookup, RoomBed> roomBedMap = dao.fetchAllRoomBeds();
-        
-        // ** this is messy, but hopefully will just be temporary **
-        // iterate through the staff beds on the first day
-        // if also present on 2nd day, create record for 2 days
-        // otherwise, create only record for 1st day
-        // iterate through staff beds on second day
-        // if bed doesn't already exist in allocations, create one
-        Map<RoomBedLookup, Allocation> bedNameAllocations = new HashMap<>();
-        staffBedsBefore
-                .forEach( bedname -> {
-                    BedAssignment bedAssign = roomBedMatcher.parse( bedname );
-                    RoomBedLookup lookupKey = new RoomBedLookup( bedAssign.getRoom(), bedAssign.getBedName() );
-                    RoomBed rb = roomBedMap.get( lookupKey );
-                    if( rb == null ) {
-                        // if you get this error; probably a room/bed name was changed
-                        // dump a call to getReservation() and update wp_lh_rooms with the correct room_id, room_type, bed_name
-                        // or view the /connect/room_types/find_one API response under Property Details, Accommodation Types
-                        throw new MissingUserDataException( "Missing mapping for " + lookupKey );
-                    }
-                    Allocation a = createAllocationFromRoomBed( rb );
-                    a.setCheckinDate( stayDate );
-                    a.setCheckoutDate( staffBedsAfter.contains( bedname ) ? stayDatePlus2 : stayDatePlus1 );
-                    bedNameAllocations.put( lookupKey, a );
-                } );
 
-        staffBedsAfter.stream()
-                .filter( bedname -> false == staffBedsBefore.contains( bedname ) )
-                .forEach( bedname -> {
-                    BedAssignment bedAssign = roomBedMatcher.parse( bedname );
-                    RoomBedLookup lookupKey = new RoomBedLookup( bedAssign.getRoom(), bedAssign.getBedName() );
-                    RoomBed rb = roomBedMap.get( lookupKey );
-                    if( rb == null ) {
-                        throw new MissingUserDataException( "Missing mapping for " + lookupKey );
-                    }
-                    Allocation a = createAllocationFromRoomBed( rb );
-                    a.setCheckinDate( stayDatePlus1 );
-                    a.setCheckoutDate( stayDatePlus2 );
-                    bedNameAllocations.put( lookupKey, a );
-                } );
-
-        return bedNameAllocations.values().stream().collect( Collectors.toList() );
+        List<String> staffBedKeysToCheck = Stream.concat(
+                staffBedsBefore.stream(),
+                staffBedsAfter.stream() )
+                .distinct()
+                .collect( Collectors.toList() );
+        Optional<RoomBedLookup> missing = findFirstMissingRoomBedLookup( staffBedKeysToCheck, roomBedMap );
+        if ( missing.isPresent() ) {
+            LOGGER.warn( "Missing wp_lh_rooms mapping for '{}'.", missing.get() );
+            syncRoomsFromCloudbeds( webClient );
+            roomBedMap = dao.fetchAllRoomBeds();
+        }
+        return buildStaffAllocationListTwoDaySpan(
+                staffBedsBefore, staffBedsAfter, roomBedMap, stayDate, stayDatePlus1, stayDatePlus2 );
     }
-    
+
     /**
      * Finds all staff allocations for the given date. Use this to dump raw "staff" data.
      * 
@@ -316,23 +291,129 @@ public class CloudbedsService {
 
         JsonObject rpt = scraper.getRoomAssignmentsReport( webClient, stayDate );
         List<String> staffBeds = extractStaffBedsFromRoomAssignmentReport( rpt, stayDate );
-
         Map<RoomBedLookup, RoomBed> roomBedMap = dao.fetchAllRoomBeds();
+
+        Optional<RoomBedLookup> missing = findFirstMissingRoomBedLookup( staffBeds, roomBedMap );
+        if ( missing.isPresent() ) {
+            LOGGER.warn( "Missing wp_lh_rooms mapping for '{}'.", missing.get() );
+            syncRoomsFromCloudbeds( webClient );
+            roomBedMap = dao.fetchAllRoomBeds();
+        }
+        return buildStaffAllocationListDaily( staffBeds, roomBedMap, stayDate );
+    }
+
+    /**
+     * Replaces {@code wp_lh_rooms} (except {@code Unallocated}) with a snapshot from Cloudbeds.
+     *
+     * @param webClient client with logged-in cookies
+     * @throws IOException on API/network errors
+     */
+    public void syncRoomsFromCloudbeds( WebClient webClient ) throws IOException {
+        LOGGER.info( "Synchronizing wp_lh_rooms from Cloudbeds roomtypes API..." );
+        JsonObject findResp = scraper.fetchRoomTypesFind( webClient );
+        JsonElement dataEl = findResp.get( "data" );
+        if ( dataEl == null || !dataEl.isJsonArray() ) {
+            LOGGER.warn( "roomtypes/find returned no data array; skipping wp_lh_rooms sync." );
+            return;
+        }
+        JsonArray data = dataEl.getAsJsonArray();
+        Map<String, JsonObject> findOneByRoomTypeId = new HashMap<>();
+        for ( JsonElement el : data ) {
+            if ( !el.isJsonObject() ) {
+                continue;
+            }
+            JsonObject rtSummary = el.getAsJsonObject();
+            JsonElement idEl = rtSummary.get( "id" );
+            if ( idEl == null || idEl.isJsonNull() ) {
+                continue;
+            }
+            String roomTypeId = idEl.getAsString().trim();
+            if ( roomTypeId.isEmpty() ) {
+                continue;
+            }
+
+            // if we error out here with a 403 permission denied, login with superuser and set cookies
+            // in {@link CloudbedsJsonRequestFactory#createRoomTypesFindOneRequest} and
+            // re-run {@link CloudbedsServiceTest#testGetAllStaffAllocations}
+            JsonObject findOneEnvelope = scraper.fetchRoomTypesFindOne( webClient, roomTypeId );
+            JsonElement innerData = findOneEnvelope.get( "data" );
+            if ( innerData != null && innerData.isJsonObject() ) {
+                findOneByRoomTypeId.put( roomTypeId, innerData.getAsJsonObject() );
+            }
+        }
+        List<RoomBed> beds = CloudbedsRoomBedSyncMapper.buildAllRoomBeds(
+                findResp, findOneByRoomTypeId, roomBedMatcher );
+        LOGGER.info( "Replacing wp_lh_rooms with {} Cloudbeds bed row(s).", beds.size() );
+        dao.replaceAllRoomBeds( beds );
+    }
+
+    private Optional<RoomBedLookup> findFirstMissingRoomBedLookup( List<String> staffBedLabels,
+            Map<RoomBedLookup, RoomBed> roomBedMap ) {
+
+        for ( String bedname : staffBedLabels ) {
+            BedAssignment bedAssign = roomBedMatcher.parse( bedname );
+            RoomBedLookup lookupKey = new RoomBedLookup( bedAssign.getRoom(), bedAssign.getBedName() );
+            if ( roomBedMap.get( lookupKey ) == null ) {
+                return Optional.of( lookupKey );
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private List<Allocation> buildStaffAllocationListTwoDaySpan( List<String> staffBedsBefore,
+            List<String> staffBedsAfter, Map<RoomBedLookup, RoomBed> roomBedMap, LocalDate stayDate,
+            LocalDate stayDatePlus1, LocalDate stayDatePlus2 ) {
+
+        // ** this is messy, but hopefully will just be temporary **
+        // iterate through the staff beds on the first day
+        // if also present on 2nd day, create record for 2 days
+        // otherwise, create only record for 1st day
+        // iterate through staff beds on second day
+        // if bed doesn't already exist in allocations, create one
         Map<RoomBedLookup, Allocation> bedNameAllocations = new HashMap<>();
-        staffBeds.forEach( bedname -> {
-                BedAssignment bedAssign = roomBedMatcher.parse( bedname );
-                RoomBedLookup lookupKey = new RoomBedLookup( bedAssign.getRoom(), bedAssign.getBedName() );
-                RoomBed rb = roomBedMap.get( lookupKey );
-                if ( rb == null ) {
-                    throw new MissingUserDataException( "Missing mapping for " + lookupKey );
-                }
-                Allocation a = createAllocationFromRoomBed( rb );
-                a.setCheckinDate( stayDate );
-                a.setCheckoutDate( stayDate.plusDays( 1 ) );
-                bedNameAllocations.put( lookupKey, a );
-            } );
+
+        staffBedsBefore.forEach( bedname -> {
+            BedAssignment bedAssign = roomBedMatcher.parse( bedname );
+            RoomBedLookup lookupKey = new RoomBedLookup( bedAssign.getRoom(), bedAssign.getBedName() );
+            RoomBed rb = roomBedMap.get( lookupKey );
+
+            Allocation a = createAllocationFromRoomBed( rb );
+            a.setCheckinDate( stayDate );
+            a.setCheckoutDate( staffBedsAfter.contains( bedname ) ? stayDatePlus2 : stayDatePlus1 );
+            bedNameAllocations.put( lookupKey, a );
+        } );
+
+        staffBedsAfter.stream()
+                .filter( bedname -> false == staffBedsBefore.contains( bedname ) )
+                .forEach( bedname -> {
+                    BedAssignment bedAssign = roomBedMatcher.parse( bedname );
+                    RoomBedLookup lookupKey = new RoomBedLookup( bedAssign.getRoom(), bedAssign.getBedName() );
+                    RoomBed rb = roomBedMap.get( lookupKey );
+                    Allocation a = createAllocationFromRoomBed( rb );
+                    a.setCheckinDate( stayDatePlus1 );
+                    a.setCheckoutDate( stayDatePlus2 );
+                    bedNameAllocations.put( lookupKey, a );
+                } );
 
         return bedNameAllocations.values().stream().collect( Collectors.toList() );
+    }
+
+    private List<Allocation> buildStaffAllocationListDaily(
+            List<String> staffBeds, Map<RoomBedLookup, RoomBed> roomBedMap, LocalDate stayDate ) {
+
+        Map<RoomBedLookup, Allocation> bedNameAllocations = new HashMap<>();
+        staffBeds.forEach( bedname -> {
+            BedAssignment bedAssign = roomBedMatcher.parse( bedname );
+            RoomBedLookup lookupKey = new RoomBedLookup( bedAssign.getRoom(), bedAssign.getBedName() );
+            RoomBed rb = roomBedMap.get( lookupKey );
+            Allocation a = createAllocationFromRoomBed( rb );
+            a.setCheckinDate( stayDate );
+            a.setCheckoutDate( stayDate.plusDays( 1 ) );
+            bedNameAllocations.put( lookupKey, a );
+        } );
+
+        return new ArrayList<>( bedNameAllocations.values() );
     }
 
     /**

@@ -555,6 +555,31 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Room types listing (same shape as Cloudbeds Property Settings → Accommodation Types index).
+     *
+     * @param webClient client
+     * @return parsed JSON ({@code success}, {@code data} array)
+     * @throws IOException on transport / API failure
+     */
+    public JsonObject fetchRoomTypesFind( WebClient webClient ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createRoomTypesFindRequest();
+        return doRequest( webClient, requestSettings );
+    }
+
+    /**
+     * Single room type with {@code accommodation_names} (bed-level labels).
+     *
+     * @param webClient client
+     * @param roomTypeId room type id from {@link #fetchRoomTypesFind}
+     * @return parsed JSON ({@code success}, {@code data} object)
+     * @throws IOException on transport / API failure
+     */
+    public JsonObject fetchRoomTypesFindOne( WebClient webClient, String roomTypeId ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createRoomTypesFindOneRequest( roomTypeId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        return doRequest( webClient, requestSettings );
+    }
+
+    /**
      * Add a payment record to the given reservation.
      * 
      * @param webClient web client instance to use
