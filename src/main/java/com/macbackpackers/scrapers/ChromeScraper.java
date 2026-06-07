@@ -26,7 +26,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.openqa.selenium.support.ui.ExpectedConditions.elementToBeClickable;
 import static org.openqa.selenium.support.ui.ExpectedConditions.or;
 import static org.openqa.selenium.support.ui.ExpectedConditions.presenceOfElementLocated;
 import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
@@ -79,16 +78,28 @@ public class ChromeScraper {
     }
 
     /**
-     * After password, Okta may show a factor picker ({@code POST /idp/idx/challenge} with {@code authenticator.id}).
-     * If that screen is absent, this is a no-op.
+     * After password, Okta OIE may show select-authenticator-authenticate ({@code POST /idp/idx/challenge}
+     * with {@code authenticator.id}). Always choose Google Authenticator when that screen is shown.
      */
-    private void clickOktaAuthenticatorOptionIfShown( WebDriver driver, boolean preferGoogleAuthenticatorOverEmail ) {
-        WebDriverWait shortWait = new WebDriverWait( driver, Duration.ofSeconds( 20 ) );
-        By locator = preferGoogleAuthenticatorOverEmail
-                ? By.xpath( "//a[@data-se='factor-option'][.//*[contains(.,'Google Authenticator')]]" )
-                : By.xpath( "//a[@data-se='factor-option'][.//*[contains(.,'Email')] and not(.//*[contains(.,'Google Authenticator')])]" );
+    private void clickOktaGoogleAuthenticatorIfShown( WebDriver driver ) {
+        WebDriverWait shortWait = new WebDriverWait( driver, Duration.ofSeconds( 30 ) );
+        By[] locators = {
+                By.cssSelector( "[data-se='google_otp'] button" ),
+                By.xpath( "//div[contains(@class,'authenticator-row')][.//*[contains(.,'Google Authenticator')]]//button" ),
+                By.xpath( "//a[@data-se='factor-option'][.//*[contains(.,'Google Authenticator')]]" ),
+        };
         try {
-            shortWait.until( elementToBeClickable( locator ) ).click();
+            shortWait.until( d -> {
+                for ( By locator : locators ) {
+                    List<WebElement> elements = d.findElements( locator );
+                    if ( !elements.isEmpty() && elements.get( 0 ).isDisplayed() && elements.get( 0 ).isEnabled() ) {
+                        elements.get( 0 ).click();
+                        return true;
+                    }
+                }
+                return false;
+            } );
+            LOGGER.info( "Selected Google Authenticator from MFA method picker" );
         }
         catch ( org.openqa.selenium.TimeoutException e ) {
             LOGGER.info( "MFA method picker not shown; continuing to verification code step" );
@@ -151,7 +162,7 @@ public class ChromeScraper {
                 if ( false == driver.getCurrentUrl().contains( "/connect/" ) ) {
                     String googleAuth2faCode = authService.fetchCloudbedsGoogleAuth2faCode();
                     boolean useTotp = StringUtils.isNotBlank( googleAuth2faCode );
-                    clickOktaAuthenticatorOptionIfShown( driver, useTotp );
+                    clickOktaGoogleAuthenticatorIfShown( driver );
 
                     // MFA code: POST /idp/idx/challenge/answer with credentials.passcode (TOTP or email OTP)
                     wait.until( presenceOfElementLocated(
