@@ -10,6 +10,7 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.htmlunit.WebClient;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Cookie;
+import org.openqa.selenium.ElementNotInteractableException;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -79,31 +80,106 @@ public class ChromeScraper {
 
     /**
      * After password, Okta OIE may show select-authenticator-authenticate ({@code POST /idp/idx/challenge}
-     * with {@code authenticator.id}). Always choose Google Authenticator when that screen is shown.
+     * with {@code authenticator.id}), or it may default to email verification with a
+     * {@code data-se="switchAuthenticator"} link. Always choose Google Authenticator when possible.
      */
+    private void logOktaMfaPageState( WebDriver driver, String context ) {
+        LOGGER.info( "Okta MFA diagnostics ({}): url={}, title={}",
+                context, driver.getCurrentUrl(), driver.getTitle() );
+        JavascriptExecutor js = (JavascriptExecutor) driver;
+        LOGGER.info(
+                "Okta MFA DOM counts: authenticatorRows={}, googleOtp={}, switchAuthenticator={}, passcodeInputs={}, gen3AuthButtons={}",
+                js.executeScript( "return document.querySelectorAll('.authenticator-row').length" ),
+                js.executeScript( "return document.querySelectorAll('[data-se=\"google_otp\"]').length" ),
+                js.executeScript( "return document.querySelectorAll('[data-se=\"switchAuthenticator\"]').length" ),
+                js.executeScript( "return document.querySelectorAll('input[name=\"credentials.passcode\"]').length" ),
+                js.executeScript( "return document.querySelectorAll('[data-se=\"authenticator-button\"]').length" ) );
+        @SuppressWarnings( "unchecked" )
+        List<String> dataSe = (List<String>) js.executeScript(
+                "return Array.from(document.querySelectorAll('[data-se]')).slice(0, 40)"
+                        + ".map(e => e.getAttribute('data-se'));" );
+        LOGGER.info( "Okta MFA data-se attributes (first 40): {}", dataSe );
+        @SuppressWarnings( "unchecked" )
+        List<String> labels = (List<String>) js.executeScript(
+                "return Array.from(document.querySelectorAll('.authenticator-label'))"
+                        + ".map(e => (e.textContent || '').trim()).filter(Boolean);" );
+        if ( !labels.isEmpty() ) {
+            LOGGER.info( "Okta authenticator labels: {}", labels );
+        }
+    }
+
+    private boolean tryClick( WebDriver driver, WebElement element ) {
+        try {
+            if ( !element.isEnabled() ) {
+                return false;
+            }
+            try {
+                element.click();
+            }
+            catch ( ElementNotInteractableException e ) {
+                ( (JavascriptExecutor) driver ).executeScript( "arguments[0].click();", element );
+            }
+            return true;
+        }
+        catch ( Exception e ) {
+            return false;
+        }
+    }
+
+    private void clickIfPresent( WebDriver driver, By locator, String description ) {
+        List<WebElement> elements = driver.findElements( locator );
+        if ( !elements.isEmpty() && tryClick( driver, elements.get( 0 ) ) ) {
+            LOGGER.info( "Clicked {}", description );
+        }
+    }
+
     private void clickOktaGoogleAuthenticatorIfShown( WebDriver driver ) {
-        WebDriverWait shortWait = new WebDriverWait( driver, Duration.ofSeconds( 30 ) );
+        logOktaMfaPageState( driver, "before MFA selection" );
+
+        // Email may be pre-selected; use the footer link to reach the authenticator picker.
+        clickIfPresent( driver, By.cssSelector( "[data-se='switchAuthenticator']" ), "switch authenticator link" );
+
+        // Okta Gen2 uses <a class="button select-factor">, not <button>.
         By[] locators = {
-                By.cssSelector( "[data-se='google_otp'] button" ),
-                By.xpath( "//div[contains(@class,'authenticator-row')][.//*[contains(.,'Google Authenticator')]]//button" ),
+                By.cssSelector( "[data-se='google_otp'] .select-factor" ),
+                By.cssSelector( "[data-se='google_otp'] .button" ),
+                By.cssSelector( ".authenticator-button[data-se='google_otp'] .button" ),
+                By.xpath( "//div[contains(@class,'authenticator-row')][.//*[contains(.,'Google Authenticator')]]//*[contains(@class,'select-factor')]" ),
+                By.xpath( "//div[contains(@class,'authenticator-row')][.//*[contains(.,'Google Authenticator')]]//a[contains(@class,'button')]" ),
+                By.cssSelector( "button[data-se='authenticator-button'][aria-label*='Google Authenticator' i]" ),
                 By.xpath( "//a[@data-se='factor-option'][.//*[contains(.,'Google Authenticator')]]" ),
         };
+
+        WebDriverWait shortWait = new WebDriverWait( driver, Duration.ofSeconds( 30 ) );
         try {
             shortWait.until( d -> {
                 for ( By locator : locators ) {
-                    List<WebElement> elements = d.findElements( locator );
-                    if ( !elements.isEmpty() && elements.get( 0 ).isDisplayed() && elements.get( 0 ).isEnabled() ) {
-                        elements.get( 0 ).click();
-                        return true;
+                    for ( WebElement element : d.findElements( locator ) ) {
+                        if ( tryClick( d, element ) ) {
+                            return true;
+                        }
                     }
                 }
                 return false;
             } );
             LOGGER.info( "Selected Google Authenticator from MFA method picker" );
+            logOktaMfaPageState( driver, "after Google Authenticator selection" );
         }
         catch ( org.openqa.selenium.TimeoutException e ) {
+            logOktaMfaPageState( driver, "MFA picker not found" );
             LOGGER.info( "MFA method picker not shown; continuing to verification code step" );
         }
+    }
+
+    private void waitForPostPasswordMfaStep( WebDriver driver ) {
+        WebDriverWait postPasswordWait = new WebDriverWait( driver, Duration.ofSeconds( 60 ) );
+        postPasswordWait.until( or(
+                presenceOfElementLocated( By.cssSelector( ".authenticator-list, .authenticator-row" ) ),
+                presenceOfElementLocated( By.cssSelector( "[data-se='google_otp']" ) ),
+                presenceOfElementLocated( By.cssSelector( "[data-se='switchAuthenticator']" ) ),
+                presenceOfElementLocated( By.cssSelector( "[data-se='authenticator-button']" ) ),
+                presenceOfElementLocated(
+                        By.xpath( "//input[@name='credentials.passcode' and not(@type='password')]" ) ) ) );
     }
 
     public synchronized void loginToCloudbedsAndSaveSession() throws Exception {
@@ -158,18 +234,31 @@ public class ChromeScraper {
                 nextButton.click();
 
                 wait.until( stalenessOf( nextButton ) );
+                LOGGER.info( "After password submit, URL is {}", driver.getCurrentUrl() );
 
                 if ( false == driver.getCurrentUrl().contains( "/connect/" ) ) {
+                    try {
+                        waitForPostPasswordMfaStep( driver );
+                    }
+                    catch ( org.openqa.selenium.TimeoutException e ) {
+                        logOktaMfaPageState( driver, "post-password MFA step did not appear within 60s" );
+                    }
+
                     String googleAuth2faCode = authService.fetchCloudbedsGoogleAuth2faCode();
                     boolean useTotp = StringUtils.isNotBlank( googleAuth2faCode );
                     clickOktaGoogleAuthenticatorIfShown( driver );
 
                     // MFA code: POST /idp/idx/challenge/answer with credentials.passcode (TOTP or email OTP)
-                    wait.until( presenceOfElementLocated(
-                            By.xpath( "//input[@name='credentials.passcode' and not(@type='password')]" ) ) );
+                    By totpInput = By.xpath( "//input[@name='credentials.passcode' and not(@type='password')]" );
+                    try {
+                        wait.until( presenceOfElementLocated( totpInput ) );
+                    }
+                    catch ( org.openqa.selenium.TimeoutException e ) {
+                        logOktaMfaPageState( driver, "TOTP input not found after MFA selection" );
+                        throw e;
+                    }
 
-                    WebElement scaCode = driver.findElement(
-                            By.xpath( "//input[@name='credentials.passcode' and not(@type='password')]" ) );
+                    WebElement scaCode = driver.findElement( totpInput );
                     if ( useTotp ) {
                         LOGGER.info( "Attempting TOTP verification: " + googleAuth2faCode );
                         scaCode.sendKeys( googleAuth2faCode );
