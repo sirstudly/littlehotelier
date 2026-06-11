@@ -154,8 +154,7 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
             return;
         }
 
-        LOGGER.debug( "Cloudbeds WebSocket other message: {}",
-                trimmed.length() > 200 ? trimmed.substring( 0, 200 ) + "..." : trimmed );
+        LOGGER.info( "Cloudbeds WebSocket other message: {}", trimmed );
     }
 
     private void handleOnMigrate( JsonObject root ) {
@@ -190,7 +189,7 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
             }
         }
         else {
-            LOGGER.debug( "Cloudbeds WebSocket payload action ignored: {}", action );
+            LOGGER.info( "Cloudbeds WebSocket payload action ignored: {}", action );
         }
     }
 
