@@ -54,6 +54,7 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
     private final CountDownLatch closedLatch = new CountDownLatch( 1 );
 
     private volatile String lastGuaranteeToken;
+    private volatile boolean authRejected;
 
     public CloudbedsWebSocketClient( URI serverUri, Map<String, String> httpHeaders,
             String propertyId, String version, String frontVersion, String csrf, String migrateId,
@@ -74,6 +75,13 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
      */
     public void awaitClosed() throws InterruptedException {
         closedLatch.await();
+    }
+
+    /**
+     * @return true if the server explicitly rejected authentication ({@code auth success=false})
+     */
+    public boolean isAuthRejected() {
+        return authRejected;
     }
 
     @Override
@@ -122,8 +130,16 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
         String action = root.has( "action" ) ? root.get( "action" ).getAsString() : null;
 
         if ( "auth".equals( action ) ) {
-            LOGGER.info( "Cloudbeds WebSocket auth: success={} property_id={}",
-                    root.get( "success" ), root.get( "property_id" ) );
+            boolean success = root.has( "success" ) && root.get( "success" ).getAsBoolean();
+            if ( success ) {
+                LOGGER.info( "Cloudbeds WebSocket auth OK: property_id={}", root.get( "property_id" ) );
+            }
+            else {
+                authRejected = true;
+                LOGGER.warn( "Cloudbeds WebSocket auth REJECTED (success=false) for property_id={}. "
+                        + "The handshake cookies were not accepted by websocket.cloudbeds.com. Raw frame: {}",
+                        root.get( "property_id" ), trimmed );
+            }
             return;
         }
 

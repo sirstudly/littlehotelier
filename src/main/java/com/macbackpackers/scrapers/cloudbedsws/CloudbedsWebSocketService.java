@@ -170,6 +170,9 @@ public class CloudbedsWebSocketService {
         currentClient = client;
         try {
             LOGGER.info( "Connecting to Cloudbeds calendar WebSocket: {}", uri );
+            LOGGER.info( "WS handshake details: cookiePresent={} cookieNames={} userAgentPresent={} frontVersion={}",
+                    session.cookies != null, summariseCookieNames( session.cookies ),
+                    session.userAgent != null, session.frontVersion );
             boolean connected = client.connectBlocking( CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS );
             if ( !connected ) {
                 LOGGER.warn( "Could not connect to Cloudbeds calendar WebSocket (timeout)" );
@@ -177,11 +180,38 @@ public class CloudbedsWebSocketService {
                 return false;
             }
             client.awaitClosed();
+            if ( client.isAuthRejected() ) {
+                LOGGER.warn( "Cloudbeds WebSocket authentication was rejected. The stored session cookies "
+                        + "(hbo_cloudbeds_cookies) are not accepted by websocket.cloudbeds.com. A session refresh "
+                        + "(ResetCloudbedsSessionJob) may be required, or the WS needs a cookie not captured at login." );
+                return false; // treat as failure so we back off rather than hot-loop
+            }
             return true;
         }
         finally {
             currentClient = null;
         }
+    }
+
+    /**
+     * Returns a comma-separated list of cookie names (no values) for diagnostic logging.
+     */
+    private static String summariseCookieNames( String cookies ) {
+        if ( cookies == null || cookies.isEmpty() ) {
+            return "(none)";
+        }
+        StringBuilder sb = new StringBuilder();
+        for ( String pair : cookies.split( ";" ) ) {
+            int eq = pair.indexOf( '=' );
+            String name = ( eq > 0 ? pair.substring( 0, eq ) : pair ).trim();
+            if ( !name.isEmpty() ) {
+                if ( sb.length() > 0 ) {
+                    sb.append( ',' );
+                }
+                sb.append( name );
+            }
+        }
+        return sb.toString();
     }
 
     /**
