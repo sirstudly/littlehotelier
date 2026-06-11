@@ -60,6 +60,22 @@
         </triggeringPolicy>
     </appender>
 
+    <!-- dedicated log file for Cloudbeds calendar WebSocket events -->
+    <appender name="CLOUDBEDS-EVENTS" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${USER_HOME}/cloudbeds-events.log</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <Pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %level - %msg%n</Pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <FileNamePattern>${USER_HOME}/cloudbeds-events.%i.log.zip</FileNamePattern>
+            <MinIndex>1</MinIndex>
+            <MaxIndex>10</MaxIndex>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <MaxFileSize>50MB</MaxFileSize>
+        </triggeringPolicy>
+    </appender>
+
     <logger name="org.hibernate" level="INFO" />
     <logger name="org.quartz" level="INFO" />
 
@@ -74,6 +90,12 @@
 
     <logger name="com.macbackpackers" level="INFO" additivity="false">
         <appender-ref ref="BY-JOB" />
+        <appender-ref ref="STDOUT" />
+    </logger>
+
+    <!-- Cloudbeds calendar WebSocket events go to their own file (and the console) -->
+    <logger name="cloudbeds.events" level="INFO" additivity="false">
+        <appender-ref ref="CLOUDBEDS-EVENTS" />
         <appender-ref ref="STDOUT" />
     </logger>
     

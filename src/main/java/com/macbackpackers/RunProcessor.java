@@ -3,6 +3,7 @@ package com.macbackpackers;
 
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.ShutdownException;
+import com.macbackpackers.scrapers.cloudbedsws.CloudbedsWebSocketService;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.ProcessorService;
 import com.macbackpackers.utils.AnyByteStringToStringConverter;
@@ -48,6 +49,9 @@ public class RunProcessor
     @Autowired
     private GenericObjectPool<WebDriver> webDriverObjectPool;
 
+    @Autowired
+    private CloudbedsWebSocketService cloudbedsWebSocketService;
+
     // exclusive-file lock so only ever one instance of the processor is running
     private FileLock processorLock;
     
@@ -91,6 +95,12 @@ public class RunProcessor
         acquireLock();
         dao.resetAllProcessingJobsToSubmitted();
 //        scheduler.reloadScheduledJobs(); // load and start the scheduler
+
+        // keep a permanent connection to the Cloudbeds calendar to monitor bookings (logging-only for now)
+        if ( dao.isCloudbeds() ) {
+            cloudbedsWebSocketService.startMonitoring();
+        }
+
         processorService.processJobsLoopIndefinitely();
     }
 
@@ -128,6 +138,12 @@ public class RunProcessor
      */
     public void shutdown() {
         LOGGER.info( "Shutting down... Closing WebDriver pool." );
+        try {
+            cloudbedsWebSocketService.stopMonitoring();
+        }
+        catch ( Exception ex ) {
+            LOGGER.error( "Error attempting to stop Cloudbeds WebSocket monitor.", ex );
+        }
         try {
             webDriverObjectPool.close(); // This ensures all objects in the pool are destroyed
         }
