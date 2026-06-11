@@ -2,20 +2,32 @@
 package com.macbackpackers.scrapers.cloudbedsws;
 
 import java.net.URI;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.htmlunit.CookieManager;
+import org.htmlunit.HttpMethod;
+import org.htmlunit.Page;
 import org.htmlunit.WebClient;
+import org.htmlunit.WebRequest;
+import org.htmlunit.util.Cookie;
+import org.htmlunit.util.NameValuePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.CloudbedsJsonRequestFactory;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -41,6 +53,7 @@ public class CloudbedsWebSocketService {
 
     private static final String WS_URL_PREFIX = "wss://websocket.cloudbeds.com/calendar/";
     private static final String ORIGIN = "https://hotels.cloudbeds.com";
+    private static final String REFRESH_URL = ORIGIN + "/auth/session_access_token/refresh";
     private static final Pattern CSRF_COOKIE_PATTERN = Pattern.compile( "csrf_accessa_cookie=([0-9a-f]+)" );
 
     private static final int CONNECT_TIMEOUT_SEC = 30;
@@ -233,6 +246,12 @@ public class CloudbedsWebSocketService {
                 LOGGER.warn( "Cloudbeds session has no CSRF token yet; cannot open WebSocket" );
                 return null;
             }
+
+            // the WS rejects sessions whose short-lived access token ('at' cookie; ~8h JWT) has
+            // expired, so mint a fresh one immediately before connecting (mirrors the browser,
+            // which POSTs /auth/session_access_token/refresh right before opening the WS)
+            s.cookies = refreshAccessToken( s );
+            s.csrf = resolveCsrf( s.cookies );
             return s;
         }
         catch ( Exception e ) {
@@ -259,6 +278,112 @@ public class CloudbedsWebSocketService {
         catch ( Exception e ) {
             return null;
         }
+    }
+
+    /**
+     * Refreshes the short-lived Cloudbeds access token ('at' cookie) using the stored refresh token
+     * ('rt' cookie), exactly as the browser does before opening the calendar WebSocket:
+     * {@code POST /auth/session_access_token/refresh} with {@code code=<rt>&csrf_accessa=<csrf>}.
+     * <p>
+     * The refresh rotates the refresh token (one-time use), so on success the updated cookie set is
+     * persisted back to {@code hbo_cloudbeds_cookies} (REST is unaffected; it does not use at/rt).
+     * On any failure the original cookie string is returned unchanged and nothing is persisted.
+     *
+     * @param s session holding the current cookies/csrf/propertyId/userAgent
+     * @return the refreshed cookie string, or the original cookies if the refresh failed
+     */
+    private String refreshAccessToken( WsSession s ) {
+        String refreshToken = extractCookieValue( s.cookies, "rt" );
+        if ( refreshToken == null ) {
+            LOGGER.warn( "No 'rt' (refresh token) cookie in stored session; skipping access token refresh" );
+            return s.cookies;
+        }
+        try ( WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
+
+            // seed the cookie jar with the stored session so HtmlUnit sends them and
+            // applies the Set-Cookie updates (at/rt rotation) from the response
+            CookieManager cookieManager = webClient.getCookieManager();
+            cookieManager.setCookiesEnabled( true );
+            cookieManager.clearCookies();
+            for ( String pair : s.cookies.split( ";" ) ) {
+                int eq = pair.indexOf( '=' );
+                if ( eq > 0 ) {
+                    cookieManager.addCookie( new Cookie( ".cloudbeds.com",
+                            pair.substring( 0, eq ).trim(), pair.substring( eq + 1 ).trim(), "/", null, true ) );
+                }
+            }
+
+            WebRequest req = new WebRequest( new URL( REFRESH_URL ), HttpMethod.POST );
+            req.setAdditionalHeader( "Accept", "application/json, text/plain, */*" );
+            req.setAdditionalHeader( "Content-Type", "application/x-www-form-urlencoded; charset=UTF-8" );
+            req.setAdditionalHeader( "Origin", ORIGIN );
+            req.setAdditionalHeader( "Referer", ORIGIN + "/connect/" + s.propertyId );
+            req.setAdditionalHeader( "X-Property-Id", s.propertyId );
+            req.setAdditionalHeader( "Cache-Control", "no-cache" );
+            req.setAdditionalHeader( "Pragma", "no-cache" );
+            if ( s.userAgent != null ) {
+                req.setAdditionalHeader( "User-Agent", s.userAgent );
+            }
+            req.setRequestParameters( Arrays.asList(
+                    new NameValuePair( "code", refreshToken ),
+                    new NameValuePair( "csrf_accessa", s.csrf ) ) );
+
+            Page page = webClient.getPage( req );
+            int status = page.getWebResponse().getStatusCode();
+            String body = page.getWebResponse().getContentAsString();
+            if ( status != 200 ) {
+                LOGGER.warn( "Access token refresh failed (HTTP {}): {}", status, abbreviate( body ) );
+                return s.cookies;
+            }
+            JsonObject json = JsonParser.parseString( body ).getAsJsonObject();
+            if ( false == json.has( "accessToken" ) ) {
+                LOGGER.warn( "Access token refresh response has no accessToken: {}", abbreviate( body ) );
+                return s.cookies;
+            }
+
+            // rebuild the cookie string from the (now updated) jar and persist the rotated tokens
+            String refreshedCookies = rebuildCookieString( cookieManager );
+            jsonRequestFactory.setCookies( refreshedCookies );
+            LOGGER.info( "Access token refreshed OK; updated cookies persisted ({} cookies)",
+                    cookieManager.getCookies().size() );
+            return refreshedCookies;
+        }
+        catch ( Exception e ) {
+            LOGGER.warn( "Access token refresh failed; continuing with stored cookies: {}", e.toString() );
+            return s.cookies;
+        }
+    }
+
+    /** Joins all cookies in the jar into a single Cookie header value. */
+    private static String rebuildCookieString( CookieManager cookieManager ) {
+        List<String> pairs = new ArrayList<>();
+        for ( Cookie c : cookieManager.getCookies() ) {
+            pairs.add( c.getName() + "=" + c.getValue() );
+        }
+        return String.join( "; ", pairs );
+    }
+
+    /** Extracts the value of the named cookie from a Cookie header string, or null if absent. */
+    private static String extractCookieValue( String cookies, String name ) {
+        if ( cookies == null ) {
+            return null;
+        }
+        for ( String pair : cookies.split( ";" ) ) {
+            int eq = pair.indexOf( '=' );
+            if ( eq > 0 && name.equals( pair.substring( 0, eq ).trim() ) ) {
+                return pair.substring( eq + 1 ).trim();
+            }
+        }
+        return null;
+    }
+
+    /** Trims a (possibly large) response body for logging. */
+    private static String abbreviate( String body ) {
+        if ( body == null ) {
+            return "(empty)";
+        }
+        return body.length() > 500 ? body.substring( 0, 500 ) + "..." : body;
     }
 
     private String resolveFrontVersion() {

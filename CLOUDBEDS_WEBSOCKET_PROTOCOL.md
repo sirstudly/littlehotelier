@@ -32,6 +32,25 @@ So there are **two useful data sources**: the **`on_migrate` bulk snapshot** (fu
 }
 ```
 
+Authentication is taken from the **cookies on the WS handshake** (no auth message is sent by the
+client). The session is keyed on `acessa_session`, but it is only accepted while the short-lived
+**`at` access-token cookie (a JWT, ~8h lifetime)** is current. On failure the server replies with
+`success: false` and names the session cookie (`"name":"acessa_session"`), then closes with code 1000.
+
+The browser avoids this by minting a fresh access token **immediately before** opening the WS:
+
+```
+POST https://hotels.cloudbeds.com/auth/session_access_token/refresh
+Content-Type: application/x-www-form-urlencoded
+x-property-id: <propertyId>
+
+code=<rt cookie value>&csrf_accessa=<csrf_accessa_cookie value>
+```
+
+The response returns `{"refreshToken": ..., "accessToken": ...}` and Set-Cookie rotates both the
+`at` and `rt` cookies. Note the **refresh token is one-time use** — the rotated `rt` must be kept
+for the next refresh. Any WS client must replicate this refresh-then-connect sequence.
+
 ### 2. >>> Migrate (client → server)
 
 ```json
