@@ -1,0 +1,210 @@
+package com.macbackpackers.services;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.util.stream.Collectors;
+
+import org.apache.commons.io.IOUtils;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import com.google.gson.FieldNamingPolicy;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.services.EdinburghVisitorLevyCalculator.LevyCalculation;
+import com.macbackpackers.services.EdinburghVisitorLevyCalculator.LevyNight;
+
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.comparesEqualTo;
+import static org.hamcrest.Matchers.is;
+
+public class EdinburghVisitorLevyCalculatorTest {
+
+    private static final LocalDate STAY_DATE_FROM = LocalDate.of( 2026, 7, 24 );
+    private static final LocalDate BOOKED_DATE_FROM = LocalDate.of( 2025, 10, 1 );
+    private static final BigDecimal HWL_DEPOSIT_FRACTION = new BigDecimal( "0.15" );
+
+    private Gson gson;
+    private Reservation baseReservation;
+
+    @BeforeEach
+    public void setUp() throws IOException {
+        gson = new GsonBuilder()
+                .setFieldNamingPolicy( FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES )
+                .create();
+        String json = IOUtils.toString(
+                getClass().getClassLoader().getResourceAsStream( "get_reservation_20220731.json" ),
+                StandardCharsets.UTF_8 );
+        baseReservation = gson.fromJson( json, Reservation.class );
+    }
+
+    @Test
+    public void testDirectBookingLevyOnThreeNights() {
+        Reservation reservation = reservationWithRates(
+                "Walk-In", "2026-10-01", "2026-10-04", "2025-11-01",
+                rateLine( "2026-10-01", "55.00" ),
+                rateLine( "2026-10-02", "55.00" ),
+                rateLine( "2026-10-03", "55.00" ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM, HWL_DEPOSIT_FRACTION );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "8.25" ) ) );
+        assertThat( calculation.getEligibleNights().size(), is( 3 ) );
+        assertThat( EdinburghVisitorLevyCalculator.useInclusiveTax( reservation ), is( false ) );
+    }
+
+    @Test
+    public void testBookingDotComUsesInclusiveTax() {
+        Reservation reservation = reservationWithRates(
+                "Booking.com", "2026-10-01", "2026-10-02", "2025-11-01",
+                rateLine( "2026-10-01", "165.00" ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM, HWL_DEPOSIT_FRACTION );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "8.25" ) ) );
+        assertThat( EdinburghVisitorLevyCalculator.useInclusiveTax( reservation ), is( true ) );
+    }
+
+    @Test
+    public void testHostelworldGrossUp() {
+        Reservation reservation = reservationWithRates(
+                "Hostelworld", "2026-10-01", "2026-10-04", "2025-11-01",
+                rateLine( "2026-10-01", "51.41" ),
+                rateLine( "2026-10-02", "51.41" ),
+                rateLine( "2026-10-03", "51.41" ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM, HWL_DEPOSIT_FRACTION );
+
+        assertThat( calculation.isHostelworldGrossUp(), is( true ) );
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "9.07" ) ) );
+    }
+
+    @Test
+    public void testStayStraddlingLevyStartDate() {
+        Reservation reservation = reservationWithRates(
+                "Walk-In", "2026-07-22", "2026-07-26", "2025-11-01",
+                rateLine( "2026-07-22", "100.00" ),
+                rateLine( "2026-07-23", "100.00" ),
+                rateLine( "2026-07-24", "100.00" ),
+                rateLine( "2026-07-25", "100.00" ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM, HWL_DEPOSIT_FRACTION );
+
+        assertThat( calculation.getEligibleNights().stream().map( LevyNight::getDate ).collect( Collectors.toList() ),
+                is( java.util.Arrays.asList(
+                        LocalDate.of( 2026, 7, 24 ),
+                        LocalDate.of( 2026, 7, 25 ) ) ) );
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "10.00" ) ) );
+    }
+
+    @Test
+    public void testCapsLevyAtFiveNights() {
+        Reservation reservation = reservationWithRates(
+                "Walk-In", "2026-10-01", "2026-10-08", "2025-11-01",
+                rateLine( "2026-10-01", "60.00" ),
+                rateLine( "2026-10-02", "60.00" ),
+                rateLine( "2026-10-03", "60.00" ),
+                rateLine( "2026-10-04", "60.00" ),
+                rateLine( "2026-10-05", "60.00" ),
+                rateLine( "2026-10-06", "60.00" ),
+                rateLine( "2026-10-07", "60.00" ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM, HWL_DEPOSIT_FRACTION );
+
+        assertThat( calculation.getEligibleNights().size(), is( 5 ) );
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "15.00" ) ) );
+    }
+
+    @Test
+    public void testBookingBeforeLevyBookingDateIsExempt() {
+        Reservation reservation = reservationWithRates(
+                "Walk-In", "2026-10-01", "2026-10-02", "2025-09-30",
+                rateLine( "2026-10-01", "165.00" ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM, HWL_DEPOSIT_FRACTION );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
+        assertThat( calculation.isBookingExempt(), is( true ) );
+    }
+
+    @Test
+    public void testCanceledReservationHasZeroLevy() {
+        Reservation reservation = reservationWithRates(
+                "Walk-In", "2026-10-01", "2026-10-02", "2025-11-01",
+                rateLine( "2026-10-01", "165.00" ) );
+        reservation.setStatus( "canceled" );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM, HWL_DEPOSIT_FRACTION );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
+        assertThat( calculation.isCanceledOrNoShow(), is( true ) );
+        assertThat( EdinburghVisitorLevyCalculator.buildAdjustmentNote( calculation ),
+                is( "Reservation canceled/no-show - visitor levy not applicable. -RONBOT" ) );
+    }
+
+    @Test
+    public void testNoShowReservationHasZeroLevy() {
+        Reservation reservation = reservationWithRates(
+                "Walk-In", "2026-10-01", "2026-10-02", "2025-11-01",
+                rateLine( "2026-10-01", "165.00" ) );
+        reservation.setStatus( "no_show" );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM, HWL_DEPOSIT_FRACTION );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
+        assertThat( calculation.isCanceledOrNoShow(), is( true ) );
+    }
+
+    @Test
+    public void testResolveTaxIdFromPropertyContentFixture() throws IOException {
+        String json = IOUtils.toString(
+                getClass().getClassLoader().getResourceAsStream( "get_property_content_taxes.json" ),
+                StandardCharsets.UTF_8 );
+        JsonObject propertyContent = gson.fromJson( json, JsonObject.class );
+
+        String exclusiveTaxId = propertyContent.get( "taxes" ).getAsJsonArray().asList().stream()
+                .map( e -> e.getAsJsonObject() )
+                .filter( tax -> "Edinburgh Visitor Levy 2026".equals(
+                        tax.get( "name_langs" ).getAsJsonObject().get( "en" ).getAsString() ) )
+                .map( tax -> tax.get( "id" ).getAsString() )
+                .findFirst()
+                .orElseThrow( () -> new IllegalStateException( "tax not found" ) );
+
+        assertThat( exclusiveTaxId, is( "824186" ) );
+    }
+
+    @Test
+    public void testWithinTolerance() {
+        assertThat( EdinburghVisitorLevyCalculator.isWithinTolerance( new BigDecimal( "0.005" ) ), is( true ) );
+        assertThat( EdinburghVisitorLevyCalculator.isWithinTolerance( new BigDecimal( "0.02" ) ), is( false ) );
+    }
+
+    private Reservation reservationWithRates( String sourceName, String checkin, String checkout,
+            String bookingDate, String... detailedRates ) {
+        Reservation reservation = gson.fromJson( gson.toJson( baseReservation ), Reservation.class );
+        reservation.setSourceName( sourceName );
+        reservation.setCheckinDate( checkin );
+        reservation.setCheckoutDate( checkout );
+        reservation.setBookingDateHotelTime( bookingDate + " 12:00:00" );
+        reservation.setStatus( "confirmed" );
+        reservation.getBookingRooms().get( 0 ).setDetailedRates(
+                "[" + String.join( ",", detailedRates ) + "]" );
+        return reservation;
+    }
+
+    private String rateLine( String date, String rate ) {
+        return String.format( "{\"date\":\"%s\",\"rate\":%s,\"adults\":1,\"kids\":0}", date, rate );
+    }
+}

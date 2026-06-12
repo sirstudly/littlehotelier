@@ -9,7 +9,9 @@ import java.time.Month;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.StreamSupport;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -35,6 +37,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String nights;
     private String cancellationDate;
     private String sourceName;
+    private String source;
     private String isRootSource;
     private String identifier;
     private String specialRequests;
@@ -264,6 +267,14 @@ public class Reservation extends CloudbedsJsonResponse {
         this.sourceName = sourceName;
     }
 
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource( String source ) {
+        this.source = source;
+    }
+
     public String getIsRootSource() {
         return isRootSource;
     }
@@ -474,6 +485,44 @@ public class Reservation extends CloudbedsJsonResponse {
                 .map( dr -> dr.get( "rate" ).getAsBigDecimal() )
                 .reduce( BigDecimal.ZERO, BigDecimal::add )
                 .setScale( 2, RoundingMode.HALF_UP );
+    }
+
+    /**
+     * Returns nightly accommodation rates summed across all booking rooms, keyed by date.
+     *
+     * @param gson Gson encoder/decoder
+     * @return map of date to total rate for that night
+     */
+    public Map<LocalDate, BigDecimal> getRatesByDate( Gson gson ) {
+        Map<LocalDate, BigDecimal> ratesByDate = new LinkedHashMap<>();
+        if ( getBookingRooms() == null ) {
+            return ratesByDate;
+        }
+        for ( BookingRoom bookingRoom : getBookingRooms() ) {
+            if ( bookingRoom.getDetailedRates() == null ) {
+                continue;
+            }
+            StreamSupport.stream( gson.fromJson( bookingRoom.getDetailedRates(), JsonArray.class ).spliterator(), false )
+                    .map( dr -> dr.getAsJsonObject() )
+                    .forEach( dr -> {
+                        LocalDate date = LocalDate.parse( dr.get( "date" ).getAsString() );
+                        BigDecimal rate = dr.get( "rate" ).getAsBigDecimal();
+                        ratesByDate.merge( date, rate, BigDecimal::add );
+                    } );
+        }
+        return ratesByDate;
+    }
+
+    public boolean isHostelworldBooking() {
+        return getSourceName() != null && getSourceName().startsWith( "Hostelworld" );
+    }
+
+    public boolean isBookingDotComBooking() {
+        return "Booking.com".equals( getSourceName() );
+    }
+
+    public boolean isCanceledOrNoShow() {
+        return "canceled".equals( getStatus() ) || "no_show".equals( getStatus() );
     }
 
     public int getNumberOfGuests() {

@@ -1298,4 +1298,58 @@ public class CloudbedsJsonRequestFactory {
         return webRequest;
     }
 
+    /**
+     * Adds a new tax/fee charge to a reservation folio.
+     */
+    public WebRequest createAddNewFeeOrTaxRequest( String reservationId, String bookingRoomId, String taxId,
+            BigDecimal amount, String billingPortalId, String frontVersion ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_fee_or_tax" );
+        String datetime = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm" ).format( java.time.LocalDateTime.now() );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "id", "tax-" + taxId ),
+                new NameValuePair( "reservation_id", reservationId ),
+                new NameValuePair( "amount", CURRENCY_FORMAT.format( amount ) ),
+                new NameValuePair( "assign_to", bookingRoomId ),
+                new NameValuePair( "auto_date", "1" ),
+                new NameValuePair( "datetime", datetime ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Adjusts an existing tax/fee charge on a reservation folio.
+     */
+    public WebRequest createAddNewAdjustRequest( Reservation res, String bookingRoomId, String taxId,
+            BigDecimal amount, String notes, String billingPortalId, String frontVersion ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_adjust" );
+        String datetime = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm" ).format( java.time.LocalDateTime.now() );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "adjust[id]", "tax_" + taxId ),
+                new NameValuePair( "adjust[reservation_id]", res.getReservationId() ),
+                new NameValuePair( "adjust[source]", res.getSource() ),
+                new NameValuePair( "adjust[is_hotel_collect_booking]", res.getIsHotelCollectBooking() ),
+                new NameValuePair( "adjust[is_root_source]", res.getIsRootSource() ),
+                new NameValuePair( "adjust[booking_rooms_id]", bookingRoomId ),
+                new NameValuePair( "adjust[amount]", CURRENCY_FORMAT.format( amount ) ),
+                new NameValuePair( "adjust[notes]", notes ),
+                new NameValuePair( "adjust[auto_date]", "1" ),
+                new NameValuePair( "adjust[datetime]", datetime ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
 }

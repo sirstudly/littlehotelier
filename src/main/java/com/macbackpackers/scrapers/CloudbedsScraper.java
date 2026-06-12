@@ -526,6 +526,89 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Resolves a property tax ID by matching the English label in cached property content.
+     */
+    public String resolveTaxIdByLabel( WebClient webClient, String label ) throws IOException {
+        JsonObject propertyContent = getPropertyContent( webClient );
+        if ( false == propertyContent.has( "taxes" ) ) {
+            throw new MissingUserDataException( "No taxes configured in property content" );
+        }
+        Optional<String> taxId = StreamSupport.stream(
+                propertyContent.get( "taxes" ).getAsJsonArray().spliterator(), false )
+                .map( JsonElement::getAsJsonObject )
+                .filter( tax -> tax.has( "name_langs" )
+                        && tax.get( "name_langs" ).getAsJsonObject().has( "en" )
+                        && label.equals( tax.get( "name_langs" ).getAsJsonObject().get( "en" ).getAsString() ) )
+                .map( tax -> tax.get( "id" ).getAsString() )
+                .findFirst();
+        if ( false == taxId.isPresent() ) {
+            throw new MissingUserDataException( "Unable to resolve tax ID for label: " + label );
+        }
+        return taxId.get();
+    }
+
+    /**
+     * Returns the net visitor levy total currently on the reservation folio.
+     */
+    public BigDecimal getCurrentVisitorLevyTotal( WebClient webClient, Reservation res, String... levyLabels ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest(
+                res, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        JsonObject rpt = doRequest( webClient, requestSettings );
+        List<String> labels = Arrays.asList( levyLabels );
+
+        return StreamSupport.stream( rpt.get( "records" ).getAsJsonArray().spliterator(), false )
+                .map( JsonElement::getAsJsonObject )
+                .filter( r -> {
+                    if ( r.has( "is_voided" ) && false == r.get( "is_voided" ).isJsonNull()
+                            && "1".equals( r.get( "is_voided" ).getAsString() ) ) {
+                        return false;
+                    }
+                    String type = r.has( "type" ) ? r.get( "type" ).getAsString() : "";
+                    if ( false == "tax".equals( type ) && false == "adjustment".equals( type ) ) {
+                        return false;
+                    }
+                    String description = r.has( "description" ) ? r.get( "description" ).getAsString() : "";
+                    return labels.contains( description );
+                } )
+                .map( r -> parseFolioCreditAmount( r.get( "credit" ).getAsString() ) )
+                .reduce( BigDecimal.ZERO, BigDecimal::add )
+                .setScale( 2, java.math.RoundingMode.HALF_UP );
+    }
+
+    private BigDecimal parseFolioCreditAmount( String credit ) {
+        if ( StringUtils.isBlank( credit ) ) {
+            return BigDecimal.ZERO;
+        }
+        String normalized = credit.replace( "£", "" ).replace( ",", "" ).trim();
+        return new BigDecimal( normalized );
+    }
+
+    /**
+     * Adds a visitor levy charge to the first booking room on the reservation.
+     */
+    public void addVisitorLevyCharge( WebClient webClient, Reservation res, String taxId, BigDecimal amount ) throws IOException {
+        BookingRoom bookingRoom = res.getBookingRooms().get( 0 );
+        WebRequest requestSettings = jsonRequestFactory.createAddNewFeeOrTaxRequest(
+                res.getReservationId(), bookingRoom.getId(), taxId, amount,
+                getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        doRequest( webClient, requestSettings );
+        LOGGER.info( "Added visitor levy charge of {} to reservation {}", amount, res.getReservationId() );
+    }
+
+    /**
+     * Adjusts the visitor levy on the first booking room on the reservation.
+     */
+    public void adjustVisitorLevyCharge( WebClient webClient, Reservation res, String taxId,
+            BigDecimal amount, String notes ) throws IOException {
+        BookingRoom bookingRoom = res.getBookingRooms().get( 0 );
+        WebRequest requestSettings = jsonRequestFactory.createAddNewAdjustRequest(
+                res, bookingRoom.getId(), taxId, amount, notes,
+                getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        doRequest( webClient, requestSettings );
+        LOGGER.info( "Adjusted visitor levy by {} on reservation {}", amount, res.getReservationId() );
+    }
+
+    /**
      * Runs Room Assignments report and returns the raw response.
      * 
      * @param webClient web client instance to use

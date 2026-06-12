@@ -1,0 +1,20 @@
+{
+  "success": true,
+  "taxes": [
+    {
+      "id": "687007",
+      "name_langs": { "en": "VAT" },
+      "type": "inclusive"
+    },
+    {
+      "id": "824186",
+      "name_langs": { "en": "Edinburgh Visitor Levy 2026" },
+      "type": "exclusive"
+    },
+    {
+      "id": "824360",
+      "name_langs": { "en": "Edinburgh Visitor Levy (Inclusive)" },
+      "type": "inclusive"
+    }
+  ]
+}
