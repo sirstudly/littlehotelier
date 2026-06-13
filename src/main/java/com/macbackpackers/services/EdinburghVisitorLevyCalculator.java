@@ -17,6 +17,9 @@ import com.macbackpackers.beans.cloudbeds.responses.Reservation;
  */
 public final class EdinburghVisitorLevyCalculator {
 
+    public static final String EXCLUSIVE_TAX_LABEL = "Edinburgh Visitor Levy 2026";
+    public static final String INCLUSIVE_TAX_LABEL = "Edinburgh Visitor Levy (Inclusive)";
+
     private static final BigDecimal LEVY_RATE = new BigDecimal( "0.05" );
     private static final int MAX_LEVY_NIGHTS = 5;
     private static final BigDecimal TOLERANCE = new BigDecimal( "0.01" );
@@ -156,5 +159,18 @@ public final class EdinburghVisitorLevyCalculator {
 
     public static boolean useInclusiveTax( Reservation reservation ) {
         return reservation.isBookingDotComBooking();
+    }
+
+    public static BigDecimal getVisitorLevyTotal( Reservation reservation ) {
+        return reservation.getVisitorLevyTotal( EXCLUSIVE_TAX_LABEL, INCLUSIVE_TAX_LABEL );
+    }
+
+    /**
+     * Balance due excluding visitor levy, which is collected on arrival when the guest actually stays.
+     */
+    public static BigDecimal getBalanceDueExcludingVisitorLevy( Reservation reservation ) {
+        return reservation.getBalanceDue()
+                .subtract( getVisitorLevyTotal( reservation ) )
+                .setScale( 2, RoundingMode.HALF_UP );
     }
 }

@@ -212,6 +212,21 @@ public class EdinburghVisitorLevyCalculatorTest {
     }
 
     @Test
+    public void testBalanceDueExcludingVisitorLevy() {
+        TaxBreakdownItem exclusive = new TaxBreakdownItem();
+        exclusive.setName( "Edinburgh Visitor Levy 2026" );
+        exclusive.setAmount( new BigDecimal( "1.56" ) );
+
+        BalanceDetails balanceDetails = new BalanceDetails();
+        balanceDetails.setTaxBreakdown( Arrays.asList( exclusive ) );
+        baseReservation.setBalanceDetails( balanceDetails );
+        baseReservation.setBalanceDue( new BigDecimal( "50.00" ) );
+
+        assertThat( EdinburghVisitorLevyCalculator.getBalanceDueExcludingVisitorLevy( baseReservation ),
+                comparesEqualTo( new BigDecimal( "48.44" ) ) );
+    }
+
+    @Test
     public void testWithinTolerance() {
         assertThat( EdinburghVisitorLevyCalculator.isWithinTolerance( new BigDecimal( "0.005" ) ), is( true ) );
         assertThat( EdinburghVisitorLevyCalculator.isWithinTolerance( new BigDecimal( "0.02" ) ), is( false ) );

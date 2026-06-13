@@ -316,6 +316,16 @@ public class PaymentProcessorService {
             }
         }
 
+        final BigDecimal amountToCharge = EdinburghVisitorLevyCalculator.getBalanceDueExcludingVisitorLevy( cbReservation );
+        final BigDecimal visitorLevy = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( cbReservation );
+        if ( visitorLevy.compareTo( BigDecimal.ZERO ) > 0 ) {
+            LOGGER.info( "Excluding visitor levy of {} from non-refundable charge (collected on arrival).", visitorLevy );
+        }
+        if ( amountToCharge.compareTo( BigDecimal.ZERO ) <= 0 ) {
+            LOGGER.info( "Nothing to charge after excluding visitor levy from balance due." );
+            return;
+        }
+
         final String WILL_POST_AUTOMATICALLY = " will post automatically when customer confirms via email.";
         try {
             if ( cbReservation.containsNote( WILL_POST_AUTOMATICALLY ) ) {
@@ -324,9 +334,9 @@ public class PaymentProcessorService {
             }
 
             // should have credit card details at this point; attempt autocharge
-            cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
+            cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, amountToCharge );
             cloudbedsScraper.addArchivedNote( webClient, reservationId, "Outstanding balance of "
-                    + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() ) + " successfully charged." );
+                    + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + " successfully charged." );
 
             // mark booking as fully paid in Hostelworld
 //            if ( Arrays.asList( "Hostelworld & Hostelbookers", "Hostelworld" ).contains( cbReservation.getSourceName() ) ) {
@@ -339,14 +349,14 @@ public class PaymentProcessorService {
             // send email if successful
             SendNonRefundableSuccessfulEmailJob job = new SendNonRefundableSuccessfulEmailJob();
             job.setReservationId( reservationId );
-            job.setAmount( cbReservation.getBalanceDue() );
+            job.setAmount( amountToCharge );
             job.setStatus( JobStatus.submitted );
             wordpressDAO.insertJob( job );
         }
         catch ( PaymentPendingException ex ) {
             LOGGER.info( ex.getMessage() );
             cloudbedsScraper.addNote( webClient, reservationId,
-                    "Non-refundable amount of £" + cloudbedsScraper.getCurrencyFormat().format( cbReservation.getBalanceDue() )
+                    "Non-refundable amount of £" + cloudbedsScraper.getCurrencyFormat().format( amountToCharge )
                             + WILL_POST_AUTOMATICALLY );
         }
         catch ( RecordPaymentFailedException payEx ) {
@@ -363,7 +373,7 @@ public class PaymentProcessorService {
 
                 SendNonRefundableDeclinedEmailJob job = new SendNonRefundableDeclinedEmailJob();
                 job.setReservationId( reservationId );
-                job.setAmount( cbReservation.getBalanceDue() );
+                job.setAmount( amountToCharge );
                 job.setPaymentURL( paymentURL );
                 job.setStatus( JobStatus.submitted );
                 wordpressDAO.insertJob( job );
