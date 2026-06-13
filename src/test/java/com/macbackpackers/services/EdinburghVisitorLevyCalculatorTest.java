@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
@@ -14,7 +15,9 @@ import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.macbackpackers.beans.cloudbeds.responses.BalanceDetails;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.beans.cloudbeds.responses.TaxBreakdownItem;
 import com.macbackpackers.services.EdinburghVisitorLevyCalculator.LevyCalculation;
 import com.macbackpackers.services.EdinburghVisitorLevyCalculator.LevyNight;
 
@@ -183,6 +186,29 @@ public class EdinburghVisitorLevyCalculatorTest {
                 .orElseThrow( () -> new IllegalStateException( "tax not found" ) );
 
         assertThat( exclusiveTaxId, is( "824186" ) );
+    }
+
+    @Test
+    public void testVisitorLevyTotalFromBalanceDetailsTaxBreakdown() {
+        TaxBreakdownItem inclusive = new TaxBreakdownItem();
+        inclusive.setName( "Edinburgh Visitor Levy (Inclusive)" );
+        inclusive.setAmount( new BigDecimal( "-0.12" ) );
+
+        TaxBreakdownItem exclusive = new TaxBreakdownItem();
+        exclusive.setName( "Edinburgh Visitor Levy 2026" );
+        exclusive.setAmount( new BigDecimal( "1.56" ) );
+
+        TaxBreakdownItem vat = new TaxBreakdownItem();
+        vat.setName( "VAT" );
+        vat.setAmount( new BigDecimal( "5.50" ) );
+
+        BalanceDetails balanceDetails = new BalanceDetails();
+        balanceDetails.setTaxBreakdown( Arrays.asList( inclusive, exclusive, vat ) );
+        baseReservation.setBalanceDetails( balanceDetails );
+
+        assertThat( baseReservation.getVisitorLevyTotal(
+                "Edinburgh Visitor Levy 2026", "Edinburgh Visitor Levy (Inclusive)" ),
+                comparesEqualTo( new BigDecimal( "1.44" ) ) );
     }
 
     @Test

@@ -548,42 +548,6 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Returns the net visitor levy total currently on the reservation folio.
-     */
-    public BigDecimal getCurrentVisitorLevyTotal( WebClient webClient, Reservation res, String... levyLabels ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest(
-                res, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
-        JsonObject rpt = doRequest( webClient, requestSettings );
-        List<String> labels = Arrays.asList( levyLabels );
-
-        return StreamSupport.stream( rpt.get( "records" ).getAsJsonArray().spliterator(), false )
-                .map( JsonElement::getAsJsonObject )
-                .filter( r -> {
-                    if ( r.has( "is_voided" ) && false == r.get( "is_voided" ).isJsonNull()
-                            && "1".equals( r.get( "is_voided" ).getAsString() ) ) {
-                        return false;
-                    }
-                    String type = r.has( "type" ) ? r.get( "type" ).getAsString() : "";
-                    if ( false == "tax".equals( type ) && false == "adjustment".equals( type ) ) {
-                        return false;
-                    }
-                    String description = r.has( "description" ) ? r.get( "description" ).getAsString() : "";
-                    return labels.contains( description );
-                } )
-                .map( r -> parseFolioCreditAmount( r.get( "credit" ).getAsString() ) )
-                .reduce( BigDecimal.ZERO, BigDecimal::add )
-                .setScale( 2, java.math.RoundingMode.HALF_UP );
-    }
-
-    private BigDecimal parseFolioCreditAmount( String credit ) {
-        if ( StringUtils.isBlank( credit ) ) {
-            return BigDecimal.ZERO;
-        }
-        String normalized = credit.replace( "£", "" ).replace( ",", "" ).trim();
-        return new BigDecimal( normalized );
-    }
-
-    /**
      * Adds a visitor levy charge to the first booking room on the reservation.
      */
     public void addVisitorLevyCharge( WebClient webClient, Reservation res, String taxId, BigDecimal amount ) throws IOException {

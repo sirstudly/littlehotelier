@@ -59,8 +59,7 @@ public class EdinburghVisitorLevyService {
                 ? inclusiveTaxLabel : exclusiveTaxLabel;
         String taxId = cloudbedsScraper.resolveTaxIdByLabel( webClient, taxLabel );
 
-        BigDecimal currentLevy = cloudbedsScraper.getCurrentVisitorLevyTotal(
-                webClient, reservation, exclusiveTaxLabel, inclusiveTaxLabel );
+        BigDecimal currentLevy = reservation.getVisitorLevyTotal( exclusiveTaxLabel, inclusiveTaxLabel );
         BigDecimal expectedLevy = calculation.getExpectedLevy();
         BigDecimal delta = expectedLevy.subtract( currentLevy ).setScale( 2, RoundingMode.HALF_UP );
 

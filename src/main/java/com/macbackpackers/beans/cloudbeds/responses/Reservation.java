@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -58,6 +59,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private String creditCardLast4Digits;
     private BookingSource selectedSource;
     private String documentNumber;
+    private BalanceDetails balanceDetails;
 
     public String getReservationId() {
         return reservationId;
@@ -468,6 +470,30 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setDocumentNumber( String documentNumber ) {
         this.documentNumber = documentNumber;
+    }
+
+    public BalanceDetails getBalanceDetails() {
+        return balanceDetails;
+    }
+
+    public void setBalanceDetails( BalanceDetails balanceDetails ) {
+        this.balanceDetails = balanceDetails;
+    }
+
+    /**
+     * Returns the visitor levy total from balance_details.tax_breakdown for the given tax labels.
+     */
+    public BigDecimal getVisitorLevyTotal( String... levyLabels ) {
+        if ( balanceDetails == null || balanceDetails.getTaxBreakdown() == null ) {
+            return BigDecimal.ZERO.setScale( 2, RoundingMode.HALF_UP );
+        }
+        List<String> labels = Arrays.asList( levyLabels );
+        return balanceDetails.getTaxBreakdown().stream()
+                .filter( item -> labels.contains( item.getName() ) )
+                .map( TaxBreakdownItem::getAmount )
+                .filter( amount -> amount != null )
+                .reduce( BigDecimal.ZERO, BigDecimal::add )
+                .setScale( 2, RoundingMode.HALF_UP );
     }
 
     /**
