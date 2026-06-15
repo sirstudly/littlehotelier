@@ -47,16 +47,18 @@ public final class EdinburghVisitorLevyCalculator {
 
     public static class LevyCalculation {
         private final BigDecimal expectedLevy;
+        private final BigDecimal levyBase;
         private final List<LevyNight> eligibleNights;
-        private final boolean hostelworldGrossUp;
+        private final boolean hostelworldUsesListedPrice;
         private final boolean canceledOrNoShow;
         private final boolean bookingExempt;
 
-        public LevyCalculation( BigDecimal expectedLevy, List<LevyNight> eligibleNights,
-                boolean hostelworldGrossUp, boolean canceledOrNoShow, boolean bookingExempt ) {
+        public LevyCalculation( BigDecimal expectedLevy, BigDecimal levyBase, List<LevyNight> eligibleNights,
+                boolean hostelworldUsesListedPrice, boolean canceledOrNoShow, boolean bookingExempt ) {
             this.expectedLevy = expectedLevy;
+            this.levyBase = levyBase;
             this.eligibleNights = eligibleNights;
-            this.hostelworldGrossUp = hostelworldGrossUp;
+            this.hostelworldUsesListedPrice = hostelworldUsesListedPrice;
             this.canceledOrNoShow = canceledOrNoShow;
             this.bookingExempt = bookingExempt;
         }
@@ -65,12 +67,16 @@ public final class EdinburghVisitorLevyCalculator {
             return expectedLevy;
         }
 
+        public BigDecimal getLevyBase() {
+            return levyBase;
+        }
+
         public List<LevyNight> getEligibleNights() {
             return eligibleNights;
         }
 
-        public boolean isHostelworldGrossUp() {
-            return hostelworldGrossUp;
+        public boolean isHostelworldUsesListedPrice() {
+            return hostelworldUsesListedPrice;
         }
 
         public boolean isCanceledOrNoShow() {
@@ -89,36 +95,53 @@ public final class EdinburghVisitorLevyCalculator {
     }
 
     public static LevyCalculation calculate( Reservation reservation, Gson gson,
-            LocalDate stayDateFrom, LocalDate bookedDateFrom, BigDecimal hwlDepositFraction ) {
+            LocalDate stayDateFrom, LocalDate bookedDateFrom ) {
 
         boolean canceledOrNoShow = reservation.isCanceledOrNoShow();
         boolean bookingExempt = reservation.getBookingDateAsLocalDate().isBefore( bookedDateFrom );
 
         if ( canceledOrNoShow || bookingExempt ) {
             return new LevyCalculation( BigDecimal.ZERO.setScale( 2, RoundingMode.HALF_UP ),
+                    BigDecimal.ZERO.setScale( 2, RoundingMode.HALF_UP ),
                     Collections.emptyList(), false, canceledOrNoShow, bookingExempt );
         }
 
-        List<LevyNight> eligibleNights = getEligibleNights( reservation, gson, stayDateFrom );
+        Map<LocalDate, BigDecimal> ratesByDate = reservation.getRatesByDate( gson );
+        List<LevyNight> eligibleNights = getEligibleNights( ratesByDate, reservation.getCheckoutDateAsLocalDate(), stayDateFrom );
         BigDecimal eligibleTotal = eligibleNights.stream()
                 .map( LevyNight::getRate )
                 .reduce( BigDecimal.ZERO, BigDecimal::add );
 
-        boolean hostelworldGrossUp = reservation.isHostelworldBooking();
+        boolean hostelworldUsesListedPrice = false;
         BigDecimal levyBase = eligibleTotal;
-        if ( hostelworldGrossUp ) {
-            BigDecimal depositMultiplier = BigDecimal.ONE.subtract( hwlDepositFraction );
-            levyBase = eligibleTotal.divide( depositMultiplier, 10, RoundingMode.HALF_UP );
+        if ( reservation.isHostelworldBooking() ) {
+            BigDecimal priceListed = resolveHostelworldPriceListed( reservation );
+            BigDecimal allNightsTotal = ratesByDate.values().stream()
+                    .reduce( BigDecimal.ZERO, BigDecimal::add );
+            if ( priceListed != null && allNightsTotal.compareTo( BigDecimal.ZERO ) > 0 ) {
+                hostelworldUsesListedPrice = true;
+                levyBase = priceListed.multiply( eligibleTotal )
+                        .divide( allNightsTotal, 10, RoundingMode.HALF_UP );
+            }
         }
 
         BigDecimal expectedLevy = levyBase.multiply( LEVY_RATE ).setScale( 2, RoundingMode.HALF_UP );
-        return new LevyCalculation( expectedLevy, eligibleNights, hostelworldGrossUp, false, false );
+        return new LevyCalculation( expectedLevy, levyBase.setScale( 2, RoundingMode.HALF_UP ),
+                eligibleNights, hostelworldUsesListedPrice, false, false );
     }
 
-    static List<LevyNight> getEligibleNights( Reservation reservation, Gson gson, LocalDate stayDateFrom ) {
-        Map<LocalDate, BigDecimal> ratesByDate = reservation.getRatesByDate( gson );
-        LocalDate checkoutDate = reservation.getCheckoutDateAsLocalDate();
+    static BigDecimal resolveHostelworldPriceListed( Reservation reservation ) {
+        if ( reservation.getChannelPriceListed() != null ) {
+            return reservation.getChannelPriceListed();
+        }
+        if ( reservation.getChannelBalance() != null && reservation.getChannelCommission() != null ) {
+            return reservation.getChannelBalance().add( reservation.getChannelCommission() );
+        }
+        return null;
+    }
 
+    static List<LevyNight> getEligibleNights( Map<LocalDate, BigDecimal> ratesByDate,
+            LocalDate checkoutDate, LocalDate stayDateFrom ) {
         List<LevyNight> eligibleNights = new ArrayList<>();
         for ( Map.Entry<LocalDate, BigDecimal> entry : ratesByDate.entrySet() ) {
             LocalDate night = entry.getKey();
@@ -148,9 +171,9 @@ public final class EdinburghVisitorLevyCalculator {
 
         StringBuilder note = new StringBuilder( "Visitor levy only applies to the first 5 nights. " );
         note.append( "Charge for the first " ).append( calculation.getEligibleNights().size() ).append( " nights is " );
-        note.append( calculation.getEligibleRatesTotal().setScale( 2, RoundingMode.HALF_UP ) );
-        if ( calculation.isHostelworldGrossUp() ) {
-            note.append( " (HWL grossed up)" );
+        note.append( calculation.getLevyBase() );
+        if ( calculation.isHostelworldUsesListedPrice() ) {
+            note.append( " (HWL price listed)" );
         }
         note.append( " @ 5% = " ).append( calculation.getExpectedLevy() );
         note.append( ". -RONBOT" );

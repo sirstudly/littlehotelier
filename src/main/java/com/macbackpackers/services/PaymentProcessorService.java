@@ -290,6 +290,10 @@ public class PaymentProcessorService {
             LOGGER.info( "Booking is paid. Nothing to do." );
             return;
         }
+        if ( cbReservation.getPaidValue().compareTo( BigDecimal.ZERO ) > 0 ) {
+            LOGGER.info( "This booking has been charged at least once already. Not charging again - they can pay the remainder on arrival." );
+            return;
+        }
 
         if ( false == cbReservation.isNonRefundable() ) {
             throw new UnrecoverableFault( "ABORT! Attempting to charge a non non-refundable booking!" );

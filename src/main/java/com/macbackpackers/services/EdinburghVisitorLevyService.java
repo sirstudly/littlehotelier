@@ -37,9 +37,6 @@ public class EdinburghVisitorLevyService {
     @Value( "${evl.tax.inclusive.label:Edinburgh Visitor Levy (Inclusive)}" )
     private String inclusiveTaxLabel;
 
-    @Value( "${evl.hwl.deposit.fraction:0.15}" )
-    private BigDecimal hwlDepositFraction;
-
     @Value( "${evl.stay.date.from:2026-07-24}" )
     private String stayDateFrom;
 
@@ -52,8 +49,7 @@ public class EdinburghVisitorLevyService {
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
                 reservation, gson,
                 LocalDate.parse( stayDateFrom ),
-                LocalDate.parse( bookedDateFrom ),
-                hwlDepositFraction );
+                LocalDate.parse( bookedDateFrom ) );
 
         String taxLabel = EdinburghVisitorLevyCalculator.useInclusiveTax( reservation )
                 ? inclusiveTaxLabel : exclusiveTaxLabel;

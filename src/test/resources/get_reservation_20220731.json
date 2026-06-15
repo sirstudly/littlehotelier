@@ -1,0 +1,600 @@
+{
+  "reservation_id": "58451147",
+  "identifier": "1047008282847",
+  "third_party_identifier": "11242-544851712",
+  "name": "Gamze Arici",
+  "document_number": "",
+  "booking_date_server_time": "2022-07-13 07:47:58",
+  "status": "confirmed",
+  "lang": null,
+  "street": "",
+  "number": "",
+  "complement": "",
+  "neighborhood": "",
+  "city": "",
+  "first_name": "Gamze",
+  "last_name": "Arici",
+  "zip": "",
+  "guest_tax_id_number": "",
+  "company_name": "",
+  "company_tax_id_number": "",
+  "special_requests": "",
+  "email": "g-arici@hotmail.com",
+  "phone": "0",
+  "bdate": null,
+  "customer_id": "56150870",
+  "gender": "F",
+  "passport": "",
+  "cpf": "",
+  "rg": null,
+  "issue_date": null,
+  "state": "",
+  "issuer": null,
+  "issuer_state": null,
+  "country": "TR",
+  "address1": "",
+  "address2": "",
+  "guest_status_id": "0",
+  "guest_status_name": "",
+  "is_guest_anonymized": "0",
+  "is_custom": true,
+  "property_id": "18265",
+  "taxes_value": 0,
+  "grand_total": 12.39,
+  "third_party": true,
+  "source": "466672",
+  "is_root_source": "0",
+  "is_hotel_collect_booking": "1",
+  "cancellation_numb": null,
+  "cell_phone": "",
+  "additional_charges": 0,
+  "booking_payment": {
+    "payment_method": "pay_at_location",
+    "payment_method_name": "Credit Card"
+  },
+  "booking_deposit": "12.39",
+  "total": "12.3900",
+  "booking_total": "12.3900",
+  "booking_via": "Third-Party",
+  "association_id": "0",
+  "association_name": null,
+  "prolongation_day": false,
+  "currency_from": "GBP",
+  "currency_to": "GBP",
+  "currency_rate": "1.0000000000",
+  "checkin_date": "2022-07-31",
+  "checkout_date": "2022-08-01",
+  "booking_estimated_arrival_time": "0:00",
+  "nights": "1",
+  "paid_value": 12.39,
+  "room_rate_total_adjustment": "0.0000",
+  "last_change": "2022-07-31 18:39:07",
+  "room_revenue_total": "0.0000",
+  "room_revenue_total_adjustment": "0.0000",
+  "receipt_identifier": null,
+  "receipt_integration": null,
+  "folio_config_id": null,
+  "group_profile_id": null,
+  "group_profile_name": null,
+  "allotment_block_id": null,
+  "allotment_block_name": null,
+  "receipt_amount": null,
+  "receipt_date": null,
+  "adults_number": "1",
+  "kids_number": "0",
+  "deleted": "0",
+  "cancellation_date": null,
+  "item_level_rounding_applied": "1",
+  "mybookings_origin": null,
+  "gha_is_ad_click": null,
+  "is_cbd": null,
+  "channel_name": "Hostelworld",
+  "channel_price_listed": "14.58",
+  "channel_commission": "2.19",
+  "channel_balance": "12.39",
+  "channel_payment_type": null,
+  "channel": "hw2",
+  "myallocator_table_id": "49089809",
+  "myallocator_booking_id": "1d3d945e028011edb815ded22",
+  "order_source": null,
+  "order_males": "0",
+  "order_females": "1",
+  "no_show_reported": "0",
+  "no_show_fees_waived": null,
+  "guest_misconduct_reported": "0",
+  "booking_date_hotel_time": "2022-07-13 08:47:58",
+  "cancellation_date_hotel_time": null,
+  "rooms_total": 12.39,
+  "balance_due": 0,
+  "sub_total": 12.39,
+  "cancellation_fee": 0,
+  "booking_rooms": [
+    {
+      "id": "81528309",
+      "booking_id": "58451147",
+      "room_identifier": "1047008282847",
+      "room_group": "1",
+      "in_house": "-1",
+      "parent_id": null,
+      "room_id": "112202-9",
+      "event_id": "16588824372001204",
+      "adults": "1",
+      "kids": "0",
+      "start_date": "2022-07-31",
+      "end_date": "2022-08-01",
+      "room_type_id": "112202",
+      "room_total": "12.39",
+      "room_type_name": "10 bed female dorm",
+      "min_room_rate": "12.39",
+      "max_room_rate": "12.39",
+      "total": "12.39",
+      "detailed_rates": "[{\"date\":\"2022-07-31\",\"rate\":12.39,\"adults\":0,\"kids\":0,\"rate_description\":\"Non-refundable\"}]",
+      "adults_inBasePrice": "1",
+      "children_inBasePrice": "0",
+      "charge_additional_adult": "[]",
+      "charge_additional_child": "[]",
+      "add_adult_rate_first_night": "0.00",
+      "add_adult_total": "0.00",
+      "add_kid_rate_first_night": "0.00",
+      "add_kids_total": "0.00",
+      "package": "0",
+      "guest_id": "56150870",
+      "guest_first_name": "Gamze",
+      "guest_last_name": "Arici",
+      "rate_id": "199889",
+      "is_room_locked": null,
+      "created_at": "2022-07-13 07:48:03.095914",
+      "updated_at": "2022-07-27 00:40:37.240126",
+      "is_guest_anonymized": "0",
+      "nights": "1",
+      "group_name": "Little Miss",
+      "package_name": null,
+      "room_type_name_short": "1BD",
+      "room_number": "LM 10 Bossy "
+    }
+  ],
+  "used_room_types": "Non-refundable",
+  "selected_source": {
+    "id": "466672",
+    "sub_source": "Hostelworld",
+    "property_id": "18265",
+    "parent_source": "7",
+    "deleted": "0",
+    "is_active": "1",
+    "ota_source_id": "281",
+    "commission": "0",
+    "default": "0",
+    "date_created": "2021-10-18 09:04:05.340558",
+    "date_modified": "2021-10-18 09:04:05.340558",
+    "original_id": "466672"
+  },
+  "source_name": "Hostelworld",
+  "code_booking_via": "myallocator",
+  "country_name": "Turkey",
+  "adjustment_rate": 0,
+  "adjustment_product": 0,
+  "adjustment_roomRevenue": 0,
+  "assigned_guests": [
+    {
+      "id": "92645522",
+      "property_id": "18265",
+      "customer_id": "56150870",
+      "booking_id": "58451147",
+      "booking_rooms_id": "81528309",
+      "police_report_status": "new"
+    }
+  ],
+  "additional_guests": [
+    {
+      "id": "56150870",
+      "customer_id": "56150870",
+      "first_name": "Gamze",
+      "last_name": "Arici",
+      "email": "g-arici@hotmail.com",
+      "phone": "0",
+      "cell_phone": "",
+      "gender": "F",
+      "birthday": null,
+      "guest_tax_id_number": "",
+      "company_name": "",
+      "company_tax_id_number": "",
+      "address1": "",
+      "address2": "",
+      "city": "",
+      "state": "",
+      "zip": "",
+      "country": "TR",
+      "country_name": "Turkey",
+      "document_type": "na",
+      "document_type_name": "document_type_list_na",
+      "document_number": "",
+      "document_issuing_country": null,
+      "document_issuing_country_name": null,
+      "document_issue_date": null,
+      "document_expiration_date": null,
+      "deleted": "0",
+      "count_reservations": "1",
+      "is_main_customer": true,
+      "booking_id": "58451147",
+      "is_opt_in": "0",
+      "is_repeat_guest": "0",
+      "is_merged_guest": false,
+      "merged_guest_id": null,
+      "photo_id": "0",
+      "original_name": null,
+      "path": null,
+      "crop_param": null,
+      "cropped_image": null,
+      "custom_fields": [],
+      "status_id": "0",
+      "status_name": ""
+    }
+  ],
+  "notes": [],
+  "notes_customers": [],
+  "folios": [],
+  "filters": {
+    "user": [
+      {
+        "user_name": "SYSTEM",
+        "user_id": 0,
+        "active": 1
+      },
+      {
+        "user_name": "Birgit Nathan",
+        "user_id": "43667",
+        "active": 1
+      },
+      {
+        "user_name": "Janette Wilson",
+        "user_id": "43898",
+        "active": 1
+      },
+      {
+        "user_name": "RMB Head Reception",
+        "user_id": "46955",
+        "active": 1
+      },
+      {
+        "user_name": "RON BOT",
+        "user_id": "47667",
+        "active": 1
+      },
+      {
+        "user_name": "Michael Addison",
+        "user_id": "312160",
+        "active": 1
+      },
+      {
+        "user_name": "Royal Mile Manager",
+        "user_id": "43795",
+        "active": 1
+      },
+      {
+        "user_name": "Hayden Barnes",
+        "user_id": "43796",
+        "active": 1
+      },
+      {
+        "user_name": "Selina Hoffmann",
+        "user_id": "43797",
+        "active": 1
+      },
+      {
+        "user_name": "Ron Chan",
+        "user_id": "47854",
+        "active": 1
+      },
+      {
+        "user_name": "RMB reception",
+        "user_id": "46271",
+        "active": 0
+      },
+      {
+        "user_name": "Ron Chan",
+        "user_id": "46963",
+        "active": 0
+      },
+      {
+        "user_name": "Erica Lupocz",
+        "user_id": "57453",
+        "active": 0
+      },
+      {
+        "user_name": "Jamie Porten",
+        "user_id": "43668",
+        "active": 0
+      },
+      {
+        "user_name": "Erica Accounts",
+        "user_id": "57351",
+        "active": 0
+      }
+    ],
+    "taxes": [
+      {
+        "text": "VAT (Before 22\/05\/2018 12:14 PM)",
+        "id": "tax_28793"
+      },
+      {
+        "text": "VAT (Before 14\/07\/2020 10:18 PM)",
+        "id": "tax_30119"
+      },
+      {
+        "text": "VAT (Before 01\/10\/2021 07:11 PM)",
+        "id": "tax_87096"
+      },
+      {
+        "text": "VAT",
+        "id": "tax_122620"
+      }
+    ],
+    "fees": [
+      {
+        "text": "VAT (Before 28\/04\/2018 06:35 PM)",
+        "id": "fee_9053"
+      }
+    ],
+    "description": [
+      {
+        "text": "Room Revenue",
+        "children": [
+          {
+            "text": "Room Rate",
+            "id": "rate"
+          },
+          {
+            "text": "Cancellation",
+            "id": "roomRevenue_cancellation"
+          },
+          {
+            "text": "No Show",
+            "id": "roomRevenue_no_show"
+          },
+          {
+            "text": "Manual",
+            "id": "roomRevenue_manual"
+          }
+        ],
+        "id": "temp_100"
+      },
+      {
+        "text": "Items and Services",
+        "children": [],
+        "id": "temp_101"
+      },
+      {
+        "text": "Taxes",
+        "children": [
+          {
+            "text": "VAT (Before 22\/05\/2018 12:14 PM)",
+            "id": "tax_28793"
+          },
+          {
+            "text": "VAT (Before 14\/07\/2020 10:18 PM)",
+            "id": "tax_30119"
+          },
+          {
+            "text": "VAT (Before 01\/10\/2021 07:11 PM)",
+            "id": "tax_87096"
+          },
+          {
+            "text": "VAT",
+            "id": "tax_122620"
+          }
+        ],
+        "id": "temp_taxes"
+      },
+      {
+        "text": "Fees",
+        "children": [
+          {
+            "text": "VAT (Before 28\/04\/2018 06:35 PM)",
+            "id": "fee_9053"
+          }
+        ],
+        "id": "temp_fees"
+      }
+    ]
+  },
+  "another_currency_text": "",
+  "sub_fees_grouped_by_date": [],
+  "sub_taxes_grouped_by_date": [],
+  "fees_on_res_grouped_by_name": [],
+  "taxes_on_res_grouped_by_name": [],
+  "taxes_on_fees_res_grouped_by_name": [],
+  "linked_taxes": [],
+  "linked_fees": [],
+  "custom_item_sub_fees_array": [],
+  "custom_item_sub_taxes_array": [],
+  "product_sub_fees_array": [],
+  "product_sub_taxes_array": [],
+  "addon_sub_fees_array": [],
+  "addon_sub_taxes_array": [],
+  "adjustments_fees_array": [],
+  "adjustments_taxes_array": [],
+  "rates_fees_array": [],
+  "rates_taxes_array": [],
+  "rates_sub_taxes_array": [],
+  "rates_sub_fees_array": [],
+  "room_revenue_sub_fees_array": [],
+  "room_revenue_sub_taxes_array": [],
+  "credit_cards": {
+    "29271053": {
+      "id": "29271053",
+      "property_id": "18265",
+      "booking_id": "58451147",
+      "house_account_id": "0",
+      "group_profile_id": null,
+      "card_type": "master",
+      "card_type_short": "ma",
+      "bin": "554960",
+      "card_number": "1014",
+      "token_data": "cus_M36VNEKtVaWKz5",
+      "token_vault": "stripe",
+      "encryption_method": "mcrypt",
+      "source": "ota",
+      "country": "TR",
+      "source_identifier": null,
+      "created_at": null,
+      "is_active": true,
+      "deleted": false,
+      "is_token": true,
+      "is_cc_data_purged": false,
+      "cc_data_purged_datetime": null,
+      "requires_authentication": null,
+      "authentication_url": null,
+      "card_details": null,
+      "logs": {
+        "has_not_failed_transactions": 1,
+        "logs": [
+          {
+            "date": "2022-07-31 19:39:04",
+            "price": "12.39",
+            "paid": "12.39",
+            "transaction_type": "Purchase",
+            "transaction_token": "txn_3LRh2YGId9wuCgDd044uF6w3",
+            "gateway_authorization": "ch_3LRh2YGId9wuCgDd0NuzvxVC",
+            "deleted": "0",
+            "refunded_value": "0.00",
+            "captured_value": "0.00",
+            "payment_status": "successful",
+            "payment_id": "72026946",
+            "date_of_perform_payment": null,
+            "gateway": "StripeConnectGateway"
+          }
+        ],
+        "total_charged": 12.39,
+        "total_refunded": 0,
+        "total_authorized": 0,
+        "total_processed": 12.39,
+        "payment_id": 0,
+        "total_authorized_pending": 0,
+        "total_authorized_scheduled": 0,
+        "total_authorized_unconfirmed": 0,
+        "total_charged_pending": 0,
+        "total_charged_scheduled": 0,
+        "total_charged_unconfirmed": 0,
+        "interval": 0,
+        "refunded_value": 0
+      },
+      "inventory_object_type": null,
+      "inventory_object_id": null,
+      "inventory_object": null,
+      "validate": true,
+      "authentication_return_page": null,
+      "inputData": null,
+      "inputDataType": null
+    }
+  },
+  "success": true,
+  "adjustments_sources": [],
+  "custom_fields": [],
+  "additional_charges_with_adj": 0,
+  "files": [],
+  "invoice": {
+    "count": "1"
+  },
+  "setup_invoice": {
+    "id": "18897",
+    "property_id": "18265",
+    "title": {
+      "en": "Royal Mile Backpackers Invoice",
+      "pt-br": "",
+      "es": "",
+      "ru": "",
+      "ua": "",
+      "it": "",
+      "de": "",
+      "fr": "",
+      "et": "",
+      "pl": "",
+      "nl": "",
+      "fi": "",
+      "el": "",
+      "ja": "",
+      "th": "",
+      "cn": "",
+      "he": "",
+      "ko": "",
+      "sv": "",
+      "no": "",
+      "lt": "",
+      "vn": "",
+      "hu": "",
+      "sk": "",
+      "cs": "",
+      "ro": ""
+    },
+    "prefix": "RMB",
+    "suffix": "",
+    "start_number": "1001",
+    "tax_id1": "",
+    "tax_id2": "",
+    "cpf": "",
+    "due_date": null,
+    "arr_dep_date": "0",
+    "charge_breakdown": "0",
+    "custom_text": {
+      "en": "<div>ONLINE PAYMENTS WILL SHOW ON YOUR CARD STATEMENT AS WWW.MACBACKPACKERSTOUR<\/div><div><br><\/div>",
+      "pt-br": "",
+      "es": "",
+      "ru": "",
+      "ua": "",
+      "it": "",
+      "de": "",
+      "fr": "",
+      "et": "",
+      "pl": "",
+      "nl": "",
+      "fi": "",
+      "el": "",
+      "ja": "",
+      "th": "",
+      "cn": "",
+      "he": "",
+      "ko": "",
+      "sv": "",
+      "no": "",
+      "lt": "",
+      "vn": "",
+      "hu": "",
+      "sk": "",
+      "cs": "",
+      "ro": ""
+    },
+    "generate_at_once": "1",
+    "when_generates": "on_reservation_created",
+    "set_on": "2018-05-23 13:48:45",
+    "expired_on": null,
+    "logo_id": "3447341",
+    "guest_lang": "1",
+    "invoice_lang": "en",
+    "room_number": "0",
+    "tax_specifics": "0",
+    "is_compact": "0",
+    "show_legal_company_name": "0",
+    "legal_company_name": "",
+    "credit_note_same_settings": "1",
+    "credit_note_title": null,
+    "credit_note_prefix": null,
+    "credit_note_suffix": null,
+    "credit_note_start_number": null,
+    "id_setup": "18897",
+    "path": "https:\/\/h-img3.cloudbeds.com\/uploads\/18265\/untitled~~5b0477eccd9fb.jpg",
+    "cropped_image": "https:\/\/h-img2.cloudbeds.com\/uploads\/18265\/untitled_thumb~~5b0477ed0c104.jpg",
+    "crop_param": "null"
+  },
+  "maxRoomIdentifier": 1,
+  "minTransDate": "2022-07-31 19:39:04",
+  "check_role": false,
+  "check_via": true,
+  "allotment_block_code": null,
+  "isInvoicingConfigured": true,
+  "trialLeft": null,
+  "accountStatus": false,
+  "isAcceptedTosAgreement": true,
+  "isAcceptedApiTosAgreement": true,
+  "announcementsNew": null,
+  "pie_new_sys_events_num": 0
+}

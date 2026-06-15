@@ -9,3 +9,5 @@
 /chromeprofile/
 /.settings
 /credentials
+/.idea
+/.gradle

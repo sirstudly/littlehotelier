@@ -49,6 +49,9 @@ public class Reservation extends CloudbedsJsonResponse {
     private Integer adultsNumber;
     private String channelName;
     private String channelPaymentType;
+    private BigDecimal channelPriceListed;
+    private BigDecimal channelCommission;
+    private BigDecimal channelBalance;
     private String isHotelCollectBooking;
     private BigDecimal paidValue;
     private BigDecimal roomsTotal;
@@ -359,6 +362,30 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setChannelPaymentType( String channelPaymentType ) {
         this.channelPaymentType = channelPaymentType;
+    }
+
+    public BigDecimal getChannelPriceListed() {
+        return channelPriceListed;
+    }
+
+    public void setChannelPriceListed( BigDecimal channelPriceListed ) {
+        this.channelPriceListed = channelPriceListed;
+    }
+
+    public BigDecimal getChannelCommission() {
+        return channelCommission;
+    }
+
+    public void setChannelCommission( BigDecimal channelCommission ) {
+        this.channelCommission = channelCommission;
+    }
+
+    public BigDecimal getChannelBalance() {
+        return channelBalance;
+    }
+
+    public void setChannelBalance( BigDecimal channelBalance ) {
+        this.channelBalance = channelBalance;
     }
 
     public String getIsHotelCollectBooking() {
