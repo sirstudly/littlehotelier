@@ -98,7 +98,7 @@ public final class EdinburghVisitorLevyCalculator {
             LocalDate stayDateFrom, LocalDate bookedDateFrom ) {
 
         boolean canceledOrNoShow = reservation.isCanceledOrNoShow();
-        boolean bookingExempt = reservation.getBookingDateAsLocalDate().isBefore( bookedDateFrom );
+        boolean bookingExempt = isBookingExempt( reservation.getBookingDateAsLocalDate(), bookedDateFrom );
 
         if ( canceledOrNoShow || bookingExempt ) {
             return new LevyCalculation( BigDecimal.ZERO.setScale( 2, RoundingMode.HALF_UP ),
@@ -155,6 +155,18 @@ public final class EdinburghVisitorLevyCalculator {
             return eligibleNights.subList( 0, MAX_LEVY_NIGHTS );
         }
         return eligibleNights;
+    }
+
+    public static boolean isBookingExempt( LocalDate bookingDate, LocalDate bookedDateFrom ) {
+        return bookingDate.isBefore( bookedDateFrom );
+    }
+
+    /**
+     * Returns true if the stay includes at least one night on or after the levy start date.
+     * The last night of a stay is the day before checkout.
+     */
+    public static boolean hasEligibleStayDates( LocalDate checkoutDate, LocalDate stayDateFrom ) {
+        return checkoutDate.isAfter( stayDateFrom );
     }
 
     public static boolean isWithinTolerance( BigDecimal delta ) {

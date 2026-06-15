@@ -266,6 +266,22 @@ public class EdinburghVisitorLevyCalculatorTest {
         assertThat( EdinburghVisitorLevyCalculator.isWithinTolerance( new BigDecimal( "0.02" ) ), is( false ) );
     }
 
+    @Test
+    public void testIsBookingExempt() {
+        assertThat( EdinburghVisitorLevyCalculator.isBookingExempt(
+                LocalDate.of( 2025, 9, 30 ), BOOKED_DATE_FROM ), is( true ) );
+        assertThat( EdinburghVisitorLevyCalculator.isBookingExempt(
+                LocalDate.of( 2025, 10, 1 ), BOOKED_DATE_FROM ), is( false ) );
+    }
+
+    @Test
+    public void testHasEligibleStayDates() {
+        assertThat( EdinburghVisitorLevyCalculator.hasEligibleStayDates(
+                LocalDate.of( 2026, 7, 24 ), STAY_DATE_FROM ), is( false ) );
+        assertThat( EdinburghVisitorLevyCalculator.hasEligibleStayDates(
+                LocalDate.of( 2026, 7, 25 ), STAY_DATE_FROM ), is( true ) );
+    }
+
     private Reservation reservationWithRates( String sourceName, String checkin, String checkout,
             String bookingDate, String... detailedRates ) {
         Reservation reservation = gson.fromJson( gson.toJson( baseReservation ), Reservation.class );

@@ -10,11 +10,13 @@ import jakarta.persistence.Transient;
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.scrapers.CloudbedsScraper;
+import com.macbackpackers.services.EdinburghVisitorLevyCalculator;
 
 /**
  * Creates {@link CalculateEdinburghVisitorLevyForBookingJob}s for active bookings made within a
@@ -34,6 +36,14 @@ public class CreateCalculateEdinburghVisitorLevyForBookingJob extends AbstractJo
     @Autowired
     @Transient
     private CloudbedsScraper cbScraper;
+
+    @Value( "${evl.stay.date.from:2026-07-24}" )
+    @Transient
+    private String stayDateFrom;
+
+    @Value( "${evl.booked.date.from:2025-10-01}" )
+    @Transient
+    private String bookedDateFrom;
 
     @Override
     @Transactional
@@ -56,6 +66,16 @@ public class CreateCalculateEdinburghVisitorLevyForBookingJob extends AbstractJo
     }
 
     private boolean requiresVisitorLevyAdjustment( Customer customer ) {
+        if ( customer.getBookingDate() != null
+                && EdinburghVisitorLevyCalculator.isBookingExempt(
+                        LocalDate.parse( customer.getBookingDate() ), LocalDate.parse( bookedDateFrom ) ) ) {
+            return false;
+        }
+        if ( customer.getCheckoutDate() != null
+                && false == EdinburghVisitorLevyCalculator.hasEligibleStayDates(
+                        LocalDate.parse( customer.getCheckoutDate() ), LocalDate.parse( stayDateFrom ) ) ) {
+            return false;
+        }
         if ( isHostelworldBooking( customer ) ) {
             return true;
         }
