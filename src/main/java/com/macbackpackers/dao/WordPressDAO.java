@@ -159,6 +159,13 @@ public interface WordPressDAO {
     long getOutstandingJobCount();
 
     /**
+     * Returns the number of jobs currently at 'processing'.
+     *
+     * @return number of jobs actively running
+     */
+    long getProcessingJobCount();
+
+    /**
      * Updates the status of the given job.
      * 
      * @param jobId PK of job

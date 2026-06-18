@@ -392,6 +392,23 @@ public class WordPressDAOTest {
     }
 
     @Test
+    public void testGetProcessingJobCount() throws Exception {
+        Job submitted = new AllocationScraperJob();
+        submitted.setStatus( JobStatus.submitted );
+        dao.insertJob( submitted );
+
+        Job processing = new HousekeepingJob();
+        processing.setStatus( JobStatus.processing );
+        dao.insertJob( processing );
+
+        Job completed = new HousekeepingJob();
+        completed.setStatus( JobStatus.completed );
+        dao.insertJob( completed );
+
+        assertEquals( 1, dao.getProcessingJobCount(), "processing job count" );
+    }
+
+    @Test
     public void testPurgeRecordsOlderThan() throws Exception {
         Calendar now = Calendar.getInstance();
         now.add( Calendar.DATE, -30 ); // 30 days ago

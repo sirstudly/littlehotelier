@@ -134,6 +134,18 @@ public class RunProcessor
     }
 
     /**
+     * Returns the number of jobs currently in {@link com.macbackpackers.beans.JobStatus#processing}.
+     *
+     * @return exit code 0 if idle, 1 if any jobs are running
+     */
+    public int checkRunningJobs() {
+        long count = dao.getProcessingJobCount();
+        System.out.print( count );
+        System.out.flush();
+        return count > 0 ? 1 : 0;
+    }
+
+    /**
      * Cleanup any resources before shutting down.
      */
     public void shutdown() {
@@ -168,6 +180,8 @@ public class RunProcessor
         options.addOption( "h", "help", false, "Show this help message" );
         options.addOption( "S", "server", false, "server-mode; keep the processor running continuously" );
         options.addOption( "n", "nolock", false, "allow multiple instances to run by ignoring exclusivity lock" );
+        options.addOption( null, "check-running", false,
+                "check for jobs in processing; exit 0 if idle, 1 if any running, 2 on error" );
 
         // parse the command line arguments
         CommandLine line = parser.parse( options, args );
@@ -185,6 +199,25 @@ public class RunProcessor
         ( (DefaultConversionService) DefaultConversionService.getSharedInstance() ).addConverter( new AnyByteStringToStringConverter() );
 
         TimeZone.setDefault( TimeZone.getTimeZone( "Europe/London" ) );
+
+        if ( line.hasOption( "check-running" ) ) {
+            ConfigurableApplicationContext context = SpringApplication.run( RunProcessor.class, new String[0] );
+            RunProcessor processor = context.getBean( RunProcessor.class );
+            processor.setCheckLock( false );
+            int exitCode;
+            try {
+                exitCode = processor.checkRunningJobs();
+            }
+            catch ( Throwable th ) {
+                LOGGER.error( "Failed to check running jobs", th );
+                exitCode = 2;
+            }
+            finally {
+                context.close();
+            }
+            System.exit( exitCode );
+        }
+
         LOGGER.info( "Starting processor... " + new Date() );
         ConfigurableApplicationContext context = SpringApplication.run( RunProcessor.class, args );
 

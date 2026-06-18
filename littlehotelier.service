@@ -1,0 +1,17 @@
+[Unit]
+Description=LittleHotelier/Cloudbeds Docker Compose Services
+Requires=docker.service
+After=docker.service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/botpress/littlehotelier
+ExecStart=/snap/bin/docker-compose up -d
+ExecStop=/home/botpress/littlehotelier/scripts/stop-if-idle.sh
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target 
