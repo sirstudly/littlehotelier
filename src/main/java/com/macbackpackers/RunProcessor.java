@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.convert.support.DefaultConversionService;
@@ -26,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileLock;
 import java.util.Date;
+import java.util.Map;
 import java.util.TimeZone;
 
 /**
@@ -140,7 +142,7 @@ public class RunProcessor
      */
     public int checkRunningJobs() {
         long count = dao.getProcessingJobCount();
-        System.out.print( count );
+        System.out.println( "PROCESSING_JOB_COUNT=" + count );
         System.out.flush();
         return count > 0 ? 1 : 0;
     }
@@ -201,7 +203,12 @@ public class RunProcessor
         TimeZone.setDefault( TimeZone.getTimeZone( "Europe/London" ) );
 
         if ( line.hasOption( "check-running" ) ) {
-            ConfigurableApplicationContext context = SpringApplication.run( RunProcessor.class, new String[0] );
+            SpringApplication app = new SpringApplication( RunProcessor.class );
+            app.setWebApplicationType( WebApplicationType.NONE );
+            app.setDefaultProperties( Map.of(
+                    "spring.main.banner-mode", "off",
+                    "logging.level.root", "ERROR" ) );
+            ConfigurableApplicationContext context = app.run( new String[0] );
             RunProcessor processor = context.getBean( RunProcessor.class );
             processor.setCheckLock( false );
             int exitCode;

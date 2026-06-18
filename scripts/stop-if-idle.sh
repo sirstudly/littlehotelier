@@ -15,16 +15,28 @@ for container in "${CONTAINERS[@]}"; do
   fi
 
   set +e
-  count=$("$DOCKER" exec "$container" sh -c \
-    'java -server $JAVA_OPTS -Dchrome.binary.path=$CHROME_BINARY_PATH -Dspring.main.banner-mode=off -Dlogging.level.root=WARN -jar /app/lilhotelier.jar --check-running -n 2>/dev/null')
+  output=$("$DOCKER" exec "$container" sh -c \
+    'java -server $JAVA_OPTS -Dchrome.binary.path=$CHROME_BINARY_PATH -Dspring.main.web-application-type=none -Dspring.main.banner-mode=off -Dlogging.level.root=ERROR -jar /app/lilhotelier.jar --check-running -n 2>&1')
   exit_code=$?
   set -e
 
-  if [ "$exit_code" -eq 1 ]; then
+  count=$(echo "$output" | grep '^PROCESSING_JOB_COUNT=' | tail -1 | cut -d= -f2)
+  if [ -z "$count" ]; then
+    count=$(echo "$output" | tail -1 | tr -d '[:space:]')
+  fi
+
+  if [ -z "$count" ] || ! [[ "$count" =~ ^[0-9]+$ ]]; then
+    echo "Error checking running jobs in $container (exit $exit_code)" >&2
+    echo "$output" >&2
+    exit 2
+  fi
+
+  if [ "$count" -gt 0 ]; then
     echo "Refusing stop: $container has ${count} job(s) in processing" >&2
     BUSY=1
   elif [ "$exit_code" -ne 0 ]; then
     echo "Error checking running jobs in $container (exit $exit_code)" >&2
+    echo "$output" >&2
     exit "$exit_code"
   fi
 done
