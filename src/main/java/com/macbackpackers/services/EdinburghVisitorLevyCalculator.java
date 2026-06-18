@@ -6,10 +6,15 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 
 /**
@@ -21,6 +26,7 @@ public final class EdinburghVisitorLevyCalculator {
     public static final String INCLUSIVE_TAX_LABEL = "Edinburgh Visitor Levy (Inclusive)";
 
     private static final BigDecimal LEVY_RATE = new BigDecimal( "0.05" );
+    private static final BigDecimal BDC_GROSS_TO_NET = new BigDecimal( "1.25" );
     private static final int MAX_LEVY_NIGHTS = 5;
     private static final BigDecimal TOLERANCE = new BigDecimal( "0.01" );
 
@@ -42,6 +48,30 @@ public final class EdinburghVisitorLevyCalculator {
 
         public BigDecimal getRate() {
             return rate;
+        }
+    }
+
+    static class PersonNightRate {
+        private final LocalDate date;
+        private final BigDecimal grossRate;
+        private final int guestCount;
+
+        PersonNightRate( LocalDate date, BigDecimal grossRate, int guestCount ) {
+            this.date = date;
+            this.grossRate = grossRate;
+            this.guestCount = guestCount;
+        }
+
+        LocalDate getDate() {
+            return date;
+        }
+
+        BigDecimal getGrossRate() {
+            return grossRate;
+        }
+
+        int getGuestCount() {
+            return guestCount;
         }
     }
 
@@ -108,13 +138,32 @@ public final class EdinburghVisitorLevyCalculator {
 
         Map<LocalDate, BigDecimal> ratesByDate = reservation.getRatesByDate( gson );
         List<LevyNight> eligibleNights = getEligibleNights( ratesByDate, reservation.getCheckoutDateAsLocalDate(), stayDateFrom );
-        BigDecimal eligibleTotal = eligibleNights.stream()
-                .map( LevyNight::getRate )
-                .reduce( BigDecimal.ZERO, BigDecimal::add );
 
         boolean hostelworldUsesListedPrice = false;
-        BigDecimal levyBase = eligibleTotal;
-        if ( reservation.isHostelworldBooking() ) {
+        BigDecimal levyBase;
+        BigDecimal expectedLevy;
+
+        if ( reservation.isBookingDotComBooking() ) {
+            List<PersonNightRate> personNightRates = getEligiblePersonNightRates(
+                    reservation, gson, reservation.getCheckoutDateAsLocalDate(), stayDateFrom );
+            levyBase = BigDecimal.ZERO;
+            expectedLevy = BigDecimal.ZERO;
+            for ( PersonNightRate personNight : personNightRates ) {
+                BigDecimal netPerGuest = personNight.getGrossRate()
+                        .divide( BDC_GROSS_TO_NET, 10, RoundingMode.HALF_UP )
+                        .setScale( 2, RoundingMode.HALF_UP );
+                BigDecimal levyPerGuest = netPerGuest.multiply( LEVY_RATE )
+                        .setScale( 2, RoundingMode.HALF_UP );
+                int guests = personNight.getGuestCount();
+                levyBase = levyBase.add( netPerGuest.multiply( BigDecimal.valueOf( guests ) ) );
+                expectedLevy = expectedLevy.add( levyPerGuest.multiply( BigDecimal.valueOf( guests ) ) );
+            }
+        }
+        else if ( reservation.isHostelworldBooking() ) {
+            BigDecimal eligibleTotal = eligibleNights.stream()
+                    .map( LevyNight::getRate )
+                    .reduce( BigDecimal.ZERO, BigDecimal::add );
+            levyBase = eligibleTotal;
             BigDecimal priceListed = resolveHostelworldPriceListed( reservation );
             BigDecimal allNightsTotal = ratesByDate.values().stream()
                     .reduce( BigDecimal.ZERO, BigDecimal::add );
@@ -123,11 +172,68 @@ public final class EdinburghVisitorLevyCalculator {
                 levyBase = priceListed.multiply( eligibleTotal )
                         .divide( allNightsTotal, 10, RoundingMode.HALF_UP );
             }
+            expectedLevy = levyBase.multiply( LEVY_RATE ).setScale( 2, RoundingMode.HALF_UP );
+        }
+        else {
+            levyBase = BigDecimal.ZERO;
+            expectedLevy = BigDecimal.ZERO;
+            for ( LevyNight night : eligibleNights ) {
+                levyBase = levyBase.add( night.getRate() );
+                expectedLevy = expectedLevy.add(
+                        night.getRate().multiply( LEVY_RATE ).setScale( 2, RoundingMode.HALF_UP ) );
+            }
         }
 
-        BigDecimal expectedLevy = levyBase.multiply( LEVY_RATE ).setScale( 2, RoundingMode.HALF_UP );
-        return new LevyCalculation( expectedLevy, levyBase.setScale( 2, RoundingMode.HALF_UP ),
+        return new LevyCalculation( expectedLevy.setScale( 2, RoundingMode.HALF_UP ),
+                levyBase.setScale( 2, RoundingMode.HALF_UP ),
                 eligibleNights, hostelworldUsesListedPrice, false, false );
+    }
+
+    static List<PersonNightRate> getEligiblePersonNightRates( Reservation reservation, Gson gson,
+            LocalDate checkoutDate, LocalDate stayDateFrom ) {
+        List<PersonNightRate> personNightRates = new ArrayList<>();
+        if ( reservation.getBookingRooms() == null ) {
+            return personNightRates;
+        }
+        for ( BookingRoom bookingRoom : reservation.getBookingRooms() ) {
+            if ( bookingRoom.getDetailedRates() == null ) {
+                continue;
+            }
+            JsonArray detailedRates = gson.fromJson( bookingRoom.getDetailedRates(), JsonArray.class );
+            for ( int i = 0; i < detailedRates.size(); i++ ) {
+                JsonObject rateLine = detailedRates.get( i ).getAsJsonObject();
+                LocalDate date = LocalDate.parse( rateLine.get( "date" ).getAsString() );
+                if ( date.isBefore( stayDateFrom ) || false == date.isBefore( checkoutDate ) ) {
+                    continue;
+                }
+                BigDecimal rate = rateLine.get( "rate" ).getAsBigDecimal();
+                int guestCount = resolveGuestCount( rateLine, reservation );
+                personNightRates.add( new PersonNightRate( date, rate, guestCount ) );
+            }
+        }
+        personNightRates.sort( Comparator.comparing( PersonNightRate::getDate ) );
+
+        List<LocalDate> eligibleDates = personNightRates.stream()
+                .map( PersonNightRate::getDate )
+                .distinct()
+                .sorted()
+                .limit( MAX_LEVY_NIGHTS )
+                .collect( Collectors.toList() );
+
+        return personNightRates.stream()
+                .filter( rate -> eligibleDates.contains( rate.getDate() ) )
+                .collect( Collectors.toList() );
+    }
+
+    static int resolveGuestCount( JsonObject rateLine, Reservation reservation ) {
+        int adults = rateLine.has( "adults" ) ? rateLine.get( "adults" ).getAsInt() : 0;
+        int kids = rateLine.has( "kids" ) ? rateLine.get( "kids" ).getAsInt() : 0;
+        int guestsOnLine = adults + kids;
+        if ( guestsOnLine > 0 ) {
+            return guestsOnLine;
+        }
+        int reservationGuests = reservation.getNumberOfGuests();
+        return reservationGuests > 0 ? reservationGuests : 1;
     }
 
     static BigDecimal resolveHostelworldPriceListed( Reservation reservation ) {
@@ -149,7 +255,7 @@ public final class EdinburghVisitorLevyCalculator {
                 eligibleNights.add( new LevyNight( night, entry.getValue() ) );
             }
         }
-        eligibleNights.sort( ( a, b ) -> a.getDate().compareTo( b.getDate() ) );
+        eligibleNights.sort( Comparator.comparing( LevyNight::getDate ) );
 
         if ( eligibleNights.size() > MAX_LEVY_NIGHTS ) {
             return eligibleNights.subList( 0, MAX_LEVY_NIGHTS );

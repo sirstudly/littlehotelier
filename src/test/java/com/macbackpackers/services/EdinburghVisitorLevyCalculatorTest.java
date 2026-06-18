@@ -69,8 +69,41 @@ public class EdinburghVisitorLevyCalculatorTest {
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
                 reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
 
-        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "8.25" ) ) );
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "6.60" ) ) );
         assertThat( EdinburghVisitorLevyCalculator.useInclusiveTax( reservation ), is( true ) );
+    }
+
+    @Test
+    public void testBookingDotComTwoGuestsTwoNightsMatchesCloudbedsFolio() {
+        Reservation reservation = reservationWithRates(
+                "Booking.com", "2026-10-01", "2026-10-03", "2025-11-01",
+                rateLine( "2026-10-01", "47.20", 2 ),
+                rateLine( "2026-10-02", "47.20", 2 ) );
+        reservation.setAdultsNumber( 2 );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "7.56" ) ) );
+        assertThat( calculation.getLevyBase(), comparesEqualTo( new BigDecimal( "151.04" ) ) );
+    }
+
+    @Test
+    public void testBookingDotComFiveNightsTwoGuestsMatchesCloudbedsFolio() {
+        Reservation reservation = reservationWithRates(
+                "Booking.com", "2026-07-26", "2026-07-31", "2025-11-01",
+                rateLine( "2026-07-26", "26.15", 2 ),
+                rateLine( "2026-07-27", "30.82", 2 ),
+                rateLine( "2026-07-28", "30.82", 2 ),
+                rateLine( "2026-07-29", "30.82", 2 ),
+                rateLine( "2026-07-30", "30.82", 2 ) );
+        reservation.setAdultsNumber( 2 );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "11.94" ) ) );
+        assertThat( calculation.getLevyBase(), comparesEqualTo( new BigDecimal( "239.12" ) ) );
     }
 
     @Test
@@ -299,6 +332,10 @@ public class EdinburghVisitorLevyCalculatorTest {
     }
 
     private String rateLine( String date, String rate ) {
-        return String.format( "{\"date\":\"%s\",\"rate\":%s,\"adults\":1,\"kids\":0}", date, rate );
+        return rateLine( date, rate, 1 );
+    }
+
+    private String rateLine( String date, String rate, int adults ) {
+        return String.format( "{\"date\":\"%s\",\"rate\":%s,\"adults\":%d,\"kids\":0}", date, rate, adults );
     }
 }

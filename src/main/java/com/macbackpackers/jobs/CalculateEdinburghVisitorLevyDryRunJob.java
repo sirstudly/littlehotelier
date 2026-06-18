@@ -10,19 +10,19 @@ import jakarta.persistence.Transient;
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.transaction.annotation.Transactional;
 
-import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.services.EdinburghVisitorLevyService;
+import com.macbackpackers.services.EdinburghVisitorLevyService.LevyAssessment;
 
 /**
- * Creates {@link CalculateEdinburghVisitorLevyForBookingJob}s for active bookings made within a
- * booking-date range where the stay exceeds five nights or the booking is from Hostelworld.
+ * Dry-run visitor levy calculation for active bookings in a booking-date range that would normally
+ * be queued by {@link CreateCalculateEdinburghVisitorLevyForBookingJob}. Logs whether each
+ * reservation needs an adjustment without posting charges.
  */
 @Entity
-@DiscriminatorValue( value = "com.macbackpackers.jobs.CreateCalculateEdinburghVisitorLevyForBookingJob" )
-public class CreateCalculateEdinburghVisitorLevyForBookingJob extends AbstractJob {
+@DiscriminatorValue( value = "com.macbackpackers.jobs.CalculateEdinburghVisitorLevyDryRunJob" )
+public class CalculateEdinburghVisitorLevyDryRunJob extends AbstractJob {
 
     @Autowired
     @Transient
@@ -34,25 +34,27 @@ public class CreateCalculateEdinburghVisitorLevyForBookingJob extends AbstractJo
     private EdinburghVisitorLevyService edinburghVisitorLevyService;
 
     @Override
-    @Transactional
     public void processJob() throws Exception {
         if ( false == dao.isCloudbeds() ) {
             return;
         }
 
-        edinburghVisitorLevyService.findReservationsRequiringVisitorLevyAdjustment(
-                cbWebClient, getBookingDateStart(), getBookingDateEnd() )
-                .forEach( this::createCalculateJob );
-    }
+        int needingAdjustment = 0;
+        int checked = 0;
 
-    private void createCalculateJob( Customer customer ) {
-        LOGGER.info( "Creating CalculateEdinburghVisitorLevyForBookingJob for Res #{} ({}) {} {} ({} nights)",
-                customer.getId(), customer.getSourceName(), customer.getFirstName(), customer.getLastName(),
-                customer.getNights() );
-        CalculateEdinburghVisitorLevyForBookingJob job = new CalculateEdinburghVisitorLevyForBookingJob();
-        job.setStatus( JobStatus.submitted );
-        job.setReservationId( customer.getId() );
-        dao.insertJob( job );
+        for ( Customer customer : edinburghVisitorLevyService.findReservationsRequiringVisitorLevyAdjustment(
+                cbWebClient, getBookingDateStart(), getBookingDateEnd() ) ) {
+            LevyAssessment assessment = edinburghVisitorLevyService.assessVisitorLevyForBooking(
+                    cbWebClient, customer.getId() );
+            edinburghVisitorLevyService.logDryRunAssessment( customer, assessment );
+            checked++;
+            if ( assessment.needsAdjustment() ) {
+                needingAdjustment++;
+            }
+        }
+
+        LOGGER.info( "Visitor levy dry run {} to {}: {} reservations checked, {} need adjustment",
+                getBookingDateStart(), getBookingDateEnd(), checked, needingAdjustment );
     }
 
     @Override
