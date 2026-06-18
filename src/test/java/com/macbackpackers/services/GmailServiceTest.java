@@ -48,6 +48,11 @@ public class GmailServiceTest {
     }
 
     @Test
+    public void testFetchHostelworldLoginUrl() throws Exception {
+        LOGGER.info( gmailService.fetchHostelworldLoginUrl() );
+    }
+
+    @Test
     public void testAuthorize() throws Exception {
         // this should throw up a login window on first run
         gmailService.connectAsClient();

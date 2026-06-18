@@ -81,6 +81,9 @@ public class GmailService {
     /** String for matching emails for LH security access */
     private final String LH_SECURITY_ACCESS = "subject:\"LittleHotelier - Security access required\" from:noreply@app.littlehotelier.com in:inbox"; 
 
+    /** String for matching Hostelworld inbox login emails */
+    private final String HOSTELWORLD_LOGIN_INBOX = "subject:\"Login to Inbox\" from:noreply@hostelworld.com in:inbox";
+
     /** Global instance of the JSON factory. */
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
 
@@ -273,6 +276,56 @@ public class GmailService {
     }
 
     /**
+     * Returns the login URL from the most recent Hostelworld inbox login email.
+     * 
+     * @return non-null login URL
+     * @throws IOException on I/O error
+     * @throws EmptyResultDataAccessException if no message found within timeout
+     */
+    public String fetchHostelworldLoginUrl() throws IOException, EmptyResultDataAccessException {
+        for(int i = 0; i < 8; i++) {
+            Gmail service = connectAsClient();
+            ListMessagesResponse listResponse = 
+                    service.users().messages()
+                    .list( GMAIL_USER )
+                    .setQ( HOSTELWORLD_LOGIN_INBOX )
+                    .execute();
+            List<Message> messages = listResponse.getMessages();
+            if ( messages != null ) {
+                LOGGER.info( messages.size() + " messages:" );
+                for ( Message message : messages ) {
+                    LOGGER.info( message.getId() + " - " + message.getThreadId() );
+                    String body = fetchMessageBody( service, message.getId() );
+                    if ( body == null ) {
+                        throw new EmptyResultDataAccessException( "No body found in Hostelworld login message?", 1 );
+                    }
+                    try {
+                        return findAndReturn( "(https://inbox\\.hostelworld\\.com/login/[^\\s\"<>]+)", body );
+                    }
+                    catch ( EmptyResultDataAccessException e ) {
+                        try {
+                            return findAndReturn( "(https?://url[0-9]+\\.hostelworld\\.com/ls/click\\?[^\\s\"<>]+)", body );
+                        }
+                        catch ( EmptyResultDataAccessException e2 ) {
+                            LOGGER.info( "Unable to find login URL for messageId " + message.getId() + "; continuing", e2 );
+                        }
+                    }
+                }
+            }
+            
+            // email hasn't arrived yet? backoff.. 30 sec
+            try {
+                LOGGER.info( "Email hasn't arrived yet, waiting a bit..." );
+                Thread.sleep( 30000 );
+            }
+            catch ( InterruptedException e ) {
+                // ignore
+            }
+        }
+        throw new EmptyResultDataAccessException( "No Hostelworld login messages found", 1 );
+    }
+
+    /**
      * Sends an email from the current email address.
      * 
      * @param toAddress email address of the receiver
@@ -435,6 +488,11 @@ public class GmailService {
                             return webSafeBase64Decode( innerPart.getBody().getData() );
                         }
                     }
+                }
+                else if ( part.getBody() != null
+                        && ( "text/plain".equals( part.getMimeType() )
+                        || "text/html".equals( part.getMimeType() ) ) ) {
+                    return webSafeBase64Decode( part.getBody().getData() );
                 }
             }
         }

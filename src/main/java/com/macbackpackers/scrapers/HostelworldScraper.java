@@ -6,7 +6,6 @@ import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Iterator;
@@ -31,7 +30,6 @@ import org.htmlunit.html.HtmlSubmitInput;
 import org.htmlunit.html.HtmlTextInput;
 import org.htmlunit.html.HtmlUnorderedList;
 import org.htmlunit.util.Cookie;
-import org.htmlunit.util.NameValuePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +39,7 @@ import org.springframework.stereotype.Component;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.HostelworldBookingDate;
@@ -49,6 +48,7 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.exceptions.WebResponseException;
 import com.macbackpackers.services.FileService;
+import com.macbackpackers.services.GmailService;
 
 @Component
 public class HostelworldScraper {
@@ -61,6 +61,10 @@ public class HostelworldScraper {
     /** the title on the login page */
     public static final String LOGIN_PAGE_TITLE = "Hostels Inbox Login";
 
+    private static final String LOGIN_URL = "https://inbox.hostelworld.com/";
+
+    private static final String LOGGED_IN_PATH = "/loggedin.php";
+
     /** for saving login credentials */
     private static final String COOKIE_FILE = "hostelworld.cookies";
     
@@ -69,6 +73,9 @@ public class HostelworldScraper {
     
     @Autowired
     private FileService fileService;
+
+    @Autowired
+    private GmailService gmailService;
 
     @Autowired
     private WordPressDAO wordPressDAO;
@@ -101,32 +108,41 @@ public class HostelworldScraper {
      */
     public HtmlPage doLogin( WebClient webClient, String username, String password ) throws IOException {
         LOGGER.info( "Logging into Hostelworld" );
-        HtmlPage loginPage = webClient.getPage( wordPressDAO.getMandatoryOption( "hbo_hw_url_login" ) );
+        HtmlPage loginPage = webClient.getPage( LOGIN_URL );
         HtmlForm form = loginPage.getFormByName( "loginForm" );
 
         HtmlTextInput hostelNumberField = form.getInputByName( "HostelNumber" );
         HtmlTextInput usernameField = form.getInputByName( "Username" );
         HtmlPasswordInput passwordField = form.getInputByName( "Password" );
 
-        // Change the value of the text fields
         hostelNumberField.setValueAttribute( wordPressDAO.getMandatoryOption( "hbo_hw_hostelnumber" ) );
         usernameField.setValueAttribute( username );
         passwordField.setValueAttribute( password );
         HtmlSubmitInput loginLink = loginPage.getFirstByXPath( "//input[@type='submit' and @value='Login']" );
 
         HtmlPage nextPage = loginLink.click();
-        LOGGER.info( "Finished logging in" );
 
-        // if we get redirected to the login page again...
-        if ( LOGIN_PAGE_TITLE.equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
+        if ( isLoginPage( nextPage ) ) {
             LOGGER.error( nextPage.asXml() );
             throw new UnrecoverableFault( "Unable to login to Hostelworld. Incorrect password?" );
         }
 
-        // save credentials to disk so we don't need to do this again
-        // for the immediate future
+        LOGGER.info( "Credentials accepted; waiting for secure login email..." );
+        sleep( 15000 );
+
+        String loginUrl = gmailService.fetchHostelworldLoginUrl();
+        LOGGER.info( "Following secure login link from email" );
+        HtmlPage loggedInPage = webClient.getPage( loginUrl );
+
+        if ( false == LOGGED_IN_PATH.equals( loggedInPage.getUrl().getPath() ) ) {
+            LOGGER.error( loggedInPage.asXml() );
+            throw new UnrecoverableFault( "Hostelworld login did not complete; expected " + LOGGED_IN_PATH
+                    + " but got " + loggedInPage.getUrl() );
+        }
+
+        LOGGER.info( "Finished logging in" );
         fileService.writeCookiesToFile( webClient, COOKIE_FILE );
-        return nextPage;
+        return loggedInPage;
     }
 
     /**
@@ -146,7 +162,7 @@ public class HostelworldScraper {
         HtmlPage nextPage = webClient.getPage( url );
 
         // if we got redirected, then login
-        if ( LOGIN_PAGE_TITLE.equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
+        if ( isLoginPage( nextPage ) ) {
 
             // create a new web client just for logging in
             try (WebClient webClientForLogin = context.getBean( "webClientForHostelworldLogin", WebClient.class )) {
@@ -154,7 +170,7 @@ public class HostelworldScraper {
                 nextPage = webClientForLogin.getPage( url );
 
                 // if we still get redirected to the login page...
-                if ( LOGIN_PAGE_TITLE.equals( StringUtils.trim( nextPage.getTitleText() ) ) ) {
+                if ( isLoginPage( nextPage ) ) {
                     throw new UnrecoverableFault( "Unable to login to Hostelworld! Has the password changed?" );
                 }
 
@@ -422,20 +438,13 @@ public class HostelworldScraper {
 
         LOGGER.info( "Acknowledging full payment taken for HWL-" + bookingRef );
 
-        // strip property id if provided
-        String hwlBookingId = bookingRef;
-        Pattern p = Pattern.compile( wordPressDAO.getMandatoryOption( "hbo_hw_hostelnumber" ) + "-([\\d]+)" );
-        Matcher m = p.matcher( bookingRef );
-        if ( m.find() ) {
-            hwlBookingId = m.group( 1 );
-        }
+        String hwlBookingId = stripHostelworldPropertyPrefix( bookingRef );
+        String bookingViewUrl = "https://inbox.hostelworld.com/booking/view/" + hwlBookingId;
+        gotoPage( webClient, bookingViewUrl );
 
-        gotoPage( webClient, "https://inbox.hostelworld.com/booking/view/" + hwlBookingId );
-
-        WebRequest webRequest = createBasePostRequest( "https://inbox.hostelworld.com/booking/payment/confirm" );
-        webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "custId", hwlBookingId ),
-                new NameValuePair( "bookingPaymentAck", "1" ) ) );
+        WebRequest webRequest = createJsonPostRequest(
+                "https://inbox.hostelworld.com/booking/payment/confirm", bookingViewUrl );
+        webRequest.setRequestBody( "{\"bookingPaymentAck\":true,\"custId\":\"" + hwlBookingId + "\"}" );
         Page redirectPage = webClient.getPage( webRequest );
 
         LOGGER.info( "Going to: " + redirectPage.getUrl().getPath() );
@@ -445,6 +454,50 @@ public class HostelworldScraper {
         if ( jelement == null || jelement.getAsJsonObject().get( "success" ) == null ) {
             LOGGER.error( redirectPage.getWebResponse().getContentAsString() );
             throw new WebResponseException( "Acknowledgement probably failed...", redirectPage.getWebResponse() );
+        }
+    }
+
+    /**
+     * Reports a card payment issue to Hostelworld for the given booking.
+     * 
+     * @param webClient the logged-in web client
+     * @param bookingRef HWL reservation id (property ID not required)
+     * @param cardIssue card issue selected in the Hostelworld form
+     * @param sendEmailCopy whether to send a copy of the email to the property
+     * @throws IOException on page load or request failure
+     */
+    public synchronized void reportPaymentIssue( WebClient webClient, String bookingRef, String cardIssue,
+            boolean sendEmailCopy ) throws IOException {
+
+        if ( StringUtils.isBlank( wordPressDAO.getOption( "hbo_hw_password" ) ) ) {
+            LOGGER.info( "Hostelworld password not set. Unable to report payment issue on HWL." );
+            return;
+        }
+
+        LOGGER.info( "Reporting card payment issue for HWL-" + bookingRef + ": " + cardIssue );
+
+        String hwlBookingId = stripHostelworldPropertyPrefix( bookingRef );
+        String bookingViewUrl = "https://inbox.hostelworld.com/booking/view/" + hwlBookingId;
+        HtmlPage bookingPage = gotoPage( webClient, bookingViewUrl );
+        String formToken = extractViewBookingFormToken( bookingPage );
+
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty( "formToken", formToken );
+        requestBody.addProperty( "custID", hwlBookingId );
+        requestBody.addProperty( "comment", cardIssue );
+        requestBody.addProperty( "reason", "ccissue" );
+        requestBody.addProperty( "sendEmailCopy", sendEmailCopy );
+
+        WebRequest webRequest = createJsonPostRequest( "https://inbox.hostelworld.com/booking/cancel", bookingViewUrl );
+        webRequest.setRequestBody( gson.toJson( requestBody ) );
+        Page responsePage = webClient.getPage( webRequest );
+
+        LOGGER.info( responsePage.getWebResponse().getContentAsString() );
+
+        JsonElement jelement = gson.fromJson( responsePage.getWebResponse().getContentAsString(), JsonElement.class );
+        if ( jelement == null || jelement.getAsJsonObject().get( "success" ) == null ) {
+            LOGGER.error( responsePage.getWebResponse().getContentAsString() );
+            throw new WebResponseException( "Reporting card payment issue probably failed...", responsePage.getWebResponse() );
         }
     }
 
@@ -523,17 +576,51 @@ public class HostelworldScraper {
                 .replaceAll( "__DATE_TYPE__", "bookeddate" );
     }
 
+    private String stripHostelworldPropertyPrefix( String bookingRef ) {
+        String hwlBookingId = bookingRef;
+        Pattern p = Pattern.compile( wordPressDAO.getMandatoryOption( "hbo_hw_hostelnumber" ) + "-([\\d]+)" );
+        Matcher m = p.matcher( bookingRef );
+        if ( m.find() ) {
+            hwlBookingId = m.group( 1 );
+        }
+        return hwlBookingId;
+    }
+
+    private String extractViewBookingFormToken( HtmlPage bookingPage ) {
+        Pattern p = Pattern.compile( "\"viewBooking\"\\s*:\\s*\"([^\"]+)\"" );
+        Matcher m = p.matcher( bookingPage.getWebResponse().getContentAsString() );
+        if ( m.find() ) {
+            return m.group( 1 );
+        }
+        throw new UnrecoverableFault( "Unable to find viewBooking form token on Hostelworld booking page" );
+    }
+
+    private boolean isLoginPage( HtmlPage page ) {
+        return LOGIN_PAGE_TITLE.equals( StringUtils.trim( page.getTitleText() ) )
+                || page.getUrl().toString().contains( "error=USERORPASSWORDINCORRECT" );
+    }
+
+    private void sleep( int millis ) {
+        try {
+            Thread.sleep( millis );
+        }
+        catch ( InterruptedException e ) {
+            // ignore
+        }
+    }
+
     /**
-     * Creates a standard POST request.
+     * Creates a JSON POST request.
      * 
      * @param url the page to POST to
+     * @param referer the referring page
      * @return request options
      */
-    private WebRequest createBasePostRequest( String url ) throws IOException {
+    private WebRequest createJsonPostRequest( String url, String referer ) throws IOException {
         WebRequest requestSettings = new WebRequest( new URL( url ), HttpMethod.POST );
-        requestSettings.setAdditionalHeader( "Accept", "*/*" );
-        requestSettings.setAdditionalHeader( "Content-Type", "application/x-www-form-urlencoded; charset=UTF-8" );
-        requestSettings.setAdditionalHeader( "Referer", "https://inbox.hostelworld.com/" );
+        requestSettings.setAdditionalHeader( "Accept", "application/json, text/plain, */*" );
+        requestSettings.setAdditionalHeader( "Content-Type", "application/json;charset=UTF-8" );
+        requestSettings.setAdditionalHeader( "Referer", referer );
         requestSettings.setAdditionalHeader( "Accept-Language", "en-GB,en-US;q=0.9,en;q=0.8" );
         requestSettings.setAdditionalHeader( "Accept-Encoding", "gzip, deflate, br" );
         requestSettings.setAdditionalHeader( "Origin", "https://inbox.hostelworld.com" );
