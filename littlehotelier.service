@@ -9,7 +9,7 @@ After=network-online.target
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/home/botpress/littlehotelier
-ExecStart=/snap/bin/docker-compose up -d
+ExecStart=/usr/bin/docker compose up -d
 ExecStop=/home/botpress/littlehotelier/scripts/stop-if-idle.sh
 TimeoutStartSec=0
 
