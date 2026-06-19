@@ -44,7 +44,7 @@ import com.macbackpackers.scrapers.CloudbedsScraper;
  * <li>rebuild the session on every (re)connect so a session refresh
  * ({@code ResetCloudbedsSessionJob}) is picked up automatically.</li>
  * </ul>
- * This first step only forwards events to {@link CloudbedsEventListener} (logging); no DB writes.
+ * This first step forwards events to registered {@link CloudbedsEventListener} implementations.
  */
 @Service
 public class CloudbedsWebSocketService {
@@ -70,7 +70,7 @@ public class CloudbedsWebSocketService {
     private CloudbedsJsonRequestFactory jsonRequestFactory;
 
     @Autowired
-    private CloudbedsEventListener eventListener;
+    private List<CloudbedsEventListener> eventListeners;
 
     @Autowired
     private ApplicationContext context;
@@ -179,7 +179,7 @@ public class CloudbedsWebSocketService {
 
         CloudbedsWebSocketClient client = new CloudbedsWebSocketClient( uri, headers,
                 session.propertyId, session.version, session.frontVersion, session.csrf,
-                session.migrateId, eventListener );
+                session.migrateId, multiplexEventListeners() );
         currentClient = client;
         try {
             LOGGER.info( "Connecting to Cloudbeds calendar WebSocket: {}", uri );
@@ -204,6 +204,37 @@ public class CloudbedsWebSocketService {
         finally {
             currentClient = null;
         }
+    }
+
+    /**
+     * Returns a listener that forwards each event to every registered {@link CloudbedsEventListener}.
+     */
+    private CloudbedsEventListener multiplexEventListeners() {
+        return new CloudbedsEventListener() {
+            @Override
+            public void onSnapshot( String propertyId, List<CloudbedsCalendarEvent> events ) {
+                for ( CloudbedsEventListener listener : eventListeners ) {
+                    try {
+                        listener.onSnapshot( propertyId, events );
+                    }
+                    catch ( Exception e ) {
+                        LOGGER.error( "Cloudbeds WebSocket snapshot listener failed: {}", listener.getClass().getSimpleName(), e );
+                    }
+                }
+            }
+
+            @Override
+            public void onChanges( String propertyId, List<CloudbedsCalendarEvent> events ) {
+                for ( CloudbedsEventListener listener : eventListeners ) {
+                    try {
+                        listener.onChanges( propertyId, events );
+                    }
+                    catch ( Exception e ) {
+                        LOGGER.error( "Cloudbeds WebSocket changes listener failed: {}", listener.getClass().getSimpleName(), e );
+                    }
+                }
+            }
+        };
     }
 
     /**

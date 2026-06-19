@@ -152,6 +152,14 @@ public interface WordPressDAO {
     int insertJob( Job job );
 
     /**
+     * Returns true if a {@code ChargeNonRefundableBookingJob} already exists for the given
+     * reservation in a non-terminal state ({@code submitted}, {@code processing}, or {@code retry}).
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    boolean hasChargeNonRefundableJobForReservation( String reservationId );
+
+    /**
      * Returns the number of jobs at 'submitted' or 'processing'.
      * 
      * @return number of jobs

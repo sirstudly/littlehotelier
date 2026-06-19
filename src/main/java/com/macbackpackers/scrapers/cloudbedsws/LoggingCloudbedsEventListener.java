@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * Default {@link CloudbedsEventListener} that simply logs incoming calendar events to a dedicated
  * logger ({@code cloudbeds.events}, routed to {@code cloudbeds-events.log} via logback).
  * <p>
- * This is the logging-only first step; it performs no DB writes or actions.
+ * This is the logging listener; other listeners (e.g. charge-job creation) are registered separately.
  */
 @Component
 public class LoggingCloudbedsEventListener implements CloudbedsEventListener {

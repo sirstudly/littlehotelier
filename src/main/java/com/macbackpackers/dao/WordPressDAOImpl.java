@@ -244,6 +244,23 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public boolean hasChargeNonRefundableJobForReservation( String reservationId ) {
+        if ( StringUtils.isBlank( reservationId ) ) {
+            return false;
+        }
+        Number count = (Number) em.createNativeQuery(
+                "SELECT COUNT(1) FROM wp_lh_jobs j "
+                        + "  JOIN wp_lh_job_param p ON j.job_id = p.job_id "
+                        + " WHERE j.classname = 'com.macbackpackers.jobs.ChargeNonRefundableBookingJob' "
+                        + "   AND p.name = 'reservation_id' "
+                        + "   AND p.value = :reservationId "
+                        + "   AND j.status IN ('submitted', 'processing', 'retry')" )
+                .setParameter( "reservationId", reservationId )
+                .getSingleResult();
+        return count.longValue() > 0;
+    }
+
+    @Override
     public long getOutstandingJobCount() {
         return em.createQuery( "SELECT COUNT(1) FROM AbstractJob "
                 + "     WHERE status IN (:submittedStatus, :processingStatus)", Long.class )
