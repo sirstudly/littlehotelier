@@ -118,9 +118,13 @@ public class HostelworldScraper {
         hostelNumberField.setValueAttribute( wordPressDAO.getMandatoryOption( "hbo_hw_hostelnumber" ) );
         usernameField.setValueAttribute( username );
         passwordField.setValueAttribute( password );
-        HtmlSubmitInput loginLink = loginPage.getFirstByXPath( "//input[@type='submit' and @value='Login']" );
+        HtmlSubmitInput loginButton = form.getFirstByXPath( ".//input[@type='submit']" );
+        if ( loginButton == null ) {
+            LOGGER.error( loginPage.asXml() );
+            throw new UnrecoverableFault( "Unable to find login submit button on Hostelworld login page" );
+        }
 
-        HtmlPage nextPage = loginLink.click();
+        HtmlPage nextPage = loginButton.click();
 
         if ( isLoginPage( nextPage ) ) {
             LOGGER.error( nextPage.asXml() );
