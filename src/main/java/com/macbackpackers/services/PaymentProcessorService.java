@@ -16,6 +16,8 @@ import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.ArchiveAllTransactionNotesJob;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
+import com.macbackpackers.jobs.HostelworldAcknowledgeFullPaymentTakenJob;
+import com.macbackpackers.jobs.HostelworldReportPaymentIssueJob;
 import com.macbackpackers.jobs.SendDepositChargeDeclinedEmailJob;
 import com.macbackpackers.jobs.SendDepositChargeSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendHostelworldLateCancellationEmailJob;
@@ -343,12 +345,13 @@ public class PaymentProcessorService {
                     + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + " successfully charged." );
 
             // mark booking as fully paid in Hostelworld
-//            if ( Arrays.asList( "Hostelworld & Hostelbookers", "Hostelworld" ).contains( cbReservation.getSourceName() ) ) {
-//                HostelworldAcknowledgeFullPaymentTakenJob ackJob = new HostelworldAcknowledgeFullPaymentTakenJob();
-//                ackJob.setHostelworldBookingRef( cbReservation.getThirdPartyIdentifier() );
-//                ackJob.setStatus( JobStatus.submitted );
-//                wordpressDAO.insertJob( ackJob );
-//            }
+            if ( Arrays.asList( "Hostelworld & Hostelbookers", "Hostelworld" ).contains( cbReservation.getSourceName() )
+                    && StringUtils.isNotBlank( wordpressDAO.getOption( "hbo_hw_password" ) ) ) {
+                HostelworldAcknowledgeFullPaymentTakenJob ackJob = new HostelworldAcknowledgeFullPaymentTakenJob();
+                ackJob.setHostelworldBookingRef( cbReservation.getThirdPartyIdentifier() );
+                ackJob.setStatus( JobStatus.submitted );
+                wordpressDAO.insertJob( ackJob );
+            }
 
             // send email if successful
             SendNonRefundableSuccessfulEmailJob job = new SendNonRefundableSuccessfulEmailJob();
@@ -381,6 +384,16 @@ public class PaymentProcessorService {
                 job.setPaymentURL( paymentURL );
                 job.setStatus( JobStatus.submitted );
                 wordpressDAO.insertJob( job );
+
+                if ( Arrays.asList( "Hostelworld & Hostelbookers", "Hostelworld" ).contains( cbReservation.getSourceName() )
+                        && StringUtils.isNotBlank( wordpressDAO.getOption( "hbo_hw_password" ) ) ) {
+                    HostelworldReportPaymentIssueJob paymentIssueJob = new HostelworldReportPaymentIssueJob();
+                    paymentIssueJob.setReservationId( reservationId );
+                    paymentIssueJob.setEmailConfirmToSelf( true );
+                    paymentIssueJob.setCardIssue( resolveHostelworldCardIssue( payEx.getMessage() ) );
+                    paymentIssueJob.setStatus( JobStatus.submitted );
+                    wordpressDAO.insertJob( paymentIssueJob );
+                }
             }
         }
     }
@@ -974,5 +987,25 @@ public class PaymentProcessorService {
 
     private String getStripeApiKey() {
         return wordpressDAO.getMandatoryOption( "hbo_stripe_apikey" );
+    }
+
+    private String resolveHostelworldCardIssue( String paymentFailureMessage ) {
+        String message = StringUtils.defaultString( paymentFailureMessage ).toLowerCase();
+        if ( message.contains( "invalid card" ) ) {
+            return "Invalid card number";
+        }
+        if ( message.contains( "expired" ) ) {
+            return "Expired card";
+        }
+        if ( message.contains( "insufficient" ) ) {
+            return "Insufficient funds";
+        }
+        if ( message.contains( "fraud" ) ) {
+            return "Suspected fraud";
+        }
+        if ( message.contains( "more information" ) ) {
+            return "Require more information";
+        }
+        return "Card declined by issuer";
     }
 }

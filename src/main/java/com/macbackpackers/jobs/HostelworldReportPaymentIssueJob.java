@@ -22,7 +22,7 @@ import jakarta.persistence.Transient;
 @DiscriminatorValue( value = "com.macbackpackers.jobs.HostelworldReportPaymentIssueJob" )
 public class HostelworldReportPaymentIssueJob extends AbstractJob {
 
-    static final String REPORTED_CARD_PAYMENT_ISSUE_NOTE = "Reported card payment issue to Hostelworld.";
+    public static final String REPORTED_CARD_PAYMENT_ISSUE_NOTE = "Reported card payment issue to Hostelworld.";
 
     @Autowired
     @Transient
