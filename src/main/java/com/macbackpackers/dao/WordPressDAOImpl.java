@@ -245,18 +245,45 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Override
     public boolean hasChargeNonRefundableJobForReservation( String reservationId ) {
+        return hasRecentChargeNonRefundableJobForReservation( reservationId, NON_REFUNDABLE_CHARGE_COOLDOWN_HOURS, null );
+    }
+
+    @Override
+    public boolean hasRecentChargeNonRefundableJobForReservation( String reservationId, int hoursBack, Integer excludeJobId ) {
         if ( StringUtils.isBlank( reservationId ) ) {
             return false;
         }
-        Number count = (Number) em.createNativeQuery(
+        StringBuilder sql = new StringBuilder(
                 "SELECT COUNT(1) FROM wp_lh_jobs j "
                         + "  JOIN wp_lh_job_param p ON j.job_id = p.job_id "
                         + " WHERE j.classname = 'com.macbackpackers.jobs.ChargeNonRefundableBookingJob' "
                         + "   AND p.name = 'reservation_id' "
-                        + "   AND p.value = :reservationId "
-                        + "   AND j.status IN ('submitted', 'processing', 'retry')" )
+                        + "   AND p.value = :reservationId " );
+        if ( excludeJobId != null ) {
+            sql.append( "   AND j.job_id != :excludeJobId " );
+        }
+        if ( excludeJobId == null ) {
+            // enqueue dedup: block while a job is pending, or any finished attempt within the cooldown
+            sql.append( "   AND (j.status IN ('submitted', 'processing', 'retry') "
+                    + "        OR (j.status IN ('completed', 'failed') "
+                    + "            AND (j.created_date >= DATE_SUB(NOW(), INTERVAL :hoursBack HOUR) "
+                    + "                 OR j.last_updated_date >= DATE_SUB(NOW(), INTERVAL :hoursBack HOUR))))" );
+        }
+        else {
+            // execution cooldown: only count jobs that have actually run (or are running now), not
+            // other submitted jobs waiting in the queue
+            sql.append( "   AND (j.status = 'processing' "
+                    + "        OR (j.status IN ('completed', 'failed', 'retry') "
+                    + "            AND (j.created_date >= DATE_SUB(NOW(), INTERVAL :hoursBack HOUR) "
+                    + "                 OR j.last_updated_date >= DATE_SUB(NOW(), INTERVAL :hoursBack HOUR))))" );
+        }
+        Query query = em.createNativeQuery( sql.toString() )
                 .setParameter( "reservationId", reservationId )
-                .getSingleResult();
+                .setParameter( "hoursBack", hoursBack );
+        if ( excludeJobId != null ) {
+            query.setParameter( "excludeJobId", excludeJobId );
+        }
+        Number count = (Number) query.getSingleResult();
         return count.longValue() > 0;
     }
 

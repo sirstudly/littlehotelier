@@ -151,13 +151,28 @@ public interface WordPressDAO {
      */
     int insertJob( Job job );
 
+    /** Minimum hours between non-refundable charge attempts for the same reservation. */
+    int NON_REFUNDABLE_CHARGE_COOLDOWN_HOURS = 24;
+
     /**
-     * Returns true if a {@code ChargeNonRefundableBookingJob} already exists for the given
-     * reservation in a non-terminal state ({@code submitted}, {@code processing}, or {@code retry}).
+     * Returns true if a {@code ChargeNonRefundableBookingJob} for the given reservation should not
+     * be enqueued: either one is still pending, or any attempt was recorded within
+     * {@link #NON_REFUNDABLE_CHARGE_COOLDOWN_HOURS} hours.
      *
      * @param reservationId Cloudbeds reservation id
      */
     boolean hasChargeNonRefundableJobForReservation( String reservationId );
+
+    /**
+     * Returns true if a recent {@code ChargeNonRefundableBookingJob} exists for the reservation,
+     * using the same rules as {@link #hasChargeNonRefundableJobForReservation(String)} but with a
+     * configurable cooldown and an optional job id to exclude (the job currently executing).
+     *
+     * @param reservationId Cloudbeds reservation id
+     * @param hoursBack cooldown window in hours
+     * @param excludeJobId job id to ignore, or null when checking before enqueue
+     */
+    boolean hasRecentChargeNonRefundableJobForReservation( String reservationId, int hoursBack, Integer excludeJobId );
 
     /**
      * Returns the number of jobs at 'submitted' or 'processing'.

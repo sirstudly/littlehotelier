@@ -31,7 +31,7 @@ public class ChargeNonRefundableBookingJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        paymentProcessor.chargeNonRefundableBooking( cbWebClient, getReservationId() );
+        paymentProcessor.chargeNonRefundableBooking( cbWebClient, getReservationId(), getId() );
     }
 
     @Override

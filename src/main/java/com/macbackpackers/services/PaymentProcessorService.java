@@ -284,6 +284,21 @@ public class PaymentProcessorService {
      * @throws Exception on any kind of error
      */
     public void chargeNonRefundableBooking( WebClient webClient, String reservationId ) throws Exception {
+        chargeNonRefundableBooking( webClient, reservationId, null );
+    }
+
+    /**
+     * @param excludeJobId when called from {@code ChargeNonRefundableBookingJob}, pass the current
+     *            job id so this run is not treated as a duplicate of itself
+     */
+    public void chargeNonRefundableBooking( WebClient webClient, String reservationId, Integer excludeJobId )
+            throws Exception {
+        if ( wordpressDAO.hasRecentChargeNonRefundableJobForReservation( reservationId,
+                WordPressDAO.NON_REFUNDABLE_CHARGE_COOLDOWN_HOURS, excludeJobId ) ) {
+            LOGGER.info( "A non-refundable charge for reservation {} was already attempted within the last {} hours. Skipping.",
+                    reservationId, WordPressDAO.NON_REFUNDABLE_CHARGE_COOLDOWN_HOURS );
+            return;
+        }
         LOGGER.info( "Processing charge of non-refundable booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 

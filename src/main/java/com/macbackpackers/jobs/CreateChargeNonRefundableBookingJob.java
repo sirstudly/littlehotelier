@@ -40,6 +40,7 @@ public class CreateChargeNonRefundableBookingJob extends AbstractJob {
                 .filter( p -> p.isNonRefundable() )
                 // should we charge cancelled bookings?
                 .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
+                .filter( p -> false == dao.hasChargeNonRefundableJobForReservation( p.getReservationId() ) )
                 .forEach( p -> {
                     LOGGER.info( "Creating a ChargeNonRefundableBookingJob for booking "
                             + p.getThirdPartyIdentifier() + " (" + p.getStatus() + "): "

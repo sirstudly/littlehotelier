@@ -80,6 +80,8 @@ public class ChargeNonRefundableBookingEventListener implements CloudbedsEventLi
             }
             if ( dao.hasChargeNonRefundableJobForReservation( reservationId ) ) {
                 recentlyEnqueuedReservationIds.add( reservationId );
+                LOGGER.info( "Skipping ChargeNonRefundableBookingJob for reservation {} (charge attempted within last {} hours or job pending)",
+                        reservationId, WordPressDAO.NON_REFUNDABLE_CHARGE_COOLDOWN_HOURS );
                 continue;
             }
             enqueueChargeJob( event, reservationId );
