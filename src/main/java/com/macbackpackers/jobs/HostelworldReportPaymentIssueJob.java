@@ -1,5 +1,7 @@
 package com.macbackpackers.jobs;
 
+import java.math.BigDecimal;
+
 import org.apache.commons.lang3.StringUtils;
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +49,24 @@ public class HostelworldReportPaymentIssueJob extends AbstractJob {
             Reservation reservation = cloudbedsScraper.getReservationRetry( cbWebClient, getReservationId() );
             if ( reservation.containsNote( REPORTED_CARD_PAYMENT_ISSUE_NOTE ) ) {
                 LOGGER.info( "Issue with card already reported to Hostelworld. Nothing to do." );
+                return;
+            }
+            if ( false == reservation.isHostelworldBooking() ) {
+                LOGGER.info( "Reservation {} is not a Hostelworld booking (source: {}). Nothing to do.",
+                        getReservationId(), reservation.getSourceName() );
+                return;
+            }
+            if ( false == BigDecimal.ZERO.equals( reservation.getPaidValue() ) ) {
+                LOGGER.info( "Reservation {} already has payments of {}. Nothing to do.",
+                        getReservationId(), reservation.getPaidValue() );
+                return;
+            }
+            if ( false == reservation.isHotelCollectBooking() ) {
+                LOGGER.info( "Reservation {} is not a hotel collect booking. Nothing to do.", getReservationId() );
+                return;
+            }
+            if ( "canceled".equalsIgnoreCase( reservation.getStatus() ) ) {
+                LOGGER.info( "Reservation {} is canceled. Nothing to do.", getReservationId() );
                 return;
             }
 
