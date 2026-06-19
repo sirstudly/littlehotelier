@@ -65,6 +65,13 @@ public class HostelworldScraper {
 
     private static final String LOGGED_IN_PATH = "/loggedin.php";
 
+    private static final String INBOX_ORIGIN = "https://inbox.hostelworld.com";
+
+    private static final Pattern CONTINUE_LOGIN_PATH = Pattern.compile(
+            "\"continueLoginPath\"\\s*:\\s*\"((?:\\\\/|[^\"])*)\"" );
+
+    private static final Pattern MAGIC_LINK_TOKEN_PATH = Pattern.compile( "^/login/([^/]+)$" );
+
     /** for saving login credentials */
     private static final String COOKIE_FILE = "hostelworld.cookies";
     
@@ -136,7 +143,7 @@ public class HostelworldScraper {
 
         String loginUrl = gmailService.fetchHostelworldLoginUrl();
         LOGGER.info( "Following secure login link from email" );
-        HtmlPage loggedInPage = webClient.getPage( loginUrl );
+        HtmlPage loggedInPage = completeLoginAfterMagicLink( webClient, webClient.getPage( loginUrl ) );
 
         if ( false == LOGGED_IN_PATH.equals( loggedInPage.getUrl().getPath() ) ) {
             LOGGER.error( loggedInPage.asXml() );
@@ -602,6 +609,38 @@ public class HostelworldScraper {
     private boolean isLoginPage( HtmlPage page ) {
         return LOGIN_PAGE_TITLE.equals( StringUtils.trim( page.getTitleText() ) )
                 || page.getUrl().toString().contains( "error=USERORPASSWORDINCORRECT" );
+    }
+
+    /**
+     * After following the magic link, Hostelworld may show a "Continue to Inbox" interstitial
+     * instead of redirecting straight to {@link #LOGGED_IN_PATH}.
+     */
+    private HtmlPage completeLoginAfterMagicLink( WebClient webClient, HtmlPage page ) throws IOException {
+        if ( LOGGED_IN_PATH.equals( page.getUrl().getPath() ) ) {
+            return page;
+        }
+
+        String continuePath = extractContinueLoginPath( page );
+        if ( continuePath == null ) {
+            return page;
+        }
+
+        String continueUrl = continuePath.startsWith( "http" ) ? continuePath : INBOX_ORIGIN + continuePath;
+        LOGGER.info( "Following login interstitial continue link: " + continueUrl );
+        return webClient.getPage( continueUrl );
+    }
+
+    private String extractContinueLoginPath( HtmlPage page ) {
+        Matcher appStateMatcher = CONTINUE_LOGIN_PATH.matcher( page.asXml() );
+        if ( appStateMatcher.find() ) {
+            return appStateMatcher.group( 1 ).replace( "\\/", "/" );
+        }
+
+        Matcher tokenMatcher = MAGIC_LINK_TOKEN_PATH.matcher( page.getUrl().getPath() );
+        if ( tokenMatcher.matches() ) {
+            return "/login/continue/" + tokenMatcher.group( 1 );
+        }
+        return null;
     }
 
     private void sleep( int millis ) {
