@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: crh-processor
     restart: unless-stopped
-    stop_grace_period: 60s
+    stop_grace_period: 90s
     environment:
       - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dhttps.protocols=TLSv1.2,TLSv1.3
       - SE_SCREEN_WIDTH=1920
@@ -46,7 +46,7 @@ services:
       dockerfile: Dockerfile
     container_name: hsh-processor
     restart: unless-stopped
-    stop_grace_period: 60s
+    stop_grace_period: 90s
     environment:
       - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dhttps.protocols=TLSv1.2,TLSv1.3
       - SE_SCREEN_WIDTH=1920
@@ -86,7 +86,7 @@ services:
       dockerfile: Dockerfile
     container_name: rmb-processor
     restart: unless-stopped
-    stop_grace_period: 60s
+    stop_grace_period: 90s
     environment:
       - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dhttps.protocols=TLSv1.2,TLSv1.3
       - SE_SCREEN_WIDTH=1920
@@ -126,7 +126,7 @@ services:
       dockerfile: Dockerfile
     container_name: lsh-processor
     restart: unless-stopped
-    stop_grace_period: 60s
+    stop_grace_period: 90s
     environment:
       - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dhttps.protocols=TLSv1.2,TLSv1.3
       - SE_SCREEN_WIDTH=1920
