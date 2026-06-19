@@ -1,17 +1,22 @@
 [Unit]
-Description=LittleHotelier/Cloudbeds Docker Compose Services
+Description=LittleHotelier/Cloudbeds Backoffice Docker Services
 Requires=docker.service
 After=docker.service
 Wants=network-online.target
 After=network-online.target
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+# Type=simple with a holding process keeps the unit active while containers run.
+# If ExecStop is refused (jobs running), the stop job fails but the unit stays
+# active so subsequent systemctl stop calls re-run the idle check.
+Type=simple
 WorkingDirectory=/home/botpress/littlehotelier
-ExecStart=/usr/bin/docker compose up -d
+ExecStart=/bin/bash -c '/usr/bin/docker compose up -d && exec /bin/sleep infinity'
 ExecStop=/home/botpress/littlehotelier/scripts/stop-if-idle.sh
 TimeoutStartSec=0
+TimeoutStopSec=600
+Restart=on-failure
+RestartSec=10
 
 [Install]
-WantedBy=multi-user.target 
+WantedBy=multi-user.target
