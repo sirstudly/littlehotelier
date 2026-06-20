@@ -378,6 +378,7 @@ public class PaymentProcessorService {
             ArchiveAllTransactionNotesJob archiveJob = new ArchiveAllTransactionNotesJob();
             archiveJob.setReservationId( reservationId );
             archiveJob.setStatus( JobStatus.submitted );
+            archiveJob.getDependentJobs().add( job );
             wordpressDAO.insertJob( archiveJob );
         }
         catch ( PaymentPendingException ex ) {
