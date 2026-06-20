@@ -374,6 +374,11 @@ public class PaymentProcessorService {
             job.setAmount( amountToCharge );
             job.setStatus( JobStatus.submitted );
             wordpressDAO.insertJob( job );
+
+            ArchiveAllTransactionNotesJob archiveJob = new ArchiveAllTransactionNotesJob();
+            archiveJob.setReservationId( reservationId );
+            archiveJob.setStatus( JobStatus.submitted );
+            wordpressDAO.insertJob( archiveJob );
         }
         catch ( PaymentPendingException ex ) {
             LOGGER.info( ex.getMessage() );

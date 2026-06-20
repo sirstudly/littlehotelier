@@ -23,7 +23,6 @@ import org.htmlunit.WebClient;
 import org.htmlunit.WebRequest;
 import org.htmlunit.html.DomElement;
 import org.htmlunit.html.HtmlForm;
-import org.htmlunit.html.HtmlListItem;
 import org.htmlunit.html.HtmlPage;
 import org.htmlunit.html.HtmlPasswordInput;
 import org.htmlunit.html.HtmlSubmitInput;
@@ -83,6 +82,9 @@ public class HostelworldScraper {
 
     @Autowired
     private GmailService gmailService;
+
+    @Autowired
+    private DatatransNoShowClient datatransNoShowClient;
 
     @Autowired
     private WordPressDAO wordPressDAO;
@@ -397,40 +399,65 @@ public class HostelworldScraper {
             throw new ParseException( "WTF kind of booking is this? " + bookingRef, 0 );
         }
 
+        String hwlBookingId = m.group( 1 );
+        String bookingViewUrl = INBOX_ORIGIN + "/booking/view/" + hwlBookingId;
+        HtmlPage bookingPage = gotoPage( webClient, bookingViewUrl );
+        String formToken = extractCustomerCCDataFormToken( bookingPage );
+
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty( "formToken", formToken );
+        requestBody.addProperty( "username", wordPressDAO.getOption( "hbo_hw_username" ) );
+        requestBody.addProperty( "password", wordPressDAO.getOption( "hbo_hw_password" ) );
+        requestBody.addProperty( "isStripe", true );
+
+        WebRequest ccDataRequest = createJsonPostRequest(
+                INBOX_ORIGIN + "/booking/ccdata/" + hwlBookingId, bookingViewUrl );
+        ccDataRequest.setRequestBody( gson.toJson( requestBody ) );
+        Page ccDataPage = webClient.getPage( ccDataRequest );
+        JsonObject response = gson.fromJson( ccDataPage.getWebResponse().getContentAsString(), JsonObject.class );
+
+        if ( response == null || false == response.has( "success" ) || false == response.get( "success" ).getAsBoolean() ) {
+            LOGGER.error( ccDataPage.getWebResponse().getContentAsString() );
+            throw new WebResponseException( "Unable to retrieve Hostelworld credit card data", ccDataPage.getWebResponse() );
+        }
+
+        JsonObject ccData = response.getAsJsonObject( "ccData" );
+        if ( ccData == null || false == ccData.has( "success" ) || false == ccData.get( "success" ).getAsBoolean() ) {
+            LOGGER.error( ccDataPage.getWebResponse().getContentAsString() );
+            throw new MissingUserDataException( "Card details missing from Hostelworld." );
+        }
+
+        String datatransUrl = ccData.get( "url" ).getAsString();
+        String cardName = ccData.get( "ccName" ).getAsString();
+        String cardExpiry = ccData.get( "ccExpiry" ).getAsString();
+
         CardDetails cardDetails = new CardDetails();
-        HtmlPage ccPage = gotoPage( webClient, "https://inbox.hostelworld.com/booking/ccdata/login/" + m.group( 1 ) );
-        HtmlTextInput userInput = ccPage.getFirstByXPath( "//input[@id='username']" );
-        userInput.setValueAttribute( wordPressDAO.getOption( "hbo_hw_username" ) );
-        HtmlPasswordInput passwordInput = ccPage.getFirstByXPath( "//input[@id='password']" );
-        passwordInput.setValueAttribute( wordPressDAO.getOption( "hbo_hw_password" ) );
+        cardDetails.setName( cardName );
+        cardDetails.setExpiry( parseCardExpiry( cardExpiry ) );
+        cardDetails.setCardNumber( datatransNoShowClient.revealCardNumber( webClient, datatransUrl ) );
 
-        HtmlSubmitInput submitButton = ccPage.getFirstByXPath( "//input[@value='Submit']" );
-        submitButton.click();
-
-        // cc details should be visible now if we view the booking
-        ccPage = gotoPage( webClient, "https://inbox.hostelworld.com/booking/view/" + m.group( 1 ) );
-        HtmlListItem item = ccPage.getFirstByXPath( "//h2[text()='Payment Details']/../ul/li[1]" );
-        if( item == null ) {
-            throw new MissingUserDataException( "Card details missing from HostelWorld." );
+        if ( false == NumberUtils.isDigits( cardDetails.getCardNumber() ) ) {
+            throw new ParseException( "Unable to decode Hostelworld card number", 0 );
         }
-        cardDetails.setName( item.getTextContent().replaceAll( "Card Holder's Name : ", "" ) );
-
-        item = ccPage.getFirstByXPath( "//h2[text()='Payment Details']/../ul/li[2]" );
-        p = Pattern.compile( "([\\d]{2})/[\\d]{2}([\\d]{2})" );
-        m = p.matcher( item.getTextContent() );
-        if ( false == m.find() ) {
-            throw new ParseException( "Unable to get card expiry date", 0 );
-        }
-        cardDetails.setExpiry( m.group( 1 ) + m.group( 2 ) );
-
-        item = ccPage.getFirstByXPath( "//h2[text()='Payment Details']/../ul/li[4]" );
-        String cardNumber = item.getTextContent().replaceAll( "Credit Card Number : ", "" );
-        if ( false == NumberUtils.isDigits( cardNumber ) ) {
-            throw new ParseException( "Unable to get card number", 0 );
-        }
-        cardDetails.setCardNumber( cardNumber );
 
         return cardDetails;
+    }
+
+    private String extractCustomerCCDataFormToken( HtmlPage bookingPage ) {
+        Pattern pattern = Pattern.compile( "\"customerCCDataLogin\"\\s*:\\s*\"([^\"]+)\"" );
+        Matcher matcher = pattern.matcher( bookingPage.getWebResponse().getContentAsString() );
+        if ( matcher.find() ) {
+            return matcher.group( 1 );
+        }
+        throw new UnrecoverableFault( "Unable to find customerCCDataLogin form token on Hostelworld booking page" );
+    }
+
+    private String parseCardExpiry( String cardExpiry ) throws ParseException {
+        Matcher matcher = Pattern.compile( "(\\d{2})/(\\d{2})" ).matcher( cardExpiry );
+        if ( matcher.find() ) {
+            return matcher.group( 1 ) + matcher.group( 2 );
+        }
+        throw new ParseException( "Unable to get card expiry date: " + cardExpiry, 0 );
     }
 
     /**

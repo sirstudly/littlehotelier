@@ -84,6 +84,10 @@ public class GmailService {
     /** String for matching Hostelworld inbox login emails */
     private final String HOSTELWORLD_LOGIN_INBOX = "subject:\"Login to Inbox\" from:noreply@hostelworld.com in:inbox";
 
+    /** String for matching Datatrans PCI device activation emails */
+    private final String HOSTELWORLD_DEVICE_ACTIVATION_INBOX =
+            "subject:\"Device activation to reveal credit cards\" from:noreply@datatrans.biz in:inbox";
+
     /** Global instance of the JSON factory. */
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
 
@@ -323,6 +327,65 @@ public class GmailService {
             }
         }
         throw new EmptyResultDataAccessException( "No Hostelworld login messages found", 1 );
+    }
+
+    /**
+     * Returns the device activation code from the most recent Datatrans PCI email.
+     *
+     * @return non-null 6-digit activation code
+     * @throws IOException on I/O error
+     * @throws EmptyResultDataAccessException if no message found within timeout
+     */
+    public String fetchHostelworldDeviceActivationCode() throws IOException, EmptyResultDataAccessException {
+        for ( int i = 0 ; i < 8 ; i++ ) {
+            Gmail service = connectAsClient();
+            ListMessagesResponse listResponse =
+                    service.users().messages()
+                            .list( GMAIL_USER )
+                            .setQ( HOSTELWORLD_DEVICE_ACTIVATION_INBOX )
+                            .execute();
+            List<Message> messages = listResponse.getMessages();
+            if ( messages != null ) {
+                LOGGER.info( messages.size() + " Datatrans activation messages:" );
+                for ( Message message : messages ) {
+                    LOGGER.info( message.getId() + " - " + message.getThreadId() );
+                    String body = fetchMessageBody( service, message.getId() );
+                    if ( body == null ) {
+                        throw new EmptyResultDataAccessException( "No body found in Datatrans activation message?", 1 );
+                    }
+                    try {
+                        return findAndReturn( "[?&]code=(\\d{6})", body );
+                    }
+                    catch ( EmptyResultDataAccessException e ) {
+                        try {
+                            return findAndReturn( "code=3D(\\d{6})", body );
+                        }
+                        catch ( EmptyResultDataAccessException e2 ) {
+                            try {
+                                return findAndReturn( "padding: 15px\">(\\d{6})</div>", body );
+                            }
+                            catch ( EmptyResultDataAccessException e3 ) {
+                                try {
+                                    return findAndReturn( "(?m)^\\s*(\\d{6})\\s*$", body );
+                                }
+                                catch ( EmptyResultDataAccessException e4 ) {
+                                    LOGGER.info( "Unable to find activation code for messageId " + message.getId() + "; continuing", e4 );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            try {
+                LOGGER.info( "Datatrans activation email hasn't arrived yet, waiting a bit..." );
+                Thread.sleep( 30000 );
+            }
+            catch ( InterruptedException e ) {
+                // ignore
+            }
+        }
+        throw new EmptyResultDataAccessException( "No Datatrans device activation messages found", 1 );
     }
 
     /**

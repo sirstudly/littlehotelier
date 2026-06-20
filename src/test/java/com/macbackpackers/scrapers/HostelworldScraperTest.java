@@ -2,24 +2,35 @@ package com.macbackpackers.scrapers;
 
 import java.util.Calendar;
 
+import com.macbackpackers.SecretsManagerTestApp;
+import com.macbackpackers.utils.AnyByteStringToStringConverter;
 import jakarta.persistence.Transient;
 
 import org.htmlunit.WebClient;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.test.context.ContextConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.convert.support.DefaultConversionService;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 
+import static org.apache.commons.lang3.builder.ToStringBuilder.reflectionToString;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith( SpringExtension.class )
-@ContextConfiguration( classes = LittleHotelierConfig.class )
+@SpringBootTest( classes = SecretsManagerTestApp.class )
+@TestPropertySource( properties = {
+        "spring.profiles.active=crh"
+} )
 public class HostelworldScraperTest {
+
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
     @Autowired
     HostelworldScraper scraper;
@@ -28,6 +39,12 @@ public class HostelworldScraperTest {
     @Transient
     @Qualifier( "webClientForHostelworld" )
     private WebClient webClient;
+
+    static {
+        // Register the ByteString converter before Spring tries to resolve Secret Manager placeholders
+        // This is essential for proper Secret Manager integration in tests
+        ( (DefaultConversionService) DefaultConversionService.getSharedInstance() ).addConverter( new AnyByteStringToStringConverter() );
+    }
 
     @Test
     public void testDumpBookingsForArrivalDate() throws Exception {
@@ -50,7 +67,7 @@ public class HostelworldScraperTest {
 
     @Test
     public void testGetCardDetails() throws Exception {
-        scraper.getCardDetails( webClient, "HWL-551-306023597" );
+        LOGGER.info( reflectionToString( scraper.getCardDetails( webClient, "HWL-551-578032609" ) ) );
     }
 
     @Test
