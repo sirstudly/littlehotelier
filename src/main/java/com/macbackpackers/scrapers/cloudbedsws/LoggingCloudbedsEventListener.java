@@ -1,8 +1,10 @@
 
 package com.macbackpackers.scrapers.cloudbedsws;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 import org.slf4j.Logger;
@@ -13,8 +15,8 @@ import org.springframework.stereotype.Component;
  * Logs incoming calendar WebSocket data to {@code cloudbeds.events} ({@code cloudbeds-events.log}).
  * <p>
  * Snapshot lines are prefixed {@code SNAPSHOT}; incremental guarantee payloads use {@code UPDATE}
- * with the payload {@code action}, delete sections, and per-row {@code EVENT} /
- * {@code NON_ASSIGNED} lines.
+ * with the payload {@code action}, delete sections, per-row {@code EVENT} /
+ * {@code NON_ASSIGNED} lines, and {@code CANCEL_CANDIDATE} when calendar event ids are removed.
  */
 @Component
 public class LoggingCloudbedsEventListener implements CloudbedsEventListener {
@@ -41,11 +43,17 @@ public class LoggingCloudbedsEventListener implements CloudbedsEventListener {
             for ( Map.Entry<String, List<String>> entry : update.getDeleteSection().entrySet() ) {
                 if ( false == entry.getValue().isEmpty() ) {
                     EVENTS_LOG.info( "[{}] UPDATE DELETE {} ids={}", propertyId, entry.getKey(), entry.getValue() );
+                    if ( "Events".equals( entry.getKey() ) ) {
+                        logCancelCandidates( propertyId, update, entry.getValue(), "delete.Events" );
+                    }
                 }
             }
         }
         if ( false == update.getRemovedEventIds().isEmpty() ) {
             EVENTS_LOG.info( "[{}] UPDATE REMOVED event_ids={}", propertyId, update.getRemovedEventIds() );
+            if ( "room_free".equals( update.getPayloadAction() ) && Boolean.FALSE.equals( update.getRoomFreeAdd() ) ) {
+                logCancelCandidates( propertyId, update, update.getRemovedEventIds(), "room_free" );
+            }
         }
         if ( false == update.getEvents().isEmpty() ) {
             EVENTS_LOG.info( "[{}] UPDATE events by type: {}", propertyId, update.countByType() );
@@ -56,6 +64,33 @@ public class LoggingCloudbedsEventListener implements CloudbedsEventListener {
         for ( CloudbedsCalendarEvent ev : update.getNonAssignedReservations() ) {
             EVENTS_LOG.info( "[{}] UPDATE NON_ASSIGNED {}", propertyId, ev.toLogString() );
         }
+    }
+
+    private static void logCancelCandidates( String propertyId, CloudbedsCalendarUpdate update,
+            List<String> eventIds, String via ) {
+        Set<String> logged = new LinkedHashSet<>();
+        for ( String eventId : eventIds ) {
+            if ( false == logged.add( eventId ) ) {
+                continue;
+            }
+            String bookingId = CloudbedsEventIdParser.parseBookingIdFromEventId( eventId );
+            EVENTS_LOG.info(
+                    "[{}] UPDATE CANCEL_CANDIDATE event_id={} booking_id={} via={} action={} replacement_types={}",
+                    propertyId,
+                    eventId,
+                    bookingId == null ? "?" : bookingId,
+                    via,
+                    update.getPayloadAction(),
+                    describeReplacementTypes( update ) );
+        }
+    }
+
+    private static String describeReplacementTypes( CloudbedsCalendarUpdate update ) {
+        Map<String, Integer> types = update.countByType();
+        if ( types.isEmpty() ) {
+            return "{}";
+        }
+        return types.toString();
     }
 
     private static Map<String, Integer> countByType( List<CloudbedsCalendarEvent> events ) {

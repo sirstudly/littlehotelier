@@ -13,7 +13,7 @@ This document describes the WebSocket protocol used by the Cloudbeds calendar/al
 2. **>>> migrate** – Client sends session/version and CSRF-style token.
 3. **<<< on_migrate** – Server sends a large base64 blob in `data` (~647 KB in our capture, ~3.3 MB once decoded). It is **raw DEFLATE → JSON** in a columnar `{keys, rows}` layout and contains the **entire current calendar** (all reservations, blocked dates, out-of-service, etc.). **This is the bulk snapshot you want.**
 4. **>>> get_changes** – Client sends `{"action":"get_changes","last":<unix_ts>}` to request deltas since a timestamp.
-5. **<<< guarantee + payload** – Server echoes a `guarantee` token and sends a **payload** (JSON string) containing incremental calendar/room events (`action: "changes"` / `"room_assign"`). Client ACKs each with a **>>> guarantee** echo. This is the live-update channel (new bookings, room moves, check-ins appear without a page refresh).
+5. **<<< guarantee + payload** – Server echoes a `guarantee` token and sends a **payload** (JSON string) containing incremental calendar/room events (`action: "changes"`, `"room_assign"`, `"event_change"`, `"room_free"`, `"auto_assign"`, etc.). Client ACKs each with a **>>> guarantee** echo. This is the live-update channel (new bookings, room moves, check-ins appear without a page refresh).
 
 So there are **two useful data sources**: the **`on_migrate` bulk snapshot** (full state, columnar) and the **guarantee/changes payloads** (incremental updates, array of objects).
 
@@ -251,13 +251,64 @@ Removes (or adds) calendar rows by **event id** — used when a cell is freed or
 - `data`: array of calendar **event ids** (not `booking_id`)
 - `add`: `false` = remove those ids from the grid; `true` = add/free (semantics observed in captures)
 
+#### event_change
+
+In-place edits to **existing assigned** calendar rows — most often a bed/room move on the same reservation (same `booking_id`, new `room_id`). Observed in production when staff drag reservations on the grid; does not usually change `balance_due`.
+
+```json
+{
+  "action": "event_change",
+  "data": {
+    "Events": [
+      {
+        "id": "176766409…",
+        "booking_id": "176766409",
+        "type": "booked",
+        "status": "confirmed",
+        "room_id": "111746-13",
+        "…": "…"
+      }
+    ]
+  },
+  "time": 1782050853
+}
+```
+
+#### auto_assign
+
+Bulk auto-assignment cleanup. Often carries `extras=update` and deletes one or more `NonAssignedReservations` ids **without** new `Events` rows in the same frame (the assigned tiles may arrive in a subsequent `changes` / `room_assign` payload).
+
+```json
+{
+  "action": "auto_assign",
+  "extras": "update",
+  "delete": { "NonAssignedReservations": ["230784297", "230784298"] },
+  "data": { "Events": [] },
+  "time": 1782021961
+}
+```
+
 #### Payload fields used by this app
 
 | Payload `action` | Meaning | Key fields |
 |------------------|---------|------------|
 | `changes` | General calendar/reservation delta | `data.Events`, optional `data.NonAssignedReservations`, `delete`, `rates`, … |
 | `room_assign` | Assignment / grid placement | `data.Events`, often `delete.NonAssignedReservations` |
+| `event_change` | In-place edit / bed move on assigned row | `data.Events` |
+| `auto_assign` | Bulk auto-assign cleanup | `delete.NonAssignedReservations`, optional `extras` |
 | `room_free` | Remove (or add) grid cells by id | `data` (id array), `add` |
+
+**Removing calendar rows (cancellations / bed management):**
+
+Cloudbeds does **not** reliably emit `status=canceled` on the calendar WebSocket. Rows disappear via:
+
+| Mechanism | Typical signal | Notes |
+|-----------|----------------|-------|
+| `delete.Events` on `changes` | `delete.Events: [<event_id>]` and `removed_event_ids` | Old tile removed; may be a cancel **or** a bed move / stay split (check replacement `Events` in the same payload) |
+| `room_free` with `add: false` | `removed_event_ids: [<event_id>]` | Clears a cell; often followed by `blocked_dates` / `out_of_service` rather than a guest cancel |
+| `delete.NonAssignedReservations` | id list under `delete` | Almost always **assignment** (unassigned queue → grid), not a cancel |
+
+Calendar **event ids** are numeric strings (not `booking_id`). In production they usually **begin with the 9-digit reservation id** (e.g. `178177230140204791` → booking `178177230`); this prefix parse is best-effort. The server-side logger writes `UPDATE CANCEL_CANDIDATE` lines when `delete.Events` or `room_free` removals occur, including the parsed booking id and any replacement event types in the same update.
 
 **Event row `type`** (inside `Events[]`): `booked`, `checked_in`, `checked_out`, `blocked_dates`, `out_of_service`, `courtesy_hold`.
 
@@ -265,7 +316,7 @@ Removes (or adds) calendar rows by **event id** — used when a cell is freed or
 
 Unassigned new bookings appear in `NonAssignedReservations` (snapshot columnar; change payloads may include an array) until assigned to a `room_id`.
 
-Logged to `cloudbeds-events.log` as `UPDATE` (with payload `action`, deletes, `EVENT` / `NON_ASSIGNED` rows) or `SNAPSHOT`.
+Logged to `cloudbeds-events.log` as `UPDATE` (with payload `action`, deletes, `EVENT` / `NON_ASSIGNED` rows, and `CANCEL_CANDIDATE` on event removal) or `SNAPSHOT`.
 
 ---
 
@@ -357,7 +408,7 @@ The test client in this repo expects a WebSocket URL and, optionally, a JSON fil
 3. Send **>>> migrate** with session/version/csrf from the same browser session.
 4. **Decode <<< on_migrate** for the full snapshot: base64-decode `data` → **raw-DEFLATE** decompress (`-zlib.MAX_WBITS` / `Inflater(nowrap=true)`) → JSON → rebuild objects with `dict(zip(Events.keys, row))`. This one frame contains the entire calendar (all reservations + blocked/OOS dates).
 5. Send **>>> get_changes** with `last` = the `time` from `on_migrate`, then **>>> guarantee** periodically (e.g. every 15–30 s) with a stable or random token.
-6. On each **<<<** message that has `guarantee` and `payload`, parse `payload` as JSON; if `action` is `room_assign` or `changes`, iterate `data.Events` (a plain array of objects here) and apply them as incremental updates.
+6. On each **<<<** message that has `guarantee` and `payload`, parse `payload` as JSON; handle `action` values `changes`, `room_assign`, `event_change`, `room_free`, and `auto_assign` — iterate `data.Events` (a plain array of objects here) and apply them as incremental updates.
 
 This avoids calling `get_reservation` hundreds of times: take the bulk state from `on_migrate`, then keep it current with the incremental `changes` payloads.
 
