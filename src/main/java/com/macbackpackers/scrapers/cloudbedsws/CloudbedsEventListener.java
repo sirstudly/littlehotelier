@@ -1,14 +1,11 @@
 
 package com.macbackpackers.scrapers.cloudbedsws;
 
-import java.util.List;
-
 /**
  * Receives calendar events decoded from the Cloudbeds calendar WebSocket.
  * <p>
- * This is the extension point for reacting to bookings. The first implementation
- * ({@link LoggingCloudbedsEventListener}) only logs; later tasks can add listeners that enqueue
- * jobs or trigger actions based on specific events.
+ * This is the extension point for reacting to bookings. Implementations log, enqueue jobs, or
+ * trigger other actions based on snapshot and incremental update payloads.
  */
 public interface CloudbedsEventListener {
 
@@ -16,15 +13,16 @@ public interface CloudbedsEventListener {
      * Called once per connection with the full calendar snapshot (the {@code on_migrate} payload).
      *
      * @param propertyId the Cloudbeds property id this snapshot belongs to
-     * @param events all current events (reservations, blocked dates, out-of-service, etc.)
+     * @param events all current events (assigned grid rows and {@code NonAssignedReservations})
      */
-    void onSnapshot( String propertyId, List<CloudbedsCalendarEvent> events );
+    void onSnapshot( String propertyId, java.util.List<CloudbedsCalendarEvent> events );
 
     /**
-     * Called for each incremental update ({@code changes} / {@code room_assign} payload).
+     * Called for each incremental guarantee payload ({@code changes}, {@code room_assign},
+     * {@code room_free}, etc.).
      *
-     * @param propertyId the Cloudbeds property id these changes belong to
-     * @param events the changed events
+     * @param propertyId the Cloudbeds property id this update belongs to
+     * @param update decoded payload including assigned events, unassigned reservations, deletes, etc.
      */
-    void onChanges( String propertyId, List<CloudbedsCalendarEvent> events );
+    void onUpdate( String propertyId, CloudbedsCalendarUpdate update );
 }

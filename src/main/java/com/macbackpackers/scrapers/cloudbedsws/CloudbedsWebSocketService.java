@@ -224,13 +224,13 @@ public class CloudbedsWebSocketService {
             }
 
             @Override
-            public void onChanges( String propertyId, List<CloudbedsCalendarEvent> events ) {
+            public void onUpdate( String propertyId, CloudbedsCalendarUpdate update ) {
                 for ( CloudbedsEventListener listener : eventListeners ) {
                     try {
-                        listener.onChanges( propertyId, events );
+                        listener.onUpdate( propertyId, update );
                     }
                     catch ( Exception e ) {
-                        LOGGER.error( "Cloudbeds WebSocket changes listener failed: {}", listener.getClass().getSimpleName(), e );
+                        LOGGER.error( "Cloudbeds WebSocket update listener failed: {}", listener.getClass().getSimpleName(), e );
                     }
                 }
             }

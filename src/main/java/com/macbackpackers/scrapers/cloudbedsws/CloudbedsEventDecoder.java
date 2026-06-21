@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,15 +65,112 @@ public final class CloudbedsEventDecoder {
         if ( payloadData == null ) {
             return events;
         }
-        JsonElement eventsEl = payloadData.get( "Events" );
-        if ( eventsEl != null && eventsEl.isJsonArray() ) {
-            for ( JsonElement el : eventsEl.getAsJsonArray() ) {
+        events.addAll( decodeEventList( payloadData.get( "Events" ) ) );
+        return events;
+    }
+
+    /**
+     * Decodes a full guarantee {@code payload} object (any {@code action}) into a
+     * {@link CloudbedsCalendarUpdate}.
+     *
+     * @param payload parsed inner payload JSON
+     * @return decoded update; never null
+     */
+    public static CloudbedsCalendarUpdate decodePayload( JsonObject payload ) {
+        CloudbedsCalendarUpdate update = new CloudbedsCalendarUpdate();
+        if ( payload == null ) {
+            return update;
+        }
+
+        update.setPayloadAction( asString( payload.get( "action" ) ) );
+        update.setPayloadTime( asString( payload.get( "time" ) ) );
+        update.setPayloadId( asString( payload.get( "id" ) ) );
+        if ( payload.has( "add" ) && false == payload.get( "add" ).isJsonNull() ) {
+            update.setRoomFreeAdd( payload.get( "add" ).getAsBoolean() );
+        }
+        update.setExtraPayloadKeys( listExtraPayloadKeys( payload ) );
+
+        JsonElement dataEl = payload.get( "data" );
+        if ( dataEl != null && dataEl.isJsonObject() ) {
+            JsonObject data = dataEl.getAsJsonObject();
+            update.setEvents( decodeChanges( data ) );
+            update.setNonAssignedReservations( decodeColumnar( data.get( "NonAssignedReservations" ) ) );
+        }
+        else if ( dataEl != null && dataEl.isJsonArray() && "room_free".equals( update.getPayloadAction() ) ) {
+            update.setRemovedEventIds( decodeIdList( dataEl ) );
+        }
+
+        Map<String, List<String>> deleteSection = decodeDeleteSection( payload.get( "delete" ) );
+        update.setDeleteSection( deleteSection );
+        if ( update.getRemovedEventIds().isEmpty() ) {
+            List<String> deletedEvents = deleteSection.get( "Events" );
+            if ( deletedEvents != null && false == deletedEvents.isEmpty() ) {
+                update.setRemovedEventIds( deletedEvents );
+            }
+        }
+        return update;
+    }
+
+    static List<CloudbedsCalendarEvent> decodeEventList( JsonElement element ) {
+        List<CloudbedsCalendarEvent> events = new ArrayList<>();
+        if ( element != null && element.isJsonArray() ) {
+            for ( JsonElement el : element.getAsJsonArray() ) {
                 if ( el.isJsonObject() ) {
                     events.add( new CloudbedsCalendarEvent( toStringMap( el.getAsJsonObject() ) ) );
                 }
             }
         }
         return events;
+    }
+
+    static Map<String, List<String>> decodeDeleteSection( JsonElement deleteEl ) {
+        if ( deleteEl == null || deleteEl.isJsonNull() || false == deleteEl.isJsonObject() ) {
+            return Collections.emptyMap();
+        }
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        for ( Map.Entry<String, JsonElement> entry : deleteEl.getAsJsonObject().entrySet() ) {
+            result.put( entry.getKey(), decodeIdList( entry.getValue() ) );
+        }
+        return result;
+    }
+
+    static List<String> decodeIdList( JsonElement element ) {
+        if ( element == null || false == element.isJsonArray() ) {
+            return Collections.emptyList();
+        }
+        List<String> ids = new ArrayList<>();
+        for ( JsonElement el : element.getAsJsonArray() ) {
+            if ( el.isJsonPrimitive() ) {
+                ids.add( el.getAsString() );
+            }
+        }
+        return ids;
+    }
+
+    static List<String> listExtraPayloadKeys( JsonObject payload ) {
+        List<String> extras = new ArrayList<>();
+        for ( Map.Entry<String, JsonElement> entry : payload.entrySet() ) {
+            String key = entry.getKey();
+            if ( false == isWellKnownPayloadKey( key ) ) {
+                extras.add( key );
+            }
+        }
+        return extras;
+    }
+
+    static boolean isWellKnownPayloadKey( String key ) {
+        switch ( key ) {
+            case "action":
+            case "data":
+            case "delete":
+            case "time":
+            case "id":
+            case "add":
+            case "house_keeping_conditions":
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**

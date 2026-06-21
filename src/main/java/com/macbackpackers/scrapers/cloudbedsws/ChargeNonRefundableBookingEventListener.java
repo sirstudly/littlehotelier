@@ -25,7 +25,7 @@ import com.macbackpackers.scrapers.CloudbedsScraper;
  * {@link ChargeNonRefundableBookingJob}s for new non-refundable hotel-collect bookings, using the
  * same criteria as {@code CreateChargeNonRefundableBookingJob}.
  * <p>
- * Only {@link #onChanges} is handled; the initial {@code on_migrate} snapshot is ignored so
+ * Only {@link #onUpdate} is handled; the initial {@code on_migrate} snapshot is ignored so
  * existing bookings are not charged when the monitor connects or reconnects.
  */
 @Component
@@ -56,7 +56,14 @@ public class ChargeNonRefundableBookingEventListener implements CloudbedsEventLi
     }
 
     @Override
-    public void onChanges( String propertyId, List<CloudbedsCalendarEvent> events ) {
+    public void onUpdate( String propertyId, CloudbedsCalendarUpdate update ) {
+        if ( update == null ) {
+            return;
+        }
+        processReservationEvents( propertyId, update.getAllReservationEvents() );
+    }
+
+    private void processReservationEvents( String propertyId, List<CloudbedsCalendarEvent> events ) {
         if ( events == null || events.isEmpty() ) {
             return;
         }

@@ -162,6 +162,23 @@ public class CloudbedsCalendarEvent {
         }
     }
 
+    /** True when this is a reservation row not yet assigned to a calendar room/bed. */
+    public boolean isUnassignedReservation() {
+        return isReservationBooking() && StringUtils.isBlank( getRoomId() );
+    }
+
+    public String getAssignmentType() {
+        return get( "assignment_type" );
+    }
+
+    public String getAssignmentDate() {
+        return get( "assignment_date" );
+    }
+
+    public String getLastChange() {
+        return get( "last_change" );
+    }
+
     /**
      * Returns a concise single-line representation suitable for logging.
      *
@@ -176,6 +193,12 @@ public class CloudbedsCalendarEvent {
         sb.append( " dates=" ).append( getStartDate() ).append( "->" ).append( getEndDate() );
         sb.append( " room_id=" ).append( getRoomId() );
         sb.append( " rt=" ).append( getResRtId() );
+        if ( StringUtils.isNotBlank( getAssignmentType() ) ) {
+            sb.append( " assignment=" ).append( getAssignmentType() );
+        }
+        if ( StringUtils.isNotBlank( getAssignmentDate() ) ) {
+            sb.append( " assigned=" ).append( getAssignmentDate() );
+        }
         sb.append( " total=" ).append( getTotal() );
         sb.append( " balance_due=" ).append( getBalanceDue() );
         sb.append( " source=" ).append( getBookingSource() );

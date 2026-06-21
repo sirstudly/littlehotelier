@@ -28,7 +28,8 @@ import com.google.gson.JsonParser;
  * <li>decode the {@code on_migrate} snapshot and forward it to the {@link CloudbedsEventListener},</li>
  * <li>request deltas via {@code get_changes} (using the snapshot {@code time}),</li>
  * <li>send periodic {@code guarantee} heartbeats, and</li>
- * <li>forward incremental {@code changes}/{@code room_assign} payloads to the listener.</li>
+ * <li>forward incremental guarantee payloads ({@code changes}, {@code room_assign},
+ * {@code room_free}, etc.) to the listener.</li>
  * </ul>
  * Reconnection is handled by {@code CloudbedsWebSocketService}; this client exposes {@link #awaitClosed()}
  * so the service can block until the connection drops and then reconnect with a fresh session.
@@ -180,17 +181,12 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
 
     private void handlePayload( String payloadStr ) {
         JsonObject payload = JsonParser.parseString( payloadStr ).getAsJsonObject();
-        String action = payload.has( "action" ) ? payload.get( "action" ).getAsString() : null;
-        if ( "changes".equals( action ) || "room_assign".equals( action ) ) {
-            if ( payload.has( "data" ) && payload.get( "data" ).isJsonObject() ) {
-                List<CloudbedsCalendarEvent> events =
-                        CloudbedsEventDecoder.decodeChanges( payload.getAsJsonObject( "data" ) );
-                listener.onChanges( propertyId, events );
-            }
+        String action = payload.has( "action" ) ? payload.get( "action" ).getAsString() : "(none)";
+        CloudbedsCalendarUpdate update = CloudbedsEventDecoder.decodePayload( payload );
+        if ( update.getPayloadAction() == null ) {
+            update.setPayloadAction( action );
         }
-        else {
-            LOGGER.info( "Cloudbeds WebSocket payload action ignored: {}", action );
-        }
+        listener.onUpdate( propertyId, update );
     }
 
     private void sendGuarantee() {

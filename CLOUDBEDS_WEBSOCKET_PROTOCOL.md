@@ -235,6 +235,38 @@ Outer envelope:
 
 To request deltas, send `{"action":"get_changes","last":<unix_ts>,"property_id":"17363",...}` where `last` is the `time` from the previous `on_migrate`/changes frame.
 
+#### room_free
+
+Removes (or adds) calendar rows by **event id** — used when a cell is freed or re-added without a full reservation object:
+
+```json
+{
+  "action": "room_free",
+  "data": ["177213922705803971"],
+  "add": false,
+  "time": 1772139241
+}
+```
+
+- `data`: array of calendar **event ids** (not `booking_id`)
+- `add`: `false` = remove those ids from the grid; `true` = add/free (semantics observed in captures)
+
+#### Payload fields used by this app
+
+| Payload `action` | Meaning | Key fields |
+|------------------|---------|------------|
+| `changes` | General calendar/reservation delta | `data.Events`, optional `data.NonAssignedReservations`, `delete`, `rates`, … |
+| `room_assign` | Assignment / grid placement | `data.Events`, often `delete.NonAssignedReservations` |
+| `room_free` | Remove (or add) grid cells by id | `data` (id array), `add` |
+
+**Event row `type`** (inside `Events[]`): `booked`, `checked_in`, `checked_out`, `blocked_dates`, `out_of_service`, `courtesy_hold`.
+
+**Event row `status`** (reservations): `confirmed`, `checked_in`, `checked_out`, `canceled` (when present).
+
+Unassigned new bookings appear in `NonAssignedReservations` (snapshot columnar; change payloads may include an array) until assigned to a `room_id`.
+
+Logged to `cloudbeds-events.log` as `UPDATE` (with payload `action`, deletes, `EVENT` / `NON_ASSIGNED` rows) or `SNAPSHOT`.
+
 ---
 
 ## Event object fields

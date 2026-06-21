@@ -10,15 +10,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Default {@link CloudbedsEventListener} that simply logs incoming calendar events to a dedicated
- * logger ({@code cloudbeds.events}, routed to {@code cloudbeds-events.log} via logback).
+ * Logs incoming calendar WebSocket data to {@code cloudbeds.events} ({@code cloudbeds-events.log}).
  * <p>
- * This is the logging listener; other listeners (e.g. charge-job creation) are registered separately.
+ * Snapshot lines are prefixed {@code SNAPSHOT}; incremental guarantee payloads use {@code UPDATE}
+ * with the payload {@code action}, delete sections, and per-row {@code EVENT} /
+ * {@code NON_ASSIGNED} lines.
  */
 @Component
 public class LoggingCloudbedsEventListener implements CloudbedsEventListener {
 
-    // dedicated logger name so logback can route it to its own file
     private static final Logger EVENTS_LOG = LoggerFactory.getLogger( "cloudbeds.events" );
 
     @Override
@@ -26,18 +26,35 @@ public class LoggingCloudbedsEventListener implements CloudbedsEventListener {
         EVENTS_LOG.info( "[{}] SNAPSHOT received: {} events. Counts by type: {}",
                 propertyId, events.size(), countByType( events ) );
         for ( CloudbedsCalendarEvent ev : events ) {
-            EVENTS_LOG.info( "[{}] SNAPSHOT {}", propertyId, ev.toLogString() );
+            String prefix = ev.isUnassignedReservation() ? "SNAPSHOT NON_ASSIGNED" : "SNAPSHOT";
+            EVENTS_LOG.info( "[{}] {} {}", propertyId, prefix, ev.toLogString() );
         }
     }
 
     @Override
-    public void onChanges( String propertyId, List<CloudbedsCalendarEvent> events ) {
-        if ( events.isEmpty() ) {
+    public void onUpdate( String propertyId, CloudbedsCalendarUpdate update ) {
+        if ( update == null ) {
             return;
         }
-        EVENTS_LOG.info( "[{}] CHANGES received: {} events", propertyId, events.size() );
-        for ( CloudbedsCalendarEvent ev : events ) {
-            EVENTS_LOG.info( "[{}] CHANGE {}", propertyId, ev.toLogString() );
+        EVENTS_LOG.info( "[{}] UPDATE {}", propertyId, update.toLogHeader() );
+        if ( false == update.getDeleteSection().isEmpty() ) {
+            for ( Map.Entry<String, List<String>> entry : update.getDeleteSection().entrySet() ) {
+                if ( false == entry.getValue().isEmpty() ) {
+                    EVENTS_LOG.info( "[{}] UPDATE DELETE {} ids={}", propertyId, entry.getKey(), entry.getValue() );
+                }
+            }
+        }
+        if ( false == update.getRemovedEventIds().isEmpty() ) {
+            EVENTS_LOG.info( "[{}] UPDATE REMOVED event_ids={}", propertyId, update.getRemovedEventIds() );
+        }
+        if ( false == update.getEvents().isEmpty() ) {
+            EVENTS_LOG.info( "[{}] UPDATE events by type: {}", propertyId, update.countByType() );
+        }
+        for ( CloudbedsCalendarEvent ev : update.getEvents() ) {
+            EVENTS_LOG.info( "[{}] UPDATE EVENT {}", propertyId, ev.toLogString() );
+        }
+        for ( CloudbedsCalendarEvent ev : update.getNonAssignedReservations() ) {
+            EVENTS_LOG.info( "[{}] UPDATE NON_ASSIGNED {}", propertyId, ev.toLogString() );
         }
     }
 
