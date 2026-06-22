@@ -5,8 +5,8 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.htmlunit.WebClient;
 import org.slf4j.Logger;
@@ -89,15 +89,68 @@ public class EdinburghVisitorLevyService {
         }
     }
 
-    public List<Customer> findReservationsRequiringVisitorLevyAdjustment( WebClient webClient,
-            LocalDate bookingDateStart, LocalDate bookingDateEnd ) throws IOException {
-        return cloudbedsScraper.getReservationsByBookingDate( webClient, bookingDateStart, bookingDateEnd,
-                ACTIVE_STATUSES ).stream()
-                .filter( this::requiresVisitorLevyAdjustment )
-                .collect( Collectors.toList() );
+    public static class CustomerLevyAssessment {
+        private final Customer customer;
+        private final LevyAssessment assessment;
+
+        public CustomerLevyAssessment( Customer customer, LevyAssessment assessment ) {
+            this.customer = customer;
+            this.assessment = assessment;
+        }
+
+        public Customer getCustomer() {
+            return customer;
+        }
+
+        public LevyAssessment getAssessment() {
+            return assessment;
+        }
     }
 
-    public boolean requiresVisitorLevyAdjustment( Customer customer ) {
+    /**
+     * Returns bookings in the date range that are potentially levy-eligible and whose folio EVL
+     * differs from the calculated amount (outside tolerance).
+     */
+    public List<CustomerLevyAssessment> findReservationsRequiringVisitorLevyAdjustment( WebClient webClient,
+            LocalDate bookingDateStart, LocalDate bookingDateEnd ) throws IOException {
+        List<CustomerLevyAssessment> results = new ArrayList<>();
+        for ( CustomerLevyAssessment entry : assessReservationsInBookingDateRange(
+                webClient, bookingDateStart, bookingDateEnd ) ) {
+            if ( entry.getAssessment().needsAdjustment() ) {
+                results.add( entry );
+            }
+        }
+        return results;
+    }
+
+    /**
+     * Assesses visitor levy for all potentially eligible active bookings in a booking-date range.
+     */
+    public List<CustomerLevyAssessment> assessReservationsInBookingDateRange( WebClient webClient,
+            LocalDate bookingDateStart, LocalDate bookingDateEnd ) throws IOException {
+        List<CustomerLevyAssessment> results = new ArrayList<>();
+        for ( Customer customer : cloudbedsScraper.getReservationsByBookingDate(
+                webClient, bookingDateStart, bookingDateEnd, ACTIVE_STATUSES ) ) {
+            if ( false == isPotentiallyEligible( customer ) ) {
+                continue;
+            }
+            LevyAssessment assessment = assessVisitorLevyForBooking( webClient, customer.getId() );
+            results.add( new CustomerLevyAssessment( customer, assessment ) );
+        }
+        return results;
+    }
+
+    /**
+     * Cheap eligibility checks first, then loads the reservation and compares expected vs folio EVL.
+     */
+    public boolean requiresVisitorLevyAdjustment( WebClient webClient, Customer customer ) throws IOException {
+        if ( false == isPotentiallyEligible( customer ) ) {
+            return false;
+        }
+        return assessVisitorLevyForBooking( webClient, customer.getId() ).needsAdjustment();
+    }
+
+    private boolean isPotentiallyEligible( Customer customer ) {
         if ( customer.getBookingDate() != null
                 && EdinburghVisitorLevyCalculator.isBookingExempt(
                         LocalDate.parse( customer.getBookingDate() ), getBookedDateFrom() ) ) {
@@ -108,10 +161,7 @@ public class EdinburghVisitorLevyService {
                         LocalDate.parse( customer.getCheckoutDate() ), getStayDateFrom() ) ) {
             return false;
         }
-        if ( isHostelworldBooking( customer ) ) {
-            return true;
-        }
-        return getNumberOfNights( customer ) > 5;
+        return true;
     }
 
     public LevyAssessment assessVisitorLevyForBooking( WebClient webClient, String reservationId ) throws IOException {
@@ -183,11 +233,4 @@ public class EdinburghVisitorLevyService {
         return LocalDate.parse( bookedDateFrom );
     }
 
-    private boolean isHostelworldBooking( Customer customer ) {
-        return customer.getSourceName() != null && customer.getSourceName().startsWith( "Hostelworld" );
-    }
-
-    private int getNumberOfNights( Customer customer ) {
-        return customer.getNights() == null ? 0 : Integer.parseInt( customer.getNights() );
-    }
 }

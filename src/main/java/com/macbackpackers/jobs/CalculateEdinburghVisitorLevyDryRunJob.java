@@ -11,9 +11,7 @@ import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
-import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.services.EdinburghVisitorLevyService;
-import com.macbackpackers.services.EdinburghVisitorLevyService.LevyAssessment;
 
 /**
  * Dry-run visitor levy calculation for active bookings in a booking-date range that would normally
@@ -42,13 +40,12 @@ public class CalculateEdinburghVisitorLevyDryRunJob extends AbstractJob {
         int needingAdjustment = 0;
         int checked = 0;
 
-        for ( Customer customer : edinburghVisitorLevyService.findReservationsRequiringVisitorLevyAdjustment(
+        for ( EdinburghVisitorLevyService.CustomerLevyAssessment entry
+                : edinburghVisitorLevyService.assessReservationsInBookingDateRange(
                 cbWebClient, getBookingDateStart(), getBookingDateEnd() ) ) {
-            LevyAssessment assessment = edinburghVisitorLevyService.assessVisitorLevyForBooking(
-                    cbWebClient, customer.getId() );
-            edinburghVisitorLevyService.logDryRunAssessment( customer, assessment );
+            edinburghVisitorLevyService.logDryRunAssessment( entry.getCustomer(), entry.getAssessment() );
             checked++;
-            if ( assessment.needsAdjustment() ) {
+            if ( entry.getAssessment().needsAdjustment() ) {
                 needingAdjustment++;
             }
         }

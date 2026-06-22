@@ -18,7 +18,7 @@ import com.macbackpackers.services.EdinburghVisitorLevyService;
 
 /**
  * Creates {@link CalculateEdinburghVisitorLevyForBookingJob}s for active bookings made within a
- * booking-date range where the stay exceeds five nights or the booking is from Hostelworld.
+ * booking-date range whose folio EVL differs from the calculated amount.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.CreateCalculateEdinburghVisitorLevyForBookingJob" )
@@ -42,7 +42,7 @@ public class CreateCalculateEdinburghVisitorLevyForBookingJob extends AbstractJo
 
         edinburghVisitorLevyService.findReservationsRequiringVisitorLevyAdjustment(
                 cbWebClient, getBookingDateStart(), getBookingDateEnd() )
-                .forEach( this::createCalculateJob );
+                .forEach( entry -> createCalculateJob( entry.getCustomer() ) );
     }
 
     private void createCalculateJob( Customer customer ) {
