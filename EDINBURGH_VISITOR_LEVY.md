@@ -90,12 +90,17 @@ Calculate...DryRunJob             │
 
 ## Configuration properties
 
+Set in `application.properties` (override per profile in `application-*.properties`):
+
 ```properties
+evl.enabled=false
 evl.tax.exclusive.label=Edinburgh Visitor Levy 2026
 evl.tax.inclusive.label=Edinburgh Visitor Levy (Inclusive)
 evl.stay.date.from=2026-07-24
 evl.booked.date.from=2025-10-01
 ```
+
+`evl.enabled` must be `true` for batch assessment and adjustment jobs to consider bookings. `EdinburghVisitorLevyService.isPotentiallyEligible()` returns `false` when disabled, so create/dry-run jobs and `requiresVisitorLevyAdjustment()` do nothing.
 
 ---
 
@@ -203,13 +208,13 @@ expectedLevy = round(levyBase × 5%, 2)
 
 Parameters: `booking_date_start`, `booking_date_end`
 
-Queries active bookings (`confirmed,not_confirmed`) in range, applies cheap eligibility checks (booking/stay dates), then loads each reservation and compares folio EVL to the calculated amount.
+Queries active bookings (`confirmed,not_confirmed`) in range, applies cheap eligibility checks (`evl.enabled`, booking/stay dates), then loads each reservation and compares folio EVL to the calculated amount.
 
 | Include if | Reason |
 |---|---|
-| Potentially eligible (not booking-exempt, has eligible stay dates) **and** `expectedLevy − currentLevy` outside tolerance | Folio EVL needs correction |
+| Potentially eligible (`evl.enabled`, not booking-exempt, has eligible stay dates) **and** `expectedLevy − currentLevy` outside tolerance | Folio EVL needs correction |
 
-Excludes: booking exempt (pre Oct 2025), no eligible stay dates, levy already correct (within £0.01).
+Excludes: `evl.enabled=false`, booking exempt (pre Oct 2025), no eligible stay dates, levy already correct (within £0.01).
 
 Creates one `CalculateEdinburghVisitorLevyForBookingJob` per reservation (`reservation_id`) that needs adjustment only — no no-op jobs.
 

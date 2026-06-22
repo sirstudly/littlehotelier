@@ -36,6 +36,9 @@ public class EdinburghVisitorLevyService {
     @Qualifier( "gsonForCloudbeds" )
     private Gson gson;
 
+    @Value( "${evl.enabled:false}" )
+    private boolean evlEnabled;
+
     @Value( "${evl.tax.exclusive.label:Edinburgh Visitor Levy 2026}" )
     private String exclusiveTaxLabel;
 
@@ -151,6 +154,9 @@ public class EdinburghVisitorLevyService {
     }
 
     private boolean isPotentiallyEligible( Customer customer ) {
+        if ( false == evlEnabled ) {
+            return false;
+        }
         if ( customer.getBookingDate() != null
                 && EdinburghVisitorLevyCalculator.isBookingExempt(
                         LocalDate.parse( customer.getBookingDate() ), getBookedDateFrom() ) ) {
