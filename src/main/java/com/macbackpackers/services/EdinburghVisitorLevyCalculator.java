@@ -26,7 +26,9 @@ public final class EdinburghVisitorLevyCalculator {
     public static final String INCLUSIVE_TAX_LABEL = "Edinburgh Visitor Levy (Inclusive)";
 
     private static final BigDecimal LEVY_RATE = new BigDecimal( "0.05" );
-    private static final BigDecimal BDC_GROSS_TO_NET = new BigDecimal( "1.25" );
+    private static final BigDecimal BDC_INCLUSIVE_LEVY_RATE = new BigDecimal( "0.06" );
+    private static final BigDecimal ROOM_VAT_RATE = new BigDecimal( "0.20" );
+    private static final BigDecimal BDC_GROSS_TO_NET = new BigDecimal( "1.26" );
     private static final int MAX_LEVY_NIGHTS = 5;
     private static final BigDecimal TOLERANCE = new BigDecimal( "0.01" );
 
@@ -152,7 +154,7 @@ public final class EdinburghVisitorLevyCalculator {
                 BigDecimal netPerGuest = personNight.getGrossRate()
                         .divide( BDC_GROSS_TO_NET, 10, RoundingMode.HALF_UP )
                         .setScale( 2, RoundingMode.HALF_UP );
-                BigDecimal levyPerGuest = netPerGuest.multiply( LEVY_RATE )
+                BigDecimal levyPerGuest = netPerGuest.multiply( BDC_INCLUSIVE_LEVY_RATE )
                         .setScale( 2, RoundingMode.HALF_UP );
                 int guests = personNight.getGuestCount();
                 levyBase = levyBase.add( netPerGuest.multiply( BigDecimal.valueOf( guests ) ) );
@@ -300,6 +302,27 @@ public final class EdinburghVisitorLevyCalculator {
 
     public static boolean useInclusiveTax( Reservation reservation ) {
         return reservation.isBookingDotComBooking();
+    }
+
+    /**
+     * Room VAT on a BDC inclusive folio: 20% of net accommodation per person-night,
+     * rounded per person-night before summing (matches Cloudbeds folio posting).
+     */
+    public static BigDecimal calculateExpectedBdcRoomVat( Reservation reservation, Gson gson,
+            LocalDate stayDateFrom ) {
+        List<PersonNightRate> personNightRates = getEligiblePersonNightRates(
+                reservation, gson, reservation.getCheckoutDateAsLocalDate(), stayDateFrom );
+        BigDecimal expectedVat = BigDecimal.ZERO;
+        for ( PersonNightRate personNight : personNightRates ) {
+            BigDecimal netPerGuest = personNight.getGrossRate()
+                    .divide( BDC_GROSS_TO_NET, 10, RoundingMode.HALF_UP )
+                    .setScale( 2, RoundingMode.HALF_UP );
+            BigDecimal vatPerGuest = netPerGuest.multiply( ROOM_VAT_RATE )
+                    .setScale( 2, RoundingMode.HALF_UP );
+            expectedVat = expectedVat.add(
+                    vatPerGuest.multiply( BigDecimal.valueOf( personNight.getGuestCount() ) ) );
+        }
+        return expectedVat.setScale( 2, RoundingMode.HALF_UP );
     }
 
     public static BigDecimal getVisitorLevyTotal( Reservation reservation ) {

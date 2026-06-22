@@ -28,10 +28,10 @@ Two taxes, linked **per reservation source**:
 | Tax ID | Label | Type | Used for |
 |---|---|---|---|
 | `tax_824186` | Edinburgh Visitor Levy 2026 | **Exclusive** | Direct, walk-in, Hostelworld |
-| `tax_824360` | Edinburgh Visitor Levy (Inclusive) | **Inclusive** | Booking.com |
+| `tax_824360` | Edinburgh Visitor Levy (Inclusive) | **Inclusive** (6% of net) | Booking.com |
 
 - **Exclusive** = added on top of rate (direct/HWL).
-- **Inclusive** = carved out of fixed OTA price (BDC); must not inflate channel total.
+- **Inclusive** = carved out of fixed OTA price (BDC); must not inflate channel total. Configured at **6% of net** so the EVL line includes VAT-on-levy (consistent with the exclusive tax on direct/HWL).
 
 Cloudbeds tax/fee UI is identical for taxes and fees; **Inclusive vs Exclusive** controls pricing behaviour, not the tax/fee type name.
 
@@ -123,21 +123,23 @@ The calculator (`EdinburghVisitorLevyCalculator.calculate`) branches on source. 
 **Example:** 3 nights × £55.00 gross  
 → £2.75 + £2.75 + £2.75 = **£8.25**
 
-### Booking.com (inclusive tax `824360`)
+### Booking.com (inclusive tax `824360`, 6% of net)
 
 BDC `detailed_rates` are **per person per night**, all-in (net + EVL + room VAT).
 
 For each eligible person-night:
 
 ```
-netPerGuest = round(gross ÷ 1.25, 2)     # 1.25 = 1 + 5% levy + 20% VAT on net
-levyPerGuest = round(netPerGuest × 5%, 2)
+netPerGuest = round(gross ÷ 1.26, 2)     # 1.26 = 1 + 6% levy + 20% VAT on net
+levyPerGuest = round(netPerGuest × 6%, 2)   # 6% = 5% council + 20% VAT on levy
 total += levyPerGuest × guestCount
 ```
 
 **Guest count:** `adults + kids` on rate line; if zero, fall back to `reservation.getNumberOfGuests()` (min 1).
 
-**Important:** Cloudbeds rounds **net to 2dp before** multiplying by guests and summing. Without this, levy base can be off (e.g. £239.09 vs £239.12).
+**Important:** Cloudbeds rounds **net to 2dp before** multiplying by guests and summing. Without this, levy base can be off.
+
+**Council remittance from folio:** `SUM(EVL inclusive line) ÷ 1.2` (EVL line is VAT-inclusive guest levy, like exclusive tax on direct bookings).
 
 #### Example A — £188.80, 2 guests, 2 nights
 
@@ -145,9 +147,11 @@ Rates pp: £47.20, £47.20
 
 | Step | Per person-night | × 2 guests | × 2 nights |
 |---|---:|---:|---:|
-| Net | £47.20 ÷ 1.25 = **£37.76** | | |
-| EVL | 5% × £37.76 = **£1.89** | | |
-| **Totals** | | Subtotal **£151.04** | EVL **£7.56**, VAT **£30.20**, Grand **£188.80** |
+| Net | £47.20 ÷ 1.26 = **£37.46** | | |
+| EVL | 6% × £37.46 = **£2.25** | | |
+| **Totals** | | Subtotal **£149.84** | EVL **£9.00**, VAT **£29.96**, Grand **£188.80** |
+
+Council remittance: £9.00 ÷ 1.2 = **£7.50** (statutory ÷1.26 ≈ £7.49).
 
 #### Example B — £298.86, 2 guests, 5 nights
 
@@ -155,9 +159,9 @@ Rates pp: £26.15, £30.82 × 4
 
 | Folio line | Amount |
 |---|---:|
-| Subtotal (net) | £239.12 |
-| EVL (Inclusive) | £11.94 |
-| VAT | £47.80 |
+| Subtotal (net) | £237.18 |
+| EVL (Inclusive) | £14.26 |
+| VAT | £47.42 |
 | **Grand total** | **£298.86** |
 
 Per-person rate sum = £149.43; × 2 guests = £298.86.
@@ -188,8 +192,9 @@ expectedLevy = round(levyBase × 5%, 2)
 3. `currentLevy` = sum of `tax_breakdown` lines matching either EVL label
 4. `delta = expected - current`
 5. If `|delta| ≥ £0.01`:
-   - **delta < 0** → `adjustVisitorLevyCharge` (reduce)
-   - **delta > 0** → `addVisitorLevyCharge` (increase)
+   - **BDC** → log expected EVL and VAT vs folio; **no write** (channel total is fixed; corrections need coordinated EVL/VAT/room-rate adjustments)
+   - **Other sources, delta < 0** → `adjustVisitorLevyCharge` (reduce)
+   - **Other sources, delta > 0** → `addVisitorLevyCharge` (increase)
 6. Tax ID: inclusive label for BDC, exclusive otherwise
 7. Adjustment notes suffixed with `-RONBOT`
 
@@ -257,18 +262,19 @@ Cloudbeds folio splits and statutory remittance **differ**. Do not use Cloudbeds
 | **VAT on levy** | 20% × council amount |
 | **Guest levy (direct)** | 5% of gross accom = council + VAT on levy |
 
-### BDC inclusive folio (÷ 1.25 split)
+### BDC inclusive folio (÷ 1.26 split, 6% EVL)
 
 Cloudbeds allocates fixed OTA total as:
 
 ```
-Gross = Net + 5%×Net (EVL line) + 20%×Net (VAT line)
-      = Net × 1.25
+Gross = Net + 6%×Net (EVL line) + 20%×Net (VAT line)
+      = Net × 1.26
 ```
 
-- EVL line = **council only** (not VAT-inclusive guest levy)
-- VAT line = **room VAT only** — **VAT on levy is not shown**
-- `SUM(tax_824360)` ≈ council remittance (slightly high ~0.8% vs strict ÷1.26)
+- EVL line = **guest levy including VAT-on-levy** (6% of net = 5% council + 1% VAT-on-levy)
+- VAT line = **room VAT only**
+- Council remittance: `SUM(tax_824360) ÷ 1.2`
+- Aligns with exclusive direct posting and statutory ÷1.26 unwind (within rounding)
 
 ### Strict statutory unwind from guest total T
 
@@ -280,22 +286,18 @@ VAT on levy        = T × 1% ÷ 1.26   (5% × 20%)
 Total VAT to HMRC  = T × 21% ÷ 1.26
 ```
 
-**£188.80 example:**
+**£188.80 example (6% inclusive config):**
 
-| Method | Council | Total VAT |
-|---|---:|---:|
-| Cloudbeds folio | £7.56 | £30.20 (understates by ~£1.27) |
-| Statutory ÷1.26 | £7.49 | £31.47 |
+| Method | EVL line | Council (÷1.2) | Room VAT | VAT on levy |
+|---|---:|---:|---:|---:|
+| Cloudbeds folio | £9.00 | £7.50 | £29.96 | £1.50 (in EVL line) |
+| Statutory ÷1.26 | — | £7.49 | £29.96 | £1.50 |
 
 ### Direct exclusive (`824186`)
 
 - EVL line at **5% of gross** includes VAT on levy
 - Council remittance: `SUM(824186) ÷ 1.2`
-- Do **not** ÷1.2 on BDC `824360` sums (already council-only)
-
-### Proposed 6% inclusive tax (not implemented)
-
-Setting BDC tax to **6% of net** (÷1.26) would put VAT-on-levy inside EVL line; council = `SUM ÷ 1.2`. Discussed but not adopted — would require config migration and calculator constant change (`1.26`, `0.06`).
+- BDC `824360` also uses ÷1.2 for council (EVL line is VAT-inclusive)
 
 ### Guest invoices
 
@@ -323,9 +325,9 @@ BDC partner hub: [Edinburgh Visitor Levy](https://partner.booking.com/en-gb/help
 | Test | Expected EVL |
 |---|---:|
 | Direct 3×£55 | £8.25 |
-| BDC 1 night £165 (1 guest) | £6.60 |
-| BDC 2 guests, 2×£47.20 | £7.56 (base £151.04) |
-| BDC 2 guests, 5 nights (298.86 booking) | £11.94 (base £239.12) |
+| BDC 1 night £165 (1 guest) | £7.86 |
+| BDC 2 guests, 2×£47.20 | £9.00 (base £149.84) |
+| BDC 2 guests, 5 nights (298.86 booking) | £14.26 (base £237.18) |
 | HWL listed £181.45 / 3 nights | £9.07 |
 | HWL balance+commission Kyra | £4.70 |
 | HWL partial eligibility | £5.88 |
@@ -341,11 +343,11 @@ Run: `mvn test -Dtest=EdinburghVisitorLevyCalculatorTest`
 
 ## Known limitations & future work
 
-1. **Calculator matches Cloudbeds posting**, not strict statutory ÷1.26 — intentional for adjustment job parity on BDC.
+1. **BDC adjustments are log-only** for now — fixed channel total requires coordinated EVL/VAT/room-rate changes.
 2. **HWL** uses aggregate 5% on prorated listed price, not per-night BDC-style rounding.
 3. **BDC guest count** relies on `detailed_rates.adults/kids` or reservation guest count — verify when Cloudbeds sends `adults:0`.
-4. **VAT-on-levy** invisible on BDC folio — handle in accounts export, not adjustment job.
-5. **5-night cap** on BDC: BDC attributes 5% for whole stay; manual refund + our job correction.
+4. **BDC VAT-on-levy** is inside the 6% EVL line; room VAT is a separate folio line. Council remittance = EVL ÷ 1.2.
+5. **5-night cap** on BDC: BDC attributes levy for whole stay; manual refund + our job correction.
 6. **PaymentProcessorService** `paidValue > 0` early return — may need revisiting for partial payments.
 
 ---

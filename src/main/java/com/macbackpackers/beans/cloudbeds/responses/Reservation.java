@@ -524,6 +524,21 @@ public class Reservation extends CloudbedsJsonResponse {
     }
 
     /**
+     * Returns the room VAT total from balance_details.tax_breakdown.
+     */
+    public BigDecimal getVatTotal() {
+        if ( balanceDetails == null || balanceDetails.getTaxBreakdown() == null ) {
+            return BigDecimal.ZERO.setScale( 2, RoundingMode.HALF_UP );
+        }
+        return balanceDetails.getTaxBreakdown().stream()
+                .filter( item -> "VAT".equals( item.getName() ) )
+                .map( TaxBreakdownItem::getAmount )
+                .filter( amount -> amount != null )
+                .reduce( BigDecimal.ZERO, BigDecimal::add )
+                .setScale( 2, RoundingMode.HALF_UP );
+    }
+
+    /**
      * Returns the amount of the first night for this booking.
      * 
      * @param gson Gson encoder/decoder
