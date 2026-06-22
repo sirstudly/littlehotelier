@@ -7,11 +7,11 @@ import org.apache.commons.lang3.StringUtils;
  * Parses reservation identifiers embedded in Cloudbeds calendar {@code event id} strings.
  * <p>
  * Incremental payloads refer to grid rows by numeric {@code event id}, not {@code booking_id}.
- * In production captures those ids usually begin with the 9-digit Cloudbeds reservation id followed
- * by an opaque suffix (e.g. {@code 178177230140204791} → booking {@code 178177230}). This is
- * best-effort only — bed moves and blocked-date tiles can produce ids that decode to a numeric
- * prefix without a matching live reservation.
- */
+ * Some calendar event ids begin with the 9-digit reservation id (e.g. {@code 178177230140204791}
+ * → booking {@code 178177230}); others use a unix-timestamp prefix from when the tile was created
+ * (e.g. {@code 17820844265948041} at assignment time, not {@code 178599456}). Prefer
+ * {@link CloudbedsCalendarEventRegistry} for delete resolution; this parser is a best-effort
+ * fallback only. */
 public final class CloudbedsEventIdParser {
 
     private static final int BOOKING_ID_LENGTH = 9;

@@ -73,6 +73,9 @@ public class CloudbedsWebSocketService {
     private List<CloudbedsEventListener> eventListeners;
 
     @Autowired
+    private CloudbedsCalendarEventRegistry eventRegistry;
+
+    @Autowired
     private ApplicationContext context;
 
     private volatile boolean running;
@@ -213,6 +216,7 @@ public class CloudbedsWebSocketService {
         return new CloudbedsEventListener() {
             @Override
             public void onSnapshot( String propertyId, List<CloudbedsCalendarEvent> events ) {
+                eventRegistry.onSnapshot( propertyId, events );
                 for ( CloudbedsEventListener listener : eventListeners ) {
                     try {
                         listener.onSnapshot( propertyId, events );
@@ -225,13 +229,19 @@ public class CloudbedsWebSocketService {
 
             @Override
             public void onUpdate( String propertyId, CloudbedsCalendarUpdate update ) {
-                for ( CloudbedsEventListener listener : eventListeners ) {
-                    try {
-                        listener.onUpdate( propertyId, update );
+                eventRegistry.beginUpdate( propertyId, update );
+                try {
+                    for ( CloudbedsEventListener listener : eventListeners ) {
+                        try {
+                            listener.onUpdate( propertyId, update );
+                        }
+                        catch ( Exception e ) {
+                            LOGGER.error( "Cloudbeds WebSocket update listener failed: {}", listener.getClass().getSimpleName(), e );
+                        }
                     }
-                    catch ( Exception e ) {
-                        LOGGER.error( "Cloudbeds WebSocket update listener failed: {}", listener.getClass().getSimpleName(), e );
-                    }
+                }
+                finally {
+                    eventRegistry.commitUpdate( propertyId, update );
                 }
             }
         };

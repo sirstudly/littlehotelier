@@ -308,15 +308,43 @@ Cloudbeds does **not** reliably emit `status=canceled` on the calendar WebSocket
 | `room_free` with `add: false` | `removed_event_ids: [<event_id>]` | Clears a cell; often followed by `blocked_dates` / `out_of_service` rather than a guest cancel |
 | `delete.NonAssignedReservations` | id list under `delete` | Almost always **assignment** (unassigned queue → grid), not a cancel |
 
-Calendar **event ids** are numeric strings (not `booking_id`). In production they usually **begin with the 9-digit reservation id** (e.g. `178177230140204791` → booking `178177230`); this prefix parse is best-effort. The server-side logger writes `UPDATE CANCEL_CANDIDATE` lines when `delete.Events` or `room_free` removals occur, including the parsed booking id and any replacement event types in the same update.
+Calendar **event ids** are opaque numeric strings — they are **not** the same as `booking_id`. Three id namespaces appear on the wire:
+
+| Namespace | Where | Meaning |
+|-----------|-------|---------|
+| `Events[].id` | Assigned calendar grid rows | Calendar **event id** (used in `delete.Events` and `room_free`) |
+| `NonAssignedReservations[].id` | Unassigned queue rows | **`booking_rooms.id`** (REST `get_reservation` → `booking_rooms[].id`), not a calendar event id |
+| `Events[].booking_id` | Both assigned and unassigned reservation rows | Cloudbeds **reservation id** |
+
+**Event id structure (two observed formats):**
+
+| Format | Shape | Example |
+|--------|-------|---------|
+| Reservation-prefix | `{booking_id 9d}{suffix}` | `178177230140204791` → booking `178177230` |
+| Timestamp-prefix | `{last_change unix 10d}{suffix 7–8d}` | `17820844265948041` = `1782084426` + `5948041` (tile created at assignment time) |
+
+Do **not** rely on parsing the prefix of a deleted event id to recover `booking_id`. Timestamp-prefix ids can yield a plausible-looking but wrong 9-digit value (e.g. `17820844265948041` → `178208442`, which is **not** a live reservation — the actual booking was `178599456`). Prefix parsing is a last-resort fallback only.
+
+**Resolving deletes to a booking id:**
+
+`delete.Events` and `room_free` (`add: false`) carry only calendar event ids — never `booking_id`. To identify which reservation was cancelled (or moved):
+
+1. Maintain an **event id → booking id cache** from the `on_migrate` snapshot and every incremental payload that includes `data.Events` (`changes`, `room_assign`, `event_change`, …). Index each row's `id` and `booking_id` as events arrive.
+2. On `delete.Events` / `room_free`, look up the removed id in that cache **before** dropping it.
+3. Also index `NonAssignedReservations` rows (`id` = `booking_rooms.id` → `booking_id`) so assignment flows are tracked; ids in `delete.NonAssignedReservations` are removed from that index when a booking is placed on the grid.
+4. If the cache misses (e.g. WS reconnect after assignment), fall back to REST (`get_reservation`, cancellation report) — the delete payload alone is not decodable.
+
+This app implements the cache in `CloudbedsCalendarEventRegistry` (`CloudbedsWebSocketService` calls `beginUpdate` / `commitUpdate` around listener fan-out). `CloudbedsEventIdParser` remains a best-effort prefix fallback.
+
+**Cancel vs bed-move heuristic:** when `delete.Events` fires with `replacement_types={}` and `events=0` in the same payload, it is very likely a cancellation rather than a bed move (moves usually emit replacement `Events` with the same `booking_id` in the same or next frame).
+
+Logged to `cloudbeds-events.log` as `UPDATE` (payload `action`, deletes, `EVENT` / `NON_ASSIGNED` rows — each includes `event_id=` — and `CANCEL_CANDIDATE` on calendar event removal) or `SNAPSHOT`. `CANCEL_CANDIDATE` lines include `booking_id`, `booking_id_source` (`CACHE`, `PARSED_PREFIX`, or `UNKNOWN`), and `replacement_types`.
 
 **Event row `type`** (inside `Events[]`): `booked`, `checked_in`, `checked_out`, `blocked_dates`, `out_of_service`, `courtesy_hold`.
 
 **Event row `status`** (reservations): `confirmed`, `checked_in`, `checked_out`, `canceled` (when present).
 
 Unassigned new bookings appear in `NonAssignedReservations` (snapshot columnar; change payloads may include an array) until assigned to a `room_id`.
-
-Logged to `cloudbeds-events.log` as `UPDATE` (with payload `action`, deletes, `EVENT` / `NON_ASSIGNED` rows, and `CANCEL_CANDIDATE` on event removal) or `SNAPSHOT`.
 
 ---
 
@@ -326,7 +354,7 @@ The `on_migrate` snapshot ships these **49 columns** (in `Events.keys`); the `ch
 
 | Field | Example | Notes |
 |-------|---------|--------|
-| `id` | `"17708284850805693"` | Event id |
+| `id` | `"17708284850805693"` | Row id — calendar **event id** on assigned `Events` rows; **`booking_rooms.id`** on `NonAssignedReservations` rows |
 | `property_id` | `"17363"` | Property |
 | `booking_id` | `"176834876"` / `"0"` | Reservation id; `0` for blocked_dates |
 | `type` | `"checked_in"` | `booked`, `checked_in`, `checked_out`, `out_of_service`, `blocked_dates`, `courtesy_hold` |
@@ -342,7 +370,7 @@ The `on_migrate` snapshot ships these **49 columns** (in `Events.keys`); the `ch
 | `customer_id` | | Guest/customer id |
 | `first_name`, `last_name`, `email`, `phone` | `"YIXUN"`, `"WANG"` | Guest info |
 | `res_rt_id` | `"112564"` | Room type id (matches `rate_ids` `0-112564` in `availability/get`) |
-| `booking_rooms_id` | | Booking-room link id |
+| `booking_rooms_id` | `"230860568"` | Booking-room link id; matches REST `get_reservation` → `booking_rooms[].id` |
 | `detailed_rates` | | Per-night rate breakdown |
 | `room_rate_total_adjustment` | `"0.00"` | Manual adjustment |
 | `adults`, `kids` | `1`, `0` | Occupancy |

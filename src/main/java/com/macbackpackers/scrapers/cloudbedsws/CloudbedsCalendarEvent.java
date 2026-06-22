@@ -49,6 +49,11 @@ public class CloudbedsCalendarEvent {
         return get( "booking_id" );
     }
 
+    /** {@code booking_rooms.id} when present; also the {@code id} of {@code NonAssignedReservations} rows. */
+    public String getBookingRoomsId() {
+        return get( "booking_rooms_id" );
+    }
+
     /** e.g. booked, checked_in, checked_out, out_of_service, blocked_dates, courtesy_hold. */
     public String getType() {
         return get( "type" );
@@ -188,6 +193,9 @@ public class CloudbedsCalendarEvent {
         StringBuilder sb = new StringBuilder();
         sb.append( "type=" ).append( getType() );
         sb.append( " status=" ).append( getStatus() );
+        if ( StringUtils.isNotBlank( getId() ) ) {
+            sb.append( " event_id=" ).append( getId() );
+        }
         sb.append( " booking_id=" ).append( getBookingId() );
         sb.append( " guest=" ).append( trim( getFirstName() ) ).append( " " ).append( trim( getLastName() ) );
         sb.append( " dates=" ).append( getStartDate() ).append( "->" ).append( getEndDate() );

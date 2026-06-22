@@ -118,6 +118,27 @@ public class CloudbedsCalendarUpdate {
         return false == removedEventIds.isEmpty() || deleteSection.values().stream().anyMatch( list -> false == list.isEmpty() );
     }
 
+    /**
+     * Calendar grid event ids removed by {@code delete.Events} and {@code room_free} ({@code add:false}).
+     */
+    public List<String> getAllRemovedCalendarEventIds() {
+        Map<String, String> seen = new LinkedHashMap<>();
+        for ( String eventId : removedEventIds ) {
+            if ( eventId != null ) {
+                seen.put( eventId, eventId );
+            }
+        }
+        List<String> deletedEvents = deleteSection.get( "Events" );
+        if ( deletedEvents != null ) {
+            for ( String eventId : deletedEvents ) {
+                if ( eventId != null ) {
+                    seen.put( eventId, eventId );
+                }
+            }
+        }
+        return new ArrayList<>( seen.keySet() );
+    }
+
     public String toLogHeader() {
         StringBuilder sb = new StringBuilder();
         sb.append( "action=" ).append( payloadAction );

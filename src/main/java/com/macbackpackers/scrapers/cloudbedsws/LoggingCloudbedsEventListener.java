@@ -9,6 +9,7 @@ import java.util.TreeMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -22,6 +23,9 @@ import org.springframework.stereotype.Component;
 public class LoggingCloudbedsEventListener implements CloudbedsEventListener {
 
     private static final Logger EVENTS_LOG = LoggerFactory.getLogger( "cloudbeds.events" );
+
+    @Autowired
+    private CloudbedsCalendarEventRegistry eventRegistry;
 
     @Override
     public void onSnapshot( String propertyId, List<CloudbedsCalendarEvent> events ) {
@@ -66,19 +70,21 @@ public class LoggingCloudbedsEventListener implements CloudbedsEventListener {
         }
     }
 
-    private static void logCancelCandidates( String propertyId, CloudbedsCalendarUpdate update,
+    private void logCancelCandidates( String propertyId, CloudbedsCalendarUpdate update,
             List<String> eventIds, String via ) {
         Set<String> logged = new LinkedHashSet<>();
         for ( String eventId : eventIds ) {
             if ( false == logged.add( eventId ) ) {
                 continue;
             }
-            String bookingId = CloudbedsEventIdParser.parseBookingIdFromEventId( eventId );
+            CloudbedsCalendarEventRegistry.ResolvedBookingId resolved =
+                    eventRegistry.resolveRemovedEventBookingId( propertyId, eventId );
             EVENTS_LOG.info(
-                    "[{}] UPDATE CANCEL_CANDIDATE event_id={} booking_id={} via={} action={} replacement_types={}",
+                    "[{}] UPDATE CANCEL_CANDIDATE event_id={} booking_id={} booking_id_source={} via={} action={} replacement_types={}",
                     propertyId,
                     eventId,
-                    bookingId == null ? "?" : bookingId,
+                    resolved.isKnown() ? resolved.getBookingId() : "?",
+                    resolved.getSource(),
                     via,
                     update.getPayloadAction(),
                     describeReplacementTypes( update ) );
