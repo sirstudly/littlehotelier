@@ -30,8 +30,6 @@ public class CloudbedsCalendarEventRegistry {
     public enum BookingIdSource {
         /** Previously indexed from snapshot or incremental {@code Events}. */
         CACHE,
-        /** Best-effort {@link CloudbedsEventIdParser} prefix parse (may be wrong). */
-        PARSED_PREFIX,
         /** No mapping available. */
         UNKNOWN
     }
@@ -49,10 +47,6 @@ public class CloudbedsCalendarEventRegistry {
 
         public static ResolvedBookingId cached( String bookingId ) {
             return new ResolvedBookingId( bookingId, BookingIdSource.CACHE );
-        }
-
-        public static ResolvedBookingId parsedPrefix( String bookingId ) {
-            return new ResolvedBookingId( bookingId, BookingIdSource.PARSED_PREFIX );
         }
 
         public static ResolvedBookingId unknown() {
@@ -155,10 +149,6 @@ public class CloudbedsCalendarEventRegistry {
             if ( StringUtils.isNotBlank( bookingId ) ) {
                 return ResolvedBookingId.cached( bookingId );
             }
-        }
-        String parsed = CloudbedsEventIdParser.parseBookingIdFromEventId( eventId );
-        if ( StringUtils.isNotBlank( parsed ) ) {
-            return ResolvedBookingId.parsedPrefix( parsed );
         }
         return ResolvedBookingId.unknown();
     }

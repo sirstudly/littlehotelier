@@ -42,24 +42,23 @@ public class CloudbedsCalendarEventRegistryTest {
 
         assertEquals( "178599456", resolved.getBookingId() );
         assertEquals( CloudbedsCalendarEventRegistry.BookingIdSource.CACHE, resolved.getSource() );
-        assertEquals( "178208442", CloudbedsEventIdParser.parseBookingIdFromEventId( "17820844265948041" ) );
         assertEquals( 0, registry.calendarEventCount( PROPERTY_ID ) );
     }
 
     @Test
-    public void resolveRemovedEventBookingId_fallsBackToPrefixParserWhenNotCached() {
-        CloudbedsCalendarUpdate deleteUpdate = deleteEventsUpdate( "178177230140204791" );
+    public void resolveRemovedEventBookingId_unknownWhenNotCached() {
+        CloudbedsCalendarUpdate deleteUpdate = deleteEventsUpdate( "17820844265948041" );
         registry.beginUpdate( PROPERTY_ID, deleteUpdate );
         CloudbedsCalendarEventRegistry.ResolvedBookingId resolved =
-                registry.resolveRemovedEventBookingId( PROPERTY_ID, "178177230140204791" );
+                registry.resolveRemovedEventBookingId( PROPERTY_ID, "17820844265948041" );
         registry.commitUpdate( PROPERTY_ID, deleteUpdate );
 
-        assertEquals( "178177230", resolved.getBookingId() );
-        assertEquals( CloudbedsCalendarEventRegistry.BookingIdSource.PARSED_PREFIX, resolved.getSource() );
+        assertFalse( resolved.isKnown() );
+        assertEquals( CloudbedsCalendarEventRegistry.BookingIdSource.UNKNOWN, resolved.getSource() );
     }
 
     @Test
-    public void resolveRemovedEventBookingId_unknownWhenNotCachedAndPrefixNotReservationLike() {
+    public void resolveRemovedEventBookingId_unknownForUnrecognizedEventIdShape() {
         CloudbedsCalendarUpdate deleteUpdate = deleteEventsUpdate( "12345678901234567" );
         registry.beginUpdate( PROPERTY_ID, deleteUpdate );
         CloudbedsCalendarEventRegistry.ResolvedBookingId resolved =

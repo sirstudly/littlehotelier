@@ -316,14 +316,9 @@ Calendar **event ids** are opaque numeric strings — they are **not** the same 
 | `NonAssignedReservations[].id` | Unassigned queue rows | **`booking_rooms.id`** (REST `get_reservation` → `booking_rooms[].id`), not a calendar event id |
 | `Events[].booking_id` | Both assigned and unassigned reservation rows | Cloudbeds **reservation id** |
 
-**Event id structure (two observed formats):**
+**Event id structure:**
 
-| Format | Shape | Example |
-|--------|-------|---------|
-| Reservation-prefix | `{booking_id 9d}{suffix}` | `178177230140204791` → booking `178177230` |
-| Timestamp-prefix | `{last_change unix 10d}{suffix 7–8d}` | `17820844265948041` = `1782084426` + `5948041` (tile created at assignment time) |
-
-Do **not** rely on parsing the prefix of a deleted event id to recover `booking_id`. Timestamp-prefix ids can yield a plausible-looking but wrong 9-digit value (e.g. `17820844265948041` → `178208442`, which is **not** a live reservation — the actual booking was `178599456`). Prefix parsing is a last-resort fallback only.
+Calendar event ids are opaque numeric strings. One confirmed pattern is `{last_change unix 10d}{suffix 7–8d}` — e.g. `17820844265948041` = `1782084426` + `5948041`, where `1782084426` is the unix time the tile was created (assignment). The suffix does not encode `booking_id`. Do **not** attempt to decode a deleted event id — even a 9-digit prefix can look like a reservation id while being a timestamp fragment (e.g. `178208442` from `17820844265948041` is **not** booking `178599456`).
 
 **Resolving deletes to a booking id:**
 
@@ -334,11 +329,11 @@ Do **not** rely on parsing the prefix of a deleted event id to recover `booking_
 3. Also index `NonAssignedReservations` rows (`id` = `booking_rooms.id` → `booking_id`) so assignment flows are tracked; ids in `delete.NonAssignedReservations` are removed from that index when a booking is placed on the grid.
 4. If the cache misses (e.g. WS reconnect after assignment), fall back to REST (`get_reservation`, cancellation report) — the delete payload alone is not decodable.
 
-This app implements the cache in `CloudbedsCalendarEventRegistry` (`CloudbedsWebSocketService` calls `beginUpdate` / `commitUpdate` around listener fan-out). `CloudbedsEventIdParser` remains a best-effort prefix fallback.
+This app implements the cache in `CloudbedsCalendarEventRegistry` (`CloudbedsWebSocketService` calls `beginUpdate` / `commitUpdate` around listener fan-out).
 
 **Cancel vs bed-move heuristic:** when `delete.Events` fires with `replacement_types={}` and `events=0` in the same payload, it is very likely a cancellation rather than a bed move (moves usually emit replacement `Events` with the same `booking_id` in the same or next frame).
 
-Logged to `cloudbeds-events.log` as `UPDATE` (payload `action`, deletes, `EVENT` / `NON_ASSIGNED` rows — each includes `event_id=` — and `CANCEL_CANDIDATE` on calendar event removal) or `SNAPSHOT`. `CANCEL_CANDIDATE` lines include `booking_id`, `booking_id_source` (`CACHE`, `PARSED_PREFIX`, or `UNKNOWN`), and `replacement_types`.
+Logged to `cloudbeds-events.log` as `UPDATE` (payload `action`, deletes, `EVENT` / `NON_ASSIGNED` rows — each includes `event_id=` — and `CANCEL_CANDIDATE` on calendar event removal) or `SNAPSHOT`. `CANCEL_CANDIDATE` lines include `booking_id`, `booking_id_source` (`CACHE` or `UNKNOWN`), and `replacement_types`.
 
 **Event row `type`** (inside `Events[]`): `booked`, `checked_in`, `checked_out`, `blocked_dates`, `out_of_service`, `courtesy_hold`.
 
