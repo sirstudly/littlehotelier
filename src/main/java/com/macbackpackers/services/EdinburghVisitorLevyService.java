@@ -50,9 +50,6 @@ public class EdinburghVisitorLevyService {
     @Value( "${evl.stay.date.from:2026-07-24}" )
     private String stayDateFrom;
 
-    @Value( "${evl.booked.date.from:2025-10-01}" )
-    private String bookedDateFrom;
-
     public static class LevyAssessment {
         private final String reservationId;
         private final LevyCalculation calculation;
@@ -151,7 +148,7 @@ public class EdinburghVisitorLevyService {
      */
     public boolean isPotentiallyEligibleForNewBooking( CloudbedsCalendarEvent event ) {
         return EdinburghVisitorLevyBookingCriteria.matchesNewBookingCalendarEvent(
-                event, evlEnabled, getStayDateFrom(), getBookedDateFrom() );
+                event, evlEnabled, getStayDateFrom() );
     }
 
     /**
@@ -166,11 +163,6 @@ public class EdinburghVisitorLevyService {
 
     private boolean isPotentiallyEligible( Customer customer ) {
         if ( false == evlEnabled ) {
-            return false;
-        }
-        if ( customer.getBookingDate() != null
-                && EdinburghVisitorLevyCalculator.isBookingExempt(
-                        LocalDate.parse( customer.getBookingDate() ), getBookedDateFrom() ) ) {
             return false;
         }
         if ( customer.getCheckoutDate() != null
@@ -188,7 +180,7 @@ public class EdinburghVisitorLevyService {
 
     public LevyAssessment assessVisitorLevy( Reservation reservation ) {
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, getStayDateFrom(), getBookedDateFrom() );
+                reservation, gson, getStayDateFrom() );
 
         BigDecimal currentLevy = reservation.getVisitorLevyTotal( exclusiveTaxLabel, inclusiveTaxLabel );
         BigDecimal expectedLevy = calculation.getExpectedLevy();
@@ -265,10 +257,6 @@ public class EdinburghVisitorLevyService {
 
     private LocalDate getStayDateFrom() {
         return LocalDate.parse( stayDateFrom );
-    }
-
-    private LocalDate getBookedDateFrom() {
-        return LocalDate.parse( bookedDateFrom );
     }
 
 }

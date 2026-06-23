@@ -24,10 +24,9 @@ public final class EdinburghVisitorLevyBookingCriteria {
      * @param event calendar event from the WebSocket
      * @param evlEnabled {@code evl.enabled} property
      * @param stayDateFrom first stay date on which the levy applies
-     * @param bookedDateFrom bookings made before this date are exempt
      */
     public static boolean matchesNewBookingCalendarEvent( CloudbedsCalendarEvent event,
-            boolean evlEnabled, LocalDate stayDateFrom, LocalDate bookedDateFrom ) {
+            boolean evlEnabled, LocalDate stayDateFrom ) {
         if ( false == evlEnabled ) {
             return false;
         }
@@ -36,13 +35,6 @@ public final class EdinburghVisitorLevyBookingCriteria {
         }
         if ( event.isCanceled() ) {
             return false;
-        }
-        String bookingDateStr = event.getBookingDate();
-        if ( StringUtils.isNotBlank( bookingDateStr ) ) {
-            LocalDate bookingDate = LocalDate.parse( bookingDateStr.trim().substring( 0, 10 ) );
-            if ( EdinburghVisitorLevyCalculator.isBookingExempt( bookingDate, bookedDateFrom ) ) {
-                return false;
-            }
         }
         String endDateStr = event.getEndDate();
         if ( StringUtils.isNotBlank( endDateStr )

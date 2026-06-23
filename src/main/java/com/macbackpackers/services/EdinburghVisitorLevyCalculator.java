@@ -83,16 +83,14 @@ public final class EdinburghVisitorLevyCalculator {
         private final List<LevyNight> eligibleNights;
         private final boolean hostelworldUsesListedPrice;
         private final boolean canceledOrNoShow;
-        private final boolean bookingExempt;
 
         public LevyCalculation( BigDecimal expectedLevy, BigDecimal levyBase, List<LevyNight> eligibleNights,
-                boolean hostelworldUsesListedPrice, boolean canceledOrNoShow, boolean bookingExempt ) {
+                boolean hostelworldUsesListedPrice, boolean canceledOrNoShow ) {
             this.expectedLevy = expectedLevy;
             this.levyBase = levyBase;
             this.eligibleNights = eligibleNights;
             this.hostelworldUsesListedPrice = hostelworldUsesListedPrice;
             this.canceledOrNoShow = canceledOrNoShow;
-            this.bookingExempt = bookingExempt;
         }
 
         public BigDecimal getExpectedLevy() {
@@ -115,10 +113,6 @@ public final class EdinburghVisitorLevyCalculator {
             return canceledOrNoShow;
         }
 
-        public boolean isBookingExempt() {
-            return bookingExempt;
-        }
-
         public BigDecimal getEligibleRatesTotal() {
             return eligibleNights.stream()
                     .map( LevyNight::getRate )
@@ -127,15 +121,14 @@ public final class EdinburghVisitorLevyCalculator {
     }
 
     public static LevyCalculation calculate( Reservation reservation, Gson gson,
-            LocalDate stayDateFrom, LocalDate bookedDateFrom ) {
+            LocalDate stayDateFrom ) {
 
         boolean canceledOrNoShow = reservation.isCanceledOrNoShow();
-        boolean bookingExempt = isBookingExempt( reservation.getBookingDateAsLocalDate(), bookedDateFrom );
 
-        if ( canceledOrNoShow || bookingExempt ) {
+        if ( canceledOrNoShow ) {
             return new LevyCalculation( BigDecimal.ZERO.setScale( 2, RoundingMode.HALF_UP ),
                     BigDecimal.ZERO.setScale( 2, RoundingMode.HALF_UP ),
-                    Collections.emptyList(), false, canceledOrNoShow, bookingExempt );
+                    Collections.emptyList(), false, true );
         }
 
         Map<LocalDate, BigDecimal> ratesByDate = reservation.getRatesByDate( gson );
@@ -188,7 +181,7 @@ public final class EdinburghVisitorLevyCalculator {
 
         return new LevyCalculation( expectedLevy.setScale( 2, RoundingMode.HALF_UP ),
                 levyBase.setScale( 2, RoundingMode.HALF_UP ),
-                eligibleNights, hostelworldUsesListedPrice, false, false );
+                eligibleNights, hostelworldUsesListedPrice, false );
     }
 
     static List<PersonNightRate> getEligiblePersonNightRates( Reservation reservation, Gson gson,
@@ -265,10 +258,6 @@ public final class EdinburghVisitorLevyCalculator {
         return eligibleNights;
     }
 
-    public static boolean isBookingExempt( LocalDate bookingDate, LocalDate bookedDateFrom ) {
-        return bookingDate.isBefore( bookedDateFrom );
-    }
-
     /**
      * Returns true if the stay includes at least one night on or after the levy start date.
      * The last night of a stay is the day before checkout.
@@ -284,9 +273,6 @@ public final class EdinburghVisitorLevyCalculator {
     public static String buildAdjustmentNote( LevyCalculation calculation ) {
         if ( calculation.isCanceledOrNoShow() ) {
             return "Reservation canceled/no-show - visitor levy not applicable. -RONBOT";
-        }
-        if ( calculation.isBookingExempt() ) {
-            return "Booking made before levy booking date - visitor levy not applicable. -RONBOT";
         }
 
         StringBuilder note = new StringBuilder( "Visitor levy only applies to the first 5 nights. " );

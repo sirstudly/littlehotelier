@@ -28,7 +28,6 @@ import static org.hamcrest.Matchers.is;
 public class EdinburghVisitorLevyCalculatorTest {
 
     private static final LocalDate STAY_DATE_FROM = LocalDate.of( 2026, 7, 24 );
-    private static final LocalDate BOOKED_DATE_FROM = LocalDate.of( 2025, 10, 1 );
 
     private Gson gson;
     private Reservation baseReservation;
@@ -53,7 +52,7 @@ public class EdinburghVisitorLevyCalculatorTest {
                 rateLine( "2026-10-03", "55.00" ) );
 
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+                reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "8.25" ) ) );
         assertThat( calculation.getEligibleNights().size(), is( 3 ) );
@@ -67,7 +66,7 @@ public class EdinburghVisitorLevyCalculatorTest {
                 rateLine( "2026-10-01", "165.00" ) );
 
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+                reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "7.86" ) ) );
         assertThat( EdinburghVisitorLevyCalculator.useInclusiveTax( reservation ), is( true ) );
@@ -82,7 +81,7 @@ public class EdinburghVisitorLevyCalculatorTest {
         reservation.setAdultsNumber( 2 );
 
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+                reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "9.00" ) ) );
         assertThat( calculation.getLevyBase(), comparesEqualTo( new BigDecimal( "149.84" ) ) );
@@ -103,7 +102,7 @@ public class EdinburghVisitorLevyCalculatorTest {
         reservation.setAdultsNumber( 2 );
 
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+                reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "14.26" ) ) );
         assertThat( calculation.getLevyBase(), comparesEqualTo( new BigDecimal( "237.18" ) ) );
@@ -119,7 +118,7 @@ public class EdinburghVisitorLevyCalculatorTest {
         reservation.setChannelPriceListed( new BigDecimal( "181.45" ) );
 
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+                reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.isHostelworldUsesListedPrice(), is( true ) );
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "9.07" ) ) );
@@ -135,7 +134,7 @@ public class EdinburghVisitorLevyCalculatorTest {
         reservation.setChannelCommission( new BigDecimal( "14.09" ) );
 
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+                reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.isHostelworldUsesListedPrice(), is( true ) );
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "4.70" ) ) );
@@ -152,7 +151,7 @@ public class EdinburghVisitorLevyCalculatorTest {
         reservation.setChannelPriceListed( new BigDecimal( "235.29" ) );
 
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+                reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.getEligibleNights().size(), is( 2 ) );
         assertThat( calculation.isHostelworldUsesListedPrice(), is( true ) );
@@ -169,7 +168,7 @@ public class EdinburghVisitorLevyCalculatorTest {
                 rateLine( "2026-07-25", "100.00" ) );
 
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+                reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.getEligibleNights().stream().map( LevyNight::getDate ).collect( Collectors.toList() ),
                 is( java.util.Arrays.asList(
@@ -191,23 +190,10 @@ public class EdinburghVisitorLevyCalculatorTest {
                 rateLine( "2026-10-07", "60.00" ) );
 
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+                reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.getEligibleNights().size(), is( 5 ) );
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "15.00" ) ) );
-    }
-
-    @Test
-    public void testBookingBeforeLevyBookingDateIsExempt() {
-        Reservation reservation = reservationWithRates(
-                "Walk-In", "2026-10-01", "2026-10-02", "2025-09-30",
-                rateLine( "2026-10-01", "165.00" ) );
-
-        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
-
-        assertThat( calculation.getExpectedLevy(), comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
-        assertThat( calculation.isBookingExempt(), is( true ) );
     }
 
     @Test
@@ -218,7 +204,7 @@ public class EdinburghVisitorLevyCalculatorTest {
         reservation.setStatus( "canceled" );
 
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+                reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
         assertThat( calculation.isCanceledOrNoShow(), is( true ) );
@@ -234,7 +220,7 @@ public class EdinburghVisitorLevyCalculatorTest {
         reservation.setStatus( "no_show" );
 
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
-                reservation, gson, STAY_DATE_FROM, BOOKED_DATE_FROM );
+                reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
         assertThat( calculation.isCanceledOrNoShow(), is( true ) );
@@ -300,14 +286,6 @@ public class EdinburghVisitorLevyCalculatorTest {
     public void testWithinTolerance() {
         assertThat( EdinburghVisitorLevyCalculator.isWithinTolerance( new BigDecimal( "0.005" ) ), is( true ) );
         assertThat( EdinburghVisitorLevyCalculator.isWithinTolerance( new BigDecimal( "0.02" ) ), is( false ) );
-    }
-
-    @Test
-    public void testIsBookingExempt() {
-        assertThat( EdinburghVisitorLevyCalculator.isBookingExempt(
-                LocalDate.of( 2025, 9, 30 ), BOOKED_DATE_FROM ), is( true ) );
-        assertThat( EdinburghVisitorLevyCalculator.isBookingExempt(
-                LocalDate.of( 2025, 10, 1 ), BOOKED_DATE_FROM ), is( false ) );
     }
 
     @Test

@@ -9,7 +9,6 @@ Reference for developers and AI agents working on EVL in this codebase. Covers s
 | Rate | **5%** of **pre-VAT accommodation** |
 | Night cap | First **5 consecutive** eligible nights |
 | Stay eligible from | **2026-07-24** (last night = day before checkout) |
-| Booking exempt if booked before | **2025-10-01** |
 | Canceled / no-show | Levy = **£0** |
 | VAT | If VAT-registered, levy is taxable turnover (20% VAT on levy) |
 
@@ -104,10 +103,11 @@ evl.enabled=false
 evl.tax.exclusive.label=Edinburgh Visitor Levy 2026
 evl.tax.inclusive.label=Edinburgh Visitor Levy (Inclusive)
 evl.stay.date.from=2026-07-24
-evl.booked.date.from=2025-10-01
 ```
 
 `evl.enabled` must be `true` for batch assessment, adjustment jobs, and real-time WebSocket enqueueing to consider bookings. `EdinburghVisitorLevyService.isPotentiallyEligible()` returns `false` when disabled, so create/dry-run jobs and `requiresVisitorLevyAdjustment()` do nothing. The WebSocket listener uses the same flag via `isPotentiallyEligibleForNewBooking()`.
+
+All bookings in Cloudbeds were created after the statutory booking cutoff (Oct 2025); the codebase does not apply booking-date exemption checks.
 
 ---
 
@@ -224,9 +224,9 @@ Queries active bookings (`confirmed,not_confirmed`) in range, applies cheap elig
 
 | Include if | Reason |
 |---|---|
-| Potentially eligible (`evl.enabled`, not booking-exempt, has eligible stay dates) **and** `expectedLevy − currentLevy` outside tolerance | Folio EVL needs correction |
+| Potentially eligible (`evl.enabled`, has eligible stay dates) **and** `expectedLevy − currentLevy` outside tolerance | Folio EVL needs correction |
 
-Excludes: `evl.enabled=false`, booking exempt (pre Oct 2025), no eligible stay dates, levy already correct (within £0.01).
+Excludes: `evl.enabled=false`, no eligible stay dates, levy already correct (within £0.01).
 
 Creates one `CalculateEdinburghVisitorLevyForBookingJob` per reservation (`reservation_id`) that needs adjustment only — no no-op jobs.
 
@@ -266,10 +266,9 @@ Mirrors `EdinburghVisitorLevyService.isPotentiallyEligible()` using fields avail
 | `evl.enabled=true` | property config |
 | `type=booked`, valid `booking_id` | `type`, `booking_id` |
 | Not canceled | `status` |
-| Booking date not exempt (≥ `evl.booked.date.from`) | `booking_date` |
 | Stay includes eligible nights (checkout after `evl.stay.date.from`) | `end_date` |
 
-If `booking_date` is absent, the booking-exempt check is skipped (same as when `Customer.getBookingDate()` is null). If `end_date` is absent, the stay-date check is skipped.
+If `end_date` is absent, the stay-date check is skipped.
 
 The listener does **not** compare folio EVL before enqueueing — that happens inside `CalculateEdinburghVisitorLevyForBookingJob` (`processVisitorLevyForBooking`), which no-ops when levy is already correct.
 
@@ -400,7 +399,6 @@ Run: `mvn test -Dtest=EdinburghVisitorLevyCalculatorTest`
 | `booked` + eligible dates, `evl.enabled=true` | match |
 | `evl.enabled=false` | no match |
 | Canceled | no match |
-| Booking date before Oct 2025 | no match |
 | Checkout on levy start date (no eligible nights) | no match |
 | `blocked_dates` | no match |
 
