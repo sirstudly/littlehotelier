@@ -586,7 +586,18 @@ public class Reservation extends CloudbedsJsonResponse {
     }
 
     public boolean isBookingDotComBooking() {
-        return "Booking.com".equals( getSourceName() );
+        return getSourceName() != null && getSourceName().startsWith( "Booking.com" );
+    }
+
+    public boolean isAgodaPricelineBooking() {
+        return getSourceName() != null && getSourceName().startsWith( "Agoda" );
+    }
+
+    /**
+     * OTA sources where EVL is carved out of a fixed channel total (inclusive tax in Cloudbeds).
+     */
+    public boolean isInclusiveTaxBooking() {
+        return isBookingDotComBooking() || isAgodaPricelineBooking();
     }
 
     public boolean isCanceledOrNoShow() {

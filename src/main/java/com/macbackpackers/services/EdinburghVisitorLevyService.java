@@ -220,8 +220,8 @@ public class EdinburghVisitorLevyService {
 
     private void applyVisitorLevyAdjustment( WebClient webClient, Reservation reservation,
             LevyAssessment assessment ) throws IOException {
-        if ( reservation.isBookingDotComBooking() ) {
-            logBdcVisitorLevyAndVatDiscrepancy( reservation, assessment );
+        if ( EdinburghVisitorLevyCalculator.useInclusiveTax( reservation ) ) {
+            logInclusiveTaxVisitorLevyAndVatDiscrepancy( reservation, assessment );
             return;
         }
 
@@ -239,7 +239,7 @@ public class EdinburghVisitorLevyService {
         }
     }
 
-    private void logBdcVisitorLevyAndVatDiscrepancy( Reservation reservation, LevyAssessment assessment ) {
+    private void logInclusiveTaxVisitorLevyAndVatDiscrepancy( Reservation reservation, LevyAssessment assessment ) {
         BigDecimal expectedEvl = assessment.getExpectedLevy();
         BigDecimal currentEvl = assessment.getCurrentLevy();
         BigDecimal evlDelta = expectedEvl.subtract( currentEvl ).setScale( 2, RoundingMode.HALF_UP );
@@ -249,9 +249,9 @@ public class EdinburghVisitorLevyService {
         BigDecimal currentVat = reservation.getVatTotal();
         BigDecimal vatDelta = expectedVat.subtract( currentVat ).setScale( 2, RoundingMode.HALF_UP );
 
-        LOGGER.info( "BDC reservation {}: skipping adjustment (fixed channel total). "
+        LOGGER.info( "Inclusive-tax reservation {} ({}): skipping adjustment (fixed channel total). "
                 + "EVL expected={}, current={}, delta={}. VAT expected={}, current={}, delta={}.",
-                reservation.getReservationId(), expectedEvl, currentEvl, evlDelta,
+                reservation.getReservationId(), reservation.getSourceName(), expectedEvl, currentEvl, evlDelta,
                 expectedVat, currentVat, vatDelta );
     }
 

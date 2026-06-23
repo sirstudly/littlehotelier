@@ -138,7 +138,7 @@ public final class EdinburghVisitorLevyCalculator {
         BigDecimal levyBase;
         BigDecimal expectedLevy;
 
-        if ( reservation.isBookingDotComBooking() ) {
+        if ( reservation.isInclusiveTaxBooking() ) {
             List<PersonNightRate> personNightRates = getEligiblePersonNightRates(
                     reservation, gson, reservation.getCheckoutDateAsLocalDate(), stayDateFrom );
             levyBase = BigDecimal.ZERO;
@@ -287,7 +287,7 @@ public final class EdinburghVisitorLevyCalculator {
     }
 
     public static boolean useInclusiveTax( Reservation reservation ) {
-        return reservation.isBookingDotComBooking();
+        return reservation.isInclusiveTaxBooking();
     }
 
     /**

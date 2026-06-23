@@ -109,6 +109,35 @@ public class EdinburghVisitorLevyCalculatorTest {
     }
 
     @Test
+    public void testAgodaChannelCollectUsesInclusiveTax() {
+        Reservation reservation = reservationWithRates(
+                "Agoda (Channel Collect Booking)", "2026-10-01", "2026-10-02", "2025-11-01",
+                rateLine( "2026-10-01", "165.00" ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "7.86" ) ) );
+        assertThat( EdinburghVisitorLevyCalculator.useInclusiveTax( reservation ), is( true ) );
+    }
+
+    @Test
+    public void testAgodaPricelineHotelCollectMatchesBdcInclusiveCalculation() {
+        Reservation reservation = reservationWithRates(
+                "Agoda / Priceline (Hotel Collect Booking)", "2026-10-01", "2026-10-03", "2025-11-01",
+                rateLine( "2026-10-01", "47.20", 2 ),
+                rateLine( "2026-10-02", "47.20", 2 ) );
+        reservation.setAdultsNumber( 2 );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "9.00" ) ) );
+        assertThat( calculation.getLevyBase(), comparesEqualTo( new BigDecimal( "149.84" ) ) );
+        assertThat( EdinburghVisitorLevyCalculator.useInclusiveTax( reservation ), is( true ) );
+    }
+
+    @Test
     public void testHostelworldUsesPriceListed() {
         Reservation reservation = reservationWithRates(
                 "Hostelworld", "2026-10-01", "2026-10-04", "2025-11-01",

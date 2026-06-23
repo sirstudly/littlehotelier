@@ -20,30 +20,55 @@ Official sources:
 
 ---
 
-## Cloudbeds configuration (property 18265)
+## Cloudbeds configuration
 
-Two taxes, linked **per reservation source**:
+Each property needs **two EVL taxes**, linked **per reservation source** in Cloudbeds Settings → Taxes & Fees.
 
-| Tax ID | Label | Type | Used for |
+### Tax types (same on every property)
+
+| Role | Typical English label | Type | Used for |
 |---|---|---|---|
-| `tax_824186` | Edinburgh Visitor Levy 2026 | **Exclusive** | Direct, walk-in, Hostelworld |
-| `tax_824360` | Edinburgh Visitor Levy (Inclusive) | **Inclusive** (6% of net) | Booking.com |
+| Exclusive | Edinburgh Visitor Levy 2026 | **Exclusive** (5%) | Direct, walk-in, Hostelworld |
+| Inclusive | see below | **Inclusive** (6% of net) | Booking.com, Agoda, Agoda / Priceline |
 
 - **Exclusive** = added on top of rate (direct/HWL).
-- **Inclusive** = carved out of fixed OTA price (BDC); must not inflate channel total. Configured at **6% of net** so the EVL line includes VAT-on-levy (consistent with the exclusive tax on direct/HWL).
+- **Inclusive** = carved out of fixed OTA price (BDC, Agoda/Priceline); must not inflate channel total. Configured at **6% of net** so the EVL line includes VAT-on-levy (consistent with the exclusive tax on direct/HWL).
 
 Cloudbeds tax/fee UI is identical for taxes and fees; **Inclusive vs Exclusive** controls pricing behaviour, not the tax/fee type name.
 
-Tax IDs are resolved at runtime by **English label** via `CloudbedsScraper.resolveTaxIdByLabel()` (cached property content from `getPropertyContent`). Do not hardcode IDs except in tests/fixtures.
+### Tax IDs are property-specific
 
-Fixture: `src/test/resources/get_property_content_taxes.json`
+Cloudbeds assigns a **unique numeric tax ID per property** when each tax is created. Do **not** assume IDs are shared across hostels — only the **English label** and **exclusive/inclusive type** need to match.
+
+Known examples (from HAR captures in this repo):
+
+| Property | Cloudbeds property ID | Exclusive (`tax_*`) | Inclusive (`tax_*`) | Inclusive label in Cloudbeds |
+|---|---|---|---|---|
+| Royal Mile Backpackers (RMB) | 18265 | `824186` | `824360` | Edinburgh Visitor Levy (Inclusive) |
+| High Street Hostel (HSH) | 17959 | `824362` | `824364` | Edinburgh Visitor Levy 2026 (Inclusive) |
+| Castle Rock Hostel (CRH) | 17363 | not captured | not captured | verify in Cloudbeds |
+
+The exclusive label **Edinburgh Visitor Levy 2026** has been consistent where seen; the **inclusive label can differ by property** (RMB vs HSH above). If `resolveTaxIdByLabel()` fails on a property, check the exact label in Cloudbeds and set `evl.tax.inclusive.label` in that property's `application-*.properties` profile.
+
+### Runtime resolution (not hardcoded IDs)
+
+Tax IDs for API calls are resolved at runtime by **English label** via `CloudbedsScraper.resolveTaxIdByLabel()` (cached property content from `getPropertyContent`). Labels come from:
+
+```properties
+evl.tax.exclusive.label=Edinburgh Visitor Levy 2026
+evl.tax.inclusive.label=Edinburgh Visitor Levy (Inclusive)
+```
+
+(`application.properties` defaults — override per profile if Cloudbeds uses a different inclusive name.)
+
+Do not hardcode numeric IDs in production code. Tests/fixtures may use RMB IDs: `src/test/resources/get_property_content_taxes.json`.
 
 ### Auto-post vs adjustment job
 
 Cloudbeds auto-applies EVL per source config but:
 - Does not reliably cap at 5 nights
 - May miss eligibility boundaries (pre/post 24 Jul)
-- BDC multi-guest per-person rates need correct guest count
+- BDC and Agoda/Priceline multi-guest per-person rates need correct guest count
 
 The **adjustment job** compares `balance_details.tax_breakdown` to our calculated expected levy and posts corrections.
 
@@ -101,7 +126,7 @@ Set in `application.properties` (override per profile in `application-*.properti
 ```properties
 evl.enabled=false
 evl.tax.exclusive.label=Edinburgh Visitor Levy 2026
-evl.tax.inclusive.label=Edinburgh Visitor Levy (Inclusive)
+evl.tax.inclusive.label=Edinburgh Visitor Levy 2026 (Inclusive)
 evl.stay.date.from=2026-07-24
 ```
 
@@ -121,7 +146,7 @@ The calculator (`EdinburghVisitorLevyCalculator.calculate`) branches on source. 
 2. Sort chronologically
 3. Cap at **first 5** nights
 
-### Direct / walk-in / other (exclusive tax `824186`)
+### Direct / walk-in / other (exclusive tax)
 
 - Uses `getRatesByDate()` — nightly room totals from `booking_rooms[].detailed_rates`
 - **Guest levy** = **5% of gross** (VAT-inclusive accommodation), **rounded per night**, then summed
@@ -130,9 +155,11 @@ The calculator (`EdinburghVisitorLevyCalculator.calculate`) branches on source. 
 **Example:** 3 nights × £55.00 gross  
 → £2.75 + £2.75 + £2.75 = **£8.25**
 
-### Booking.com (inclusive tax `824360`, 6% of net)
+### Booking.com, Agoda / Priceline (inclusive tax, 6% of net)
 
-BDC `detailed_rates` are **per person per night**, all-in (net + EVL + room VAT).
+Applies when `reservation.isInclusiveTaxBooking()` — source name starts with `Booking.com` or `Agoda` (covers Agoda and Agoda / Priceline, hotel and channel collect).
+
+`detailed_rates` are **per person per night**, all-in (net + EVL + room VAT).
 
 For each eligible person-night:
 
@@ -173,7 +200,7 @@ Rates pp: £26.15, £30.82 × 4
 
 Per-person rate sum = £149.43; × 2 guests = £298.86.
 
-### Hostelworld (exclusive tax `824186`)
+### Hostelworld (exclusive tax)
 
 Cloudbeds `detailed_rates` are **net** (post-commission). Use **channel listed price** for levy base:
 
@@ -199,10 +226,10 @@ expectedLevy = round(levyBase × 5%, 2)
 3. `currentLevy` = sum of `tax_breakdown` lines matching either EVL label
 4. `delta = expected - current`
 5. If `|delta| ≥ £0.01`:
-   - **BDC** → log expected EVL and VAT vs folio; **no write** (channel total is fixed; corrections need coordinated EVL/VAT/room-rate adjustments)
+   - **BDC, Agoda, Agoda / Priceline** (inclusive tax) → log expected EVL and VAT vs folio; **no write** (channel total is fixed; corrections need coordinated EVL/VAT/room-rate adjustments)
    - **Other sources, delta < 0** → `adjustVisitorLevyCharge` (reduce)
    - **Other sources, delta > 0** → `addVisitorLevyCharge` (increase)
-6. Tax ID: inclusive label for BDC, exclusive otherwise
+6. Tax ID: inclusive label for BDC/Agoda/Priceline, exclusive otherwise
 7. Adjustment notes suffixed with `-RONBOT`
 
 ### API endpoints
@@ -326,7 +353,7 @@ Gross = Net + 6%×Net (EVL line) + 20%×Net (VAT line)
 
 - EVL line = **guest levy including VAT-on-levy** (6% of net = 5% council + 1% VAT-on-levy)
 - VAT line = **room VAT only**
-- Council remittance: `SUM(tax_824360) ÷ 1.2`
+- Council remittance: `SUM(inclusive EVL folio line) ÷ 1.2`
 - Aligns with exclusive direct posting and statutory ÷1.26 unwind (within rounding)
 
 ### Strict statutory unwind from guest total T
@@ -346,11 +373,11 @@ Total VAT to HMRC  = T × 21% ÷ 1.26
 | Cloudbeds folio | £9.00 | £7.50 | £29.96 | £1.50 (in EVL line) |
 | Statutory ÷1.26 | — | £7.49 | £29.96 | £1.50 |
 
-### Direct exclusive (`824186`)
+### Direct exclusive
 
 - EVL line at **5% of gross** includes VAT on levy
-- Council remittance: `SUM(824186) ÷ 1.2`
-- BDC `824360` also uses ÷1.2 for council (EVL line is VAT-inclusive)
+- Council remittance: `SUM(exclusive EVL folio line) ÷ 1.2`
+- Inclusive OTA folio lines also use ÷1.2 for council (EVL line is VAT-inclusive)
 
 ### Guest invoices
 
@@ -363,6 +390,7 @@ Use Cloudbeds **Invoice Footer** (Settings → Finance → Invoices) for static 
 | Channel | EVL handling |
 |---|---|
 | **Booking.com** | 5% attributed in rate from 1 Oct 2025; **cannot cap at 5 nights** — provider must refund excess; rates must include levy |
+| **Agoda / Priceline** | EVL baked into fixed OTA total (inclusive tax); hotel and channel collect — same calculation as BDC |
 | **Hostelworld** | Listed price in `channel_price_listed` / balance+commission |
 | **Airbnb** | No auto-tool yet; build into calendar pricing |
 | **Direct** | Exclusive EVL tax on source |
@@ -381,6 +409,8 @@ BDC partner hub: [Edinburgh Visitor Levy](https://partner.booking.com/en-gb/help
 | BDC 1 night £165 (1 guest) | £7.86 |
 | BDC 2 guests, 2×£47.20 | £9.00 (base £149.84) |
 | BDC 2 guests, 5 nights (298.86 booking) | £14.26 (base £237.18) |
+| Agoda channel collect 1 night £165 | £7.86 |
+| Agoda / Priceline hotel collect 2×£47.20 × 2 guests | £9.00 (base £149.84) |
 | HWL listed £181.45 / 3 nights | £9.07 |
 | HWL balance+commission Kyra | £4.70 |
 | HWL partial eligibility | £5.88 |
@@ -408,22 +438,25 @@ Run: `mvn test -Dtest=EdinburghVisitorLevyBookingCriteriaTest`
 
 ## Known limitations & future work
 
-1. **BDC adjustments are log-only** for now — fixed channel total requires coordinated EVL/VAT/room-rate changes.
-2. **HWL** uses aggregate 5% on prorated listed price, not per-night BDC-style rounding.
-3. **BDC guest count** relies on `detailed_rates.adults/kids` or reservation guest count — verify when Cloudbeds sends `adults:0`.
-4. **BDC VAT-on-levy** is inside the 6% EVL line; room VAT is a separate folio line. Council remittance = EVL ÷ 1.2.
-5. **5-night cap** on BDC: BDC attributes levy for whole stay; manual refund + our job correction.
+1. **Inclusive-tax OTA adjustments are log-only** (BDC, Agoda, Agoda / Priceline) — fixed channel total requires coordinated EVL/VAT/room-rate changes.
+2. **HWL** uses aggregate 5% on prorated listed price, not per-night inclusive-OTA rounding.
+3. **Inclusive OTA guest count** relies on `detailed_rates.adults/kids` or reservation guest count — verify when Cloudbeds sends `adults:0`.
+4. **Inclusive OTA VAT-on-levy** is inside the 6% EVL line; room VAT is a separate folio line. Council remittance = EVL ÷ 1.2.
+5. **5-night cap** on inclusive OTAs: channel may attribute levy for whole stay; manual refund + our job logs discrepancy.
 6. **PaymentProcessorService** `paidValue > 0` early return — may need revisiting for partial payments.
+7. **Per-property tax labels** — inclusive EVL name may differ (e.g. RMB vs HSH); verify Cloudbeds and set `evl.tax.inclusive.label` per profile if needed.
 
 ---
 
-## Quick reference: which tax ID when adjusting
+## Quick reference: which tax when adjusting
 
 ```java
 EdinburghVisitorLevyCalculator.useInclusiveTax(reservation)
-// true  → "Edinburgh Visitor Levy (Inclusive)" → BDC
-// false → "Edinburgh Visitor Levy 2026"       → direct, HWL, walk-in
+// true  → inclusive label (evl.tax.inclusive.label) → BDC, Agoda, Agoda / Priceline
+// false → exclusive label (evl.tax.exclusive.label) → direct, HWL, walk-in
 ```
+
+Numeric `tax_*` IDs differ per property; the service resolves them via label at runtime.
 
 Current levy on folio:
 
