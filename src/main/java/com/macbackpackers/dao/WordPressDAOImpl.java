@@ -288,6 +288,23 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public boolean hasCalculateEdinburghVisitorLevyJobForReservation( String reservationId ) {
+        if ( StringUtils.isBlank( reservationId ) ) {
+            return false;
+        }
+        String sql = "SELECT COUNT(1) FROM wp_lh_jobs j "
+                + "  JOIN wp_lh_job_param p ON j.job_id = p.job_id "
+                + " WHERE j.classname = 'com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob' "
+                + "   AND p.name = 'reservation_id' "
+                + "   AND p.value = :reservationId "
+                + "   AND j.status IN ('submitted', 'processing', 'retry')";
+        Number count = (Number) em.createNativeQuery( sql )
+                .setParameter( "reservationId", reservationId )
+                .getSingleResult();
+        return count.longValue() > 0;
+    }
+
+    @Override
     public long getOutstandingJobCount() {
         return em.createQuery( "SELECT COUNT(1) FROM AbstractJob "
                 + "     WHERE status IN (:submittedStatus, :processingStatus)", Long.class )

@@ -175,6 +175,14 @@ public interface WordPressDAO {
     boolean hasRecentChargeNonRefundableJobForReservation( String reservationId, int hoursBack, Integer excludeJobId );
 
     /**
+     * Returns true if a pending {@code CalculateEdinburghVisitorLevyForBookingJob} already exists
+     * for the given reservation.
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    boolean hasCalculateEdinburghVisitorLevyJobForReservation( String reservationId );
+
+    /**
      * Returns the number of jobs at 'submitted' or 'processing'.
      * 
      * @return number of jobs

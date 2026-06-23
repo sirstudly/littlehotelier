@@ -21,6 +21,7 @@ import org.htmlunit.WebResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StreamUtils;
 
 import com.macbackpackers.exceptions.UnrecoverableFault;
 
@@ -112,7 +113,7 @@ public class DatatransImageDecoder {
         String url = imagePath.startsWith( "http" ) ? imagePath : DATATRANS_ORIGIN + imagePath;
         WebResponse response = webClient.getPage( url ).getWebResponse();
         try (InputStream inputStream = response.getContentAsStream()) {
-            return inputStream.readAllBytes();
+            return StreamUtils.copyToByteArray( inputStream );
         }
     }
 
@@ -182,7 +183,7 @@ public class DatatransImageDecoder {
                     LOGGER.warn( "Missing Datatrans digit template {}", resource );
                     continue;
                 }
-                digitTemplates.put( digit, toBinaryGrid( in.readAllBytes() ) );
+                digitTemplates.put( digit, toBinaryGrid( StreamUtils.copyToByteArray( in ) ) );
             }
             catch ( IOException e ) {
                 LOGGER.warn( "Unable to load Datatrans digit template {}", resource, e );

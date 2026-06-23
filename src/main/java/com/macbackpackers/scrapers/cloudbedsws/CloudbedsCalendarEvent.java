@@ -72,6 +72,10 @@ public class CloudbedsCalendarEvent {
         return get( "end_date" );
     }
 
+    public String getBookingDate() {
+        return get( "booking_date" );
+    }
+
     /** Room/bed id in the form {@code roomTypeId-bedId} (bed/unit {@code 0} when whole-room). */
     public String getRoomId() {
         return get( "room_id" );

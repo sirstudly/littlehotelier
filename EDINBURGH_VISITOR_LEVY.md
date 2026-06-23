@@ -53,11 +53,12 @@ The **adjustment job** compares `balance_details.tax_breakdown` to our calculate
 ## Architecture
 
 ```
-Jobs                          Service                         Calculator (pure)
+Jobs / WebSocket                 Service                         Calculator (pure)
 ─────────────────────────────────────────────────────────────────────────────
-CreateCalculate...Job  ──►    EdinburghVisitorLevyService  ──► EdinburghVisitorLevyCalculator
-Calculate...ForBookingJob         │ assess / apply
-Calculate...DryRunJob             │
+CreateCalculate...Job  ──►       EdinburghVisitorLevyService  ──► EdinburghVisitorLevyCalculator
+Calculate...ForBookingJob            │ assess / apply
+Calculate...DryRunJob                │
+Calculate...BookingEventListener ────┘  (real-time, on `booked` WS events)
                                   ▼
                             CloudbedsScraper
                               - getReservationRetry
@@ -73,9 +74,12 @@ Calculate...DryRunJob             │
 | `EdinburghVisitorLevyCalculator` | `services/EdinburghVisitorLevyCalculator.java` | Pure calculation; no I/O |
 | `EdinburghVisitorLevyService` | `services/EdinburghVisitorLevyService.java` | Orchestration, filtering, assess/apply |
 | `CalculateEdinburghVisitorLevyForBookingJob` | `jobs/` | Single reservation; posts adjustments |
-| `CreateCalculateEdinburghVisitorLevyForBookingJob` | `jobs/` | Fans out jobs for HWL or >5-night stays |
+| `CreateCalculateEdinburghVisitorLevyForBookingJob` | `jobs/` | Batch: fans out jobs for bookings needing correction |
 | `CalculateEdinburghVisitorLevyDryRunJob` | `jobs/` | Batch assess + log only |
+| `CalculateEdinburghVisitorLevyBookingEventListener` | `scrapers/cloudbedsws/` | Real-time: enqueues jobs on new `booked` WebSocket events |
+| `EdinburghVisitorLevyBookingCriteria` | `scrapers/cloudbedsws/` | Cheap eligibility for calendar `booked` events |
 | `EdinburghVisitorLevyCalculatorTest` | `test/.../` | Unit tests for calculator |
+| `EdinburghVisitorLevyBookingCriteriaTest` | `test/.../` | Unit tests for WebSocket eligibility |
 
 ### Related changes elsewhere
 
@@ -85,6 +89,9 @@ Calculate...DryRunJob             │
 | `CloudbedsScraper` | `resolveTaxIdByLabel`, `addVisitorLevyCharge`, `adjustVisitorLevyCharge` |
 | `CloudbedsJsonRequestFactory` | `createAddNewFeeOrTaxRequest`, `createAddNewAdjustRequest` |
 | `PaymentProcessorService` | Non-refundable charges use `getBalanceDueExcludingVisitorLevy()`; skips if already paid |
+| `CalculateEdinburghVisitorLevyBookingEventListener` | `@Component` `CloudbedsEventListener`; auto-registered via Spring `List<CloudbedsEventListener>` in `CloudbedsWebSocketService` |
+| `CloudbedsCalendarEvent` | `getBookingDate()` exposes `booking_date` from WebSocket payloads |
+| `WordPressDAO` | `hasCalculateEdinburghVisitorLevyJobForReservation()` — blocks enqueue only while a job is pending |
 
 ---
 
@@ -100,7 +107,7 @@ evl.stay.date.from=2026-07-24
 evl.booked.date.from=2025-10-01
 ```
 
-`evl.enabled` must be `true` for batch assessment and adjustment jobs to consider bookings. `EdinburghVisitorLevyService.isPotentiallyEligible()` returns `false` when disabled, so create/dry-run jobs and `requiresVisitorLevyAdjustment()` do nothing.
+`evl.enabled` must be `true` for batch assessment, adjustment jobs, and real-time WebSocket enqueueing to consider bookings. `EdinburghVisitorLevyService.isPotentiallyEligible()` returns `false` when disabled, so create/dry-run jobs and `requiresVisitorLevyAdjustment()` do nothing. The WebSocket listener uses the same flag via `isPotentiallyEligibleForNewBooking()`.
 
 ---
 
@@ -240,6 +247,53 @@ No Cloudbeds writes.
 
 ---
 
+## Real-time (WebSocket)
+
+When the processor runs in server mode (`RunProcessor.runInServerMode()`), `CloudbedsWebSocketService` maintains a calendar WebSocket connection and fans out incremental updates to all `CloudbedsEventListener` beans. See `CLOUDBEDS_WEBSOCKET_PROTOCOL.md` for payload shapes.
+
+### `CalculateEdinburghVisitorLevyBookingEventListener`
+
+Enqueues a `CalculateEdinburghVisitorLevyForBookingJob` as soon as a new booking appears on the calendar WebSocket — i.e. a row with `type=booked` (see `CloudbedsCalendarEvent.isReservationBooking()`). This covers both assigned `Events[]` rows and unassigned `NonAssignedReservations[]` rows.
+
+**Only `onUpdate` is handled.** The initial `on_migrate` snapshot is ignored so existing bookings are not processed when the monitor connects or reconnects (same pattern as `ChargeNonRefundableBookingEventListener`).
+
+#### Eligibility (cheap checks)
+
+Mirrors `EdinburghVisitorLevyService.isPotentiallyEligible()` using fields available on the calendar event, via `EdinburghVisitorLevyBookingCriteria.matchesNewBookingCalendarEvent()` / `EdinburghVisitorLevyService.isPotentiallyEligibleForNewBooking()`:
+
+| Check | Source on event |
+|---|---|
+| `evl.enabled=true` | property config |
+| `type=booked`, valid `booking_id` | `type`, `booking_id` |
+| Not canceled | `status` |
+| Booking date not exempt (≥ `evl.booked.date.from`) | `booking_date` |
+| Stay includes eligible nights (checkout after `evl.stay.date.from`) | `end_date` |
+
+If `booking_date` is absent, the booking-exempt check is skipped (same as when `Customer.getBookingDate()` is null). If `end_date` is absent, the stay-date check is skipped.
+
+The listener does **not** compare folio EVL before enqueueing — that happens inside `CalculateEdinburghVisitorLevyForBookingJob` (`processVisitorLevyForBooking`), which no-ops when levy is already correct.
+
+#### Deduplication
+
+| Layer | Behaviour |
+|---|---|
+| Same WebSocket batch | One job per `booking_id` per update (multiple room rows deduped) |
+| In-memory | `recentlyEnqueuedReservationIds` avoids duplicate inserts within the JVM session |
+| Database | `WordPressDAO.hasCalculateEdinburghVisitorLevyJobForReservation()` skips enqueue when a job for that reservation is already **pending** (`submitted`, `processing`, or `retry`) |
+
+There is **no cooldown** on completed or failed jobs — a subsequent `booked` event (e.g. after a room move) may enqueue a fresh job once the previous one has finished.
+
+#### Batch vs real-time
+
+| Path | When | Pre-enqueue filter |
+|---|---|---|
+| **WebSocket** (`CalculateEdinburghVisitorLevyBookingEventListener`) | New `booked` event | Cheap eligibility only |
+| **Batch** (`CreateCalculateEdinburghVisitorLevyForBookingJob`) | Scheduled booking-date range | Cheap eligibility **and** folio delta outside tolerance |
+
+Both paths enqueue the same `CalculateEdinburghVisitorLevyForBookingJob`, which loads the full reservation and applies or skips the adjustment.
+
+---
+
 ## Payment processing
 
 `PaymentProcessorService.chargeNonRefundableBooking()`:
@@ -338,6 +392,19 @@ BDC partner hub: [Edinburgh Visitor Levy](https://partner.booking.com/en-gb/help
 Test helper `reservationWithRates()` clears `channelPriceListed/Balance/Commission` to avoid stale fixture data.
 
 Run: `mvn test -Dtest=EdinburghVisitorLevyCalculatorTest`
+
+`EdinburghVisitorLevyBookingCriteriaTest` — WebSocket eligibility:
+
+| Test | Expected |
+|---|---|
+| `booked` + eligible dates, `evl.enabled=true` | match |
+| `evl.enabled=false` | no match |
+| Canceled | no match |
+| Booking date before Oct 2025 | no match |
+| Checkout on levy start date (no eligible nights) | no match |
+| `blocked_dates` | no match |
+
+Run: `mvn test -Dtest=EdinburghVisitorLevyBookingCriteriaTest`
 
 ---
 

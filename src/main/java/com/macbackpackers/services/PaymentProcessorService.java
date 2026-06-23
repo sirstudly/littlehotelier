@@ -291,7 +291,7 @@ public class PaymentProcessorService {
      * @param excludeJobId when called from {@code ChargeNonRefundableBookingJob}, pass the current
      *            job id so this run is not treated as a duplicate of itself
      */
-    public void chargeNonRefundableBooking( WebClient webClient, String reservationId, Integer excludeJobId )
+    public synchronized void chargeNonRefundableBooking( WebClient webClient, String reservationId, Integer excludeJobId )
             throws Exception {
         if ( wordpressDAO.hasRecentChargeNonRefundableJobForReservation( reservationId,
                 WordPressDAO.NON_REFUNDABLE_CHARGE_COOLDOWN_HOURS, excludeJobId ) ) {

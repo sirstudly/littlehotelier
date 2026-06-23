@@ -13,6 +13,7 @@ import com.macbackpackers.SecretsManagerTestApp;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.ArchiveAllTransactionNotesJob;
 import com.macbackpackers.jobs.BedCountReportJob;
+import com.macbackpackers.jobs.CreateCalculateEdinburghVisitorLevyForBookingJob;
 import com.macbackpackers.jobs.CreatePrepaidRefundJob;
 import com.macbackpackers.jobs.PrepaidRefundJob;
 import com.macbackpackers.utils.AnyByteStringToStringConverter;
@@ -606,17 +607,37 @@ public class ProcessorServiceTest {
         jobToRun.processJob();
     }
 
-//    @Test
-//    public void testCreateConnectToCalendarWSSJob() throws Exception {
-//        ConnectToCalendarWSSJob j = new ConnectToCalendarWSSJob();
-//        j.setStatus( JobStatus.submitted );
-//        dao.insertJob( j );
-//    }
-//
-//    @Test
-//    public void testLoadCloudbedsCalendarJob() throws Exception {
-//        LoadCloudbedsCalendarJob j = new LoadCloudbedsCalendarJob();
-//        j.setStatus( JobStatus.submitted );
-//        dao.insertJob( j );
-//    }
+    @Test
+    public void testCreateCalculateEdinburghVisitorLevyForBookingJob() throws Exception {
+        CreateCalculateEdinburghVisitorLevyForBookingJob j = new CreateCalculateEdinburghVisitorLevyForBookingJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingDateStart( LocalDate.parse( "2026-02-01" ) );
+        j.setBookingDateEnd( LocalDate.parse( "2026-03-31" ) );
+        dao.insertJob( j );
+
+        j = new CreateCalculateEdinburghVisitorLevyForBookingJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingDateStart( LocalDate.parse( "2026-04-01" ) );
+        j.setBookingDateEnd( LocalDate.parse( "2026-05-31" ) );
+        dao.insertJob( j );
+
+        j = new CreateCalculateEdinburghVisitorLevyForBookingJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingDateStart( LocalDate.parse( "2026-06-01" ) );
+        j.setBookingDateEnd( LocalDate.parse( "2026-06-08" ) );
+        dao.insertJob( j );
+
+        j = new CreateCalculateEdinburghVisitorLevyForBookingJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingDateStart( LocalDate.parse( "2026-06-09" ) );
+        j.setBookingDateEnd( LocalDate.parse( "2026-06-16" ) );
+        dao.insertJob( j );
+
+        j = new CreateCalculateEdinburghVisitorLevyForBookingJob();
+        j.setStatus( JobStatus.submitted );
+        j.setBookingDateStart( LocalDate.parse( "2026-06-17" ) );
+        j.setBookingDateEnd( LocalDate.parse( "2026-06-24" ) );
+        dao.insertJob( j );
+    }
+
 }

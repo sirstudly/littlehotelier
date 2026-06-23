@@ -20,6 +20,8 @@ import com.google.gson.Gson;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.scrapers.CloudbedsScraper;
+import com.macbackpackers.scrapers.cloudbedsws.CloudbedsCalendarEvent;
+import com.macbackpackers.scrapers.cloudbedsws.EdinburghVisitorLevyBookingCriteria;
 import com.macbackpackers.services.EdinburghVisitorLevyCalculator.LevyCalculation;
 
 @Service
@@ -144,6 +146,15 @@ public class EdinburghVisitorLevyService {
     }
 
     /**
+     * Cheap eligibility check for a new {@code booked} calendar WebSocket event, mirroring
+     * {@link #isPotentiallyEligible(Customer)} using fields available on the event.
+     */
+    public boolean isPotentiallyEligibleForNewBooking( CloudbedsCalendarEvent event ) {
+        return EdinburghVisitorLevyBookingCriteria.matchesNewBookingCalendarEvent(
+                event, evlEnabled, getStayDateFrom(), getBookedDateFrom() );
+    }
+
+    /**
      * Cheap eligibility checks first, then loads the reservation and compares expected vs folio EVL.
      */
     public boolean requiresVisitorLevyAdjustment( WebClient webClient, Customer customer ) throws IOException {
@@ -186,7 +197,7 @@ public class EdinburghVisitorLevyService {
         return new LevyAssessment( reservation.getReservationId(), calculation, currentLevy, expectedLevy, delta );
     }
 
-    public void processVisitorLevyForBooking( WebClient webClient, String reservationId ) throws IOException {
+    public synchronized void processVisitorLevyForBooking( WebClient webClient, String reservationId ) throws IOException {
         Reservation reservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
         LevyAssessment assessment = assessVisitorLevy( reservation );
 
