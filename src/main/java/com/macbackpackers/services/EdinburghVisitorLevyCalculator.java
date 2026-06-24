@@ -202,7 +202,7 @@ public final class EdinburghVisitorLevyCalculator {
                     continue;
                 }
                 BigDecimal rate = rateLine.get( "rate" ).getAsBigDecimal();
-                int guestCount = resolveGuestCount( rateLine, reservation );
+                int guestCount = resolveGuestCount( rateLine, bookingRoom, reservation );
                 personNightRates.add( new PersonNightRate( date, rate, guestCount ) );
             }
         }
@@ -220,15 +220,30 @@ public final class EdinburghVisitorLevyCalculator {
                 .collect( Collectors.toList() );
     }
 
-    static int resolveGuestCount( JsonObject rateLine, Reservation reservation ) {
+    static int resolveGuestCount( JsonObject rateLine, BookingRoom bookingRoom, Reservation reservation ) {
         int adults = rateLine.has( "adults" ) ? rateLine.get( "adults" ).getAsInt() : 0;
         int kids = rateLine.has( "kids" ) ? rateLine.get( "kids" ).getAsInt() : 0;
         int guestsOnLine = adults + kids;
         if ( guestsOnLine > 0 ) {
             return guestsOnLine;
         }
-        int reservationGuests = reservation.getNumberOfGuests();
-        return reservationGuests > 0 ? reservationGuests : 1;
+        int roomGuests = bookingRoom.getGuestCount();
+        if ( roomGuests > 0 ) {
+            if ( reservation.getBookingRooms() != null && reservation.getBookingRooms().size() == 1 ) {
+                int reservationGuests = reservation.getNumberOfGuests();
+                if ( reservationGuests > roomGuests ) {
+                    return reservationGuests;
+                }
+            }
+            return roomGuests;
+        }
+        if ( reservation.getBookingRooms() != null && reservation.getBookingRooms().size() == 1 ) {
+            int reservationGuests = reservation.getNumberOfGuests();
+            if ( reservationGuests > 0 ) {
+                return reservationGuests;
+            }
+        }
+        return 1;
     }
 
     static BigDecimal resolveHostelworldPriceListed( Reservation reservation ) {

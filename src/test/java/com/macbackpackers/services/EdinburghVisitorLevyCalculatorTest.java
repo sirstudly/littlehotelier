@@ -16,6 +16,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.cloudbeds.responses.BalanceDetails;
+import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TaxBreakdownItem;
 import com.macbackpackers.services.EdinburghVisitorLevyCalculator.LevyCalculation;
@@ -318,6 +319,53 @@ public class EdinburghVisitorLevyCalculatorTest {
     }
 
     @Test
+    public void testBookingDotComSingleRoomFallsBackToReservationGuestCount() {
+        Reservation reservation = reservationWithRates(
+                "Booking.com", "2026-10-01", "2026-10-03", "2025-11-01",
+                rateLine( "2026-10-01", "47.20", 0 ),
+                rateLine( "2026-10-02", "47.20", 0 ) );
+        reservation.setAdultsNumber( 2 );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "9.00" ) ) );
+    }
+
+    @Test
+    public void testBookingDotComMultiRoomUsesOneGuestPerBedNotReservationTotal() {
+        String detailedRates = "[" + String.join( ",",
+                rateLine( "2026-08-24", "52.16", 0 ),
+                rateLine( "2026-08-25", "52.16", 0 ) ) + "]";
+        Reservation reservation = gson.fromJson( gson.toJson( baseReservation ), Reservation.class );
+        reservation.setSourceName( "Booking.com" );
+        reservation.setCheckinDate( "2026-08-24" );
+        reservation.setCheckoutDate( "2026-08-26" );
+        reservation.setBookingDateHotelTime( "2026-06-21 12:00:00" );
+        reservation.setStatus( "confirmed" );
+        reservation.setAdultsNumber( 5 );
+
+        BookingRoom template = reservation.getBookingRooms().get( 0 );
+        template.setDetailedRates( detailedRates );
+        template.setAdults( 1 );
+        template.setKids( 0 );
+        reservation.setBookingRooms( Arrays.asList(
+                copyBookingRoom( template, "1" ),
+                copyBookingRoom( template, "2" ),
+                copyBookingRoom( template, "3" ),
+                copyBookingRoom( template, "4" ),
+                copyBookingRoom( template, "5" ) ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "24.80" ) ) );
+        assertThat( EdinburghVisitorLevyCalculator.calculateExpectedBdcRoomVat(
+                        reservation, gson, STAY_DATE_FROM ),
+                comparesEqualTo( new BigDecimal( "82.80" ) ) );
+    }
+
+    @Test
     public void testHasEligibleStayDates() {
         assertThat( EdinburghVisitorLevyCalculator.hasEligibleStayDates(
                 LocalDate.of( 2026, 7, 24 ), STAY_DATE_FROM ), is( false ) );
@@ -347,5 +395,11 @@ public class EdinburghVisitorLevyCalculatorTest {
 
     private String rateLine( String date, String rate, int adults ) {
         return String.format( "{\"date\":\"%s\",\"rate\":%s,\"adults\":%d,\"kids\":0}", date, rate, adults );
+    }
+
+    private BookingRoom copyBookingRoom( BookingRoom template, String suffix ) {
+        BookingRoom room = gson.fromJson( gson.toJson( template ), BookingRoom.class );
+        room.setRoomIdentifier( template.getRoomIdentifier() + "-" + suffix );
+        return room;
     }
 }

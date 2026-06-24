@@ -3,6 +3,8 @@ package com.macbackpackers.beans.cloudbeds.responses;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
+import com.google.gson.annotations.SerializedName;
+
 /**
  * Essentially an "allocation" for a specific reservation. Each reservation may have one or more of
  * these.
@@ -23,6 +25,10 @@ public class BookingRoom {
     private String detailedRates;
     private String rateId;
     private String guestId;
+    @SerializedName( "adults" )
+    private Integer adults;
+    @SerializedName( "kids" )
+    private Integer kids;
 
     public String getId() {
         return id;
@@ -126,6 +132,26 @@ public class BookingRoom {
 
     public void setGuestId( String guestId ) {
         this.guestId = guestId;
+    }
+
+    public Integer getAdults() {
+        return adults;
+    }
+
+    public void setAdults( Integer adults ) {
+        this.adults = adults;
+    }
+
+    public Integer getKids() {
+        return kids;
+    }
+
+    public void setKids( Integer kids ) {
+        this.kids = kids;
+    }
+
+    public int getGuestCount() {
+        return (adults == null ? 0 : adults) + (kids == null ? 0 : kids);
     }
 
     @Override
