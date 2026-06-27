@@ -927,8 +927,8 @@ public class CloudbedsScraper {
     public void chargeCardForBooking( WebClient webClient, Reservation res, BigDecimal amount )
             throws IOException, PaymentPendingException, RecordPaymentFailedException {
         LOGGER.info( "Begin PROCESS CHARGE for reservation " + res.getReservationId()  + " for " + getCurrencyFormat().format( amount ) );
-        WebRequest requestSettings = jsonRequestFactory.createAddNewProcessPaymentRequest( res.getReservationId(), res.getBookingRooms().get( 0 ).getId(),
-                res.getCreditCardId(), amount, "Autocharging -RONBOT", getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        WebRequest requestSettings = jsonRequestFactory.createAddNewProcessPaymentRequest( res.getBookingRooms().get( 0 ).getId(),
+                res.getCreditCardId(), amount, "Autocharging -RONBOT" );
         doRequest( webClient, requestSettings, AddPaymentResponse.class,
                 (resp, jsonResp) -> {
                     // 2021-03-19: success when charge from Stripe is incomplete??

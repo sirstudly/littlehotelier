@@ -844,41 +844,30 @@ public class CloudbedsJsonRequestFactory {
     
     /**
      * Processes a new payment onto an existing reservation with the current active card.
-     * 
-     * @param reservationId ID of reservation (as it appears in the URL)
-     * @param bookingRoomId (which "room" we're booking the payment to)
+     * Uses the next-gen folio payload ({@code isNextGenPayload: true}) recorded from mfd-folio.
+     *
+     * @param bookingRoomId which reservation room the payment is allocated to
      * @param cardId active card to charge
      * @param amount amount to record
-     * @param description description
-     * @param billingPortalId
-     * @param frontVersion
+     * @param description payment description
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createAddNewProcessPaymentRequest( String reservationId, String bookingRoomId, String cardId, BigDecimal amount,
-            String description, String billingPortalId, String frontVersion ) throws IOException {
+    public WebRequest createAddNewProcessPaymentRequest( String bookingRoomId, String cardId, BigDecimal amount,
+            String description ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
+        webRequest.setAdditionalHeader( "Accept", "application/json, text/plain, */*" );
+        webRequest.setAdditionalHeader( "X-Property-Id", getPropertyId() );
         String paymentJson = IOUtils.toString( getClass().getClassLoader()
                 .getResourceAsStream( "add_payment_data.json" ), StandardCharsets.UTF_8 )
                 .replaceAll( "__PROPERTY_ID__", getPropertyId() )
                 .replaceAll( "__PAYMENT_AMOUNT__", CURRENCY_FORMAT.format( amount ) )
                 .replaceAll( "__CREDIT_CARD_ID__", cardId )
-                .replaceAll( "__DESCRIPTION__", description )
-                .replaceAll( "__TRANSACTION_DATE__", LocalDate.now().format( YYYY_MM_DD ) )
-                .replaceAll( "__BOOKING_ID__", reservationId )
-                .replaceAll( "__ROOM_ID__", bookingRoomId );
+                .replaceAll( "__DESCRIPTION__", description );
         webRequest.setRequestParameters( Arrays.asList(
                 new NameValuePair( "payment", paymentJson ),
-                new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation_room\",\"id\":\"%s\"}", bookingRoomId ) ),
-                new NameValuePair( "suppress_client_errors", "true" ),
-                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
-                new NameValuePair( "billing_portal_id", billingPortalId ),
-                new NameValuePair( "is_bp_setup_completed", "1" ),
-                new NameValuePair( "announcementsLast", "" ),
                 new NameValuePair( "property_id", getPropertyId() ),
-                new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "frontVersion", frontVersion ),
-                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+                new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation_room\",\"id\":\"%s\"}", bookingRoomId ) ) ) );
         return webRequest;
     }
     
