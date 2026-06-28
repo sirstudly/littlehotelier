@@ -130,7 +130,7 @@ evl.tax.inclusive.label=Edinburgh Visitor Levy 2026 (Inclusive)
 evl.stay.date.from=2026-07-24
 ```
 
-`evl.enabled` must be `true` for batch assessment, adjustment jobs, and real-time WebSocket enqueueing to consider bookings. `EdinburghVisitorLevyService.isPotentiallyEligible()` returns `false` when disabled, so create/dry-run jobs and `requiresVisitorLevyAdjustment()` do nothing. The WebSocket listener uses the same flag via `isPotentiallyEligibleForNewBooking()`.
+`evl.enabled` must be `true` for batch assessment, adjustment jobs, and real-time WebSocket enqueueing to consider bookings. When disabled, create/dry-run jobs and the WebSocket listener (`isPotentiallyEligibleForNewBooking()`) do nothing.
 
 All bookings in Cloudbeds were created after the statutory booking cutoff (Oct 2025); the codebase does not apply booking-date exemption checks.
 
@@ -253,7 +253,7 @@ Queries active bookings (`confirmed,not_confirmed`) in range, applies cheap elig
 |---|---|
 | Potentially eligible (`evl.enabled`, has eligible stay dates) **and** `expectedLevy − currentLevy` outside tolerance | Folio EVL needs correction |
 
-Excludes: `evl.enabled=false`, no eligible stay dates, levy already correct (within £0.01).
+Excludes: `evl.enabled=false`, no eligible stay dates, levy already correct (within £0.01), **inclusive-tax bookings** (`Booking.com`, Agoda / Priceline — no adjustment job is created because channel totals are fixed; see [Adjustment job flow](#adjustment-job-flow)).
 
 Creates one `CalculateEdinburghVisitorLevyForBookingJob` per reservation (`reservation_id`) that needs adjustment only — no no-op jobs.
 
@@ -291,11 +291,14 @@ Mirrors `EdinburghVisitorLevyService.isPotentiallyEligible()` using fields avail
 | Check | Source on event |
 |---|---|
 | `evl.enabled=true` | property config |
+| Not inclusive-tax (BDC, Agoda / Priceline) | `booking_source` (numeric sub-source id or source name) |
 | `type=booked`, valid `booking_id` | `type`, `booking_id` |
 | Not canceled | `status` |
 | Stay includes eligible nights (checkout after `evl.stay.date.from`) | `end_date` |
 
 If `end_date` is absent, the stay-date check is skipped.
+
+Inclusive-tax sub-source ids are resolved from Cloudbeds via `CloudbedsScraper.lookupInclusiveTaxSubSourceIds()` (Guava cache, 24-hour TTL per property).
 
 The listener does **not** compare folio EVL before enqueueing — that happens inside `CalculateEdinburghVisitorLevyForBookingJob` (`processVisitorLevyForBooking`), which no-ops when levy is already correct.
 
@@ -313,10 +316,10 @@ There is **no cooldown** on completed or failed jobs — a subsequent `booked` e
 
 | Path | When | Pre-enqueue filter |
 |---|---|---|
-| **WebSocket** (`CalculateEdinburghVisitorLevyBookingEventListener`) | New `booked` event | Cheap eligibility only |
-| **Batch** (`CreateCalculateEdinburghVisitorLevyForBookingJob`) | Scheduled booking-date range | Cheap eligibility **and** folio delta outside tolerance |
+| **WebSocket** (`CalculateEdinburghVisitorLevyBookingEventListener`) | New `booked` event | Cheap eligibility only (excludes inclusive-tax sources) |
+| **Batch** (`CreateCalculateEdinburghVisitorLevyForBookingJob`) | Scheduled booking-date range | Cheap eligibility **and** folio delta outside tolerance (excludes inclusive-tax sources) |
 
-Both paths enqueue the same `CalculateEdinburghVisitorLevyForBookingJob`, which loads the full reservation and applies or skips the adjustment.
+Both paths enqueue the same `CalculateEdinburghVisitorLevyForBookingJob` for exclusive-tax sources only. Inclusive-tax bookings (BDC, Agoda / Priceline) are excluded at enqueue time — no job is created because adjustments cannot be applied without coordinated EVL/VAT/room-rate changes.
 
 ---
 

@@ -6,7 +6,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import org.htmlunit.WebClient;
 import org.slf4j.Logger;
@@ -147,22 +149,20 @@ public class EdinburghVisitorLevyService {
      * {@link #isPotentiallyEligible(Customer)} using fields available on the event.
      */
     public boolean isPotentiallyEligibleForNewBooking( CloudbedsCalendarEvent event ) {
-        return EdinburghVisitorLevyBookingCriteria.matchesNewBookingCalendarEvent(
-                event, evlEnabled, getStayDateFrom() );
+        return isPotentiallyEligibleForNewBooking( event, Collections.emptySet() );
     }
 
-    /**
-     * Cheap eligibility checks first, then loads the reservation and compares expected vs folio EVL.
-     */
-    public boolean requiresVisitorLevyAdjustment( WebClient webClient, Customer customer ) throws IOException {
-        if ( false == isPotentiallyEligible( customer ) ) {
-            return false;
-        }
-        return assessVisitorLevyForBooking( webClient, customer.getId() ).needsAdjustment();
+    public boolean isPotentiallyEligibleForNewBooking( CloudbedsCalendarEvent event,
+            Set<String> inclusiveTaxSubSourceIds ) {
+        return EdinburghVisitorLevyBookingCriteria.matchesNewBookingCalendarEvent(
+                event, evlEnabled, getStayDateFrom(), inclusiveTaxSubSourceIds );
     }
 
     private boolean isPotentiallyEligible( Customer customer ) {
         if ( false == evlEnabled ) {
+            return false;
+        }
+        if ( EdinburghVisitorLevyBookingCriteria.isInclusiveTaxSourceName( customer.getSourceName() ) ) {
             return false;
         }
         if ( customer.getCheckoutDate() != null

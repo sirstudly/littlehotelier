@@ -1,19 +1,24 @@
 
 package com.macbackpackers.scrapers.cloudbedsws;
 
+import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.htmlunit.WebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob;
+import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.services.EdinburghVisitorLevyService;
 
 /**
@@ -36,6 +41,12 @@ public class CalculateEdinburghVisitorLevyBookingEventListener implements Cloudb
     @Autowired
     private EdinburghVisitorLevyService edinburghVisitorLevyService;
 
+    @Autowired
+    private CloudbedsScraper cloudbedsScraper;
+
+    @Autowired
+    private ApplicationContext context;
+
     /** Avoid duplicate inserts when Cloudbeds sends multiple room rows for one booking. */
     private final Set<String> recentlyEnqueuedReservationIds = ConcurrentHashMap.newKeySet();
 
@@ -57,9 +68,10 @@ public class CalculateEdinburghVisitorLevyBookingEventListener implements Cloudb
             return;
         }
 
+        Set<String> inclusiveTaxSources = getInclusiveTaxSubSourceIds();
         Set<String> reservationIdsSeenInBatch = new HashSet<>();
         for ( CloudbedsCalendarEvent event : events ) {
-            if ( false == edinburghVisitorLevyService.isPotentiallyEligibleForNewBooking( event ) ) {
+            if ( false == edinburghVisitorLevyService.isPotentiallyEligibleForNewBooking( event, inclusiveTaxSources ) ) {
                 continue;
             }
             String reservationId = event.getBookingId();
@@ -87,5 +99,15 @@ public class CalculateEdinburghVisitorLevyBookingEventListener implements Cloudb
         job.setReservationId( reservationId );
         dao.insertJob( job );
         recentlyEnqueuedReservationIds.add( reservationId );
+    }
+
+    private Set<String> getInclusiveTaxSubSourceIds() {
+        try ( WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            return cloudbedsScraper.lookupInclusiveTaxSubSourceIds( webClient );
+        }
+        catch ( IOException e ) {
+            LOGGER.error( "Unable to resolve inclusive-tax booking-source ids: {}", e.getMessage() );
+            return Collections.emptySet();
+        }
     }
 }

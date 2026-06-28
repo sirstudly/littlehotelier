@@ -45,11 +45,6 @@ public class ChargeNonRefundableBookingEventListener implements CloudbedsEventLi
     /** Avoid duplicate inserts when Cloudbeds sends multiple room rows for one booking. */
     private final Set<String> recentlyEnqueuedReservationIds = ConcurrentHashMap.newKeySet();
 
-    private volatile Set<String> eligibleSubSourceIds = Collections.emptySet();
-    private volatile long eligibleSubSourceIdsLoadedAt;
-
-    private static final long SOURCE_LOOKUP_TTL_MS = 24L * 60L * 60L * 1000L;
-
     @Override
     public void onSnapshot( String propertyId, List<CloudbedsCalendarEvent> events ) {
         // intentionally ignored: only react to live booking changes, not the bulk snapshot
@@ -60,10 +55,10 @@ public class ChargeNonRefundableBookingEventListener implements CloudbedsEventLi
         if ( update == null ) {
             return;
         }
-        processReservationEvents( propertyId, update.getAllReservationEvents() );
+        processReservationEvents( update.getAllReservationEvents() );
     }
 
-    private void processReservationEvents( String propertyId, List<CloudbedsCalendarEvent> events ) {
+    private void processReservationEvents( List<CloudbedsCalendarEvent> events ) {
         if ( events == null || events.isEmpty() ) {
             return;
         }
@@ -107,26 +102,12 @@ public class ChargeNonRefundableBookingEventListener implements CloudbedsEventLi
     }
 
     private Set<String> getEligibleSubSourceIds() {
-        long now = System.currentTimeMillis();
-        if ( false == eligibleSubSourceIds.isEmpty() && now - eligibleSubSourceIdsLoadedAt < SOURCE_LOOKUP_TTL_MS ) {
-            return eligibleSubSourceIds;
+        try ( WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            return cloudbedsScraper.lookupNonRefundableSubSourceIds( webClient );
         }
-        synchronized ( this ) {
-            now = System.currentTimeMillis();
-            if ( false == eligibleSubSourceIds.isEmpty() && now - eligibleSubSourceIdsLoadedAt < SOURCE_LOOKUP_TTL_MS ) {
-                return eligibleSubSourceIds;
-            }
-            try ( WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class ) ) {
-                String lookup = cloudbedsScraper.lookupBookingSourceIds( webClient,
-                        NonRefundableBookingCriteria.ELIGIBLE_SOURCE_NAMES );
-                eligibleSubSourceIds = NonRefundableBookingCriteria.parseSubSourceIds( lookup );
-                eligibleSubSourceIdsLoadedAt = now;
-                LOGGER.info( "Resolved eligible non-refundable booking sub-source ids: {}", eligibleSubSourceIds );
-            }
-            catch ( IOException e ) {
-                LOGGER.warn( "Unable to resolve eligible booking-source ids: {}", e.getMessage() );
-            }
-            return eligibleSubSourceIds;
+        catch ( IOException e ) {
+            LOGGER.warn( "Unable to resolve eligible booking-source ids: {}", e.getMessage() );
+            return Collections.emptySet();
         }
     }
 }

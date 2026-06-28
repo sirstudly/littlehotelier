@@ -26,6 +26,8 @@ import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.exceptions.PaymentPendingException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.scrapers.cloudbedsws.EdinburghVisitorLevyBookingCriteria;
+import com.macbackpackers.scrapers.cloudbedsws.NonRefundableBookingCriteria;
 import org.apache.commons.lang3.StringUtils;
 import org.htmlunit.Page;
 import org.htmlunit.WebClient;
@@ -47,11 +49,13 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -88,6 +92,9 @@ public class CloudbedsScraper {
     /** Expire email template cache entries after this many minutes without access. */
     private static final long EMAIL_TEMPLATE_CACHE_TIMEOUT_MINUTES = 5;
 
+    /** Expire booking sub-source id cache entries after this many hours. */
+    private static final long BOOKING_SUB_SOURCE_CACHE_HOURS = 24;
+
     // the last result of getPropertyContent() as it's an expensive operation; refreshed after cache timeout
     private static volatile JsonObject propertyContent;
     private static volatile long propertyContentLoadedAtMs;
@@ -100,6 +107,24 @@ public class CloudbedsScraper {
             .build( new CacheLoader<String, EmailTemplateInfo>() {
                 @Override
                 public EmailTemplateInfo load( String templateId ) {
+                    throw new UnsupportedOperationException( "Not used." ); // logic defined in get(key, Callable)
+                }
+            } );
+
+    private static final LoadingCache<String, Set<String>> inclusiveTaxSubSourceIdCache = CacheBuilder.newBuilder()
+            .expireAfterWrite( BOOKING_SUB_SOURCE_CACHE_HOURS, TimeUnit.HOURS )
+            .build( new CacheLoader<String, Set<String>>() {
+                @Override
+                public Set<String> load( String propertyId ) {
+                    throw new UnsupportedOperationException( "Not used." ); // logic defined in get(key, Callable)
+                }
+            } );
+
+    private static final LoadingCache<String, Set<String>> nonRefundableSubSourceIdCache = CacheBuilder.newBuilder()
+            .expireAfterWrite( BOOKING_SUB_SOURCE_CACHE_HOURS, TimeUnit.HOURS )
+            .build( new CacheLoader<String, Set<String>>() {
+                @Override
+                public Set<String> load( String propertyId ) {
                     throw new UnsupportedOperationException( "Not used." ); // logic defined in get(key, Callable)
                 }
             } );
@@ -819,6 +844,56 @@ public class CloudbedsScraper {
             throw new IOException( "Unable to find sources for " + Arrays.toString( sourceNames ) );
         }
         return sourceIds.stream().collect( Collectors.joining( "," ) );
+    }
+
+    /**
+     * Returns cached calendar WebSocket sub-source ids for BDC and Agoda / Priceline (inclusive tax).
+     *
+     * @param webClient web client instance to use
+     * @return non-null, unmodifiable set of sub-source ids (middle segment of {@code data-source-id})
+     * @throws IOException on lookup failure
+     */
+    public Set<String> lookupInclusiveTaxSubSourceIds( WebClient webClient ) throws IOException {
+        try {
+            return inclusiveTaxSubSourceIdCache.get( getPropertyId(), new Callable<Set<String>>() {
+                @Override
+                public Set<String> call() throws Exception {
+                    String lookup = lookupBookingSourceIds( webClient,
+                            EdinburghVisitorLevyBookingCriteria.INCLUSIVE_TAX_SOURCE_NAMES );
+                    Set<String> ids = NonRefundableBookingCriteria.parseSubSourceIds( lookup );
+                    LOGGER.info( "Resolved inclusive-tax booking sub-source ids: {}", ids );
+                    return Collections.unmodifiableSet( ids );
+                }
+            } );
+        }
+        catch ( ExecutionException ex ) {
+            throw new IOException( ex );
+        }
+    }
+
+    /**
+     * Returns cached calendar WebSocket sub-source ids for non-refundable hotel-collect OTAs.
+     *
+     * @param webClient web client instance to use
+     * @return non-null, unmodifiable set of sub-source ids (middle segment of {@code data-source-id})
+     * @throws IOException on lookup failure
+     */
+    public Set<String> lookupNonRefundableSubSourceIds( WebClient webClient ) throws IOException {
+        try {
+            return nonRefundableSubSourceIdCache.get( getPropertyId(), new Callable<Set<String>>() {
+                @Override
+                public Set<String> call() throws Exception {
+                    String lookup = lookupBookingSourceIds( webClient,
+                            NonRefundableBookingCriteria.ELIGIBLE_SOURCE_NAMES );
+                    Set<String> ids = NonRefundableBookingCriteria.parseSubSourceIds( lookup );
+                    LOGGER.info( "Resolved eligible non-refundable booking sub-source ids: {}", ids );
+                    return Collections.unmodifiableSet( ids );
+                }
+            } );
+        }
+        catch ( ExecutionException ex ) {
+            throw new IOException( ex );
+        }
     }
     
     /**

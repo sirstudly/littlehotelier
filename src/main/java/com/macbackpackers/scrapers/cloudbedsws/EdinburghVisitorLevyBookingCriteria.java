@@ -2,6 +2,8 @@
 package com.macbackpackers.scrapers.cloudbedsws;
 
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -14,8 +16,46 @@ import com.macbackpackers.services.EdinburghVisitorLevyCalculator;
  */
 public final class EdinburghVisitorLevyBookingCriteria {
 
+    /** Exact Cloudbeds source names for BDC and Agoda / Priceline (inclusive tax). */
+    public static final String[] INCLUSIVE_TAX_SOURCE_NAMES = {
+            "Booking.com (Hotel Collect Booking)",
+            "Booking.com (Channel Collect Booking)",
+            "Agoda (Hotel Collect Booking)",
+            "Agoda (Channel Collect Booking)",
+            "Agoda / Priceline (Hotel Collect Booking)",
+            "Agoda / Priceline (Channel Collect Booking)"
+    };
+
     private EdinburghVisitorLevyBookingCriteria() {
         // utility class
+    }
+
+    /**
+     * Returns true when the source name indicates an inclusive-tax OTA booking (BDC or Agoda /
+     * Priceline), matching {@code Reservation#isInclusiveTaxBooking()}.
+     */
+    public static boolean isInclusiveTaxSourceName( String sourceName ) {
+        return sourceName != null
+                && ( sourceName.startsWith( "Booking.com" ) || sourceName.startsWith( "Agoda" ) );
+    }
+
+    /**
+     * Returns true when a calendar event is from an inclusive-tax OTA. {@code booking_source} is
+     * usually a numeric sub-source id on WebSocket events; it may also be a source name string.
+     */
+    public static boolean isInclusiveTaxCalendarEvent( CloudbedsCalendarEvent event,
+            Set<String> inclusiveTaxSubSourceIds ) {
+        if ( event == null ) {
+            return false;
+        }
+        String bookingSource = event.getBookingSource();
+        if ( StringUtils.isBlank( bookingSource ) ) {
+            return false;
+        }
+        if ( isInclusiveTaxSourceName( bookingSource ) ) {
+            return true;
+        }
+        return inclusiveTaxSubSourceIds != null && inclusiveTaxSubSourceIds.contains( bookingSource );
     }
 
     /**
@@ -27,6 +67,11 @@ public final class EdinburghVisitorLevyBookingCriteria {
      */
     public static boolean matchesNewBookingCalendarEvent( CloudbedsCalendarEvent event,
             boolean evlEnabled, LocalDate stayDateFrom ) {
+        return matchesNewBookingCalendarEvent( event, evlEnabled, stayDateFrom, Collections.emptySet() );
+    }
+
+    public static boolean matchesNewBookingCalendarEvent( CloudbedsCalendarEvent event,
+            boolean evlEnabled, LocalDate stayDateFrom, Set<String> inclusiveTaxSubSourceIds ) {
         if ( false == evlEnabled ) {
             return false;
         }
@@ -34,6 +79,9 @@ public final class EdinburghVisitorLevyBookingCriteria {
             return false;
         }
         if ( event.isCanceled() ) {
+            return false;
+        }
+        if ( isInclusiveTaxCalendarEvent( event, inclusiveTaxSubSourceIds ) ) {
             return false;
         }
         String endDateStr = event.getEndDate();
