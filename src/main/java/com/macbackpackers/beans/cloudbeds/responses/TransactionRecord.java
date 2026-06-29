@@ -15,7 +15,6 @@ public class TransactionRecord {
     private String reservationId;
     private String datetimeTransaction;
     private String description;
-    private String descriptionFilter;
     private String notes;
     private String type;
     @SerializedName( "void" )
