@@ -23,7 +23,7 @@ public class TransactionRecord {
     private Boolean canBeVoided;
     private String debit;
     private String credit;
-    private BigDecimal paid;
+    private String paid;
     private String transactionType;
     private String creditCardType;
     private String creditCardId;
@@ -133,11 +133,14 @@ public class TransactionRecord {
         return debit == null ? null : new BigDecimal(debit.replaceAll("£", ""));
     }
 
-    public BigDecimal getPaid() {
-        return paid;
+    public BigDecimal getPaidAsBigDecimal() {
+        if ( paid == null || paid.trim().isEmpty() ) {
+            return null;
+        }
+        return new BigDecimal( paid.replaceAll( "£", "" ) );
     }
 
-    public void setPaid(BigDecimal paid) {
+    public void setPaid( String paid ) {
         this.paid = paid;
     }
 
