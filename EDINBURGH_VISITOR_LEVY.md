@@ -226,9 +226,10 @@ expectedLevy = round(levyBase × 5%, 2)
 3. `currentLevy` = sum of `tax_breakdown` lines matching either EVL label
 4. `delta = expected - current`
 5. If `|delta| ≥ £0.01`:
+   - **Canceled/no-show + exclusive tax** → void remaining EVL folio lines (see [Cancel / no-show](#cancel--no-show)); do **not** use `add_new_adjust`
    - **BDC, Agoda, Agoda / Priceline** (inclusive tax) → log expected EVL and VAT vs folio; **no write** (channel total is fixed; corrections need coordinated EVL/VAT/room-rate adjustments)
-   - **Other sources, delta < 0** → `adjustVisitorLevyCharge` (reduce)
-   - **Other sources, delta > 0** → `addVisitorLevyCharge` (increase)
+   - **Other sources, active booking, delta < 0** → `adjustVisitorLevyCharge` (reduce)
+   - **Other sources, active booking, delta > 0** → `addVisitorLevyCharge` (increase)
 6. Tax ID: inclusive label for BDC/Agoda/Priceline, exclusive otherwise
 7. Adjustment notes suffixed with `-RONBOT`
 
@@ -238,8 +239,28 @@ expectedLevy = round(levyBase × 5%, 2)
 |---|---|---|
 | Add charge | `POST /hotel/add_new_fee_or_tax` | `id=tax-{numericId}` |
 | Adjust | `POST /hotel/add_new_adjust` | `adjust[id]=tax_{numericId}` |
+| Void tax/fee line | `POST /hotel/void_fee_or_tax_transaction` | `transaction_id`, `reservation_id` |
+| Void adjustment | `POST /hotel/void_adjustment` | `adjustment_id`, `reservation_id` |
 
 ---
+
+## Cancel / no-show
+
+Statutory rule: **levy = £0** for canceled and no-show bookings (`Reservation.isCanceledOrNoShow()`).
+
+On cancel, Cloudbeds clears **system-applied** exclusive EVL from the rate. **Bot-added** folio lines remain (manual `add_new_fee_or_tax` charges and `add_new_adjust` adjustments). The bot voids those via the void endpoints above.
+
+| Source | Behavior |
+|---|---|
+| **Exclusive** (direct, HWL, walk-in) | Void all voidable EVL `tax` and `adjustment` folio lines until folio EVL = £0 |
+| **Inclusive OTA** (BDC, Agoda / Priceline) | Log-only (same as active inclusive bookings) |
+
+Triggers:
+
+- **WebSocket** — `status=canceled` or `status=no_show` on a `booked` row; also calendar `delete.Events` / `room_free` removals with no replacement events in the same batch (resolved to `booking_id` via `CloudbedsCalendarEventRegistry`)
+- **Batch** — `CreateCalculateEdinburghVisitorLevyForBookingJob` now queries **all** reservation statuses in the booking-date range (not just `confirmed,not_confirmed`); canceled/no-show rows with leftover EVL enqueue the same per-reservation job
+
+Both enqueue `CalculateEdinburghVisitorLevyForBookingJob`, which branches on REST-loaded status inside `processVisitorLevyForBooking`.
 
 ## Batch jobs
 
@@ -247,7 +268,7 @@ expectedLevy = round(levyBase × 5%, 2)
 
 Parameters: `booking_date_start`, `booking_date_end`
 
-Queries active bookings (`confirmed,not_confirmed`) in range, applies cheap eligibility checks (`evl.enabled`, booking/stay dates), then loads each reservation and compares folio EVL to the calculated amount.
+Queries **all** bookings in range (all Cloudbeds statuses, including canceled and no_show), applies cheap eligibility checks (`evl.enabled`, booking/stay dates), then loads each reservation and compares folio EVL to the calculated amount.
 
 | Include if | Reason |
 |---|---|
@@ -280,13 +301,19 @@ When the processor runs in server mode (`RunProcessor.runInServerMode()`), `Clou
 
 ### `CalculateEdinburghVisitorLevyBookingEventListener`
 
-Enqueues a `CalculateEdinburghVisitorLevyForBookingJob` as soon as a new booking appears on the calendar WebSocket — i.e. a row with `type=booked` (see `CloudbedsCalendarEvent.isReservationBooking()`). This covers both assigned `Events[]` rows and unassigned `NonAssignedReservations[]` rows.
+Enqueues a `CalculateEdinburghVisitorLevyForBookingJob` when:
+
+1. A new **`booked`** row appears (adjustment path for active exclusive-tax bookings), or
+2. A **`canceled` / `no_show`** status appears on a reservation row (void path), or
+3. A likely **cancellation delete** occurs (`delete.Events` / `room_free` with no replacement `Events` in the same batch; `booking_id` from `CloudbedsCalendarEventRegistry`)
+
+This covers both assigned `Events[]` rows and unassigned `NonAssignedReservations[]` rows.
 
 **Only `onUpdate` is handled.** The initial `on_migrate` snapshot is ignored so existing bookings are not processed when the monitor connects or reconnects (same pattern as `ChargeNonRefundableBookingEventListener`).
 
 #### Eligibility (cheap checks)
 
-Mirrors `EdinburghVisitorLevyService.isPotentiallyEligible()` using fields available on the calendar event, via `EdinburghVisitorLevyBookingCriteria.matchesNewBookingCalendarEvent()` / `EdinburghVisitorLevyService.isPotentiallyEligibleForNewBooking()`:
+**New active booking** — mirrors `EdinburghVisitorLevyService.isPotentiallyEligible()` via `EdinburghVisitorLevyBookingCriteria.matchesNewBookingCalendarEvent()`:
 
 | Check | Source on event |
 |---|---|
@@ -295,6 +322,8 @@ Mirrors `EdinburghVisitorLevyService.isPotentiallyEligible()` using fields avail
 | `type=booked`, valid `booking_id` | `type`, `booking_id` |
 | Not canceled | `status` |
 | Stay includes eligible nights (checkout after `evl.stay.date.from`) | `end_date` |
+
+**Canceled / no-show** — via `matchesCanceledOrNoShowCalendarEvent()`: `evl.enabled`, `type=booked`, `status=canceled|no_show`, not inclusive-tax. No stay-date check (void whenever folio EVL ≠ 0).
 
 If `end_date` is absent, the stay-date check is skipped.
 
@@ -316,7 +345,7 @@ There is **no cooldown** on completed or failed jobs — a subsequent `booked` e
 
 | Path | When | Pre-enqueue filter |
 |---|---|---|
-| **WebSocket** (`CalculateEdinburghVisitorLevyBookingEventListener`) | New `booked` event | Cheap eligibility only (excludes inclusive-tax sources) |
+| **WebSocket** (`CalculateEdinburghVisitorLevyBookingEventListener`) | New `booked`, canceled/no_show, or cancel-delete | Cheap eligibility (excludes inclusive-tax sources) |
 | **Batch** (`CreateCalculateEdinburghVisitorLevyForBookingJob`) | Scheduled booking-date range | Cheap eligibility **and** folio delta outside tolerance (excludes inclusive-tax sources) |
 
 Both paths enqueue the same `CalculateEdinburghVisitorLevyForBookingJob` for exclusive-tax sources only. Inclusive-tax bookings (BDC, Agoda / Priceline) are excluded at enqueue time — no job is created because adjustments cannot be applied without coordinated EVL/VAT/room-rate changes.
@@ -431,7 +460,8 @@ Run: `mvn test -Dtest=EdinburghVisitorLevyCalculatorTest`
 |---|---|
 | `booked` + eligible dates, `evl.enabled=true` | match |
 | `evl.enabled=false` | no match |
-| Canceled | no match |
+| Canceled | no match (new booking path) |
+| Canceled/no-show void | match via `matchesCanceledOrNoShowCalendarEvent` |
 | Checkout on levy start date (no eligible nights) | no match |
 | `blocked_dates` | no match |
 

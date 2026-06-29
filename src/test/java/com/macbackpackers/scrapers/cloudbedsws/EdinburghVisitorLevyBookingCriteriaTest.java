@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -71,6 +72,49 @@ public class EdinburghVisitorLevyBookingCriteriaTest {
                 "Agoda / Priceline (Hotel Collect Booking)" ) );
         assertFalse( EdinburghVisitorLevyBookingCriteria.isInclusiveTaxSourceName( "Hostelworld Group" ) );
         assertFalse( EdinburghVisitorLevyBookingCriteria.isInclusiveTaxSourceName( null ) );
+    }
+
+    @Test
+    public void matchesCanceledOrNoShowCalendarEvent_matchesExclusiveCanceledAndNoShow() {
+        CloudbedsCalendarEvent canceled = event(
+                "booked", "canceled", "176704740", "2026-08-01", "Walk-In" );
+        CloudbedsCalendarEvent noShow = event(
+                "booked", "no_show", "176704741", "2026-08-01", "Walk-In" );
+        CloudbedsCalendarEvent confirmed = event(
+                "booked", "confirmed", "176704742", "2026-08-01", "Walk-In" );
+
+        assertTrue( EdinburghVisitorLevyBookingCriteria.matchesCanceledOrNoShowCalendarEvent(
+                canceled, true, Set.of() ) );
+        assertTrue( EdinburghVisitorLevyBookingCriteria.matchesCanceledOrNoShowCalendarEvent(
+                noShow, true, Set.of() ) );
+        assertFalse( EdinburghVisitorLevyBookingCriteria.matchesCanceledOrNoShowCalendarEvent(
+                confirmed, true, Set.of() ) );
+        assertFalse( EdinburghVisitorLevyBookingCriteria.matchesCanceledOrNoShowCalendarEvent(
+                canceled, false, Set.of() ) );
+    }
+
+    @Test
+    public void matchesCanceledOrNoShowCalendarEvent_excludesInclusiveTaxSources() {
+        CloudbedsCalendarEvent bdcCanceled = event(
+                "booked", "canceled", "176704743", "2026-08-01",
+                "Booking.com (Hotel Collect Booking)" );
+
+        assertFalse( EdinburghVisitorLevyBookingCriteria.matchesCanceledOrNoShowCalendarEvent(
+                bdcCanceled, true, Set.of() ) );
+    }
+
+    @Test
+    public void isLikelyCancellationDelete_requiresRemovedEventsWithoutReplacements() {
+        CloudbedsCalendarUpdate withDelete = new CloudbedsCalendarUpdate();
+        withDelete.setRemovedEventIds( List.of( "17820844265948041" ) );
+
+        CloudbedsCalendarUpdate withReplacement = new CloudbedsCalendarUpdate();
+        withReplacement.setRemovedEventIds( List.of( "17820844265948041" ) );
+        withReplacement.setEvents( List.of( event(
+                "booked", "confirmed", "176704744", "2026-08-01", "Walk-In" ) ) );
+
+        assertTrue( EdinburghVisitorLevyBookingCriteria.isLikelyCancellationDelete( withDelete ) );
+        assertFalse( EdinburghVisitorLevyBookingCriteria.isLikelyCancellationDelete( withReplacement ) );
     }
 
     private static CloudbedsCalendarEvent event( String type, String status, String bookingId,

@@ -14,9 +14,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import com.macbackpackers.services.EdinburghVisitorLevyService;
 
 /**
- * Dry-run visitor levy calculation for active bookings in a booking-date range that would normally
- * be queued by {@link CreateCalculateEdinburghVisitorLevyForBookingJob}. Logs whether each
- * reservation needs an adjustment without posting charges.
+ * Dry-run visitor levy calculation for bookings in a booking-date range (all statuses, including
+ * canceled and no_show) that would normally be queued by
+ * {@link CreateCalculateEdinburghVisitorLevyForBookingJob}. Logs whether each reservation needs
+ * an adjustment without posting charges.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.CalculateEdinburghVisitorLevyDryRunJob" )

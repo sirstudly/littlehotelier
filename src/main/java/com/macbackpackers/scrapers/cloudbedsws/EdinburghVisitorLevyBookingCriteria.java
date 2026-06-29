@@ -92,4 +92,36 @@ public final class EdinburghVisitorLevyBookingCriteria {
         }
         return true;
     }
+
+    /**
+     * Returns true when a canceled or no-show calendar event may need EVL folio lines voided
+     * (exclusive-tax sources only).
+     */
+    public static boolean matchesCanceledOrNoShowCalendarEvent( CloudbedsCalendarEvent event,
+            boolean evlEnabled, Set<String> inclusiveTaxSubSourceIds ) {
+        if ( false == evlEnabled ) {
+            return false;
+        }
+        if ( event == null || false == event.isReservationBooking() ) {
+            return false;
+        }
+        if ( false == event.isCanceledOrNoShow() ) {
+            return false;
+        }
+        if ( isInclusiveTaxCalendarEvent( event, inclusiveTaxSubSourceIds ) ) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Returns true when a calendar delete payload likely indicates a cancellation rather than a
+     * bed move (no replacement {@code Events} in the same update).
+     */
+    public static boolean isLikelyCancellationDelete( CloudbedsCalendarUpdate update ) {
+        if ( update == null || false == update.getEvents().isEmpty() ) {
+            return false;
+        }
+        return false == update.getAllRemovedCalendarEventIds().isEmpty();
+    }
 }

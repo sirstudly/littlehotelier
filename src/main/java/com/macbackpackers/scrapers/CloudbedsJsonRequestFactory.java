@@ -992,9 +992,14 @@ public class CloudbedsJsonRequestFactory {
      * @throws IOException on creation failure
      */
     public WebRequest createGetTransactionsByReservationRequest( Reservation res, String billingPortalId, String frontVersion ) throws IOException {
+        return createGetTransactionsByReservationRequest( res.getReservationId(), billingPortalId, frontVersion );
+    }
+
+    public WebRequest createGetTransactionsByReservationRequest( String reservationId, String billingPortalId,
+            String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reports/transactions_by_reservation" );
         webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "booking_id", res.getReservationId() ),
+                new NameValuePair( "booking_id", reservationId ),
                 new NameValuePair( "options", "{\"filters\":{\"from\":\"\",\"to\":\"\",\"filter\":\"\",\"user\":\"all\",\"posted\":[\"1\"],\"description\":[]},\"group\":{\"main\":\"\",\"sub\":\"\"},\"sort\":{\"column\":\"datetime_transaction\",\"order\":\"desc\"},\"loaded_filter\":1}" ),
                 new NameValuePair( "suppress_client_errors", "true" ),
                 new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
@@ -1330,6 +1335,46 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "adjust[notes]", notes ),
                 new NameValuePair( "adjust[auto_date]", "1" ),
                 new NameValuePair( "adjust[datetime]", datetime ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Voids a manual tax/fee folio line ({@code void_fee_or_tax_transaction}).
+     */
+    public WebRequest createVoidFeeOrTaxTransactionRequest( String reservationId, String transactionId,
+            String billingPortalId, String frontVersion ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/void_fee_or_tax_transaction" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "transaction_id", transactionId ),
+                new NameValuePair( "reservation_id", reservationId ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Voids a folio adjustment line ({@code void_adjustment}).
+     */
+    public WebRequest createVoidAdjustmentRequest( String reservationId, String adjustmentId,
+            String billingPortalId, String frontVersion ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/void_adjustment" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "adjustment_id", adjustmentId ),
+                new NameValuePair( "reservation_id", reservationId ),
                 new NameValuePair( "suppress_client_errors", "true" ),
                 new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
                 new NameValuePair( "billing_portal_id", billingPortalId ),

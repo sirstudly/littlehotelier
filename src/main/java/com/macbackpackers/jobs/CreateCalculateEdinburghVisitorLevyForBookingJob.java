@@ -17,8 +17,8 @@ import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.services.EdinburghVisitorLevyService;
 
 /**
- * Creates {@link CalculateEdinburghVisitorLevyForBookingJob}s for active bookings made within a
- * booking-date range whose folio EVL differs from the calculated amount.
+ * Creates {@link CalculateEdinburghVisitorLevyForBookingJob}s for bookings made within a
+ * booking-date range (all statuses) whose folio EVL differs from the calculated amount.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.CreateCalculateEdinburghVisitorLevyForBookingJob" )

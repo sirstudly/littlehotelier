@@ -129,6 +129,14 @@ public class CloudbedsCalendarEvent {
         return "canceled".equalsIgnoreCase( getStatus() );
     }
 
+    public boolean isNoShow() {
+        return "no_show".equalsIgnoreCase( getStatus() );
+    }
+
+    public boolean isCanceledOrNoShow() {
+        return isCanceled() || isNoShow();
+    }
+
     public boolean isHotelCollectBooking() {
         return "1".equals( getIsHotelCollectPayment() );
     }

@@ -23,9 +23,8 @@ import com.macbackpackers.services.EdinburghVisitorLevyService;
 
 /**
  * Reacts to incremental calendar WebSocket updates by enqueueing
- * {@link CalculateEdinburghVisitorLevyForBookingJob}s for new {@code booked} events where a visitor
- * levy adjustment may apply, using the same cheap eligibility checks as
- * {@code EdinburghVisitorLevyService#isPotentiallyEligible}.
+ * {@link CalculateEdinburghVisitorLevyForBookingJob}s for new {@code booked} events and for
+ * canceled/no-show bookings where visitor levy folio lines may need voiding.
  * <p>
  * Only {@link #onUpdate} is handled; the initial {@code on_migrate} snapshot is ignored so
  * existing bookings are not processed when the monitor connects or reconnects.
@@ -45,6 +44,9 @@ public class CalculateEdinburghVisitorLevyBookingEventListener implements Cloudb
     private CloudbedsScraper cloudbedsScraper;
 
     @Autowired
+    private CloudbedsCalendarEventRegistry eventRegistry;
+
+    @Autowired
     private ApplicationContext context;
 
     /** Avoid duplicate inserts when Cloudbeds sends multiple room rows for one booking. */
@@ -60,40 +62,75 @@ public class CalculateEdinburghVisitorLevyBookingEventListener implements Cloudb
         if ( update == null || false == dao.isCloudbeds() ) {
             return;
         }
-        processReservationEvents( update.getAllReservationEvents() );
+        Set<String> inclusiveTaxSources = getInclusiveTaxSubSourceIds();
+        processReservationEvents( update.getAllReservationEvents(), inclusiveTaxSources );
+        processCancelDeleteCandidates( propertyId, update );
     }
 
-    private void processReservationEvents( List<CloudbedsCalendarEvent> events ) {
+    private void processReservationEvents( List<CloudbedsCalendarEvent> events, Set<String> inclusiveTaxSources ) {
         if ( events == null || events.isEmpty() ) {
             return;
         }
 
-        Set<String> inclusiveTaxSources = getInclusiveTaxSubSourceIds();
         Set<String> reservationIdsSeenInBatch = new HashSet<>();
         for ( CloudbedsCalendarEvent event : events ) {
-            if ( false == edinburghVisitorLevyService.isPotentiallyEligibleForNewBooking( event, inclusiveTaxSources ) ) {
+            boolean matchesNewBooking = edinburghVisitorLevyService.isPotentiallyEligibleForNewBooking(
+                    event, inclusiveTaxSources );
+            boolean matchesCanceledOrNoShow = edinburghVisitorLevyService.isPotentiallyEligibleForCanceledOrNoShow(
+                    event, inclusiveTaxSources );
+            if ( false == matchesNewBooking && false == matchesCanceledOrNoShow ) {
                 continue;
             }
             String reservationId = event.getBookingId();
             if ( false == reservationIdsSeenInBatch.add( reservationId ) ) {
                 continue;
             }
-            if ( recentlyEnqueuedReservationIds.contains( reservationId ) ) {
-                continue;
-            }
-            if ( dao.hasCalculateEdinburghVisitorLevyJobForReservation( reservationId ) ) {
-                recentlyEnqueuedReservationIds.add( reservationId );
-                LOGGER.info( "Skipping CalculateEdinburghVisitorLevyForBookingJob for reservation {} (job already pending)",
-                        reservationId );
-                continue;
-            }
-            enqueueCalculateJob( event, reservationId );
+            tryEnqueueCalculateJob( event, reservationId );
         }
     }
 
+    private void processCancelDeleteCandidates( String propertyId, CloudbedsCalendarUpdate update ) {
+        if ( false == EdinburghVisitorLevyBookingCriteria.isLikelyCancellationDelete( update ) ) {
+            return;
+        }
+        Set<String> reservationIdsSeenInBatch = new HashSet<>();
+        for ( String eventId : update.getAllRemovedCalendarEventIds() ) {
+            CloudbedsCalendarEventRegistry.ResolvedBookingId resolved =
+                    eventRegistry.resolveRemovedEventBookingId( propertyId, eventId );
+            if ( false == resolved.isKnown() ) {
+                continue;
+            }
+            String reservationId = resolved.getBookingId();
+            if ( false == reservationIdsSeenInBatch.add( reservationId ) ) {
+                continue;
+            }
+            LOGGER.info( "Cancel-delete candidate for reservation {} (event_id={})", reservationId, eventId );
+            tryEnqueueCalculateJob( null, reservationId );
+        }
+    }
+
+    private void tryEnqueueCalculateJob( CloudbedsCalendarEvent event, String reservationId ) {
+        if ( recentlyEnqueuedReservationIds.contains( reservationId ) ) {
+            return;
+        }
+        if ( dao.hasCalculateEdinburghVisitorLevyJobForReservation( reservationId ) ) {
+            recentlyEnqueuedReservationIds.add( reservationId );
+            LOGGER.info( "Skipping CalculateEdinburghVisitorLevyForBookingJob for reservation {} (job already pending)",
+                    reservationId );
+            return;
+        }
+        enqueueCalculateJob( event, reservationId );
+    }
+
     private void enqueueCalculateJob( CloudbedsCalendarEvent event, String reservationId ) {
-        LOGGER.info( "Creating CalculateEdinburghVisitorLevyForBookingJob for booking {} ({}): {} {}",
-                reservationId, event.getStatus(), event.getFirstName(), event.getLastName() );
+        if ( event != null ) {
+            LOGGER.info( "Creating CalculateEdinburghVisitorLevyForBookingJob for booking {} ({}): {} {}",
+                    reservationId, event.getStatus(), event.getFirstName(), event.getLastName() );
+        }
+        else {
+            LOGGER.info( "Creating CalculateEdinburghVisitorLevyForBookingJob for booking {} (cancel-delete candidate)",
+                    reservationId );
+        }
         CalculateEdinburghVisitorLevyForBookingJob job = new CalculateEdinburghVisitorLevyForBookingJob();
         job.setStatus( JobStatus.submitted );
         job.setReservationId( reservationId );

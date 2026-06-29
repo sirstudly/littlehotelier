@@ -598,6 +598,105 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Returns all posted folio transactions for a reservation.
+     */
+    public List<TransactionRecord> getTransactionsByReservation( WebClient webClient, String reservationId )
+            throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createGetTransactionsByReservationRequest(
+                reservationId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        JsonObject rpt = doRequest( webClient, requestSettings );
+        return StreamSupport.stream( rpt.get( "records" ).getAsJsonArray().spliterator(), false )
+                .map( r -> gson.fromJson( r, TransactionRecord.class ) )
+                .collect( Collectors.toList() );
+    }
+
+    /**
+     * Voids a manual tax/fee folio line.
+     */
+    public void voidFeeOrTaxTransaction( WebClient webClient, String reservationId, String transactionId )
+            throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createVoidFeeOrTaxTransactionRequest(
+                reservationId, transactionId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        doRequest( webClient, requestSettings );
+        LOGGER.info( "Voided EVL tax transaction {} on reservation {} — canceled/no-show.", transactionId, reservationId );
+    }
+
+    /**
+     * Voids a folio adjustment line.
+     */
+    public void voidAdjustment( WebClient webClient, String reservationId, String adjustmentId ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createVoidAdjustmentRequest(
+                reservationId, adjustmentId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        doRequest( webClient, requestSettings );
+        LOGGER.info( "Voided EVL adjustment {} on reservation {} — canceled/no-show.", adjustmentId, reservationId );
+    }
+
+    /**
+     * Voids all voidable visitor-levy tax and adjustment folio lines (adjustments first, then tax
+     * charges). Used when a canceled/no-show booking still has bot-added EVL lines on the folio.
+     *
+     * @return number of folio lines voided
+     */
+    public int voidVoidableVisitorLevyTransactions( WebClient webClient, Reservation res,
+            String exclusiveTaxLabel, String inclusiveTaxLabel ) throws IOException {
+        List<TransactionRecord> voidable = listVoidableVisitorLevyTransactions(
+                getTransactionsByReservation( webClient, res.getReservationId() ),
+                exclusiveTaxLabel, inclusiveTaxLabel );
+        String reservationId = res.getReservationId();
+        int voided = 0;
+        for ( TransactionRecord txn : voidable ) {
+            if ( "adjustment".equalsIgnoreCase( txn.getType() ) ) {
+                voidAdjustment( webClient, reservationId, txn.getId() );
+            }
+            else if ( "tax".equalsIgnoreCase( txn.getType() ) ) {
+                voidFeeOrTaxTransaction( webClient, reservationId, txn.getId() );
+            }
+            voided++;
+        }
+        return voided;
+    }
+
+    /**
+     * Returns voidable visitor-levy folio lines (adjustments before tax charges).
+     */
+    static List<TransactionRecord> listVoidableVisitorLevyTransactions( List<TransactionRecord> records,
+            String exclusiveTaxLabel, String inclusiveTaxLabel ) {
+        List<TransactionRecord> adjustments = new ArrayList<>();
+        List<TransactionRecord> taxes = new ArrayList<>();
+        for ( TransactionRecord record : records ) {
+            if ( false == isVoidableVisitorLevyTransaction( record, exclusiveTaxLabel, inclusiveTaxLabel ) ) {
+                continue;
+            }
+            if ( "adjustment".equalsIgnoreCase( record.getType() ) ) {
+                adjustments.add( record );
+            }
+            else if ( "tax".equalsIgnoreCase( record.getType() ) ) {
+                taxes.add( record );
+            }
+        }
+        List<TransactionRecord> result = new ArrayList<>( adjustments.size() + taxes.size() );
+        result.addAll( adjustments );
+        result.addAll( taxes );
+        return result;
+    }
+
+    private static boolean isVoidableVisitorLevyTransaction( TransactionRecord record,
+            String exclusiveTaxLabel, String inclusiveTaxLabel ) {
+        if ( record == null || record.isVoided() || false == record.isVoidable() ) {
+            return false;
+        }
+        String description = record.getDescription();
+        if ( description == null ) {
+            return false;
+        }
+        if ( false == description.equals( exclusiveTaxLabel ) && false == description.equals( inclusiveTaxLabel ) ) {
+            return false;
+        }
+        String type = record.getType();
+        return "adjustment".equalsIgnoreCase( type ) || "tax".equalsIgnoreCase( type );
+    }
+
+    /**
      * Runs Room Assignments report and returns the raw response.
      * 
      * @param webClient web client instance to use

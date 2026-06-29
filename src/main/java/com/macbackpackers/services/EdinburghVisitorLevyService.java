@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import com.google.gson.Gson;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.cloudbedsws.CloudbedsCalendarEvent;
 import com.macbackpackers.scrapers.cloudbedsws.EdinburghVisitorLevyBookingCriteria;
@@ -29,7 +30,7 @@ import com.macbackpackers.services.EdinburghVisitorLevyCalculator.LevyCalculatio
 @Service
 public class EdinburghVisitorLevyService {
 
-    private static final String ACTIVE_STATUSES = "confirmed,not_confirmed";
+    private static final String ALL_STATUSES = null;
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
 
@@ -128,13 +129,14 @@ public class EdinburghVisitorLevyService {
     }
 
     /**
-     * Assesses visitor levy for all potentially eligible active bookings in a booking-date range.
+     * Assesses visitor levy for all potentially eligible bookings in a booking-date range
+     * (all reservation statuses, including canceled and no_show).
      */
     public List<CustomerLevyAssessment> assessReservationsInBookingDateRange( WebClient webClient,
             LocalDate bookingDateStart, LocalDate bookingDateEnd ) throws IOException {
         List<CustomerLevyAssessment> results = new ArrayList<>();
         for ( Customer customer : cloudbedsScraper.getReservationsByBookingDate(
-                webClient, bookingDateStart, bookingDateEnd, ACTIVE_STATUSES ) ) {
+                webClient, bookingDateStart, bookingDateEnd, ALL_STATUSES ) ) {
             if ( false == isPotentiallyEligible( customer ) ) {
                 continue;
             }
@@ -156,6 +158,12 @@ public class EdinburghVisitorLevyService {
             Set<String> inclusiveTaxSubSourceIds ) {
         return EdinburghVisitorLevyBookingCriteria.matchesNewBookingCalendarEvent(
                 event, evlEnabled, getStayDateFrom(), inclusiveTaxSubSourceIds );
+    }
+
+    public boolean isPotentiallyEligibleForCanceledOrNoShow( CloudbedsCalendarEvent event,
+            Set<String> inclusiveTaxSubSourceIds ) {
+        return EdinburghVisitorLevyBookingCriteria.matchesCanceledOrNoShowCalendarEvent(
+                event, evlEnabled, inclusiveTaxSubSourceIds );
     }
 
     private boolean isPotentiallyEligible( Customer customer ) {
@@ -196,12 +204,44 @@ public class EdinburghVisitorLevyService {
         LOGGER.info( "Reservation {}: expected levy={}, current levy={}, delta={}",
                 reservationId, assessment.getExpectedLevy(), assessment.getCurrentLevy(), assessment.getDelta() );
 
+        if ( reservation.isCanceledOrNoShow() ) {
+            processCanceledOrNoShowVisitorLevy( webClient, reservation, assessment );
+            return;
+        }
+
         if ( false == assessment.needsAdjustment() ) {
             LOGGER.info( "Visitor levy already correct for reservation {}", reservationId );
             return;
         }
 
         applyVisitorLevyAdjustment( webClient, reservation, assessment );
+    }
+
+    private void processCanceledOrNoShowVisitorLevy( WebClient webClient, Reservation reservation,
+            LevyAssessment assessment ) throws IOException {
+        if ( EdinburghVisitorLevyCalculator.useInclusiveTax( reservation ) ) {
+            logInclusiveTaxVisitorLevyAndVatDiscrepancy( reservation, assessment );
+            return;
+        }
+
+        if ( false == assessment.needsAdjustment() ) {
+            LOGGER.info( "Visitor levy already zero for canceled/no-show reservation {}", reservation.getReservationId() );
+            return;
+        }
+
+        int voided = cloudbedsScraper.voidVoidableVisitorLevyTransactions( webClient, reservation, exclusiveTaxLabel, inclusiveTaxLabel );
+        LOGGER.info( "Voided {} EVL folio line(s) on canceled/no-show reservation {}", voided, reservation.getReservationId() );
+
+        Reservation refreshed = cloudbedsScraper.getReservationRetry( webClient, reservation.getReservationId() );
+        BigDecimal remainingLevy = refreshed.getVisitorLevyTotal( exclusiveTaxLabel, inclusiveTaxLabel );
+        if ( EdinburghVisitorLevyCalculator.isWithinTolerance( assessment.getExpectedLevy().subtract( remainingLevy ) ) ) {
+            LOGGER.info( "Visitor levy cleared for canceled/no-show reservation {}", reservation.getReservationId() );
+        }
+        else {
+            throw new UnrecoverableFault( String.format(
+                    "Visitor levy still %s on canceled/no-show reservation %s after voiding %d line(s)",
+                    remainingLevy, reservation.getReservationId(), voided ) );
+        }
     }
 
     public void logDryRunAssessment( Customer customer, LevyAssessment assessment ) {

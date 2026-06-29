@@ -3,6 +3,8 @@ package com.macbackpackers.beans.cloudbeds.responses;
 
 import java.math.BigDecimal;
 
+import com.google.gson.annotations.SerializedName;
+
 /**
  * Corresponds with an entry on the "Folio" page for a booking.
  *
@@ -13,8 +15,12 @@ public class TransactionRecord {
     private String reservationId;
     private String datetimeTransaction;
     private String description;
+    private String descriptionFilter;
     private String notes;
     private String type;
+    @SerializedName( "void" )
+    private Object voidFlag;
+    private Boolean canBeVoided;
     private String debit;
     private String credit;
     private BigDecimal paid;
@@ -74,6 +80,37 @@ public class TransactionRecord {
 
     public void setType( String type ) {
         this.type = type;
+    }
+
+    public Object getVoidFlag() {
+        return voidFlag;
+    }
+
+    public void setVoidFlag( Object voidFlag ) {
+        this.voidFlag = voidFlag;
+    }
+
+    public Boolean getCanBeVoided() {
+        return canBeVoided;
+    }
+
+    public void setCanBeVoided( Boolean canBeVoided ) {
+        this.canBeVoided = canBeVoided;
+    }
+
+    public boolean isVoided() {
+        if ( voidFlag instanceof Boolean ) {
+            return Boolean.TRUE.equals( voidFlag );
+        }
+        if ( voidFlag != null ) {
+            String s = voidFlag.toString();
+            return "1".equals( s ) || "true".equalsIgnoreCase( s );
+        }
+        return false;
+    }
+
+    public boolean isVoidable() {
+        return Boolean.TRUE.equals( canBeVoided );
     }
 
     public String getDebit() {
