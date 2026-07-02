@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
 import com.google.gson.Gson;
@@ -159,7 +160,7 @@ public class Reservation extends CloudbedsJsonResponse {
      * @return true if non-refundable; false otherwise
      */
     public boolean isNonRefundable() {
-        return "Non-refundable".equalsIgnoreCase( getUsedRoomTypes() )
+        return StringUtils.containsIgnoreCase( getUsedRoomTypes(), "Non-refundable" )
                 || "nonref".equalsIgnoreCase( getUsedRoomTypes() );
     }
 
