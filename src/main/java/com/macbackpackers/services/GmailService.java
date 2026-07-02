@@ -81,8 +81,8 @@ public class GmailService {
     /** String for matching emails for LH security access */
     private final String LH_SECURITY_ACCESS = "subject:\"LittleHotelier - Security access required\" from:noreply@app.littlehotelier.com in:inbox"; 
 
-    /** String for matching Hostelworld inbox login emails */
-    private final String HOSTELWORLD_LOGIN_INBOX = "subject:\"Login to Inbox\" from:noreply@hostelworld.com in:inbox";
+    /** String for matching Hostelworld inbox login emails anywhere in the mailbox (including trash). */
+    private final String HOSTELWORLD_LOGIN_INBOX = "subject:\"Login to Inbox\" from:noreply@hostelworld.com in:anywhere";
 
     /** String for matching Datatrans PCI device activation emails */
     private final String HOSTELWORLD_DEVICE_ACTIVATION_INBOX =
@@ -280,8 +280,9 @@ public class GmailService {
     }
 
     /**
-     * Returns the login URL from the most recent Hostelworld inbox login email.
-     * 
+     * Returns the login URL from the most recent Hostelworld login email.
+     * Searches all labels including trash.
+     *
      * @return non-null login URL
      * @throws IOException on I/O error
      * @throws EmptyResultDataAccessException if no message found within timeout
@@ -293,26 +294,25 @@ public class GmailService {
                     service.users().messages()
                     .list( GMAIL_USER )
                     .setQ( HOSTELWORLD_LOGIN_INBOX )
+                    .setMaxResults( 1L )
                     .execute();
             List<Message> messages = listResponse.getMessages();
-            if ( messages != null ) {
-                LOGGER.info( messages.size() + " messages:" );
-                for ( Message message : messages ) {
-                    LOGGER.info( message.getId() + " - " + message.getThreadId() );
-                    String body = fetchMessageBody( service, message.getId() );
-                    if ( body == null ) {
-                        throw new EmptyResultDataAccessException( "No body found in Hostelworld login message?", 1 );
-                    }
+            if ( messages != null && !messages.isEmpty() ) {
+                Message message = messages.get( 0 );
+                LOGGER.info( "Latest Hostelworld login message: " + message.getId() + " - " + message.getThreadId() );
+                String body = fetchMessageBody( service, message.getId() );
+                if ( body == null ) {
+                    throw new EmptyResultDataAccessException( "No body found in Hostelworld login message?", 1 );
+                }
+                try {
+                    return findAndReturn( "(https://inbox\\.hostelworld\\.com/login/[^\\s\"<>]+)", body );
+                }
+                catch ( EmptyResultDataAccessException e ) {
                     try {
-                        return findAndReturn( "(https://inbox\\.hostelworld\\.com/login/[^\\s\"<>]+)", body );
+                        return findAndReturn( "(https?://url[0-9]+\\.hostelworld\\.com/ls/click\\?[^\\s\"<>]+)", body );
                     }
-                    catch ( EmptyResultDataAccessException e ) {
-                        try {
-                            return findAndReturn( "(https?://url[0-9]+\\.hostelworld\\.com/ls/click\\?[^\\s\"<>]+)", body );
-                        }
-                        catch ( EmptyResultDataAccessException e2 ) {
-                            LOGGER.info( "Unable to find login URL for messageId " + message.getId() + "; continuing", e2 );
-                        }
+                    catch ( EmptyResultDataAccessException e2 ) {
+                        LOGGER.info( "Unable to find login URL in latest messageId " + message.getId() + "; waiting for a newer email", e2 );
                     }
                 }
             }
