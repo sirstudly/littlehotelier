@@ -4,6 +4,9 @@ package com.macbackpackers.beans.cloudbeds.responses;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.number.BigDecimalCloseTo.closeTo;
+
+import java.math.BigDecimal;
 
 import org.junit.jupiter.api.Test;
 
@@ -33,6 +36,23 @@ public class TransactionRecordTest {
 
         record.setCanBeVoided( true );
         assertThat( record.isVoidable(), is( true ) );
+    }
+
+    @Test
+    public void getCreditAsBigDecimal_parsesSignedCurrencyValues() {
+        TransactionRecord record = new TransactionRecord();
+        record.setCredit( "£0.08" );
+        assertThat( record.getCreditAsBigDecimal(), closeTo( new BigDecimal( "0.08" ), BigDecimal.ZERO ) );
+
+        record.setCredit( "-£0.24" );
+        assertThat( record.getCreditAsBigDecimal(), closeTo( new BigDecimal( "-0.24" ), BigDecimal.ZERO ) );
+    }
+
+    @Test
+    public void getVisitorLevyContribution_returnsScaledCreditAmount() {
+        TransactionRecord record = new TransactionRecord();
+        record.setCredit( "-£0.170000" );
+        assertThat( record.getVisitorLevyContribution(), closeTo( new BigDecimal( "-0.17" ), BigDecimal.ZERO ) );
     }
 
     @Test

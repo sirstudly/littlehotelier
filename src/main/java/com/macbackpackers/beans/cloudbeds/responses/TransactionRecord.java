@@ -2,6 +2,7 @@
 package com.macbackpackers.beans.cloudbeds.responses;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 import com.google.gson.annotations.SerializedName;
 
@@ -129,7 +130,25 @@ public class TransactionRecord {
     }
 
     public BigDecimal getDebitAsBigDecimal() {
-        return debit == null ? null : new BigDecimal(debit.replaceAll("£", ""));
+        return debit == null ? null : new BigDecimal( debit.replaceAll( "£", "" ) );
+    }
+
+    public BigDecimal getCreditAsBigDecimal() {
+        if ( credit == null || credit.trim().isEmpty() ) {
+            return null;
+        }
+        return new BigDecimal( credit.replaceAll( "£", "" ) );
+    }
+
+    /**
+     * Signed folio amount this EVL tax/adjustment line contributes to the visitor levy total.
+     */
+    public BigDecimal getVisitorLevyContribution() {
+        BigDecimal creditAmount = getCreditAsBigDecimal();
+        if ( creditAmount == null ) {
+            return BigDecimal.ZERO.setScale( 2, RoundingMode.HALF_UP );
+        }
+        return creditAmount.setScale( 2, RoundingMode.HALF_UP );
     }
 
     public BigDecimal getPaidAsBigDecimal() {

@@ -280,6 +280,19 @@ public class EdinburghVisitorLevyService {
 
         String note = EdinburghVisitorLevyCalculator.buildAdjustmentNote( assessment.getCalculation() );
         BigDecimal delta = assessment.getDelta();
+        if ( cloudbedsScraper.tryVoidMatchingVisitorLevyTransaction(
+                webClient, reservation, exclusiveTaxLabel, inclusiveTaxLabel, delta ) ) {
+            LOGGER.info( "Voided matching EVL line instead of posting delta {} on reservation {}",
+                    delta, reservation.getReservationId() );
+            Reservation refreshed = cloudbedsScraper.getReservationRetry( webClient, reservation.getReservationId() );
+            LevyAssessment refreshedAssessment = assessVisitorLevy( refreshed );
+            if ( refreshedAssessment.needsAdjustment() ) {
+                LOGGER.warn( "Visitor levy still outside tolerance after void on reservation {}: expected={}, current={}, delta={}",
+                        reservation.getReservationId(), refreshedAssessment.getExpectedLevy(),
+                        refreshedAssessment.getCurrentLevy(), refreshedAssessment.getDelta() );
+            }
+            return;
+        }
         if ( delta.compareTo( BigDecimal.ZERO ) < 0 ) {
             cloudbedsScraper.adjustVisitorLevyCharge( webClient, reservation, taxId, delta.abs(), note );
         }

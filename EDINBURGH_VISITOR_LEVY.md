@@ -228,10 +228,23 @@ expectedLevy = round(levyBase × 5%, 2)
 5. If `|delta| ≥ £0.01`:
    - **Canceled/no-show + exclusive tax** → void remaining EVL folio lines (see [Cancel / no-show](#cancel--no-show)); do **not** use `add_new_adjust`
    - **BDC, Agoda, Agoda / Priceline** (inclusive tax) → log expected EVL and VAT vs folio; **no write** (channel total is fixed; corrections need coordinated EVL/VAT/room-rate adjustments)
-   - **Other sources, active booking, delta < 0** → `adjustVisitorLevyCharge` (reduce)
-   - **Other sources, active booking, delta > 0** → `addVisitorLevyCharge` (increase)
+   - **Other sources, active booking** → first try **void-on-exact-match** (see below); if no matching line, fall back to add/adjust:
+     - `delta < 0` → `adjustVisitorLevyCharge` (reduce)
+     - `delta > 0` → `addVisitorLevyCharge` (increase)
 6. Tax ID: inclusive label for BDC/Agoda/Priceline, exclusive otherwise
 7. Adjustment notes suffixed with `-RONBOT`
+
+### Void-on-exact-match (active exclusive-tax bookings)
+
+Before posting a compensating add/adjust, the service looks for a **single** voidable EVL `tax` or `adjustment` folio line whose contribution exactly offsets the delta (to the penny). Voiding a line with contribution `C` changes total EVL by `-C`, so the match condition is `C = -delta`.
+
+| Example | Folio | Target | Delta | Action |
+|---|---:|---:|---:|---|
+| Undo reduction | £1.23 fee + £0.24 reduction adj → £0.99 | £1.23 | +£0.24 | Void the £0.24 **adjustment** line |
+| Undo extra charge | £1.23 fee + £0.24 extra tax → £1.47 | £1.23 | −£0.24 | Void the £0.24 **tax** line |
+| No exact line | only £0.12 line exists | need +£0.24 | +£0.24 | Add/adjust as before |
+
+If multiple lines match the same amount, the **most recent** voidable line is voided. Partial matches (e.g. two £0.12 lines for a £0.24 delta) do **not** trigger void — the service falls back to add/adjust. Cancel/no-show full void behaviour is unchanged.
 
 ### API endpoints
 

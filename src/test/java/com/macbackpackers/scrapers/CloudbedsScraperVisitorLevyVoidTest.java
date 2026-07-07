@@ -4,8 +4,10 @@ package com.macbackpackers.scrapers;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
@@ -50,6 +52,72 @@ public class CloudbedsScraperVisitorLevyVoidTest {
 
         assertThat( voidable.size(), is( 1 ) );
         assertThat( voidable.get( 0 ).getId(), is( "inc-1" ) );
+    }
+
+    @Test
+    public void findVoidableVisitorLevyTransactionForDelta_matchesReductionAdjustmentWhenDeltaPositive() {
+        TransactionRecord adjustment = evlTransaction( "adj-1", "adjustment", EXCLUSIVE_LABEL, false, true );
+        adjustment.setCredit( "-£0.24" );
+
+        Optional<TransactionRecord> match = CloudbedsScraper.findVoidableVisitorLevyTransactionForDelta(
+                Arrays.asList( adjustment ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL, new BigDecimal( "0.24" ) );
+
+        assertThat( match.isPresent(), is( true ) );
+        assertThat( match.get().getId(), is( "adj-1" ) );
+    }
+
+    @Test
+    public void findVoidableVisitorLevyTransactionForDelta_matchesAddedTaxWhenDeltaNegative() {
+        TransactionRecord tax = evlTransaction( "tax-1", "tax", EXCLUSIVE_LABEL, false, true );
+        tax.setCredit( "£0.24" );
+
+        Optional<TransactionRecord> match = CloudbedsScraper.findVoidableVisitorLevyTransactionForDelta(
+                Arrays.asList( tax ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL, new BigDecimal( "-0.24" ) );
+
+        assertThat( match.isPresent(), is( true ) );
+        assertThat( match.get().getId(), is( "tax-1" ) );
+    }
+
+    @Test
+    public void findVoidableVisitorLevyTransactionForDelta_returnsEmptyWhenNoExactMatch() {
+        TransactionRecord tax = evlTransaction( "tax-1", "tax", EXCLUSIVE_LABEL, false, true );
+        tax.setCredit( "£0.12" );
+
+        Optional<TransactionRecord> match = CloudbedsScraper.findVoidableVisitorLevyTransactionForDelta(
+                Arrays.asList( tax ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL, new BigDecimal( "0.24" ) );
+
+        assertThat( match.isPresent(), is( false ) );
+    }
+
+    @Test
+    public void findVoidableVisitorLevyTransactionForDelta_returnsMostRecentWhenMultipleMatch() {
+        TransactionRecord older = evlTransaction( "adj-old", "adjustment", EXCLUSIVE_LABEL, false, true );
+        older.setCredit( "-£0.24" );
+        older.setDatetimeTransaction( "01/06/2026 10:00:00" );
+        TransactionRecord newer = evlTransaction( "adj-new", "adjustment", EXCLUSIVE_LABEL, false, true );
+        newer.setCredit( "-£0.24" );
+        newer.setDatetimeTransaction( "02/06/2026 10:00:00" );
+
+        Optional<TransactionRecord> match = CloudbedsScraper.findVoidableVisitorLevyTransactionForDelta(
+                Arrays.asList( older, newer ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL, new BigDecimal( "0.24" ) );
+
+        assertThat( match.isPresent(), is( true ) );
+        assertThat( match.get().getId(), is( "adj-new" ) );
+    }
+
+    @Test
+    public void findVoidableVisitorLevyTransactionForDelta_excludesVoidedAndNonEvl() {
+        TransactionRecord voided = evlTransaction( "voided", "adjustment", EXCLUSIVE_LABEL, true, true );
+        voided.setCredit( "-£0.24" );
+        TransactionRecord notVoidable = evlTransaction( "locked", "adjustment", EXCLUSIVE_LABEL, false, false );
+        notVoidable.setCredit( "-£0.24" );
+        TransactionRecord vat = evlTransaction( "vat", "tax", "VAT", false, true );
+        vat.setCredit( "-£0.24" );
+
+        Optional<TransactionRecord> match = CloudbedsScraper.findVoidableVisitorLevyTransactionForDelta(
+                Arrays.asList( voided, notVoidable, vat ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL, new BigDecimal( "0.24" ) );
+
+        assertThat( match.isPresent(), is( false ) );
     }
 
     private static TransactionRecord evlTransaction( String id, String type, String description,

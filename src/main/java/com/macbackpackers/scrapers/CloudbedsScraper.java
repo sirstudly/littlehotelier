@@ -42,6 +42,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -50,6 +51,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -610,6 +612,9 @@ public class CloudbedsScraper {
                 .collect( Collectors.toList() );
     }
 
+    private static final DateTimeFormatter FOLIO_TRANSACTION_DATETIME =
+            DateTimeFormatter.ofPattern( "dd/MM/yyyy HH:mm:ss" );
+
     /**
      * Voids a manual tax/fee folio line.
      */
@@ -618,7 +623,7 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createVoidFeeOrTaxTransactionRequest(
                 reservationId, transactionId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         doRequest( webClient, requestSettings );
-        LOGGER.info( "Voided EVL tax transaction {} on reservation {} — canceled/no-show.", transactionId, reservationId );
+        LOGGER.info( "Voided EVL tax transaction {} on reservation {}.", transactionId, reservationId );
     }
 
     /**
@@ -628,7 +633,24 @@ public class CloudbedsScraper {
         WebRequest requestSettings = jsonRequestFactory.createVoidAdjustmentRequest(
                 reservationId, adjustmentId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         doRequest( webClient, requestSettings );
-        LOGGER.info( "Voided EVL adjustment {} on reservation {} — canceled/no-show.", adjustmentId, reservationId );
+        LOGGER.info( "Voided EVL adjustment {} on reservation {}.", adjustmentId, reservationId );
+    }
+
+    /**
+     * Voids a single voidable visitor-levy folio line when its contribution exactly offsets {@code delta}.
+     *
+     * @return {@code true} if a matching line was voided
+     */
+    public boolean tryVoidMatchingVisitorLevyTransaction( WebClient webClient, Reservation res,
+            String exclusiveTaxLabel, String inclusiveTaxLabel, BigDecimal delta ) throws IOException {
+        List<TransactionRecord> transactions = getTransactionsByReservation( webClient, res.getReservationId() );
+        Optional<TransactionRecord> match = findVoidableVisitorLevyTransactionForDelta(
+                transactions, exclusiveTaxLabel, inclusiveTaxLabel, delta );
+        if ( false == match.isPresent() ) {
+            return false;
+        }
+        voidVisitorLevyTransaction( webClient, res.getReservationId(), match.get() );
+        return true;
     }
 
     /**
@@ -645,15 +667,20 @@ public class CloudbedsScraper {
         String reservationId = res.getReservationId();
         int voided = 0;
         for ( TransactionRecord txn : voidable ) {
-            if ( "adjustment".equalsIgnoreCase( txn.getType() ) ) {
-                voidAdjustment( webClient, reservationId, txn.getId() );
-            }
-            else if ( "tax".equalsIgnoreCase( txn.getType() ) ) {
-                voidFeeOrTaxTransaction( webClient, reservationId, txn.getId() );
-            }
+            voidVisitorLevyTransaction( webClient, reservationId, txn );
             voided++;
         }
         return voided;
+    }
+
+    private void voidVisitorLevyTransaction( WebClient webClient, String reservationId, TransactionRecord txn )
+            throws IOException {
+        if ( "adjustment".equalsIgnoreCase( txn.getType() ) ) {
+            voidAdjustment( webClient, reservationId, txn.getId() );
+        }
+        else if ( "tax".equalsIgnoreCase( txn.getType() ) ) {
+            voidFeeOrTaxTransaction( webClient, reservationId, txn.getId() );
+        }
     }
 
     /**
@@ -678,6 +705,34 @@ public class CloudbedsScraper {
         result.addAll( adjustments );
         result.addAll( taxes );
         return result;
+    }
+
+    /**
+     * Finds a voidable visitor-levy folio line whose contribution exactly offsets {@code delta}.
+     * Voiding a line with contribution {@code C} changes total EVL by {@code -C}, so we match
+     * {@code C = -delta}. When multiple lines match, returns the most recent.
+     */
+    static Optional<TransactionRecord> findVoidableVisitorLevyTransactionForDelta(
+            List<TransactionRecord> records, String exclusiveTaxLabel, String inclusiveTaxLabel,
+            BigDecimal delta ) {
+        BigDecimal targetContribution = delta.negate().setScale( 2, RoundingMode.HALF_UP );
+        return records.stream()
+                .filter( record -> isVoidableVisitorLevyTransaction( record, exclusiveTaxLabel, inclusiveTaxLabel ) )
+                .filter( record -> record.getVisitorLevyContribution().compareTo( targetContribution ) == 0 )
+                .max( Comparator.comparing( CloudbedsScraper::parseTransactionDatetime ) );
+    }
+
+    private static LocalDateTime parseTransactionDatetime( TransactionRecord record ) {
+        String datetime = record.getDatetimeTransaction();
+        if ( datetime == null || StringUtils.isBlank( datetime ) ) {
+            return LocalDateTime.MIN;
+        }
+        try {
+            return LocalDateTime.parse( datetime, FOLIO_TRANSACTION_DATETIME );
+        }
+        catch ( DateTimeParseException e ) {
+            return LocalDateTime.MIN;
+        }
     }
 
     private static boolean isVoidableVisitorLevyTransaction( TransactionRecord record,
