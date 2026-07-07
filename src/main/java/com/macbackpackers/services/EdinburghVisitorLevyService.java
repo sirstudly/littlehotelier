@@ -166,6 +166,10 @@ public class EdinburghVisitorLevyService {
                 event, evlEnabled, inclusiveTaxSubSourceIds );
     }
 
+    public boolean isEvlEnabled() {
+        return evlEnabled;
+    }
+
     private boolean isPotentiallyEligible( Customer customer ) {
         if ( false == evlEnabled ) {
             return false;
@@ -198,6 +202,11 @@ public class EdinburghVisitorLevyService {
     }
 
     public synchronized void processVisitorLevyForBooking( WebClient webClient, String reservationId ) throws IOException {
+        if ( false == evlEnabled ) {
+            LOGGER.info( "Skipping visitor levy for reservation {} (evl.enabled=false)", reservationId );
+            return;
+        }
+
         Reservation reservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
         LevyAssessment assessment = assessVisitorLevy( reservation );
 

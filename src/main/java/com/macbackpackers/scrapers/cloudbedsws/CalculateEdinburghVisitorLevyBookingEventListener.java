@@ -59,7 +59,7 @@ public class CalculateEdinburghVisitorLevyBookingEventListener implements Cloudb
 
     @Override
     public void onUpdate( String propertyId, CloudbedsCalendarUpdate update ) {
-        if ( update == null || false == dao.isCloudbeds() ) {
+        if ( update == null || false == edinburghVisitorLevyService.isEvlEnabled() ) {
             return;
         }
         Set<String> inclusiveTaxSources = getInclusiveTaxSubSourceIds();
@@ -90,6 +90,9 @@ public class CalculateEdinburghVisitorLevyBookingEventListener implements Cloudb
     }
 
     private void processCancelDeleteCandidates( String propertyId, CloudbedsCalendarUpdate update ) {
+        if ( false == edinburghVisitorLevyService.isEvlEnabled() ) {
+            return;
+        }
         if ( false == EdinburghVisitorLevyBookingCriteria.isLikelyCancellationDelete( update ) ) {
             return;
         }
