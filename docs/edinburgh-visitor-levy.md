@@ -97,7 +97,9 @@ Booking.com uses the **inclusive** tax. The OTA total is fixed and must not chan
 
 **Example:** £188.80 total, 2 guests, 2 nights — £47.20 per person per night
 
-### How Cloudbeds calculates at 5% inclusive
+### Why 6% inclusive (not 5%)
+
+At a plain **5% inclusive** rate, Cloudbeds ignores “tax on the tax” — the EVL line does not include VAT on the levy:
 
 ```
 Room rate ex-VAT, ex-EVL  = £47.20 ÷ 1.25 = £37.76
@@ -105,11 +107,7 @@ EVL per person per night  = £37.76 × 5%   = £1.89
 EVL for 2 nights × 2 guests = £1.89 × 4  = £7.56
 ```
 
-This approach does **not** include VAT on the EVL itself — a limitation of how Cloudbeds handles inclusive taxes (“tax on the tax” is ignored).
-
-### Statutory breakdown (total unchanged)
-
-To split the fixed guest total without altering the amount charged:
+The statutory split of the same fixed guest total is:
 
 ```
 Net accommodation (ex-VAT, ex-EVL)  = £188.80 ÷ 1.26 = £149.84
@@ -118,20 +116,11 @@ VAT on room + levy                    = (£149.84 + £7.49) × 20% = £31.47
 Total                                 = £149.84 + £7.49 + £31.47 = £188.80
 ```
 
-Cloudbeds’ 5% inclusive calculation (£7.56) is slightly higher than the statutory council amount (£7.49).
+Cloudbeds’ 5% inclusive figure (£7.56) does not match the council amount (£7.49) and still omits VAT on the levy.
 
-### Configuration choice: 5% vs 6% inclusive
+The inclusive tax is configured at **6% of net** so the EVL line includes VAT on the levy, matching the direct and Hostelworld pattern. Council remittance is always **EVL folio total ÷ 1.2**.
 
-Two approaches were considered:
-
-| Option | Approach | Trade-off |
-|---|---|---|
-| **A** | Keep 5% inclusive | EVL folio totals are slightly off (£7.56 vs £7.49). Remittance can be corrected with a × 1.25/1.26 adjustment. |
-| **B** | Use **6% inclusive** | EVL line includes VAT on the levy (like direct/HWL). Council remittance = EVL folio total ÷ 1.2. Consistent across all sources; inclusive rate (6%) differs from exclusive rate (5%). |
-
-**Option B is recommended.** The inclusive tax is configured at **6% of net** so the EVL line matches the direct-booking pattern (levy + VAT-on-levy baked in). Divide the folio EVL total by 1.2 for council remittance.
-
-With 6% inclusive, the same £188.80 booking yields an EVL line of **£9.00** and council remittance of **£7.50** (vs statutory £7.49 — within rounding).
+For the same £188.80 booking, 6% inclusive yields an EVL line of **£9.00** and council remittance of **£7.50** (vs statutory £7.49 — within rounding).
 
 ### Booking.com partner guidance
 
