@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cloudbeds Manipulator: enable paid bed checkboxes
 // @namespace    http://cloudbeds.com/
-// @version      0.7
+// @version      0.8
 // @description  Re-enable the disabled paid-bed room-type checkboxes on a booking.
 // @author       Donovan
 // @match        https://hotels.cloudbeds.com/connect/*
@@ -15,9 +15,8 @@
 
     var CB = window.CB;
 
-    // NOTE: data-room-type '120456' is property-specific; confirm before rolling out
-    // to other properties (may need to be configurable per install).
-    var SELECTOR = "[type='checkbox'][data-room-type='120456']";
+    // NOTE: data-room-type ids are property-specific.
+    var SELECTOR = "[type='checkbox'][data-room-type='120456'], [type='checkbox'][data-room-type='645200']";
 
     CB.onReservation('enable-paid-beds', function () {
         return CB.waitFor(SELECTOR).then(function (checkbox) {
