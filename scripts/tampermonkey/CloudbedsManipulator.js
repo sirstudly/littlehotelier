@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Cloudbeds Manipulator
 // @namespace    http://cloudbeds.com/
-// @version      0.6
+// @version      0.7
 // @description  Highlight Channel Collect / Airbnb bookings that must not be charged.
 // @author       RONBOT
 // @match        https://hotels.cloudbeds.com/connect/*
 // @match        https://macbackpackers.cloudbeds.com/connect/*
-// @require      https://dropbox.macbackpackers.com/cloudbeds-core.js
+// @require      https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/cloudbeds-core.js
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
 

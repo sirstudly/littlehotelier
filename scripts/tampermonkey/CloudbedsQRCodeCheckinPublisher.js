@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Cloudbeds QR Code Checkin Publisher
 // @namespace    http://cloudbeds.com/
-// @version      0.2
+// @version      0.3
 // @description  Push QR code updates onto backoffice site.
 // @author       RONBOT
 // @match        https://hotels.cloudbeds.com/connect/*
 // @match        https://macbackpackers.cloudbeds.com/connect/*
-// @require      https://dropbox.macbackpackers.com/cloudbeds-core.js
+// @require      https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/cloudbeds-core.js
 // @grant        GM_xmlhttpRequest
 // @connect      wss.backoffice.macbackpackers.com
 // ==/UserScript==

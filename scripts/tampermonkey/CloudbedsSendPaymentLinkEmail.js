@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Cloudbeds Send Payment Link Email
 // @namespace    http://cloudbeds.com/
-// @version      0.2
+// @version      0.3
 // @description  Adds a "Send payment link" email option to a booking.
 // @author       RONBOT
 // @match        https://hotels.cloudbeds.com/connect/*
 // @match        https://macbackpackers.cloudbeds.com/connect/*
-// @require      https://dropbox.macbackpackers.com/cloudbeds-core.js
+// @require      https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/cloudbeds-core.js
 // @grant        GM_xmlhttpRequest
 // @connect      pay.macbackpackers.com
 // ==/UserScript==

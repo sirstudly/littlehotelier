@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Cloudbeds Manipulator: Highlight blacklist (Castle Rock)
 // @namespace    http://cloudbeds.com/
-// @version      0.7
+// @version      0.8
 // @description  Highlight the guest name on a booking if it appears in the shared hostel blacklist.
 // @author       RONBOT
 // @match        https://hotels.cloudbeds.com/connect/*
 // @match        https://macbackpackers.cloudbeds.com/connect/*
-// @require      https://dropbox.macbackpackers.com/cloudbeds-core.js
-// @require      https://dropbox.macbackpackers.com/blacklist-common.js
+// @require      https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/cloudbeds-core.js
+// @require      https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/blacklist-common.js
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
 

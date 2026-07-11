@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Cloudbeds Manipulator: enable paid bed checkboxes
 // @namespace    http://cloudbeds.com/
-// @version      0.6
+// @version      0.7
 // @description  Re-enable the disabled paid-bed room-type checkboxes on a booking.
 // @author       Donovan
 // @match        https://hotels.cloudbeds.com/connect/*
 // @match        https://macbackpackers.cloudbeds.com/connect/*
-// @require      https://dropbox.macbackpackers.com/cloudbeds-core.js
+// @require      https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/cloudbeds-core.js
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
