@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         Cloudbeds Manipulator
 // @namespace    http://cloudbeds.com/
-// @version      0.8
+// @version      0.9
 // @description  Highlight Channel Collect / Airbnb bookings that must not be charged (with EVL levy exception).
 // @author       RONBOT
 // @match        https://hotels.cloudbeds.com/connect/*
 // @match        https://macbackpackers.cloudbeds.com/connect/*
 // @require      https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/cloudbeds-core.js
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // ==/UserScript==
 
 (function () {
@@ -48,10 +49,18 @@
         return iso > EVL_STAY_FROM;
     }
 
+    function clearPreviousHighlight() {
+        document.querySelectorAll('h1[data-charge-note]').forEach(function (el) {
+            el.removeAttribute('data-charge-note');
+        });
+        document.querySelectorAll('[data-cb-charge-message]').forEach(function (el) {
+            el.remove();
+        });
+    }
+
     function highlightNoCharge(node) {
         var sourceType = findSourceValue();
-        if (!sourceType) { return; }
-        if (document.querySelector("h1[data-charge-note='enabled']")) { return; } // already flagged
+        if (!sourceType) { return false; }
 
         // Guests may still need to pay for BDC Smart Flex (risk-free) bookings if balance owing.
         var moreInfo = (document.querySelector('span.have_custom') || {}).textContent || '';
@@ -79,27 +88,37 @@
                 var span = document.createElement('span');
                 span.className = 'balance-due-title pull-right bold uppercase';
                 span.setAttribute('style', 'color:red; margin-right: 20px');
+                span.setAttribute('data-cb-charge-message', '1');
                 span.textContent = message;
                 totals.appendChild(span);
             }
         }
 
         var guestName = document.querySelector('h1.main-guest-name');
-        if (guestName) { guestName.setAttribute('data-charge-note', 'enabled'); } // flag booking so we only do this once
+        if (guestName) { guestName.setAttribute('data-charge-note', 'enabled'); }
+        return true;
     }
 
     // Match a .big-text element whose text mentions a channel-collect / Airbnb booking.
-    function findBigText() {
+    // Also require Check-Out so we don't treat a half-swapped SPA view as ready.
+    function findReadyHighlightTarget() {
         var hits = CB.byText(document, "[class='big-text']", 'Channel Collect Booking');
         if (!hits.length) { hits = CB.byText(document, "[class='big-text']", 'Airbnb'); }
-        return hits.length ? hits[0] : null;
+        if (!hits.length) { return null; }
+        if (!findCheckoutText()) { return null; }
+        if (!findSourceValue()) { return null; }
+        return hits[0];
     }
 
-    CB.onReservation('manipulator', function () {
-        return CB.waitFor(findBigText).then(function (node) {
+    CB.onReservation('manipulator', function (ctx, meta) {
+        clearPreviousHighlight();
+        return CB.waitFor(findReadyHighlightTarget, {
+            skipExisting: !!(meta && meta.skipExisting)
+        }).then(function (node) {
             if (!node) { return false; }
-            highlightNoCharge(node);
-            return true;
+            // Guard against a late DOM swap finishing under a different reservation.
+            if (CB.context().reservationId !== ctx.reservationId) { return false; }
+            return highlightNoCharge(node);
         });
     });
 })();

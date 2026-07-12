@@ -11,33 +11,43 @@
 // Everything is exposed on window.CB inside Tampermonkey's isolated sandbox.
 // Typing window.CB in the page DevTools console will always be undefined; that
 // is normal and does not mean the scripts are not running.
+//
+// Feature scripts should declare: // @grant unsafeWindow
+// so we can patch the page's history (SPA pushState lives on the page realm).
 
 (function () {
     'use strict';
 
     if (window.CB) { return; } // already initialised in this sandbox
 
+    // Page realm (Cloudbeds app) vs Tampermonkey sandbox. pushState runs on the page.
+    var pageWindow = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
+
     // Cloudbeds connect is a single-page app: opening a booking changes the URL to
     // /connect/{propertyId}#/reservations/{id} via history.pushState, which fires
-    // NEITHER hashchange NOR popstate. Patch History.prototype (not just the
-    // sandbox's history object) so the page app's pushState/replaceState calls
-    // also emit our unified 'cb:locationchange' event.
+    // NEITHER hashchange NOR popstate. Patch the PAGE history so SPA navigations
+    // emit our unified 'cb:locationchange' event into this sandbox.
     function installLocationChange() {
         if (window.__cbLocationChangePatched) { return; }
         window.__cbLocationChangePatched = true;
 
-        function emit() { window.dispatchEvent(new Event('cb:locationchange')); }
+        function emit() {
+            window.dispatchEvent(new Event('cb:locationchange'));
+        }
 
         ['pushState', 'replaceState'].forEach(function (method) {
-            var original = History.prototype[method];
+            var original = pageWindow.history[method];
             if (typeof original !== 'function') { return; }
-            History.prototype[method] = function () {
+            pageWindow.history[method] = function () {
                 var result = original.apply(this, arguments);
                 emit();
                 return result;
             };
         });
 
+        pageWindow.addEventListener('popstate', emit);
+        pageWindow.addEventListener('hashchange', emit);
+        // Also listen on the sandbox window in case TM mirrors these events.
         window.addEventListener('popstate', emit);
         window.addEventListener('hashchange', emit);
     }
@@ -58,13 +68,23 @@
         return matches.length === 1 ? matches[0] : null;
     }
 
+    // Prefer page location (SPA updates) over sandbox location if they ever diverge.
+    function currentLocation() {
+        try {
+            return pageWindow.location || location;
+        } catch (e) {
+            return location;
+        }
+    }
+
     // Parse the current route. reservationId is null when not on a reservation view.
     function context() {
-        var propMatch = /\/connect\/(\d+)/.exec(location.pathname);
-        var resMatch = /#\/reservations\/(\d+)/.exec(location.hash);
+        var loc = currentLocation();
+        var propMatch = /\/connect\/(\d+)/.exec(loc.pathname);
+        var resMatch = /#\/reservations\/(\d+)/.exec(loc.hash);
         var hostel = detectHostel();
         return {
-            host: location.host,
+            host: loc.host,
             propertyId: propMatch ? propMatch[1] : null,
             reservationId: resMatch ? resMatch[1] : null,
             hostel: hostel,               // { title, path } or null
@@ -73,18 +93,25 @@
     }
 
     // Register a handler that runs once each time a reservation view is entered.
-    // fn(ctx) may return a Promise; resolve with false to allow retry on the next
-    // route change (e.g. waitFor timed out). Leaving the reservation view clears
-    // completion state so dashboard -> back to the same booking re-runs handlers.
+    // fn(ctx, meta) may return a Promise; resolve with false to allow retry on the
+    // next route change (e.g. waitFor timed out). meta.skipExisting is true when
+    // navigating booking→booking so waiters ignore stale DOM from the previous one.
     function onReservation(key, fn) {
         var completedFor = {};
         var inFlightFor = {};
+        var prevId = null;
 
         function tryRun() {
             var ctx = context();
             if (!ctx.reservationId) { return; }
 
             var id = ctx.reservationId;
+            var skipExisting = (prevId !== null && prevId !== id);
+            if (prevId && prevId !== id) {
+                delete inFlightFor[prevId]; // abandon wait for previous booking
+            }
+            prevId = id;
+
             if (completedFor[id] || inFlightFor[id]) { return; }
 
             inFlightFor[id] = true;
@@ -94,7 +121,7 @@
             }
 
             try {
-                var ret = fn(ctx);
+                var ret = fn(ctx, { skipExisting: skipExisting });
                 if (ret && typeof ret.then === 'function') {
                     ret.then(finish).catch(function (e) {
                         delete inFlightFor[id];
@@ -113,12 +140,12 @@
             if (!context().reservationId) {
                 completedFor = {};
                 inFlightFor = {};
+                prevId = null;
+                return;
             }
             tryRun();
         }
 
-        // 'cb:locationchange' covers pushState/replaceState/popstate/hashchange
-        // (see installLocationChange above), so this fires on every SPA navigation.
         window.addEventListener('cb:locationchange', onRouteChange);
 
         if (document.readyState === 'loading') {
@@ -154,16 +181,21 @@
     // target is found (or the timeout fires) - no polling.
     // Default timeout is 60s because reservation data can take 20+ seconds to load
     // on a cold tab (see get_reservation timing in captured HAR files).
+    // opts.skipExisting: ignore a match already in the DOM (SPA booking→booking);
+    // wait for a mutation that produces a fresh match instead.
     function waitFor(target, opts) {
         opts = opts || {};
         var timeout = opts.timeout == null ? 60000 : opts.timeout;
+        var skipExisting = !!opts.skipExisting;
 
         return waitForBody().then(function (body) {
             var within = opts.within || body || document.documentElement;
 
             return new Promise(function (result) {
-                var existing = resolve(target);
-                if (existing) { result(existing); return; }
+                if (!skipExisting) {
+                    var existing = resolve(target);
+                    if (existing) { result(existing); return; }
+                }
 
                 var done = false;
                 var timer = null;
@@ -181,7 +213,7 @@
                     var el = resolve(target);
                     if (el) { finish(el); }
                 });
-                observer.observe(within, { childList: true, subtree: true });
+                observer.observe(within, { childList: true, subtree: true, characterData: true });
 
                 if (timeout > 0) {
                     timer = setTimeout(function () { finish(null); }, timeout);
