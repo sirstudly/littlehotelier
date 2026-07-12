@@ -20,7 +20,7 @@
 
     if (window.CB) { return; } // already initialised in this sandbox
 
-    var CORE_VERSION = '1.2';
+    var CORE_VERSION = '1.3';
     // One visible line so we can confirm in DevTools which core build is running.
     console.info('[CB] cloudbeds-core v' + CORE_VERSION + ' loaded');
 
@@ -214,39 +214,81 @@
     // target is found (or the timeout fires) - no polling.
     // Default timeout is 60s because reservation data can take 20+ seconds to load
     // on a cold tab (see get_reservation timing in captured HAR files).
+    //
     // opts.skipExisting: ignore a match already in the DOM (SPA booking→booking);
     // wait for a mutation that produces a fresh match instead.
+    //
+    // opts.settle: don't resolve on the first match; wait until the DOM has been
+    // quiet for this many ms, then re-resolve against the FINAL DOM. This guards
+    // against matching stale content mid-SPA-swap (the old booking's elements
+    // still satisfy the selector while the new booking renders, and anything we
+    // style/insert gets wiped by the re-render). opts.settleMax (default 15s)
+    // caps the settle wait on pages that never go fully quiet.
     function waitFor(target, opts) {
         opts = opts || {};
         var timeout = opts.timeout == null ? 60000 : opts.timeout;
         var skipExisting = !!opts.skipExisting;
+        var settleMs = opts.settle == null ? 0 : opts.settle;
+        var settleMaxMs = opts.settleMax == null ? 15000 : opts.settleMax;
 
         return waitForBody().then(function (body) {
             var within = opts.within || body || document.documentElement;
 
             return new Promise(function (result) {
-                if (!skipExisting) {
-                    var existing = resolve(target);
-                    if (existing) { result(existing); return; }
-                }
-
                 var done = false;
                 var timer = null;
+                var quietTimer = null;
+                var capTimer = null;
                 var observer = null;
+                var matched = false;
 
                 function finish(el) {
                     if (done) { return; }
                     done = true;
                     if (timer) { clearTimeout(timer); }
+                    if (quietTimer) { clearTimeout(quietTimer); }
+                    if (capTimer) { clearTimeout(capTimer); }
                     if (observer) { observer.disconnect(); }
                     result(el);
                 }
 
-                observer = new MutationObserver(function () {
+                // Re-resolve against the now-settled DOM. If the match evaporated
+                // (it was stale content that got swapped out), resume waiting.
+                function settleCheck() {
                     var el = resolve(target);
-                    if (el) { finish(el); }
+                    if (el) { finish(el); return; }
+                    matched = false;
+                    if (capTimer) { clearTimeout(capTimer); capTimer = null; }
+                }
+
+                function noteMatch(el) {
+                    if (!settleMs) { finish(el); return; }
+                    if (!matched) {
+                        matched = true;
+                        if (settleMaxMs > 0) { capTimer = setTimeout(settleCheck, settleMaxMs); }
+                    }
+                    if (quietTimer) { clearTimeout(quietTimer); }
+                    quietTimer = setTimeout(settleCheck, settleMs);
+                }
+
+                observer = new MutationObserver(function () {
+                    if (done) { return; }
+                    var el = resolve(target);
+                    if (el) {
+                        noteMatch(el);
+                    } else if (matched && quietTimer) {
+                        // DOM churning and match temporarily lost; push the quiet
+                        // timer back so we re-check once things calm down.
+                        clearTimeout(quietTimer);
+                        quietTimer = setTimeout(settleCheck, settleMs);
+                    }
                 });
                 observer.observe(within, { childList: true, subtree: true, characterData: true });
+
+                if (!skipExisting) {
+                    var existing = resolve(target);
+                    if (existing) { noteMatch(existing); }
+                }
 
                 if (timeout > 0) {
                     timer = setTimeout(function () { finish(null); }, timeout);

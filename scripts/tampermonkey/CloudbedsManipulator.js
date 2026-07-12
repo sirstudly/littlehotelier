@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cloudbeds Manipulator
 // @namespace    http://cloudbeds.com/
-// @version      0.9
+// @version      1.2
 // @description  Highlight Channel Collect / Airbnb bookings that must not be charged (with EVL levy exception).
 // @author       RONBOT
 // @match        https://hotels.cloudbeds.com/connect/*
@@ -112,8 +112,12 @@
 
     CB.onReservation('manipulator', function (ctx, meta) {
         clearPreviousHighlight();
+        // settle: on booking→booking the old view still matches while the new one
+        // renders; wait for the DOM to go quiet so we style the FINAL elements
+        // (anything painted mid-swap gets wiped by the re-render).
         return CB.waitFor(findReadyHighlightTarget, {
-            skipExisting: !!(meta && meta.skipExisting)
+            skipExisting: !!(meta && meta.skipExisting),
+            settle: 800
         }).then(function (node) {
             if (!node) { return false; }
             // Guard against a late DOM swap finishing under a different reservation.
