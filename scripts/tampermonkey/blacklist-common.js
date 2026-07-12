@@ -64,8 +64,10 @@
             console.error('[CB:blacklist] No API token configured for ' + propertyPath);
             return;
         }
-        CB.onReservation('blacklist', function () {
-            return CB.waitFor('.page-title h3').then(function (h3) {
+        CB.onReservation('blacklist', function (ctx, meta) {
+            return CB.waitFor('.page-title h3', {
+                skipExisting: !!(meta && meta.skipExisting)
+            }).then(function (h3) {
                 if (!h3) { return false; }
                 check(h3, propertyPath, token);
                 return true;

@@ -1,13 +1,16 @@
 // ==UserScript==
 // @name         Cloudbeds QR Code Checkin Publisher
 // @namespace    http://cloudbeds.com/
-// @version      0.3
+// @version      0.4
+// @updateURL    https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsQRCodeCheckinPublisher.js
+// @downloadURL  https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsQRCodeCheckinPublisher.js
 // @description  Push QR code updates onto backoffice site.
 // @author       RONBOT
 // @match        https://hotels.cloudbeds.com/connect/*
 // @match        https://macbackpackers.cloudbeds.com/connect/*
 // @require      https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/cloudbeds-core.js
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @connect      wss.backoffice.macbackpackers.com
 // ==/UserScript==
 
@@ -49,8 +52,10 @@
         statusSelect.parentNode.insertBefore(link, statusSelect.parentNode.firstChild); // prepend
     }
 
-    CB.onReservation('qr-code-publisher', function (ctx) {
-        return CB.waitFor("div[class*='res-status-select']").then(function (statusSelect) {
+    CB.onReservation('qr-code-publisher', function (ctx, meta) {
+        return CB.waitFor("div[class*='res-status-select']", {
+            skipExisting: !!(meta && meta.skipExisting)
+        }).then(function (statusSelect) {
             if (!statusSelect) { return false; }
             publishQRCode(statusSelect, ctx);
             return true;

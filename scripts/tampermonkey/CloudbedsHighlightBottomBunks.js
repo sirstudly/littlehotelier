@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         Cloudbeds Manipulator: highlight bottom bunks
 // @namespace    http://cloudbeds.com/
-// @version      0.6
+// @version      0.7
 // @description  Draws a subtle separator to separate bunks in the Cloudbeds calendar view.
 // @author       Donovan
 // @match        https://hotels.cloudbeds.com/connect/*
 // @match        https://macbackpackers.cloudbeds.com/connect/*
-// @require      https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/cloudbeds-core.js
+// @updateURL    https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsHighlightBottomBunks.js
+// @downloadURL  https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsHighlightBottomBunks.js
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
 

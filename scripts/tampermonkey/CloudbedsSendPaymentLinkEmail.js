@@ -1,13 +1,16 @@
 // ==UserScript==
 // @name         Cloudbeds Send Payment Link Email
 // @namespace    http://cloudbeds.com/
-// @version      0.3
+// @version      0.4
+// @updateURL    https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsSendPaymentLinkEmail.js
+// @downloadURL  https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsSendPaymentLinkEmail.js
 // @description  Adds a "Send payment link" email option to a booking.
 // @author       RONBOT
 // @match        https://hotels.cloudbeds.com/connect/*
 // @match        https://macbackpackers.cloudbeds.com/connect/*
 // @require      https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/cloudbeds-core.js
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @connect      pay.macbackpackers.com
 // ==/UserScript==
 
@@ -44,8 +47,10 @@
         parent.parentNode.insertBefore(li, parent.nextSibling); // insert after the anchor's parent
     }
 
-    CB.onReservation('send-payment-link', function (ctx) {
-        return CB.waitFor("a[class*='rs-email-compose']").then(function (anchor) {
+    CB.onReservation('send-payment-link', function (ctx, meta) {
+        return CB.waitFor("a[class*='rs-email-compose']", {
+            skipExisting: !!(meta && meta.skipExisting)
+        }).then(function (anchor) {
             if (!anchor) { return false; }
             addEmailPaymentLinkOption(anchor, ctx);
             return true;
