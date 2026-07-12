@@ -20,18 +20,38 @@
 
     if (window.CB) { return; } // already initialised in this sandbox
 
+    var CORE_VERSION = '1.2';
+    // One visible line so we can confirm in DevTools which core build is running.
+    console.info('[CB] cloudbeds-core v' + CORE_VERSION + ' loaded');
+
     // Page realm (Cloudbeds app) vs Tampermonkey sandbox. pushState runs on the page.
     var pageWindow = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
+
+    function currentHref() {
+        try {
+            return pageWindow.location.href;
+        } catch (e) {
+            return location.href;
+        }
+    }
 
     // Cloudbeds connect is a single-page app: opening a booking changes the URL to
     // /connect/{propertyId}#/reservations/{id} via history.pushState, which fires
     // NEITHER hashchange NOR popstate. Patch the PAGE history so SPA navigations
     // emit our unified 'cb:locationchange' event into this sandbox.
+    //
+    // The patch can still be bypassed if the app captured a bound reference to
+    // pushState before we ran (userscripts inject at document-idle), so a cheap
+    // URL watcher (single string compare per tick) acts as a guaranteed fallback.
     function installLocationChange() {
         if (window.__cbLocationChangePatched) { return; }
         window.__cbLocationChangePatched = true;
 
-        function emit() {
+        var lastHref = currentHref();
+
+        function emit(source) {
+            lastHref = currentHref();
+            console.debug('[CB] locationchange via ' + source + ': ' + lastHref);
             window.dispatchEvent(new Event('cb:locationchange'));
         }
 
@@ -40,16 +60,21 @@
             if (typeof original !== 'function') { return; }
             pageWindow.history[method] = function () {
                 var result = original.apply(this, arguments);
-                emit();
+                emit(method);
                 return result;
             };
         });
 
-        pageWindow.addEventListener('popstate', emit);
-        pageWindow.addEventListener('hashchange', emit);
+        pageWindow.addEventListener('popstate', function () { emit('popstate'); });
+        pageWindow.addEventListener('hashchange', function () { emit('hashchange'); });
         // Also listen on the sandbox window in case TM mirrors these events.
-        window.addEventListener('popstate', emit);
-        window.addEventListener('hashchange', emit);
+        window.addEventListener('popstate', function () { emit('popstate:sandbox'); });
+        window.addEventListener('hashchange', function () { emit('hashchange:sandbox'); });
+
+        // Fallback URL watcher: catches SPA navigations that bypass the patch.
+        setInterval(function () {
+            if (currentHref() !== lastHref) { emit('urlwatch'); }
+        }, 1000);
     }
     installLocationChange();
 
@@ -112,12 +137,20 @@
             }
             prevId = id;
 
-            if (completedFor[id] || inFlightFor[id]) { return; }
+            if (completedFor[id] || inFlightFor[id]) {
+                console.debug('[CB:' + key + '] skip reservation ' + id +
+                    (completedFor[id] ? ' (completed)' : ' (in flight)'));
+                return;
+            }
 
+            console.debug('[CB:' + key + '] run for reservation ' + id +
+                ' skipExisting=' + skipExisting);
             inFlightFor[id] = true;
             function finish(success) {
                 delete inFlightFor[id];
                 if (success !== false) { completedFor[id] = true; }
+                console.debug('[CB:' + key + '] finished reservation ' + id +
+                    ' success=' + (success !== false));
             }
 
             try {
