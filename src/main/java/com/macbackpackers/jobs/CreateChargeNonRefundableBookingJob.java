@@ -45,9 +45,14 @@ public class CreateChargeNonRefundableBookingJob extends AbstractJob {
                     LOGGER.info( "Creating a ChargeNonRefundableBookingJob for booking "
                             + p.getThirdPartyIdentifier() + " (" + p.getStatus() + "): "
                             + p.getFirstName() + " " + p.getLastName() );
+                    CalculateEdinburghVisitorLevyForBookingJob evlJob =
+                            dao.findPendingCalculateEdinburghVisitorLevyJobForReservation( p.getReservationId() );
                     ChargeNonRefundableBookingJob chargeJob = new ChargeNonRefundableBookingJob();
                     chargeJob.setStatus( JobStatus.submitted );
                     chargeJob.setReservationId( p.getReservationId() );
+                    if ( evlJob != null ) {
+                        chargeJob.getDependentJobs().add( evlJob );
+                    }
                     dao.insertJob( chargeJob );
                 } );
     }

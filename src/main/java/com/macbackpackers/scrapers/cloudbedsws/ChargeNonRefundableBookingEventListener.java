@@ -17,8 +17,10 @@ import org.springframework.stereotype.Component;
 
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob;
 import com.macbackpackers.jobs.ChargeNonRefundableBookingJob;
 import com.macbackpackers.scrapers.CloudbedsScraper;
+import com.macbackpackers.services.EdinburghVisitorLevyJobSupport;
 
 /**
  * Reacts to incremental calendar WebSocket updates by enqueueing
@@ -38,6 +40,9 @@ public class ChargeNonRefundableBookingEventListener implements CloudbedsEventLi
 
     @Autowired
     private CloudbedsScraper cloudbedsScraper;
+
+    @Autowired
+    private EdinburghVisitorLevyJobSupport edinburghVisitorLevyJobSupport;
 
     @Autowired
     private ApplicationContext context;
@@ -94,9 +99,14 @@ public class ChargeNonRefundableBookingEventListener implements CloudbedsEventLi
         LOGGER.info( "Creating a ChargeNonRefundableBookingJob for booking {} ({}): {} {}",
                 event.getThirdPartyIdentifier(), event.getStatus(),
                 event.getFirstName(), event.getLastName() );
+        CalculateEdinburghVisitorLevyForBookingJob evlJob =
+                edinburghVisitorLevyJobSupport.findOrCreatePendingJob( reservationId );
         ChargeNonRefundableBookingJob chargeJob = new ChargeNonRefundableBookingJob();
         chargeJob.setStatus( JobStatus.submitted );
         chargeJob.setReservationId( reservationId );
+        if ( evlJob != null ) {
+            chargeJob.getDependentJobs().add( evlJob );
+        }
         dao.insertJob( chargeJob );
         recentlyEnqueuedReservationIds.add( reservationId );
     }

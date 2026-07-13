@@ -23,6 +23,7 @@ import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
+import com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob;
 import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringEscapeUtils;
@@ -289,19 +290,30 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Override
     public boolean hasCalculateEdinburghVisitorLevyJobForReservation( String reservationId ) {
+        return findPendingCalculateEdinburghVisitorLevyJobForReservation( reservationId ) != null;
+    }
+
+    @Override
+    public CalculateEdinburghVisitorLevyForBookingJob findPendingCalculateEdinburghVisitorLevyJobForReservation(
+            String reservationId ) {
         if ( StringUtils.isBlank( reservationId ) ) {
-            return false;
+            return null;
         }
-        String sql = "SELECT COUNT(1) FROM wp_lh_jobs j "
+        String sql = "SELECT j.job_id FROM wp_lh_jobs j "
                 + "  JOIN wp_lh_job_param p ON j.job_id = p.job_id "
                 + " WHERE j.classname = 'com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob' "
                 + "   AND p.name = 'reservation_id' "
                 + "   AND p.value = :reservationId "
-                + "   AND j.status IN ('submitted', 'processing', 'retry')";
-        Number count = (Number) em.createNativeQuery( sql )
+                + "   AND j.status IN ('submitted', 'processing', 'retry') "
+                + " ORDER BY j.job_id ASC";
+        @SuppressWarnings( "unchecked" )
+        List<Number> jobIds = em.createNativeQuery( sql )
                 .setParameter( "reservationId", reservationId )
-                .getSingleResult();
-        return count.longValue() > 0;
+                .getResultList();
+        if ( jobIds.isEmpty() ) {
+            return null;
+        }
+        return fetchJobById( jobIds.get( 0 ).intValue(), CalculateEdinburghVisitorLevyForBookingJob.class );
     }
 
     @Override

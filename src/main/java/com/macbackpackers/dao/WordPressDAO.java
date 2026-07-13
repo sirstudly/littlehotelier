@@ -34,6 +34,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.jobs.AbstractJob;
+import com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob;
 import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
 
 public interface WordPressDAO {
@@ -181,6 +182,16 @@ public interface WordPressDAO {
      * @param reservationId Cloudbeds reservation id
      */
     boolean hasCalculateEdinburghVisitorLevyJobForReservation( String reservationId );
+
+    /**
+     * Returns a pending {@code CalculateEdinburghVisitorLevyForBookingJob} for the reservation
+     * (status {@code submitted}, {@code processing}, or {@code retry}), or {@code null} if none.
+     * When more than one pending job exists, returns the earliest by job id.
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    CalculateEdinburghVisitorLevyForBookingJob findPendingCalculateEdinburghVisitorLevyJobForReservation(
+            String reservationId );
 
     /**
      * Returns the number of jobs at 'submitted' or 'processing'.
