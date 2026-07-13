@@ -42,10 +42,12 @@ import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.HostelworldBookingDate;
+import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.exceptions.WebResponseException;
+import com.macbackpackers.jobs.SendGmailJob;
 import com.macbackpackers.services.FileService;
 import com.macbackpackers.services.GmailService;
 
@@ -63,6 +65,10 @@ public class HostelworldScraper {
     private static final String LOGIN_URL = "https://inbox.hostelworld.com/";
 
     private static final String LOGGED_IN_PATH = "/loggedin.php";
+
+    private static final String USER_EXPIRED_PATH = "/userexpired.php";
+
+    private static final String HOSTELWORLD_LOGIN_EXPIRED_SUBJECT = "Hostelworld Login has expired";
 
     private static final String INBOX_ORIGIN = "https://inbox.hostelworld.com";
 
@@ -147,6 +153,13 @@ public class HostelworldScraper {
         LOGGER.info( "Following secure login link from email" );
         HtmlPage loggedInPage = completeLoginAfterMagicLink( webClient, webClient.getPage( loginUrl ) );
 
+        if ( USER_EXPIRED_PATH.equals( loggedInPage.getUrl().getPath() ) ) {
+            LOGGER.error( loggedInPage.asXml() );
+            enqueueHostelworldLoginExpiredEmail();
+            throw new UnrecoverableFault( "Hostelworld login did not complete; expected " + LOGGED_IN_PATH
+                    + " but got " + loggedInPage.getUrl() );
+        }
+
         if ( false == LOGGED_IN_PATH.equals( loggedInPage.getUrl().getPath() ) ) {
             LOGGER.error( loggedInPage.asXml() );
             throw new UnrecoverableFault( "Hostelworld login did not complete; expected " + LOGGED_IN_PATH
@@ -156,6 +169,22 @@ public class HostelworldScraper {
         LOGGER.info( "Finished logging in" );
         fileService.writeCookiesToFile( webClient, COOKIE_FILE );
         return loggedInPage;
+    }
+
+    private void enqueueHostelworldLoginExpiredEmail() {
+        if ( wordPressDAO.hasRecentSendGmailJobWithSubject( HOSTELWORLD_LOGIN_EXPIRED_SUBJECT, 24 ) ) {
+            LOGGER.info( "Skipping SendGmailJob for expired Hostelworld login; already notified within last 24 hours" );
+            return;
+        }
+        SendGmailJob job = new SendGmailJob();
+        job.setStatus( JobStatus.submitted );
+        job.setToAddress( "me" );
+        job.setSubject( HOSTELWORLD_LOGIN_EXPIRED_SUBJECT );
+        job.setEmailBody( "It appears that the Hostelworld credentials have expired. "
+                + "Login to Hostelworld and update the backoffice site with the new password: "
+                + wordPressDAO.getMandatoryOption( "hbo_backoffice_url" ) + "/admin/report-settings/" );
+        wordPressDAO.insertJob( job );
+        LOGGER.info( "Queued SendGmailJob {} for expired Hostelworld login", job.getId() );
     }
 
     /**

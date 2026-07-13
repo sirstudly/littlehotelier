@@ -176,6 +176,15 @@ public interface WordPressDAO {
     boolean hasRecentChargeNonRefundableJobForReservation( String reservationId, int hoursBack, Integer excludeJobId );
 
     /**
+     * Returns true if a recent {@code SendGmailJob} with the given subject already exists:
+     * either one is still pending, or any attempt was recorded within {@code hoursBack} hours.
+     *
+     * @param subject email subject parameter value
+     * @param hoursBack cooldown window in hours
+     */
+    boolean hasRecentSendGmailJobWithSubject( String subject, int hoursBack );
+
+    /**
      * Returns true if a pending {@code CalculateEdinburghVisitorLevyForBookingJob} already exists
      * for the given reservation.
      *

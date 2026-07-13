@@ -289,6 +289,27 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public boolean hasRecentSendGmailJobWithSubject( String subject, int hoursBack ) {
+        if ( StringUtils.isBlank( subject ) ) {
+            return false;
+        }
+        Number count = (Number) em.createNativeQuery(
+                "SELECT COUNT(1) FROM wp_lh_jobs j "
+                        + "  JOIN wp_lh_job_param p ON j.job_id = p.job_id "
+                        + " WHERE j.classname = 'com.macbackpackers.jobs.SendGmailJob' "
+                        + "   AND p.name = 'subject' "
+                        + "   AND p.value = :subject "
+                        + "   AND (j.status IN ('submitted', 'processing', 'retry') "
+                        + "        OR (j.status IN ('completed', 'failed') "
+                        + "            AND (j.created_date >= DATE_SUB(NOW(), INTERVAL :hoursBack HOUR) "
+                        + "                 OR j.last_updated_date >= DATE_SUB(NOW(), INTERVAL :hoursBack HOUR))))" )
+                .setParameter( "subject", subject )
+                .setParameter( "hoursBack", hoursBack )
+                .getSingleResult();
+        return count.longValue() > 0;
+    }
+
+    @Override
     public boolean hasCalculateEdinburghVisitorLevyJobForReservation( String reservationId ) {
         return findPendingCalculateEdinburghVisitorLevyJobForReservation( reservationId ) != null;
     }

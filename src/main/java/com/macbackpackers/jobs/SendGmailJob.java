@@ -4,6 +4,7 @@ package com.macbackpackers.jobs;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.services.GmailService;
+import org.apache.commons.lang3.StringUtils;
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -33,21 +34,29 @@ public class SendGmailJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        try( WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+        if ( StringUtils.isBlank( getReservationId() ) ) {
+            sendEmail();
+            return;
+        }
+        try ( WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class ) ) {
             Reservation res = scraper.getReservationRetry( webClient, getReservationId() );
             final String note = getSubject() + " email sent.";
-            if( res.containsNote( note ) ) {
+            if ( res.containsNote( note ) ) {
                 LOGGER.info( "Email already sent. Nothing to do." );
             }
             else {
-                if ( "me".equalsIgnoreCase( getToAddress() ) ) {
-                    gmailService.sendEmailToSelf( getSubject(), getEmailBody() );
-                }
-                else {
-                    gmailService.sendEmail( getToAddress(), null, getSubject(), getEmailBody() );
-                }
+                sendEmail();
                 scraper.addNote( webClient, getReservationId(), note );
             }
+        }
+    }
+
+    private void sendEmail() throws Exception {
+        if ( "me".equalsIgnoreCase( getToAddress() ) ) {
+            gmailService.sendEmailToSelf( getSubject(), getEmailBody() );
+        }
+        else {
+            gmailService.sendEmail( getToAddress(), null, getSubject(), getEmailBody() );
         }
     }
 
