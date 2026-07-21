@@ -854,6 +854,7 @@ public class CloudbedsService {
 
     /**
      * Creates send email jobs for all upcoming unpaid group bookings.
+     * Bookings with only EVL remaining (collected on arrival) are treated as paid.
      * 
      * @param webClient
      * @param checkinDateStart
@@ -869,15 +870,17 @@ public class CloudbedsService {
                 .filter( c -> c.isHotelCollectBooking() )
                 .filter( c -> false == "Airbnb (API)".equals( c.getSourceName() ) ) // Airbnb is channel-collect apparently
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
+                .filter( r -> EdinburghVisitorLevyCalculator.getBalanceDueExcludingVisitorLevy( r ).compareTo( BigDecimal.ZERO ) > 0 )
                 .filter( r -> r.getNumberOfGuests() >= GROUP_BOOKING_SIZE )
                 .filter( r -> false == r.containsNote( TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER ) )
                 // don't send the payment reminder if they booked within the payment reminder window
                 .filter( r -> r.getBookingDateAsLocalDate().compareTo( LocalDate.now().minusDays( Period.between( LocalDate.now(), checkinDateEnd ).getDays() ) ) < 0 )
                 .filter( r -> false == "Airbnb (API)".equals( r.getSourceName() ) ) // Airbnb is channel-collect apparently
                 .forEach( r -> {
+                    BigDecimal amountDue = EdinburghVisitorLevyCalculator.getBalanceDueExcludingVisitorLevy( r );
                     LOGGER.info( "Creating SendGroupBookingPaymentReminderEmailJob for Res #" + r.getReservationId()
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
-                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() + " with amount due of £" + r.getBalanceDue() );
+                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() + " with amount due of £" + amountDue );
                     SendGroupBookingPaymentReminderEmailJob j = new SendGroupBookingPaymentReminderEmailJob();
                     j.setStatus( JobStatus.submitted );
                     j.setReservationId( r.getReservationId() );
