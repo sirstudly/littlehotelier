@@ -179,6 +179,9 @@ public class EdinburghVisitorLevyService {
         if ( false == evlEnabled ) {
             return false;
         }
+        if ( customer.isLongTermer() ) {
+            return false;
+        }
         if ( EdinburghVisitorLevyBookingCriteria.isInclusiveTaxSourceName( customer.getSourceName() ) ) {
             return false;
         }

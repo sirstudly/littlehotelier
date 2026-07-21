@@ -605,6 +605,14 @@ public class Reservation extends CloudbedsJsonResponse {
         return "canceled".equals( getStatus() ) || "no_show".equals( getStatus() );
     }
 
+    /**
+     * Returns true if first or last name contains LT by itself (long-term resident).
+     */
+    public boolean isLongTermer() {
+        return Arrays.asList( StringUtils.defaultString( getFirstName() ).toUpperCase().split( " " ) ).contains( "LT" )
+                || Arrays.asList( StringUtils.defaultString( getLastName() ).toUpperCase().split( " " ) ).contains( "LT" );
+    }
+
     public int getNumberOfGuests() {
         return (getAdultsNumber() == null ? 0 : getAdultsNumber())
                 + (getKidsNumber() == null ? 0 : getKidsNumber());

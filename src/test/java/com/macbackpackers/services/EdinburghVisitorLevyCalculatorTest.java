@@ -257,6 +257,40 @@ public class EdinburghVisitorLevyCalculatorTest {
     }
 
     @Test
+    public void testLongTermResidentHasZeroLevy() {
+        Reservation reservation = reservationWithRates(
+                "Walk-In", "2026-10-01", "2026-10-04", "2025-11-01",
+                rateLine( "2026-10-01", "55.00" ),
+                rateLine( "2026-10-02", "55.00" ),
+                rateLine( "2026-10-03", "55.00" ) );
+        reservation.setFirstName( "John LT" );
+        reservation.setLastName( "Smith" );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
+        assertThat( calculation.isLongTermResident(), is( true ) );
+        assertThat( EdinburghVisitorLevyCalculator.buildAdjustmentNote( calculation ),
+                is( "Long-term resident - visitor levy not applicable. -RONBOT" ) );
+    }
+
+    @Test
+    public void testLongTermResidentDetectedInLastName() {
+        Reservation reservation = reservationWithRates(
+                "Walk-In", "2026-10-01", "2026-10-02", "2025-11-01",
+                rateLine( "2026-10-01", "165.00" ) );
+        reservation.setFirstName( "Jane" );
+        reservation.setLastName( "LT Doe" );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM );
+
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
+        assertThat( calculation.isLongTermResident(), is( true ) );
+    }
+
+    @Test
     public void testResolveTaxIdFromPropertyContentFixture() throws IOException {
         String json = IOUtils.toString(
                 getClass().getClassLoader().getResourceAsStream( "get_property_content_taxes.json" ),

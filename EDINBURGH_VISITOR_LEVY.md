@@ -10,6 +10,7 @@ Reference for developers and AI agents working on EVL in this codebase. Covers s
 | Night cap | First **5 consecutive** eligible nights |
 | Stay eligible from | **2026-07-24** (last night = day before checkout) |
 | Canceled / no-show | Levy = **£0** |
+| Long-term resident (`LT` token in first or last name) | Levy = **£0** |
 | VAT | If VAT-registered, levy is taxable turnover (20% VAT on levy) |
 
 Council remittance is via **visitorlevy.scot** (quarterly, by stay dates). The platform is for reporting/remittance, not guest charging.
@@ -287,7 +288,7 @@ Queries **all** bookings in range (all Cloudbeds statuses, including canceled an
 |---|---|
 | Potentially eligible (`evl.enabled`, has eligible stay dates) **and** `expectedLevy − currentLevy` outside tolerance | Folio EVL needs correction |
 
-Excludes: `evl.enabled=false`, no eligible stay dates, levy already correct (within £0.01), **inclusive-tax bookings** (`Booking.com`, Agoda / Priceline — no adjustment job is created because channel totals are fixed; see [Adjustment job flow](#adjustment-job-flow)).
+Excludes: `evl.enabled=false`, no eligible stay dates, levy already correct (within £0.01), **long-term residents** (`LT` token in first/last name), **inclusive-tax bookings** (`Booking.com`, Agoda / Priceline — no adjustment job is created because channel totals are fixed; see [Adjustment job flow](#adjustment-job-flow)).
 
 Creates one `CalculateEdinburghVisitorLevyForBookingJob` per reservation (`reservation_id`) that needs adjustment only — no no-op jobs.
 
@@ -462,6 +463,7 @@ BDC partner hub: [Edinburgh Visitor Levy](https://partner.booking.com/en-gb/help
 | Straddling 24 Jul (2 of 4 nights) | £10.00 |
 | 7 nights capped at 5 | £15.00 |
 | Exempt / canceled | £0 |
+| Long-term resident (`LT` in name) | £0 |
 
 Test helper `reservationWithRates()` clears `channelPriceListed/Balance/Commission` to avoid stale fixture data.
 
