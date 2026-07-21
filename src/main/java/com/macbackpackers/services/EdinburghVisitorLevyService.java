@@ -113,14 +113,16 @@ public class EdinburghVisitorLevyService {
     }
 
     /**
-     * Returns bookings in the date range that are potentially levy-eligible and whose folio EVL
-     * differs from the calculated amount (outside tolerance).
+     * Returns bookings matching the given booking-date and/or checkin-date range that are
+     * potentially levy-eligible and whose folio EVL differs from the calculated amount
+     * (outside tolerance). When both ranges are set, Cloudbeds applies both filters (AND).
      */
     public List<CustomerLevyAssessment> findReservationsRequiringVisitorLevyAdjustment( WebClient webClient,
-            LocalDate bookingDateStart, LocalDate bookingDateEnd ) throws IOException {
+            LocalDate bookingDateStart, LocalDate bookingDateEnd,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
         List<CustomerLevyAssessment> results = new ArrayList<>();
-        for ( CustomerLevyAssessment entry : assessReservationsInBookingDateRange(
-                webClient, bookingDateStart, bookingDateEnd ) ) {
+        for ( CustomerLevyAssessment entry : assessReservationsInDateRange(
+                webClient, bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd ) ) {
             if ( entry.getAssessment().needsAdjustment() ) {
                 results.add( entry );
             }
@@ -129,14 +131,17 @@ public class EdinburghVisitorLevyService {
     }
 
     /**
-     * Assesses visitor levy for all potentially eligible bookings in a booking-date range
-     * (all reservation statuses, including canceled and no_show).
+     * Assesses visitor levy for all potentially eligible bookings matching the given booking-date
+     * and/or checkin-date range (all reservation statuses, including canceled and no_show).
+     * When both ranges are set, Cloudbeds applies both filters (AND).
      */
-    public List<CustomerLevyAssessment> assessReservationsInBookingDateRange( WebClient webClient,
-            LocalDate bookingDateStart, LocalDate bookingDateEnd ) throws IOException {
+    public List<CustomerLevyAssessment> assessReservationsInDateRange( WebClient webClient,
+            LocalDate bookingDateStart, LocalDate bookingDateEnd,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
         List<CustomerLevyAssessment> results = new ArrayList<>();
-        for ( Customer customer : cloudbedsScraper.getReservationsByBookingDate(
-                webClient, bookingDateStart, bookingDateEnd, ALL_STATUSES ) ) {
+        for ( Customer customer : cloudbedsScraper.getReservations( webClient,
+                null, null, checkinDateStart, checkinDateEnd, null, null,
+                bookingDateStart, bookingDateEnd, ALL_STATUSES ) ) {
             if ( false == isPotentiallyEligible( customer ) ) {
                 continue;
             }

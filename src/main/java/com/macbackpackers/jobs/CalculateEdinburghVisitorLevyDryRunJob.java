@@ -1,4 +1,3 @@
-
 package com.macbackpackers.jobs;
 
 import java.time.LocalDate;
@@ -7,6 +6,7 @@ import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Transient;
 
+import org.apache.commons.lang3.StringUtils;
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -14,10 +14,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import com.macbackpackers.services.EdinburghVisitorLevyService;
 
 /**
- * Dry-run visitor levy calculation for bookings in a booking-date range (all statuses, including
- * canceled and no_show) that would normally be queued by
+ * Dry-run visitor levy calculation for bookings in an optional booking-date and/or checkin-date
+ * range (all statuses, including canceled and no_show) that would normally be queued by
  * {@link CreateCalculateEdinburghVisitorLevyForBookingJob}. Logs whether each reservation needs
- * an adjustment without posting charges.
+ * an adjustment without posting charges. At least one of the two date pairs must be set; when
+ * both are set, only bookings matching both ranges are assessed.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.CalculateEdinburghVisitorLevyDryRunJob" )
@@ -38,12 +39,18 @@ public class CalculateEdinburghVisitorLevyDryRunJob extends AbstractJob {
             return;
         }
 
+        LocalDate bookingDateStart = getBookingDateStart();
+        LocalDate bookingDateEnd = getBookingDateEnd();
+        LocalDate checkinDateStart = getCheckinDateStart();
+        LocalDate checkinDateEnd = getCheckinDateEnd();
+        validateDateRanges( bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd );
+
         int needingAdjustment = 0;
         int checked = 0;
 
         for ( EdinburghVisitorLevyService.CustomerLevyAssessment entry
-                : edinburghVisitorLevyService.assessReservationsInBookingDateRange(
-                cbWebClient, getBookingDateStart(), getBookingDateEnd() ) ) {
+                : edinburghVisitorLevyService.assessReservationsInDateRange(
+                cbWebClient, bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd ) ) {
             edinburghVisitorLevyService.logDryRunAssessment( entry.getCustomer(), entry.getAssessment() );
             checked++;
             if ( entry.getAssessment().needsAdjustment() ) {
@@ -51,8 +58,25 @@ public class CalculateEdinburghVisitorLevyDryRunJob extends AbstractJob {
             }
         }
 
-        LOGGER.info( "Visitor levy dry run {} to {}: {} reservations checked, {} need adjustment",
-                getBookingDateStart(), getBookingDateEnd(), checked, needingAdjustment );
+        LOGGER.info( "Visitor levy dry run booking {} to {}, checkin {} to {}: {} reservations checked, {} need adjustment",
+                bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd, checked, needingAdjustment );
+    }
+
+    private static void validateDateRanges( LocalDate bookingDateStart, LocalDate bookingDateEnd,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd ) {
+        requireCompletePair( "booking_date", bookingDateStart, bookingDateEnd );
+        requireCompletePair( "checkin_date", checkinDateStart, checkinDateEnd );
+        if ( bookingDateStart == null && checkinDateStart == null ) {
+            throw new IllegalArgumentException(
+                    "Either booking_date_start/end or checkin_date_start/end must be non-blank" );
+        }
+    }
+
+    private static void requireCompletePair( String prefix, LocalDate start, LocalDate end ) {
+        if ( ( start == null ) != ( end == null ) ) {
+            throw new IllegalArgumentException(
+                    prefix + "_start and " + prefix + "_end must both be set or both blank" );
+        }
     }
 
     @Override
@@ -61,7 +85,8 @@ public class CalculateEdinburghVisitorLevyDryRunJob extends AbstractJob {
     }
 
     public LocalDate getBookingDateStart() {
-        return LocalDate.parse( getParameter( "booking_date_start" ) );
+        String bookingDateStart = getParameter( "booking_date_start" );
+        return StringUtils.isBlank( bookingDateStart ) ? null : LocalDate.parse( bookingDateStart );
     }
 
     public void setBookingDateStart( LocalDate bookingDateStart ) {
@@ -69,10 +94,29 @@ public class CalculateEdinburghVisitorLevyDryRunJob extends AbstractJob {
     }
 
     public LocalDate getBookingDateEnd() {
-        return LocalDate.parse( getParameter( "booking_date_end" ) );
+        String bookingDateEnd = getParameter( "booking_date_end" );
+        return StringUtils.isBlank( bookingDateEnd ) ? null : LocalDate.parse( bookingDateEnd );
     }
 
     public void setBookingDateEnd( LocalDate bookingDateEnd ) {
         setParameter( "booking_date_end", bookingDateEnd.toString() );
+    }
+
+    public LocalDate getCheckinDateStart() {
+        String checkinDateStart = getParameter( "checkin_date_start" );
+        return StringUtils.isBlank( checkinDateStart ) ? null : LocalDate.parse( checkinDateStart );
+    }
+
+    public void setCheckinDateStart( LocalDate checkinDateStart ) {
+        setParameter( "checkin_date_start", checkinDateStart.toString() );
+    }
+
+    public LocalDate getCheckinDateEnd() {
+        String checkinDateEnd = getParameter( "checkin_date_end" );
+        return StringUtils.isBlank( checkinDateEnd ) ? null : LocalDate.parse( checkinDateEnd );
+    }
+
+    public void setCheckinDateEnd( LocalDate checkinDateEnd ) {
+        setParameter( "checkin_date_end", checkinDateEnd.toString() );
     }
 }
