@@ -961,16 +961,19 @@ public class CloudbedsService {
     }
 
     /**
-     * Archives all transaction related messages for this booking ONLY IF the booking is fully paid for (no balance owing).
+     * Archives all transaction related messages for this booking ONLY IF the booking is fully paid for
+     * (no balance owing, or only EVL remaining — which is collected on arrival).
      *
      * @param webClient
      * @param reservationId
      */
     public void archiveAllTransactionNotes( WebClient webClient, String reservationId ) {
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
-        if ( res.getBalanceDue().compareTo( BigDecimal.ZERO ) > 0 ) {
+        BigDecimal balanceExcludingEvl = EdinburghVisitorLevyCalculator.getBalanceDueExcludingVisitorLevy( res );
+        if ( balanceExcludingEvl.compareTo( BigDecimal.ZERO ) > 0 ) {
             LOGGER.info( "Outstanding balance of " + scraper.getCurrencyFormat().format( res.getBalanceDue() )
-                    + " remaining. Not archiving transaction notes." );
+                    + " remaining (excluding EVL: " + scraper.getCurrencyFormat().format( balanceExcludingEvl )
+                    + "). Not archiving transaction notes." );
         }
         else {
             res.getNotes()
