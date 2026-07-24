@@ -52,6 +52,7 @@ RunProcessor  ──►  ProcessorService  ──►  Job classes (~80)
 ## Documentation
 
 - [Edinburgh Visitor Levy (EVL) — Cloudbeds by booking source](edinburgh-visitor-levy.html) — how EVL appears on folios per channel, with examples and screenshots
+- [Booking.com Chrome profile seeding](bdc-chromeprofile-seeding.md) — warm-session seed/cutover runbook (AWS WAF captcha, multi-property profile copies, Docker volumes)
 
 Developer reference for EVL implementation details lives in the repo root: `EDINBURGH_VISITOR_LEVY.md` (not published to GitHub Pages).
 

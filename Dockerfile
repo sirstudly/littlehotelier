@@ -56,6 +56,9 @@ COPY --from=builder /app/target/lilhotelier.jar lilhotelier.jar
 RUN mkdir -p /home/appuser/.ssh && \
     chmod 700 /home/appuser/.ssh
 
+# Chrome user-data-dir (overridden by a host volume mount in compose)
+RUN mkdir -p /app/chromeprofile
+
 # Change ownership to the appuser
 RUN chown -R appuser:appuser /app /home/appuser/.ssh
 

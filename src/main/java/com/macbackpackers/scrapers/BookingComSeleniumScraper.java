@@ -1,12 +1,18 @@
 package com.macbackpackers.scrapers;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.services.BasicCardMask;
+import com.macbackpackers.services.PaymentProcessorService;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
@@ -26,12 +32,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.text.ParseException;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
 import static org.openqa.selenium.support.ui.ExpectedConditions.urlMatches;
@@ -40,6 +47,10 @@ import static org.openqa.selenium.support.ui.ExpectedConditions.urlMatches;
 public class BookingComSeleniumScraper {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+
+    /** Multi-property accounts land here; property {@code home.html} without a fresh {@code ses} can 400. */
+    static final String BDC_GROUPS_HOME =
+            "https://admin.booking.com/hotel/hoteladmin/groups/home/index.html";
 
     @Autowired
     private WordPressDAO wordPressDAO;
@@ -72,7 +83,10 @@ public class BookingComSeleniumScraper {
             throw new MissingUserDataException( "Missing BDC username/password" );
         }
 
-        driver.get( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/home.html" );
+        final String bdcLastUrlOption = "Linux".equalsIgnoreCase( System.getProperty( "os.name" ) ) ? "hbo_bdc_lasturl" : "hbo_bdc_lasturl_dev";
+        // Always open groups home for multi-property users. Do not reuse a saved property home.html
+        // (stale/missing ses → HTTP 400). Persist groups home so DB lasturl stays safe.
+        driver.get( BDC_GROUPS_HOME );
         LOGGER.info( "Loading Booking.com website: " + driver.getCurrentUrl() );
 
         if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
@@ -85,13 +99,15 @@ public class BookingComSeleniumScraper {
         LOGGER.info( "Property name identified as: " + driver.getTitle() );
 
         // verify we are logged in
-        if ( false == driver.getCurrentUrl().startsWith( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/home.html" ) ) {
+        if ( false == driver.getCurrentUrl().startsWith( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/home.html" ) &&
+                false == driver.getCurrentUrl().startsWith( "https://admin.booking.com/hotel/hoteladmin/groups/home/index.html" ) ) {
             LOGGER.info( "Current URL: " + driver.getCurrentUrl() );
             LOGGER.info( driver.getPageSource() );
             throw new MissingUserDataException( "Are we logged in? Unexpected URL." );
         }
 
-        LOGGER.info( "Logged into Booking.com. Saving current URL." );
+        LOGGER.info( "Logged into Booking.com. Saving groups home as last URL." );
+        wordPressDAO.setOption( bdcLastUrlOption, BDC_GROUPS_HOME );
         LOGGER.info( "Loaded " + driver.getCurrentUrl() );
     }
 
@@ -484,7 +500,8 @@ public class BookingComSeleniumScraper {
     }
 
     /**
-     * Searches for all VCC bookings that can be charged immediately.
+     * Searches for all VCC bookings that can be charged immediately via the
+     * extranet fresa JSON API (not the SPA table DOM).
      *
      * @param driver
      * @param wait
@@ -494,21 +511,113 @@ public class BookingComSeleniumScraper {
     public List<String> getAllVCCBookingsThatCanBeCharged( WebDriver driver, WebDriverWait wait ) throws IOException {
         doLogin( driver, wait );
 
-        // load Virtual cards to charge page
-        String vccUrl = MessageFormat.format( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/vccs_management.html?lang=en&ses={0}&hotel_id={1}&route=vccs_to_charge",
-                getSessionFromURL( driver.getCurrentUrl() ), getHotelIdFromURL( driver.getCurrentUrl() ) );
-        LOGGER.info( "Looking up VCCs to charge " + vccUrl );
+        String hotelId = wordPressDAO.getMandatoryOption( "hbo_bdc_hotel_id" );
+        String ses = ensureSessionForHotel( driver, wait, hotelId );
+        String hotelAccountId = resolveHotelAccountId( driver, wait, hotelId, ses );
+
+        List<String> chargeableRefs = new ArrayList<>();
+        int page = 1;
+        final int limit = 50;
+        boolean lastPage = false;
+        while ( false == lastPage ) {
+            String apiUrl = MessageFormat.format(
+                    "https://admin.booking.com/fresa/extranet/payments/vccs_to_charge?lang=en&hotel_id={0}&ses={1}&limit={2}&page={3}{4}",
+                    hotelId, ses, String.valueOf( limit ), String.valueOf( page ),
+                    hotelAccountId == null ? "" : "&hotel_account_id=" + hotelAccountId );
+            LOGGER.info( "Fetching VCCs to charge page {}: {}", page, apiUrl );
+            String json = fetchJsonInBrowser( driver, apiUrl );
+            LOGGER.debug( "vccs_to_charge response: {}", json );
+
+            JsonObject root = JsonParser.parseString( json ).getAsJsonObject();
+            if ( root.get( "success" ) == null || root.get( "success" ).getAsInt() != 1 ) {
+                throw new IOException( "Unexpected vccs_to_charge response: " + json );
+            }
+            JsonObject data = root.getAsJsonObject( "data" );
+            JsonArray vccs = data.getAsJsonArray( "vccs" );
+            if ( vccs != null ) {
+                for ( JsonElement elem : vccs ) {
+                    JsonObject vcc = elem.getAsJsonObject();
+                    String formatted = vcc.getAsJsonObject( "current_amount" ).get( "formatted" ).getAsString();
+                    if ( PaymentProcessorService.isChargeableAmount( formatted ) ) {
+                        chargeableRefs.add( String.valueOf( vcc.get( "hres_id" ).getAsLong() ) );
+                    }
+                }
+            }
+            JsonObject pagination = data.getAsJsonObject( "pagination" );
+            lastPage = pagination == null || pagination.get( "is_last_page" ).getAsInt() == 1;
+            page++;
+        }
+
+        LOGGER.info( "Found {} chargeable VCC bookings for hotel_id={}", chargeableRefs.size(), hotelId );
+        return chargeableRefs;
+    }
+
+    /**
+     * Navigates to the given property home so the URL contains {@code ses}, then returns it.
+     */
+    private String ensureSessionForHotel( WebDriver driver, WebDriverWait wait, String hotelId ) {
+        if ( driver.getCurrentUrl().contains( "ses=" ) && driver.getCurrentUrl().contains( "hotel_id=" + hotelId ) ) {
+            return getSessionFromURL( driver.getCurrentUrl() );
+        }
+        String homeUrl = MessageFormat.format(
+                "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/home.html?lang=en&hotel_id={0}",
+                hotelId );
+        LOGGER.info( "Switching to BDC property hotel_id={}: {}", hotelId, homeUrl );
+        driver.get( homeUrl );
+        wait.until( d -> d.getCurrentUrl().contains( "ses=" ) );
+        return getSessionFromURL( driver.getCurrentUrl() );
+    }
+
+    /**
+     * Loads the VCC management page and extracts {@code hotel_account_id} when present
+     * (required by some fresa payment endpoints).
+     */
+    private String resolveHotelAccountId( WebDriver driver, WebDriverWait wait, String hotelId, String ses ) {
+        String vccUrl = MessageFormat.format(
+                "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/vccs_management.html?lang=en&ses={0}&hotel_id={1}&route=vccs_to_charge",
+                ses, hotelId );
+        LOGGER.info( "Loading VCC management page to resolve hotel_account_id: {}", vccUrl );
         driver.get( vccUrl );
+        wait.until( d -> d.getCurrentUrl().contains( "vccs_management" ) );
 
-        LOGGER.info( "Virtual cards to charge..." );
-        By LOADING_CELLS = By.xpath( "//span[contains(@class, 'loading-bar--animated')]" );
-        wait.until( d -> ExpectedConditions.numberOfElementsToBe( LOADING_CELLS, 0 ) ); // wait for page load
+        Matcher m = Pattern.compile( "hotel_account_id[=\"'\\s:]+(\\d+)" ).matcher( driver.getPageSource() );
+        if ( m.find() ) {
+            LOGGER.info( "Resolved hotel_account_id={}", m.group( 1 ) );
+            return m.group( 1 );
+        }
+        Object fromJs = ( (JavascriptExecutor) driver ).executeScript(
+                "var m = document.documentElement.innerHTML.match(/hotel_account_id[=\\\"'\\s:]+(\\d+)/); return m ? m[1] : null;" );
+        if ( fromJs != null ) {
+            LOGGER.info( "Resolved hotel_account_id={} from DOM", fromJs );
+            return fromJs.toString();
+        }
+        LOGGER.warn( "hotel_account_id not found on VCC page; calling fresa without it" );
+        return null;
+    }
 
-        List<WebElement> reservationRows = driver.findElements(By.xpath("//div[div/h2/span/text()='Virtual cards to charge']/div/div/table/tbody/tr"));
-        return reservationRows.stream()
-                .filter(r -> com.macbackpackers.services.PaymentProcessorService.isChargeableAmount(r.findElement(By.xpath("td[@data-heading='Amount']")).getText()))
-                .map(r -> r.findElement(By.xpath("th/span/a")).getText())
-                .collect(Collectors.toList());
+    /**
+     * Same-origin fetch inside the logged-in Chrome session (cookies + WAF tokens).
+     */
+    private String fetchJsonInBrowser( WebDriver driver, String url ) throws IOException {
+        driver.manage().timeouts().scriptTimeout( Duration.ofSeconds( 60 ) );
+        Object result = ( (JavascriptExecutor) driver ).executeAsyncScript(
+                "var url = arguments[0];"
+                        + "var callback = arguments[arguments.length - 1];"
+                        + "fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' } })"
+                        + ".then(function(r) { return r.text().then(function(t) {"
+                        + "  if (!r.ok) { callback('HTTP_ERROR:' + r.status + ':' + t); }"
+                        + "  else { callback(t); }"
+                        + "}); })"
+                        + ".catch(function(e) { callback('FETCH_ERROR:' + e); });",
+                url );
+        if ( result == null ) {
+            throw new IOException( "Empty response fetching " + url );
+        }
+        String body = result.toString();
+        if ( body.startsWith( "HTTP_ERROR:" ) || body.startsWith( "FETCH_ERROR:" ) ) {
+            throw new IOException( "Failed fetching " + url + ": " + body );
+        }
+        return body;
     }
 
     /**
