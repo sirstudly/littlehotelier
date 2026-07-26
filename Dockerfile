@@ -59,6 +59,9 @@ RUN mkdir -p /home/appuser/.ssh && \
 # Chrome user-data-dir (overridden by a host volume mount in compose)
 RUN mkdir -p /app/chromeprofile
 
+# Persistent app config (cookies etc.; overridden by a host volume mount in compose)
+RUN mkdir -p /app/config
+
 # Change ownership to the appuser
 RUN chown -R appuser:appuser /app /home/appuser/.ssh
 

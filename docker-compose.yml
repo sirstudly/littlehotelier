@@ -17,6 +17,7 @@ services:
     volumes:
       - ./logs/crh:/app/logs
       - ./chromeprofile/crh:/app/chromeprofile
+      - ./config/crh:/app/config
       - ./credentials/crh_gmail:/app/credentials/gmail
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config
@@ -58,6 +59,7 @@ services:
     volumes:
       - ./logs/hsh:/app/logs
       - ./chromeprofile/hsh:/app/chromeprofile
+      - ./config/hsh:/app/config
       - ./credentials/hsh_gmail:/app/credentials/gmail
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config
@@ -99,6 +101,7 @@ services:
     volumes:
       - ./logs/rmb:/app/logs
       - ./chromeprofile/rmb:/app/chromeprofile
+      - ./config/rmb:/app/config
       - ./credentials/rmb_gmail:/app/credentials/gmail
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config
@@ -140,6 +143,7 @@ services:
     volumes:
       - ./logs/lsh:/app/logs
       - ./chromeprofile/lsh:/app/chromeprofile
+      - ./config/lsh:/app/config
       - ./credentials/lsh_gmail:/app/credentials/gmail
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json
       - ./credentials/ssh/config:/home/appuser/.ssh/config

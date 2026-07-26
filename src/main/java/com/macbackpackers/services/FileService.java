@@ -251,7 +251,12 @@ public class FileService {
      */
     public void writeCookiesToFile( WebClient webClient, String filename ) throws IOException {
         LOGGER.info( "writing cookies to file " + filename );
-        ObjectOutput out = new ObjectOutputStream( new FileOutputStream( filename ) );
+        File file = new File( filename );
+        File parent = file.getParentFile();
+        if ( parent != null && false == parent.exists() ) {
+            parent.mkdirs();
+        }
+        ObjectOutput out = new ObjectOutputStream( new FileOutputStream( file ) );
         out.writeObject( webClient.getCookieManager().getCookies() );
         out.close();
     }

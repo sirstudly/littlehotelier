@@ -77,8 +77,8 @@ public class HostelworldScraper {
 
     private static final Pattern MAGIC_LINK_TOKEN_PATH = Pattern.compile( "^/login/([^/]+)$" );
 
-    /** for saving login credentials */
-    private static final String COOKIE_FILE = "hostelworld.cookies";
+    /** for saving login credentials (under /app/config in Docker, which is volume-mounted) */
+    private static final String COOKIE_FILE = "config/hostelworld.cookies";
     
     @Autowired
     private ApplicationContext context;
