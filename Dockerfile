@@ -60,13 +60,14 @@ RUN mkdir -p /home/appuser/.ssh && \
 RUN mkdir -p /app/chromeprofile
 
 # Persistent app config (cookies etc.; overridden by a host volume mount in compose)
-RUN mkdir -p /app/config
+RUN mkdir -p /app/config /app/logs
 
 # Change ownership to the appuser
 RUN chown -R appuser:appuser /app /home/appuser/.ssh
 
-# Switch to appuser for security
-USER appuser
+# Entrypoint runs as root to fix bind-mount ownership, then drops to appuser
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Set JVM options for containerized environment
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
@@ -76,14 +77,10 @@ ENV DISPLAY=:99
 ENV SE_SCREEN_WIDTH=1920
 ENV SE_SCREEN_HEIGHT=1080
 
-# Set SSH key permissions (this will be done at runtime after volume mount)
-ENV SSH_KEY_PERMISSIONS_SET=false
-
 # Set Chrome for Testing binary path
 ENV CHROME_BINARY_PATH=/usr/bin/google-chrome-stable
 
-# Debug entry point - uncomment for debugging (sleep for 1 hour)
-#CMD ["sleep", "3600"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
 
 # Run the application with config directory and processor ID from environment
 CMD ["sh", "-c", "java -server $JAVA_OPTS -Dchrome.binary.path=$CHROME_BINARY_PATH -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE} -jar lilhotelier.jar com.macbackpackers.RunProcessor -S"]
