@@ -970,6 +970,146 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Updates the guest email on a reservation (full guest payload; only email changes).
+     *
+     * @param webClient
+     * @param reservationId Cloudbeds reservation id
+     * @param guestId guest / customer id
+     * @param email new email address
+     * @throws IOException on failure
+     */
+    public void updateGuestReservationEmail( WebClient webClient, String reservationId, String guestId, String email )
+            throws IOException {
+        WebRequest findGuest = jsonRequestFactory.createFindGuestByIdRequest( guestId );
+        JsonObject findResp = doRequest( webClient, findGuest );
+        JsonObject guestJson = findResp.getAsJsonObject( "data" ).getAsJsonObject( "guest" );
+
+        JsonObject data = new JsonObject();
+        data.addProperty( "guestId", guestId );
+        data.addProperty( "firstName", guestJsonString( guestJson, "firstName", "first_name" ) );
+        data.addProperty( "lastName", guestJsonString( guestJson, "lastName", "last_name" ) );
+        data.addProperty( "email", email );
+        data.addProperty( "phone", guestJsonString( guestJson, "phone" ) );
+        data.addProperty( "cellPhone", guestJsonString( guestJson, "cellPhone", "cell_phone" ) );
+        data.addProperty( "birthday", guestJsonString( guestJson, "birthday" ) );
+        String gender = guestJsonString( guestJson, "gender" );
+        data.addProperty( "gender", StringUtils.isBlank( gender ) ? "N/A" : gender );
+        data.addProperty( "companyName", guestJsonString( guestJson, "companyName", "company_name" ) );
+        data.addProperty( "address1", guestJsonString( guestJson, "address1" ) );
+        data.addProperty( "address2", guestJsonString( guestJson, "address2" ) );
+        data.addProperty( "city", guestJsonString( guestJson, "city" ) );
+        data.addProperty( "country", guestJsonString( guestJson, "country" ) );
+        data.addProperty( "state", guestJsonString( guestJson, "state" ) );
+        data.addProperty( "zip", guestJsonString( guestJson, "zip" ) );
+        String documentType = guestJsonString( guestJson, "documentType", "document_type" );
+        data.addProperty( "documentType", StringUtils.isBlank( documentType ) ? "na" : documentType );
+        data.addProperty( "documentIssueDate", guestJsonString( guestJson, "documentIssueDate", "document_issue_date" ) );
+        data.addProperty( "documentIssuingCountry",
+                guestJsonString( guestJson, "documentIssuingCountry", "document_issuing_country" ) );
+        data.addProperty( "documentExpirationDate",
+                guestJsonString( guestJson, "documentExpirationDate", "document_expiration_date" ) );
+        data.add( "customFields", new JsonArray() );
+        data.add( "requirementsData", new JsonObject() );
+        data.addProperty( "sourceOfChange", "reservation" );
+
+        LOGGER.info( "Updating guest {} email on reservation {} to {}", guestId, reservationId, email );
+        WebRequest requestSettings = jsonRequestFactory.createUpdateGuestReservationRequest(
+                reservationId, data.toString(), getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
+    }
+
+    private static String guestJsonString( JsonObject guest, String... keys ) {
+        for ( String key : keys ) {
+            if ( guest.has( key ) && false == guest.get( key ).isJsonNull() ) {
+                return StringUtils.defaultString( guest.get( key ).getAsString() );
+            }
+        }
+        return "";
+    }
+
+    /**
+     * Returns the email delivery log for a reservation.
+     */
+    public JsonObject getEmailDeliveryLog( WebClient webClient, String reservationId ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createGetEmailDeliveryLogRequest(
+                reservationId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        return doRequest( webClient, requestSettings );
+    }
+
+    /**
+     * Returns a single email body from the delivery log.
+     */
+    public JsonObject getEmailView( WebClient webClient, String emailId ) throws IOException {
+        WebRequest requestSettings = jsonRequestFactory.createGetEmailViewRequest( emailId );
+        return doRequest( webClient, requestSettings );
+    }
+
+    /**
+     * Polls the reservation email log for the latest card authentication email and returns its
+     * Stripe/Cloudbeds approve URL.
+     *
+     * @param webClient
+     * @param reservationId
+     * @return non-blank approve URL
+     * @throws IOException if not found within the poll window
+     */
+    public String findLatestCardAuthApproveUrl( WebClient webClient, String reservationId ) throws IOException {
+        final Pattern APPROVE_HREF = Pattern.compile(
+                "href=\"(https://[^\"]+/payment/request/[^\"]+/approve)\"", Pattern.CASE_INSENSITIVE );
+        final int maxAttempts = 15;
+        final int sleepSeconds = 2;
+        IOException lastError = null;
+        for ( int attempt = 1 ; attempt <= maxAttempts ; attempt++ ) {
+            try {
+                JsonObject log = getEmailDeliveryLog( webClient, reservationId );
+                JsonArray rows = log.getAsJsonArray( "aaData" );
+                if ( rows != null ) {
+                    for ( JsonElement elem : rows ) {
+                        JsonObject row = elem.getAsJsonObject();
+                        String subject = row.has( "subject" ) && false == row.get( "subject" ).isJsonNull()
+                                ? row.get( "subject" ).getAsString() : "";
+                        if ( false == subject.startsWith( "Authenticate your card" ) ) {
+                            continue;
+                        }
+                        String emailId = row.get( "email_id" ).getAsString();
+                        LOGGER.info( "Found card auth email id={} subject={}", emailId, subject );
+                        JsonObject view = getEmailView( webClient, emailId );
+                        if ( view.get( "email" ) == null || false == view.get( "email" ).isJsonObject() ) {
+                            throw new IOException( "email_view missing email for id=" + emailId );
+                        }
+                        String message = view.getAsJsonObject( "email" ).get( "message" ).getAsString();
+                        Matcher m = APPROVE_HREF.matcher( message );
+                        if ( m.find() ) {
+                            String approveUrl = m.group( 1 ).replace( "\\/", "/" );
+                            LOGGER.info( "Extracted 3DS approve URL: {}", approveUrl );
+                            return approveUrl;
+                        }
+                        throw new IOException( "No approve link in card auth email id=" + emailId );
+                    }
+                }
+                lastError = new IOException( "No Authenticate your card email yet for reservation " + reservationId );
+            }
+            catch ( IOException ex ) {
+                lastError = ex;
+            }
+            LOGGER.info( "Waiting for card auth email (attempt {}/{}): {}", attempt, maxAttempts,
+                    lastError == null ? "" : lastError.getMessage() );
+            sleepQuietly( sleepSeconds );
+        }
+        throw lastError != null ? lastError
+                : new IOException( "Timed out waiting for card auth email on reservation " + reservationId );
+    }
+
+    private void sleepQuietly( int seconds ) {
+        try {
+            Thread.sleep( seconds * 1000L );
+        }
+        catch ( InterruptedException e ) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
      * Sends a source lookup request to the server.
      * 
      * @param webClient web client instance to use

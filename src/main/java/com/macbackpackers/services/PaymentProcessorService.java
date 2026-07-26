@@ -245,6 +245,10 @@ public class PaymentProcessorService {
             LOGGER.info( "Card details already exist; copying anyways..." );
         }
 
+        if ( "Booking.com".equals( cbReservation.getSourceName() ) ) {
+            return copyBdcCardDetailsToCloudbeds( webClient, cbReservation );
+        }
+
         CardDetails ccDetails = null;
         if ( cbReservation.getSourceName().startsWith( "Hostelworld" ) ) {
             String hwlRef = "HWL-" + cbReservation.getThirdPartyIdentifier();
@@ -255,18 +259,6 @@ public class PaymentProcessorService {
             LOGGER.info( "Retrieving EXP customer card details" );
             ccDetails = expediaService.returnCardDetailsForBooking(
                     cbReservation.getThirdPartyIdentifier() ).getCardDetails();
-        }
-        else if ( "Booking.com".equals( cbReservation.getSourceName() ) ) {
-            LOGGER.info( "Retrieving BDC customer card details for BDC#" + cbReservation.getThirdPartyIdentifier() );
-            WebDriver driver = webDriverPool.borrowObject();
-            try {
-                WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
-                ccDetails = bdcSeleniumScraper.returnCardDetailsForBooking(
-                        driver, wait, cbReservation.getThirdPartyIdentifier() );
-            }
-            finally {
-                webDriverPool.returnObject( driver );
-            }
         }
         //        else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
         //            LOGGER.info( "Retrieving AGO customer card details" );
@@ -285,6 +277,90 @@ public class PaymentProcessorService {
         }
         cloudbedsScraper.addCardDetails( webClient, cbReservation.getReservationId(), ccDetails );
         return cloudbedsScraper.getReservationRetry( webClient, cbReservation.getReservationId() ); // reload reservation
+    }
+
+    /**
+     * Copies a Booking.com VCC into Cloudbeds, temporarily swapping the guest email to
+     * {@code hbo_support_email} so the 3DS2 auth email is not sent to the guest, then
+     * auto-approves the Cloudbeds auth link and restores the original email.
+     * <p>
+     * BDC card scrape runs first so a scrape failure does not leave the guest email changed.
+     */
+    private Reservation copyBdcCardDetailsToCloudbeds( WebClient webClient, Reservation cbReservation )
+            throws Exception {
+        final String reservationId = cbReservation.getReservationId();
+        final String guestId = cbReservation.getCustomerId();
+        final String originalEmail = cbReservation.getEmail();
+        final String bypassEmail = wordpressDAO.getMandatoryOption( "hbo_support_email" );
+
+        LOGGER.info( "Retrieving BDC customer card details for BDC#" + cbReservation.getThirdPartyIdentifier() );
+        CardDetails ccDetails;
+        WebDriver driver = webDriverPool.borrowObject();
+        try {
+            WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
+            ccDetails = bdcSeleniumScraper.returnCardDetailsForBooking(
+                    driver, wait, cbReservation.getThirdPartyIdentifier() );
+        }
+        finally {
+            webDriverPool.returnObject( driver );
+        }
+
+        LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( ccDetails.getCardNumber() )
+                + " for " + ccDetails.getName() );
+        if ( StringUtils.isBlank( ccDetails.getName() ) ) {
+            ccDetails.setName( cbReservation.getFirstName() + " " + cbReservation.getLastName() );
+        }
+
+        LOGGER.info( "BDC card copy with 3DS bypass for reservation {} (email {} -> {})", reservationId, originalEmail, bypassEmail );
+        cloudbedsScraper.updateGuestReservationEmail( webClient, reservationId, guestId, bypassEmail );
+
+        Exception primaryFailure = null;
+        try {
+            cloudbedsScraper.addCardDetails( webClient, reservationId, ccDetails );
+
+            String approveUrl = cloudbedsScraper.findLatestCardAuthApproveUrl( webClient, reservationId );
+            approveCloudbedsCardAuthLink( approveUrl );
+        }
+        catch ( Exception ex ) {
+            primaryFailure = ex;
+        }
+        finally {
+            try {
+                LOGGER.info( "Restoring original guest email on reservation {} to {}", reservationId, originalEmail );
+                cloudbedsScraper.updateGuestReservationEmail( webClient, reservationId, guestId, originalEmail );
+            }
+            catch ( Exception restoreEx ) {
+                LOGGER.error( "Failed to restore original guest email on reservation {}", reservationId, restoreEx );
+                if ( primaryFailure != null ) {
+                    primaryFailure.addSuppressed( restoreEx );
+                    throw primaryFailure;
+                }
+                throw new IOException( "Failed to restore original guest email on reservation "
+                        + reservationId + " to " + originalEmail, restoreEx );
+            }
+        }
+
+        if ( primaryFailure != null ) {
+            throw primaryFailure;
+        }
+        return cloudbedsScraper.getReservationRetry( webClient, reservationId );
+    }
+
+    /**
+     * Opens the Cloudbeds/Stripe 3DS2 approve URL in Chrome and waits until the approved landing page.
+     */
+    private void approveCloudbedsCardAuthLink( String approveUrl ) throws Exception {
+        LOGGER.info( "Opening Cloudbeds 3DS approve URL: {}", approveUrl );
+        WebDriver driver = webDriverPool.borrowObject();
+        try {
+            WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
+            driver.get( approveUrl );
+            wait.until( d -> d.getCurrentUrl() != null && d.getCurrentUrl().contains( "/payment/request/approved/" ) );
+            LOGGER.info( "3DS card auth approved: {}", driver.getCurrentUrl() );
+        }
+        finally {
+            webDriverPool.returnObject( driver );
+        }
     }
 
     /**
@@ -444,8 +520,7 @@ public class PaymentProcessorService {
 
         // check if we have anything to pay
         if ( cbReservation.isPaid() ) {
-            LOGGER.warn( "Booking is paid! Stopping here." );
-            return;
+            LOGGER.warn( "Booking is paid! Continuing anyways..." );
         }
 
         if ( false == cbReservation.isCardDetailsPresent() ) {

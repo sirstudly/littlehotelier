@@ -1190,6 +1190,51 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Views a single email from the reservation email delivery log.
+     *
+     * @param emailId email id from {@link #createGetEmailDeliveryLogRequest}
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createGetEmailViewRequest( String emailId ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/emails/email_view" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "email_id", emailId ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    /**
+     * Updates guest details on a reservation (used to temporarily change email for 3DS bypass).
+     *
+     * @param reservationId Cloudbeds reservation id
+     * @param guestDataJson JSON object matching guestReservations/updateOne {@code data} field
+     * @param billingPortalId
+     * @param frontVersion
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createUpdateGuestReservationRequest( String reservationId, String guestDataJson,
+            String billingPortalId, String frontVersion ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/guestReservations/updateOne" );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "data", guestDataJson ),
+                new NameValuePair( "bookingId", reservationId ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    /**
      * Authorises a guest credit card.
      * 
      * @param reservationId the unique CB reservation id
