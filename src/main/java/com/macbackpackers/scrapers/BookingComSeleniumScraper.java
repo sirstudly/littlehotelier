@@ -16,7 +16,6 @@ import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
-import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -35,7 +34,6 @@ import java.text.ParseException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -356,7 +354,8 @@ public class BookingComSeleniumScraper {
     }
 
     /**
-     * Retrieves the card details for the given booking.
+     * Retrieves the card details for the given booking via secure-admin
+     * {@code booking_cc_details.html} (optionally after {@code vccs_access_details}).
      *
      * @param driver
      * @param wait
@@ -364,102 +363,180 @@ public class BookingComSeleniumScraper {
      * @return credit card details
      * @throws IOException
      * @throws ParseException on parse error during retrieval
-     * @throws MissingUserDataException if card details are missing
+     * @throws MissingUserDataException if card details are missing or access denied
      */
-    public CardDetails returnCardDetailsForBooking(WebDriver driver, WebDriverWait wait, String bdcReservation ) throws IOException, ParseException {
-        lookupReservation( driver, wait, bdcReservation );
+    public CardDetails returnCardDetailsForBooking( WebDriver driver, WebDriverWait wait, String bdcReservation )
+            throws IOException, ParseException {
+        doLogin( driver, wait );
 
-        // payment details loaded by javascript
-        final By PAYMENT_DETAILS_BLOCK = By.xpath( // "//span[normalize-space(text())='Virtual credit card'] "
-                "//span[contains(text(),'successfully charged')] "
-                + "| //span[contains(text(),'This virtual card is no longer active')] "
-                + "| //span[contains(text(),\"This virtual card isn't active anymore\")] ");
-//                + "| //span/span[normalize-space(text())='View credit card details']" );
-        List<WebElement> headerViewCCDetails = wait.until(d -> d.findElements(PAYMENT_DETAILS_BLOCK));
+        String hotelId = wordPressDAO.getMandatoryOption( "hbo_bdc_hotel_id" );
+        String ses = ensureSessionForHotel( driver, wait, hotelId );
+        String hotelAccountId = extractHotelAccountIdFromPage( driver );
 
-        LOGGER.info( "Matched " + headerViewCCDetails.size() + " VCC elements" );
-        if ( false == headerViewCCDetails.isEmpty() ) {
-            WebElement paymentDetails = headerViewCCDetails.get(0);
-            if ( paymentDetails.getText().contains( "This virtual card is no longer active." )
-                    || paymentDetails.getText().contains( "This virtual card isn't active anymore" ) ) {
-                throw new MissingUserDataException( "This virtual card is no longer active." );
-            }
-            throw new MissingUserDataException( "No card details link available." );
-        }
+        String ccDetailsUrl = resolveCcDetailsUrl( driver, hotelId, ses, hotelAccountId, bdcReservation );
+        LOGGER.info( "Looking up VCC card details " + ccDetailsUrl );
+        driver.get( ccDetailsUrl );
 
-        headerViewCCDetails = wait.until(d -> ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath("//*[self::button or self::a]/span/span[normalize-space(text())='View credit card details']/../..")).apply(d));
-        LOGGER.info( "Found {} view CC details elements.", headerViewCCDetails.size() );
-        Optional<String> nextLink = headerViewCCDetails.stream()
-                .filter(p -> StringUtils.isNotBlank(p.getAttribute("href")))
-                .map(p -> p.getAttribute( "href" ))
-                .findFirst();
-        if (nextLink.isPresent()) {
-            LOGGER.info("Link found, going to " + nextLink);
-            driver.get(nextLink.get());
-        }
-        else {
-            LOGGER.info("Clicking on View CC details.");
-            headerViewCCDetails.get(0).click();
-        }
-
-        // we may or may not need to login again to view CC details
-        final String SIGN_IN_LOCATOR_PATH = "//span[normalize-space(text())='Sign in to view credit card details']";
-        final String CC_DETAILS_PATH = "//th[contains(text(),'Credit Card Details')] | //th[contains(text(),'credit card details')]";
-        final String CC_DETAILS_NOT_AVAIL_PATH = "//h2[contains(text(),\"credit card details aren't available\")]";
-        final String CONTINUE_WITH_CC_DETAILS = "//p[normalize-space(text())='Continue to view the credit card details.']";
-        WebElement locator;
-        try {
-            locator = wait.until(d -> ExpectedConditions.visibilityOfElementLocated(By.xpath(
-                    SIGN_IN_LOCATOR_PATH + " | " + CC_DETAILS_PATH + " | " + CC_DETAILS_NOT_AVAIL_PATH + " | " + CONTINUE_WITH_CC_DETAILS)).apply(d));
-        }
-        catch ( TimeoutException ex ) {
-            LOGGER.info( "Timeout. Trying to click on view CC details again." );
-            headerViewCCDetails.get( 0 ).click();
-            locator = wait.until(d -> ExpectedConditions.visibilityOfElementLocated(By.xpath(
-                    SIGN_IN_LOCATOR_PATH + " | " + CC_DETAILS_PATH + " | " + CC_DETAILS_NOT_AVAIL_PATH + " | " + CONTINUE_WITH_CC_DETAILS)).apply(d));
-        }
-
-        Optional<Runnable> CLOSE_WINDOW_TASK = Optional.empty();
-        if ( "h2".equals( locator.getTagName() ) ) {
+        String pageState = waitForCcDetailsPageState( driver, wait );
+        if ( "unavailable".equals( pageState ) ) {
             throw new MissingUserDataException( "Credit card details aren't available." );
         }
-        else if ( "p".equals( locator.getTagName() ) ) {
-            doLoginForm( driver, wait, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
+        if ( "signin".equals( pageState ) ) {
+            LOGGER.info( "Secure-admin requires re-auth to view card details; signing in..." );
+            doLoginForm( driver, wait,
+                    wordPressDAO.getMandatoryOption( "hbo_bdc_username" ),
+                    wordPressDAO.getMandatoryOption( "hbo_bdc_password" ) );
+            pageState = waitForCcDetailsAfterReauth( driver, wait );
+            if ( "unavailable".equals( pageState ) ) {
+                throw new MissingUserDataException( "Credit card details aren't available." );
+            }
+            if ( false == "details".equals( pageState ) ) {
+                LOGGER.error( "Unexpected page after secure-admin re-auth: {} url={}", pageState, driver.getCurrentUrl() );
+                throw new MissingUserDataException( "Expecting credit card details page but not found?" );
+            }
         }
-        else if ( "span".equals( locator.getTagName() ) ) {
-            // the following should open a new window; switch to new window
-            LOGGER.info( "Logging in again to view CC details..." );
-            final String CURRENT_WINDOW = driver.getWindowHandle();
-            driver.findElement( By.xpath( SIGN_IN_LOCATOR_PATH ) ).click();
-            wait.until( d -> ExpectedConditions.numberOfWindowsToBe( 2 ) );
-
-            // switch to other window
-            driver.getWindowHandles().stream()
-                    .filter( w -> false == CURRENT_WINDOW.equals( w ) )
-                    .findFirst()
-                    .map( w -> driver.switchTo().window( w ) )
-                    .orElseThrow( () -> new IOException("Unable to find new login window.") );
-
-            // login again
-            doLoginForm( driver, wait, wordPressDAO.getOption( "hbo_bdc_username" ), wordPressDAO.getOption( "hbo_bdc_password" ) );
-
-            CLOSE_WINDOW_TASK = Optional.of( () -> {
-                driver.findElement( By.xpath( "//div[contains(@class,'sbm')]/button[normalize-space(text())='Close']" ) ).click();
-                driver.switchTo().window( CURRENT_WINDOW ); // switch back to main tab
-            } );
+        else if ( false == "details".equals( pageState ) ) {
+            LOGGER.error( "Unexpected CC details page state: {} url={}", pageState, driver.getCurrentUrl() );
+            throw new MissingUserDataException( "Expecting credit card details page but not found?" );
         }
 
-        wait.until(d -> ExpectedConditions.visibilityOfElementLocated(By.xpath(CC_DETAILS_PATH)).apply(d));
+        CardDetails cardDetails = scrapeCardDetailsFromPage( driver );
+        LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( cardDetails.getCardNumber() )
+                + " for " + cardDetails.getName() );
+        return cardDetails;
+    }
+
+    /**
+     * Resolves the secure-admin card details URL from {@code vccs_access_details}, or builds a
+     * fallback URL when that API does not return one for the reservation.
+     */
+    private String resolveCcDetailsUrl( WebDriver driver, String hotelId, String ses,
+            String hotelAccountId, String bdcReservation ) throws IOException {
+        String apiUrl = MessageFormat.format(
+                "https://admin.booking.com/fresa/extranet/payments/vccs_access_details"
+                        + "?hotel_id={0}&lang=en&ses={1}&reservation_ids=[{2}]{3}",
+                hotelId, ses, bdcReservation,
+                hotelAccountId == null ? "" : "&hotel_account_id=" + hotelAccountId );
+        try {
+            LOGGER.info( "Fetching VCC access details: {}", apiUrl );
+            String json = fetchJsonInBrowser( driver, apiUrl, "POST" );
+            LOGGER.debug( "vccs_access_details response: {}", json );
+
+            JsonObject root = JsonParser.parseString( json ).getAsJsonObject();
+            if ( root.get( "success" ) == null || root.get( "success" ).getAsInt() != 1 ) {
+                throw new IOException( "Unexpected vccs_access_details response: " + json );
+            }
+            JsonObject data = root.getAsJsonObject( "data" );
+            if ( data == null || false == data.has( "vccs" ) || false == data.get( "vccs" ).isJsonObject() ) {
+                throw new IOException( "Missing vccs in vccs_access_details response: " + json );
+            }
+            JsonObject vccs = data.getAsJsonObject( "vccs" );
+            if ( false == vccs.has( bdcReservation ) || false == vccs.get( bdcReservation ).isJsonObject() ) {
+                LOGGER.warn( "Reservation {} omitted from vccs_access_details; using fallback URL", bdcReservation );
+                return buildFallbackCcDetailsUrl( hotelId, bdcReservation );
+            }
+            JsonObject vcc = vccs.getAsJsonObject( bdcReservation );
+            String accessDetail = vcc.has( "access_detail" ) && false == vcc.get( "access_detail" ).isJsonNull()
+                    ? vcc.get( "access_detail" ).getAsString() : null;
+            if ( false == "CC_ALLOW_VIEW".equals( accessDetail ) ) {
+                throw new MissingUserDataException(
+                        "Credit card details access denied for reservation " + bdcReservation
+                                + " (access_detail=" + accessDetail + ")" );
+            }
+            if ( false == vcc.has( "cc_details_url" ) || vcc.get( "cc_details_url" ).isJsonNull()
+                    || StringUtils.isBlank( vcc.get( "cc_details_url" ).getAsString() ) ) {
+                LOGGER.warn( "cc_details_url missing for {}; using fallback URL", bdcReservation );
+                return buildFallbackCcDetailsUrl( hotelId, bdcReservation );
+            }
+            return vcc.get( "cc_details_url" ).getAsString();
+        }
+        catch ( MissingUserDataException e ) {
+            throw e;
+        }
+        catch ( Exception e ) {
+            LOGGER.warn( "vccs_access_details failed for {}: {}; using fallback URL", bdcReservation, e.toString() );
+            return buildFallbackCcDetailsUrl( hotelId, bdcReservation );
+        }
+    }
+
+    private static String buildFallbackCcDetailsUrl( String hotelId, String bdcReservation ) {
+        return MessageFormat.format(
+                "https://secure-admin.booking.com/booking_cc_details.html?lang=en&bn={0}&hotel_id={1}&has_bvc=1",
+                bdcReservation, hotelId );
+    }
+
+    /**
+     * Waits until the secure-admin page shows card details, a sign-in challenge, or unavailability.
+     *
+     * @return one of {@code details}, {@code signin}, {@code unavailable}
+     */
+    private String waitForCcDetailsPageState( WebDriver driver, WebDriverWait wait ) {
+        final By CC_DETAILS = ccDetailsLocator();
+        final By CC_NOT_AVAIL = ccUnavailableLocator();
+        final By CONTINUE_CC = By.xpath( "//p[normalize-space(text())='Continue to view the credit card details.']" );
+
+        return wait.until( d -> {
+            String url = d.getCurrentUrl();
+            if ( url.contains( "account.booking.com/sign-in" )
+                    || false == d.findElements( By.id( "loginname" ) ).isEmpty()
+                    || false == d.findElements( CONTINUE_CC ).isEmpty() ) {
+                return "signin";
+            }
+            if ( false == d.findElements( CC_NOT_AVAIL ).isEmpty() ) {
+                return "unavailable";
+            }
+            if ( false == d.findElements( CC_DETAILS ).isEmpty() ) {
+                return "details";
+            }
+            return null;
+        } );
+    }
+
+    /**
+     * After OAuth re-auth, wait only for details or unavailability (ignore transient sign-in URLs).
+     */
+    private String waitForCcDetailsAfterReauth( WebDriver driver, WebDriverWait wait ) {
+        final By CC_DETAILS = ccDetailsLocator();
+        final By CC_NOT_AVAIL = ccUnavailableLocator();
+        return wait.until( d -> {
+            if ( false == d.findElements( CC_NOT_AVAIL ).isEmpty() ) {
+                return "unavailable";
+            }
+            if ( false == d.findElements( CC_DETAILS ).isEmpty() ) {
+                return "details";
+            }
+            return null;
+        } );
+    }
+
+    private static By ccDetailsLocator() {
+        return By.xpath(
+                "//th[contains(text(),'Credit Card Details')] | //th[contains(text(),'credit card details')]"
+                        + " | //td[text()='Card number:'] | //td[contains(text(),'Card number')]" );
+    }
+
+    private static By ccUnavailableLocator() {
+        return By.xpath(
+                "//h2[contains(text(),\"credit card details aren't available\")]"
+                        + " | //*[contains(text(),\"This virtual card is no longer active\")]"
+                        + " | //*[contains(text(),\"This virtual card isn't active anymore\")]" );
+    }
+
+    private CardDetails scrapeCardDetailsFromPage( WebDriver driver ) throws ParseException {
         CardDetails cardDetails = new CardDetails();
-        cardDetails.setName( driver.findElement( By.xpath( "//td[text()=\"Card holder's name:\"]/following-sibling::td" ) ).getText().trim() );
-        cardDetails.setCardNumber( driver.findElement( By.xpath( "//td[text()='Card number:']/following-sibling::td" ) ).getText().replaceAll("\\s", "") );
-        cardDetails.setCardType( driver.findElement( By.xpath( "//td[text()='Card type:']/following-sibling::td" ) ).getText().trim() );
-        cardDetails.setExpiry( parseExpiryDate( driver.findElement( By.xpath( "//td[contains(text(),'Expiration')]/following-sibling::td" ) ).getText().trim() ) );
-        cardDetails.setCvv( StringUtils.trimToNull( driver.findElement( By.xpath( "//td[contains(text(),'CVC')]/following-sibling::td" ) ).getText() ) );
-        LOGGER.info( "Retrieved card: " + new BasicCardMask().applyCardMask( cardDetails.getCardNumber() ) + " for " + cardDetails.getName() );
-
-        // we're done here; close the newly opened window
-        CLOSE_WINDOW_TASK.ifPresent( t -> t.run() );
+        cardDetails.setName( driver.findElement(
+                By.xpath( "//td[text()=\"Card holder's name:\"]/following-sibling::td" ) ).getText().trim() );
+        cardDetails.setCardNumber( driver.findElement(
+                By.xpath( "//td[text()='Card number:']/following-sibling::td" ) ).getText().replaceAll( "\\s", "" ) );
+        cardDetails.setCardType( driver.findElement(
+                By.xpath( "//td[text()='Card type:']/following-sibling::td" ) ).getText().trim() );
+        cardDetails.setExpiry( parseExpiryDate( driver.findElement(
+                By.xpath( "//td[contains(text(),'Expiration')]/following-sibling::td" ) ).getText().trim() ) );
+        cardDetails.setCvv( StringUtils.trimToNull( driver.findElement(
+                By.xpath( "//td[contains(text(),'CVC')]/following-sibling::td" ) ).getText() ) );
+        if ( StringUtils.isBlank( cardDetails.getCardNumber() ) ) {
+            throw new MissingUserDataException( "Card number missing from credit card details page." );
+        }
         return cardDetails;
     }
 

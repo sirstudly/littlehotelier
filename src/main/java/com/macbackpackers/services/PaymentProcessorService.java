@@ -26,7 +26,6 @@ import com.macbackpackers.jobs.SendNonRefundableSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendRefundSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendStripePaymentConfirmationEmailJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
-import com.macbackpackers.scrapers.BookingComScraper;
 import com.macbackpackers.scrapers.BookingComSeleniumScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.HostelworldScraper;
@@ -108,9 +107,6 @@ public class PaymentProcessorService {
 
     @Autowired
     private CloudbedsService cloudbedsService;
-
-    @Autowired
-    private BookingComScraper bdcScraper;
 
     @Autowired
     private BookingComSeleniumScraper bdcSeleniumScraper;
@@ -262,14 +258,15 @@ public class PaymentProcessorService {
         }
         else if ( "Booking.com".equals( cbReservation.getSourceName() ) ) {
             LOGGER.info( "Retrieving BDC customer card details for BDC#" + cbReservation.getThirdPartyIdentifier() );
-            try (WebClient webClientForBDC = context.getBean( "webClientForBDC", WebClient.class )) {
-                ccDetails = bdcScraper.returnCardDetailsForBooking( webClientForBDC, cbReservation.getThirdPartyIdentifier() );
+            WebDriver driver = webDriverPool.borrowObject();
+            try {
+                WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
+                ccDetails = bdcSeleniumScraper.returnCardDetailsForBooking(
+                        driver, wait, cbReservation.getThirdPartyIdentifier() );
             }
-
-            // use Selenium driver
-//            try (AutocloseableWebDriver driver = new AutocloseableWebDriver()) {
-//                ccDetails = bdcSeleniumScraper.returnCardDetailsForBooking(driver.getDriver(), driver.getDriverWait(), cbReservation.getThirdPartyIdentifier());
-//            }
+            finally {
+                webDriverPool.returnObject( driver );
+            }
         }
         //        else if ( bookingRef.startsWith( "AGO-" ) && isCardDetailsBlank ) {
         //            LOGGER.info( "Retrieving AGO customer card details" );

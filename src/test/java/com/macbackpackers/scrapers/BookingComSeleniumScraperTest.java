@@ -1,7 +1,6 @@
 package com.macbackpackers.scrapers;
 
 import com.macbackpackers.SecretsManagerTestApp;
-import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.utils.AnyByteStringToStringConverter;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.junit.jupiter.api.AfterEach;
@@ -18,11 +17,17 @@ import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
+import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.services.BasicCardMask;
+import org.apache.commons.lang3.StringUtils;
+
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith( SpringExtension.class )
 @SpringBootTest( classes = SecretsManagerTestApp.class )
@@ -88,7 +93,13 @@ public class BookingComSeleniumScraperTest {
 
     @Test
     public void testReturnCardDetailsForBooking() throws Exception {
-        scraper.returnCardDetailsForBooking( driver, wait, "3492021542" );
+        CardDetails cardDetails = scraper.returnCardDetailsForBooking( driver, wait, "6684440976" );
+        assertNotNull( cardDetails );
+        assertNotNull( cardDetails.getCardNumber() );
+        assertFalse( StringUtils.isBlank( cardDetails.getCardNumber() ) );
+        assertTrue( cardDetails.getCardNumber().matches( "\\d+" ), "card number should be digits only" );
+        LOGGER.info( "Retrieved card: {} for {}",
+                new BasicCardMask().applyCardMask( cardDetails.getCardNumber() ), cardDetails.getName() );
     }
 
     @Test
