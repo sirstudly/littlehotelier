@@ -235,9 +235,16 @@ public class BookingComSeleniumScraper {
         LOGGER.info( "Looking up reservation " + reservationId + " using URL " + reservationUrl );
         driver.get( reservationUrl );
 
-        wait.until( d -> ExpectedConditions.or(
-                ExpectedConditions.titleContains( "Reservation Details" ),
-                ExpectedConditions.titleContains( "Reservation details" ) ) );
+        wait.until( d -> {
+            String url = d.getCurrentUrl();
+            if ( url != null && url.contains( "account.booking.com/auth-assurance" ) ) {
+                throw new MissingUserDataException(
+                        "Booking.com auth-assurance required when opening reservation "
+                                + reservationId + ". Re-seed chromeprofile (complete SMS assurance) or retry after manual approval." );
+            }
+            String title = d.getTitle();
+            return title != null && title.toLowerCase().contains( "reservation detail" );
+        } );
         LOGGER.info( "Loaded " + driver.getCurrentUrl() );
 
         // multiple places where the booking reference can appear; it should be in one of these
@@ -245,7 +252,7 @@ public class BookingComSeleniumScraper {
         By BOOKING_NUMBER_XPATH = By.xpath( "//input[@type='hidden' and @name='res_id'] "
                 + "| //p/span[text()='Booking number:']/../following-sibling::p "
                 + "| //div[not(contains(@class, 'hidden-print'))]/span[normalize-space(text())='Booking number:']/following-sibling::span" );
-        wait.until( d -> ExpectedConditions.visibilityOfElementLocated( BOOKING_NUMBER_XPATH ) );
+        wait.until( ExpectedConditions.visibilityOfElementLocated( BOOKING_NUMBER_XPATH ) );
         WebElement bookingNumberField = driver.findElement( BOOKING_NUMBER_XPATH );
         String resIdFromPage = "input".equals( bookingNumberField.getTagName() ) ? bookingNumberField.getAttribute( "value" ) : bookingNumberField.getText();
 
@@ -263,6 +270,9 @@ public class BookingComSeleniumScraper {
     /**
      * Looks up a given reservation in BDC and returns the virtual card balance on the booking
      * via the fresa {@code get_reservation_payout} API.
+     * <p>
+     * Does not open {@code booking.html} (that page can force auth-assurance SMS); only needs a
+     * warm admin session + property {@code ses}.
      *
      * @param driver
      * @param wait
@@ -271,10 +281,10 @@ public class BookingComSeleniumScraper {
      * @throws IOException if unable to login or payout API fails
      */
     public BigDecimal getVirtualCardBalance( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException {
-        lookupReservation( driver, wait, reservationId );
+        doLogin( driver, wait );
 
         String hotelId = wordPressDAO.getMandatoryOption( "hbo_bdc_hotel_id" );
-        String ses = getSessionFromURL( driver.getCurrentUrl() );
+        String ses = ensureSessionForHotel( driver, wait, hotelId );
         String hotelAccountId = extractHotelAccountIdFromPage( driver );
 
         String apiUrl = MessageFormat.format(
