@@ -18,8 +18,11 @@ import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @ExtendWith( SpringExtension.class )
 @SpringBootTest( classes = SecretsManagerTestApp.class )
@@ -78,7 +81,9 @@ public class BookingComSeleniumScraperTest {
 
     @Test
     public void testGetVirtualCardBalance() throws Exception {
-        scraper.getVirtualCardBalance( driver, wait, "3241593018" );
+        BigDecimal balance = scraper.getVirtualCardBalance( driver, wait, "5027255020" );
+        LOGGER.info( "VCC balance for booking: {}", balance );
+        assertNotNull( balance );
     }
 
     @Test

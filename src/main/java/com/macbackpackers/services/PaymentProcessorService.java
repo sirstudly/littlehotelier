@@ -27,6 +27,7 @@ import com.macbackpackers.jobs.SendRefundSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendStripePaymentConfirmationEmailJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
+import com.macbackpackers.scrapers.BookingComSeleniumScraper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.HostelworldScraper;
 import com.stripe.Stripe;
@@ -39,12 +40,16 @@ import com.stripe.model.PaymentIntent;
 import com.stripe.model.Refund;
 import com.stripe.net.RequestOptions.RequestOptionsBuilder;
 import com.stripe.param.RefundCreateParams;
-import org.htmlunit.WebClient;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.htmlunit.WebClient;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
@@ -54,6 +59,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.ParseException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -105,6 +111,15 @@ public class PaymentProcessorService {
 
     @Autowired
     private BookingComScraper bdcScraper;
+
+    @Autowired
+    private BookingComSeleniumScraper bdcSeleniumScraper;
+
+    @Autowired
+    private GenericObjectPool<WebDriver> webDriverPool;
+
+    @Value( "${chromescraper.maxwait.seconds:60}" )
+    private int chromeMaxWaitSeconds;
 
     /**
      * Attempt to charge the deposit payment for the given reservation. This method does nothing if
@@ -458,8 +473,13 @@ public class PaymentProcessorService {
             }
             LOGGER.info( "Looks like a prepaid card... Looking up actual value to charge on BDC" );
             final BigDecimal amountToCharge;
-            try (WebClient webClientForBDC = context.getBean( "webClientForBDC", WebClient.class )) {
-                amountToCharge = bdcScraper.getVirtualCardBalance( webClientForBDC, cbReservation.getThirdPartyIdentifier() );
+            WebDriver driver = webDriverPool.borrowObject();
+            try {
+                WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
+                amountToCharge = bdcSeleniumScraper.getVirtualCardBalance( driver, wait, cbReservation.getThirdPartyIdentifier() );
+            }
+            finally {
+                webDriverPool.returnObject( driver );
             }
             final String MODIFIED_OUTSIDE_OF_BDC = "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC (or payment was incorrectly collected from guest). "
                     + "VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL.";

@@ -36,7 +36,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -64,8 +63,8 @@ public class BookingComSeleniumScraper {
      */
     public void doLogin(WebDriver driver, WebDriverWait wait ) throws IOException {
         doLogin( driver, wait,
-                wordPressDAO.getOption( "hbo_bdc_username" ),
-                wordPressDAO.getOption( "hbo_bdc_password" ) );
+                wordPressDAO.getMandatoryOption( "hbo_bdc_username" ),
+                wordPressDAO.getMandatoryOption( "hbo_bdc_password" ) );
     }
 
     /**
@@ -219,22 +218,6 @@ public class BookingComSeleniumScraper {
     }
 
     /**
-     * Returns the hotel id from the URL.
-     *
-     * @param url
-     * @return non-null hotel id
-     * @throws NoSuchElementException if not found
-     */
-    private String getHotelIdFromURL( String url ) {
-        Pattern p = Pattern.compile( "hotel_id=([\\d]+)" );
-        Matcher m = p.matcher( url );
-        if ( m.find() ) {
-            return m.group( 1 );
-        }
-        throw new NoSuchElementException( "Couldn't find hotel id from URL: " + url );
-    }
-
-    /**
      * Looks up a given reservation in BDC.
      *
      * @param driver
@@ -245,15 +228,18 @@ public class BookingComSeleniumScraper {
     public void lookupReservation( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException {
         doLogin( driver, wait );
 
-        // load reservation from URL
-        String reservationUrl = MessageFormat.format( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/booking.html?res_id={0}&ses={1}&lang=en&hotel_id={2}",
-                reservationId, getSessionFromURL( driver.getCurrentUrl() ), getHotelIdFromURL( driver.getCurrentUrl() ) );
+        String hotelId = wordPressDAO.getMandatoryOption( "hbo_bdc_hotel_id" );
+        String ses = ensureSessionForHotel( driver, wait, hotelId );
+
+        String reservationUrl = MessageFormat.format(
+                "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/booking.html?res_id={0}&ses={1}&lang=en&hotel_id={2}",
+                reservationId, ses, hotelId );
         LOGGER.info( "Looking up reservation " + reservationId + " using URL " + reservationUrl );
         driver.get( reservationUrl );
 
-        wait.until(d -> ExpectedConditions.or(
-                ExpectedConditions.titleContains("Reservation Details"),
-                ExpectedConditions.titleContains("Reservation details")));
+        wait.until( d -> ExpectedConditions.or(
+                ExpectedConditions.titleContains( "Reservation Details" ),
+                ExpectedConditions.titleContains( "Reservation details" ) ) );
         LOGGER.info( "Loaded " + driver.getCurrentUrl() );
 
         // multiple places where the booking reference can appear; it should be in one of these
@@ -268,7 +254,7 @@ public class BookingComSeleniumScraper {
         if ( false == reservationId.equals( resIdFromPage ) ) {
             LOGGER.error( "Reservation ID mismatch?!: Expected " + reservationId + " but found " + resIdFromPage );
             LOGGER.info( driver.getPageSource() );
-            File scrFile = ((TakesScreenshot) driver).getScreenshotAs( OutputType.FILE );
+            File scrFile = ( (TakesScreenshot) driver ).getScreenshotAs( OutputType.FILE );
             String filename = "logs/bdc_reservation_" + reservationId + ".png";
             FileUtils.copyFile( scrFile, new File( filename ) );
             LOGGER.info( "Screenshot written to " + filename );
@@ -277,82 +263,60 @@ public class BookingComSeleniumScraper {
     }
 
     /**
-     * Looks up a given reservation in BDC and returns the virtual card balance on the booking.
+     * Looks up a given reservation in BDC and returns the virtual card balance on the booking
+     * via the fresa {@code get_reservation_payout} API.
      *
      * @param driver
      * @param wait
      * @param reservationId the BDC reference
-     * @return the amount available on the VCC
-     * @throws IOException if unable to login
-     * @throws NoSuchElementException if VCC details not found
+     * @return the amount available on the VCC (zero if no chargeable balance)
+     * @throws IOException if unable to login or payout API fails
      */
-    public BigDecimal getVirtualCardBalance(WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException, NoSuchElementException {
+    public BigDecimal getVirtualCardBalance( WebDriver driver, WebDriverWait wait, String reservationId ) throws IOException {
         lookupReservation( driver, wait, reservationId );
 
-        // Click on VCC confirmation dialog "VCC changes for Covid 19"
-        By OKAY_GOT_IT_BUTTON = By.xpath( "//button/span/span[text()='Okay, got it']" );
-        if ( driver.findElements( OKAY_GOT_IT_BUTTON ).size() > 0 ) {
-            driver.findElement( OKAY_GOT_IT_BUTTON ).click();
-        }
+        String hotelId = wordPressDAO.getMandatoryOption( "hbo_bdc_hotel_id" );
+        String ses = getSessionFromURL( driver.getCurrentUrl() );
+        String hotelAccountId = extractHotelAccountIdFromPage( driver );
 
-        // payment details loaded by javascript
-        final By PAYMENT_DETAILS_BLOCK = By.xpath( "//span[normalize-space(text())='Virtual credit card'] | //span[contains(text(),'successfully charged')]" );
-        wait.until( d -> ExpectedConditions.visibilityOfElementLocated( PAYMENT_DETAILS_BLOCK ) );
+        String apiUrl = MessageFormat.format(
+                "https://admin.booking.com/fresa/extranet/reservations/details/get_reservation_payout?hres_id={0}&hotel_id={1}&ses={2}&lang=en{3}",
+                reservationId, hotelId, ses,
+                hotelAccountId == null ? "" : "&hotel_account_id=" + hotelAccountId );
+        LOGGER.info( "Fetching reservation payout for VCC balance: {}", apiUrl );
+        String json = fetchJsonInBrowser( driver, apiUrl, "POST" );
+        LOGGER.debug( "get_reservation_payout response: {}", json );
 
+        JsonObject root;
         try {
-            // two different views of a booking? this one is from CRH
-            LOGGER.info( "Looking up VCC balance (attempt 1)" );
-            return fetchVccBalanceFromPage( driver,
-                    By.xpath( "//p[@class='reservation_bvc--balance']" ),
-                    Pattern.compile( "Virtual card balance: £(\\d+\\.?\\d*)" ),
-                    e -> e.getText() );
+            root = JsonParser.parseString( json ).getAsJsonObject();
         }
-        catch ( NoSuchElementException ex ) {
-            try { // this view is from HSH
-                LOGGER.info( "Looking up VCC balance (attempt 2)" );
-                return fetchVccBalanceFromPage( driver,
-                        By.xpath( "//div/span[normalize-space(text())='Virtual card balance:']/../following-sibling::div" ),
-                        Pattern.compile( "£(\\d+\\.?\\d*)" ),
-                        e -> getTextNode( e ) ); // remove any subelements in case of a partial charge
+        catch ( Exception e ) {
+            throw new IOException( "Unparseable get_reservation_payout response: " + json, e );
+        }
+        if ( root.get( "success" ) == null || root.get( "success" ).getAsInt() != 1 ) {
+            throw new IOException( "Unexpected get_reservation_payout response: " + json );
+        }
+        if ( root.get( "data" ) == null || false == root.get( "data" ).isJsonObject() ) {
+            throw new IOException( "Missing data in get_reservation_payout response: " + json );
+        }
+        JsonObject data = root.getAsJsonObject( "data" );
+        JsonArray cards = data.getAsJsonArray( "virtualCreditCards" );
+        if ( cards == null || cards.size() == 0 ) {
+            LOGGER.info( "No virtual credit cards on payout response; balance is zero." );
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal total = BigDecimal.ZERO;
+        for ( JsonElement elem : cards ) {
+            JsonObject card = elem.getAsJsonObject();
+            if ( card.get( "currentAmount" ) == null ) {
+                throw new IOException( "VCC missing currentAmount: " + json );
             }
-            catch ( NoSuchElementException ex2 ) {
-                LOGGER.info( "Unable to find VCC amount to charge." );
-                // the next line will either a) display that we have already fully charged the VCC or
-                // b) throw an exception if we can't find anything wrt the VCC amount to charge
-                LOGGER.info( "Looks like we've already charged it! BDC message: "
-                        + driver.findElement( By.xpath( "//div[contains(@class, 'fully_charged')] | //span[contains(text(),'successfully charged the total amount')]" ) ).getText() );
-                return BigDecimal.ZERO;
-            }
+            total = total.add( new BigDecimal( card.get( "currentAmount" ).getAsString() ) );
         }
-    }
-
-    private BigDecimal fetchVccBalanceFromPage( WebDriver driver, By path, Pattern p, Function<WebElement, String> fn ) {
-        String totalAmount = fn.apply( driver.findElement( path ) );
-
-        LOGGER.info( "Matched " + totalAmount + " from " + path );
-        LOGGER.info( "Attempting match with pattern " + p.pattern() );
-        Matcher m = p.matcher( totalAmount );
-        if ( m.find() == false ) {
-            throw new NoSuchElementException( "Couldn't find virtual card balance from '" + totalAmount );
-        }
-        LOGGER.info( "Found VCC balance of " + m.group( 1 ) );
-        return new BigDecimal( m.group( 1 ) );
-    }
-
-    /**
-     * Takes a parent element and strips out the textContent of all child elements and returns
-     * textNode content only
-     *
-     * @param e the parent element
-     * @return the text from the child textNodes
-     */
-    private static String getTextNode( WebElement e ) {
-        String text = e.getText().trim();
-        List<WebElement> children = e.findElements( By.xpath( "./*" ) );
-        for ( WebElement child : children ) {
-            text = text.replaceFirst( child.getText(), "" ).trim();
-        }
-        return text;
+        LOGGER.info( "Found VCC balance of {} for reservation {}", total, reservationId );
+        return total;
     }
 
     /**
@@ -579,7 +543,13 @@ public class BookingComSeleniumScraper {
         LOGGER.info( "Loading VCC management page to resolve hotel_account_id: {}", vccUrl );
         driver.get( vccUrl );
         wait.until( d -> d.getCurrentUrl().contains( "vccs_management" ) );
+        return extractHotelAccountIdFromPage( driver );
+    }
 
+    /**
+     * Extracts {@code hotel_account_id} from the current page source when present.
+     */
+    private String extractHotelAccountIdFromPage( WebDriver driver ) {
         Matcher m = Pattern.compile( "hotel_account_id[=\"'\\s:]+(\\d+)" ).matcher( driver.getPageSource() );
         if ( m.find() ) {
             LOGGER.info( "Resolved hotel_account_id={}", m.group( 1 ) );
@@ -591,25 +561,35 @@ public class BookingComSeleniumScraper {
             LOGGER.info( "Resolved hotel_account_id={} from DOM", fromJs );
             return fromJs.toString();
         }
-        LOGGER.warn( "hotel_account_id not found on VCC page; calling fresa without it" );
+        LOGGER.warn( "hotel_account_id not found on current page; calling fresa without it" );
         return null;
     }
 
     /**
-     * Same-origin fetch inside the logged-in Chrome session (cookies + WAF tokens).
+     * Same-origin GET fetch inside the logged-in Chrome session (cookies + WAF tokens).
      */
     private String fetchJsonInBrowser( WebDriver driver, String url ) throws IOException {
+        return fetchJsonInBrowser( driver, url, "GET" );
+    }
+
+    /**
+     * Same-origin fetch inside the logged-in Chrome session (cookies + WAF tokens).
+     *
+     * @param method HTTP method, e.g. {@code GET} or {@code POST}
+     */
+    private String fetchJsonInBrowser( WebDriver driver, String url, String method ) throws IOException {
         driver.manage().timeouts().scriptTimeout( Duration.ofSeconds( 60 ) );
         Object result = ( (JavascriptExecutor) driver ).executeAsyncScript(
                 "var url = arguments[0];"
+                        + "var method = arguments[1];"
                         + "var callback = arguments[arguments.length - 1];"
-                        + "fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' } })"
+                        + "fetch(url, { method: method, credentials: 'include', headers: { 'Accept': 'application/json' } })"
                         + ".then(function(r) { return r.text().then(function(t) {"
                         + "  if (!r.ok) { callback('HTTP_ERROR:' + r.status + ':' + t); }"
                         + "  else { callback(t); }"
                         + "}); })"
                         + ".catch(function(e) { callback('FETCH_ERROR:' + e); });",
-                url );
+                url, method );
         if ( result == null ) {
             throw new IOException( "Empty response fetching " + url );
         }
