@@ -48,6 +48,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1045,17 +1046,24 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Polls the reservation email log for the latest card authentication email and returns its
-     * Stripe/Cloudbeds approve URL.
+     * Polls the reservation email log for the latest card authentication email sent at or after
+     * {@code notBefore} and returns its Stripe/Cloudbeds approve URL.
+     * <p>
+     * Cloudbeds {@code event_date} is minute-precision ({@code dd/MM/yyyy hh:mm a}); {@code notBefore}
+     * is truncated to the minute so a card add in the same minute as the email is still matched.
      *
      * @param webClient
      * @param reservationId
+     * @param notBefore ignore auth emails with {@code event_date} before this time (local/server time)
      * @return non-blank approve URL
      * @throws IOException if not found within the poll window
      */
-    public String findLatestCardAuthApproveUrl( WebClient webClient, String reservationId ) throws IOException {
+    public String findLatestCardAuthApproveUrl( WebClient webClient, String reservationId, LocalDateTime notBefore )
+            throws IOException {
         final Pattern APPROVE_HREF = Pattern.compile(
                 "href=\"(https://[^\"]+/payment/request/[^\"]+/approve)\"", Pattern.CASE_INSENSITIVE );
+        final DateTimeFormatter EVENT_DATE = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a", Locale.ENGLISH );
+        final LocalDateTime notBeforeMinute = notBefore.truncatedTo( ChronoUnit.MINUTES );
         final int maxAttempts = 15;
         final int sleepSeconds = 2;
         IOException lastError = null;
@@ -1071,8 +1079,18 @@ public class CloudbedsScraper {
                         if ( false == subject.startsWith( "Authenticate your card" ) ) {
                             continue;
                         }
+                        if ( false == row.has( "event_date" ) || row.get( "event_date" ).isJsonNull() ) {
+                            continue;
+                        }
+                        LocalDateTime eventDate = LocalDateTime.parse( row.get( "event_date" ).getAsString(), EVENT_DATE );
+                        if ( eventDate.isBefore( notBeforeMinute ) ) {
+                            LOGGER.info( "Skipping stale card auth email id={} event_date={} (before {})",
+                                    row.has( "email_id" ) ? row.get( "email_id" ).getAsString() : "?",
+                                    eventDate, notBeforeMinute );
+                            continue;
+                        }
                         String emailId = row.get( "email_id" ).getAsString();
-                        LOGGER.info( "Found card auth email id={} subject={}", emailId, subject );
+                        LOGGER.info( "Found card auth email id={} subject={} event_date={}", emailId, subject, eventDate );
                         JsonObject view = getEmailView( webClient, emailId );
                         if ( view.get( "email" ) == null || false == view.get( "email" ).isJsonObject() ) {
                             throw new IOException( "email_view missing email for id=" + emailId );
@@ -1087,7 +1105,8 @@ public class CloudbedsScraper {
                         throw new IOException( "No approve link in card auth email id=" + emailId );
                     }
                 }
-                lastError = new IOException( "No Authenticate your card email yet for reservation " + reservationId );
+                lastError = new IOException( "No Authenticate your card email yet for reservation " + reservationId
+                        + " since " + notBeforeMinute );
             }
             catch ( IOException ex ) {
                 lastError = ex;

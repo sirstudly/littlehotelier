@@ -18,6 +18,7 @@ import com.macbackpackers.jobs.ArchiveAllTransactionNotesJob;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
 import com.macbackpackers.jobs.HostelworldAcknowledgeFullPaymentTakenJob;
 import com.macbackpackers.jobs.HostelworldReportPaymentIssueJob;
+import com.macbackpackers.jobs.PrepaidChargeJob;
 import com.macbackpackers.jobs.SendDepositChargeDeclinedEmailJob;
 import com.macbackpackers.jobs.SendDepositChargeSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendHostelworldLateCancellationEmailJob;
@@ -59,6 +60,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.ParseException;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -320,9 +322,10 @@ public class PaymentProcessorService {
 
         Exception primaryFailure = null;
         try {
+            LocalDateTime cardAddedAt = LocalDateTime.now();
             cloudbedsScraper.addCardDetails( webClient, reservationId, ccDetails );
 
-            String approveUrl = cloudbedsScraper.findLatestCardAuthApproveUrl( webClient, reservationId );
+            String approveUrl = cloudbedsScraper.findLatestCardAuthApproveUrl( webClient, reservationId, cardAddedAt );
             approveCloudbedsCardAuthLink( approveUrl );
         }
         catch ( Exception ex ) {
@@ -372,6 +375,12 @@ public class PaymentProcessorService {
                             LOGGER.info( "Copying BDC card details for reservation {} (BDC#{})",
                                     reservation.getReservationId(), reservation.getThirdPartyIdentifier() );
                             copyBdcCardDetailsToCloudbeds( webClient, reservation );
+
+                            LOGGER.info( "Creating a PrepaidChargeJob for booking " + reservation.getReservationId() );
+                            PrepaidChargeJob chargeJob = new PrepaidChargeJob();
+                            chargeJob.setStatus( JobStatus.submitted );
+                            chargeJob.setReservationId( reservation.getReservationId() );
+                            wordpressDAO.insertJob( chargeJob );
                         }
                         catch ( Exception e ) {
                             throw new RuntimeException( "Failed copying BDC card details for reservation "
@@ -559,7 +568,9 @@ public class PaymentProcessorService {
         }
 
         if ( false == cbReservation.isCardDetailsPresent() ) {
-            cbReservation = copyCardDetailsToCloudbeds( webClient, cbReservation );
+//            cbReservation = copyCardDetailsToCloudbeds( webClient, cbReservation );
+            // many captcha challenges make automating this on the production host very challenging
+            throw new MissingUserDataException( "No active card on file." );
         }
         if ( false == "Booking.com".equals( cbReservation.getSourceName() ) ) {
             throw new MissingUserDataException( "Unsupported source " + cbReservation.getSourceName() );
