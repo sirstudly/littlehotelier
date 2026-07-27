@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.bdc.BookingComVCCToCharge;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.services.BasicCardMask;
@@ -32,6 +33,7 @@ import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.text.ParseException;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -610,17 +612,18 @@ public class BookingComSeleniumScraper {
      *
      * @param driver
      * @param wait
-     * @return non-null list of BDC booking refs
+     * @return non-null list of chargeable VCCs (booking ref, charge-before date, amount)
      * @throws IOException
      */
-    public List<String> getAllVCCBookingsThatCanBeCharged( WebDriver driver, WebDriverWait wait ) throws IOException {
+    public List<BookingComVCCToCharge> getAllVCCBookingsThatCanBeCharged( WebDriver driver, WebDriverWait wait )
+            throws IOException {
         doLogin( driver, wait );
 
         String hotelId = wordPressDAO.getMandatoryOption( "hbo_bdc_hotel_id" );
         String ses = ensureSessionForHotel( driver, wait, hotelId );
         String hotelAccountId = resolveHotelAccountId( driver, wait, hotelId, ses );
 
-        List<String> chargeableRefs = new ArrayList<>();
+        List<BookingComVCCToCharge> chargeable = new ArrayList<>();
         int page = 1;
         final int limit = 50;
         boolean lastPage = false;
@@ -642,9 +645,13 @@ public class BookingComSeleniumScraper {
             if ( vccs != null ) {
                 for ( JsonElement elem : vccs ) {
                     JsonObject vcc = elem.getAsJsonObject();
-                    String formatted = vcc.getAsJsonObject( "current_amount" ).get( "formatted" ).getAsString();
+                    JsonObject currentAmount = vcc.getAsJsonObject( "current_amount" );
+                    String formatted = currentAmount.get( "formatted" ).getAsString();
                     if ( PaymentProcessorService.isChargeableAmount( formatted ) ) {
-                        chargeableRefs.add( String.valueOf( vcc.get( "hres_id" ).getAsLong() ) );
+                        chargeable.add( new BookingComVCCToCharge(
+                                String.valueOf( vcc.get( "hres_id" ).getAsLong() ),
+                                LocalDate.parse( vcc.get( "expiry_date" ).getAsString() ),
+                                new BigDecimal( currentAmount.get( "amount" ).getAsString() ) ) );
                     }
                 }
             }
@@ -653,8 +660,8 @@ public class BookingComSeleniumScraper {
             page++;
         }
 
-        LOGGER.info( "Found {} chargeable VCC bookings for hotel_id={}", chargeableRefs.size(), hotelId );
-        return chargeableRefs;
+        LOGGER.info( "Found {} chargeable VCC bookings for hotel_id={}", chargeable.size(), hotelId );
+        return chargeable;
     }
 
     /**

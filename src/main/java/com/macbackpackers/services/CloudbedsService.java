@@ -13,6 +13,7 @@ import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
 import com.macbackpackers.beans.StripeTransaction;
 import com.macbackpackers.beans.bdc.BookingComRefundRequest;
+import com.macbackpackers.beans.bdc.BookingComVCCToCharge;
 import com.macbackpackers.beans.cloudbeds.requests.CustomerInfo;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
@@ -558,22 +559,39 @@ public class CloudbedsService {
     /**
      * Returns all reservations for BDC with virtual cards that can be charged immediately.
      * Looks up chargeable VCCs via Selenium + fresa API, then maps to Cloudbeds reservation ids.
-     * 
+     * No charge-before date filter is applied.
+     *
      * @return Stream<Reservation> cloudbeds reservations
      * @throws Exception
      */
     public Stream<Reservation> getAllVCCBookingsThatCanBeCharged_LookupViaBDC() throws Exception {
-        List<String> bdcRefs;
+        return getAllVCCBookingsThatCanBeCharged_LookupViaBDC( null );
+    }
+
+    /**
+     * Returns all reservations for BDC with virtual cards that can be charged immediately.
+     * Looks up chargeable VCCs via Selenium + fresa API, then maps to Cloudbeds reservation ids.
+     *
+     * @param chargeBeforeMax when non-null, only include VCCs whose charge-before date is before this date
+     * @return Stream<Reservation> cloudbeds reservations
+     * @throws Exception
+     */
+    public Stream<Reservation> getAllVCCBookingsThatCanBeCharged_LookupViaBDC( LocalDate chargeBeforeMax )
+            throws Exception {
+        List<BookingComVCCToCharge> vccs;
         WebDriver driver = webDriverPool.borrowObject();
         try {
             WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
-            bdcRefs = bdcSeleniumScraper.getAllVCCBookingsThatCanBeCharged( driver, wait );
+            vccs = bdcSeleniumScraper.getAllVCCBookingsThatCanBeCharged( driver, wait );
         }
         finally {
             webDriverPool.returnObject( driver );
         }
-        return bdcRefs.stream()
-                .map( this::getReservationForBDC )
+        return vccs.stream()
+                .filter( vcc -> chargeBeforeMax == null || vcc.getChargeBeforeDate().isBefore( chargeBeforeMax ) )
+                .peek( vcc -> LOGGER.info( "Chargeable BDC VCC {}: amount={}, chargeBefore={}",
+                        vcc.getBookingRef(), vcc.getAmount(), vcc.getChargeBeforeDate() ) )
+                .map( vcc -> getReservationForBDC( vcc.getBookingRef() ) )
                 .filter( Optional::isPresent )
                 .map( Optional::get )
                 .peek( r -> LOGGER.info( "Found BDC reservation {} - {} with VCC for {} {}",
