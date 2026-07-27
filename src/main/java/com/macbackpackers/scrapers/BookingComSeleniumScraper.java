@@ -358,8 +358,17 @@ public class BookingComSeleniumScraper {
         BigDecimal total = BigDecimal.ZERO;
         for ( JsonElement elem : cards ) {
             JsonObject card = elem.getAsJsonObject();
-            if ( card.get( "currentAmount" ) == null ) {
-                throw new IOException( "VCC missing currentAmount: " + json );
+            // Skip closed/cancelled/replaced VCCs — only chargeable cards hold a usable balance.
+            if ( card.get( "isInChargeableStatus" ) == null || card.get( "isInChargeableStatus" ).getAsInt() != 1 ) {
+                LOGGER.info( "Skipping non-chargeable VCC ending {} (status={}, isInChargeableStatus={}, currentAmount={})",
+                        card.has( "ccLastDigits" ) ? card.get( "ccLastDigits" ).getAsString() : "?",
+                        card.has( "status" ) ? card.get( "status" ).getAsString() : "?",
+                        card.has( "isInChargeableStatus" ) ? card.get( "isInChargeableStatus" ) : null,
+                        card.has( "currentAmount" ) ? card.get( "currentAmount" ) : null );
+                continue;
+            }
+            if ( card.get( "currentAmount" ) == null || card.get( "currentAmount" ).isJsonNull() ) {
+                throw new IOException( "Chargeable VCC missing currentAmount: " + json );
             }
             total = total.add( new BigDecimal( card.get( "currentAmount" ).getAsString() ) );
         }
