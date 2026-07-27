@@ -34,6 +34,7 @@ import com.macbackpackers.jobs.SendGuestRegistrationJob;
 import com.macbackpackers.jobs.SendPaymentLinkEmailJob;
 import com.macbackpackers.jobs.SendTemplatedEmailJob;
 import com.macbackpackers.scrapers.BookingComScraper;
+import com.macbackpackers.scrapers.BookingComSeleniumScraper;
 import com.macbackpackers.scrapers.CloudbedsJsonRequestFactory;
 import com.macbackpackers.scrapers.CloudbedsRoomBedSyncMapper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -42,6 +43,7 @@ import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.text.StringEscapeUtils;
 import org.htmlunit.Page;
 import org.htmlunit.UnexpectedPage;
@@ -51,6 +53,8 @@ import org.htmlunit.html.HtmlPage;
 import org.htmlunit.html.HtmlPasswordInput;
 import org.htmlunit.html.HtmlTextInput;
 import org.htmlunit.util.Cookie;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -68,6 +72,7 @@ import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.Period;
 import java.time.format.DateTimeFormatter;
@@ -131,6 +136,12 @@ public class CloudbedsService {
     private BookingComScraper bdcScraper;
 
     @Autowired
+    private BookingComSeleniumScraper bdcSeleniumScraper;
+
+    @Autowired
+    private GenericObjectPool<WebDriver> webDriverPool;
+
+    @Autowired
     private CaptchaSolverService captchaService;
 
     @Autowired
@@ -151,6 +162,9 @@ public class CloudbedsService {
 
     @Value( "${hostelworld.latecancellation.hours:48}" )
     private int HWL_LATE_CANCEL_HOURS;
+
+    @Value( "${chromescraper.maxwait.seconds:60}" )
+    private int chromeMaxWaitSeconds;
 
     private final DateTimeFormatter DD_MMM_YYYY = DateTimeFormatter.ofPattern( "dd-MMM-yyyy" );
 
@@ -543,22 +557,27 @@ public class CloudbedsService {
 
     /**
      * Returns all reservations for BDC with virtual cards that can be charged immediately.
+     * Looks up chargeable VCCs via Selenium + fresa API, then maps to Cloudbeds reservation ids.
      * 
-     * @return List<String> cloudbeds reservation ids
+     * @return Stream<Reservation> cloudbeds reservations
      * @throws Exception
      */
-    public List<String> getAllVCCBookingsThatCanBeCharged_LookupViaBDC() throws Exception {
-        try (WebClient webClient = appContext.getBean( "webClientForBDC", WebClient.class )) {
-            return bdcScraper.getAllVCCBookingsThatCanBeCharged( webClient )
-                    .stream()
-                    .map( bdc -> getReservationForBDC( bdc ) )
-                    .filter( r -> r.isPresent() )
-                    .map( r -> r.get() )
-                    .peek( r -> LOGGER.info( "Found BDC reservation {} - {} with VCC for {} {}",
-                            r.getThirdPartyIdentifier(), r.getReservationId(), r.getFirstName(), r.getLastName() ) )
-                    .map( r -> r.getReservationId() )
-                    .collect( Collectors.toList() );
+    public Stream<Reservation> getAllVCCBookingsThatCanBeCharged_LookupViaBDC() throws Exception {
+        List<String> bdcRefs;
+        WebDriver driver = webDriverPool.borrowObject();
+        try {
+            WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
+            bdcRefs = bdcSeleniumScraper.getAllVCCBookingsThatCanBeCharged( driver, wait );
         }
+        finally {
+            webDriverPool.returnObject( driver );
+        }
+        return bdcRefs.stream()
+                .map( this::getReservationForBDC )
+                .filter( Optional::isPresent )
+                .map( Optional::get )
+                .peek( r -> LOGGER.info( "Found BDC reservation {} - {} with VCC for {} {}",
+                        r.getThirdPartyIdentifier(), r.getReservationId(), r.getFirstName(), r.getLastName() ) );
     }
 
     /**

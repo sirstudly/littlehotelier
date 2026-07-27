@@ -38,7 +38,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.openqa.selenium.support.ui.ExpectedConditions.stalenessOf;
-import static org.openqa.selenium.support.ui.ExpectedConditions.urlMatches;
 
 @Component
 public class BookingComSeleniumScraper {
@@ -120,60 +119,89 @@ public class BookingComSeleniumScraper {
 
         WebElement usernameField = findElement( driver, wait, By.id( "loginname" ) );
         usernameField.sendKeys( username );
-        findElement( driver, wait, By.xpath( "//span[text()='Next']/.." ) ).click();
+        WebElement nextButton = findElement( driver, wait, By.xpath( "//span[text()='Next']/.." ) );
+        nextButton.click();
+        wait.until( stalenessOf( nextButton ) );
+
         WebElement passwordField = findElement( driver, wait, By.id( "password" ) );
         passwordField.sendKeys( password );
 
-        {
-            final WebElement nextButton = findElement(driver, wait, By.xpath("//span[text()='Sign in']/.."));
+        WebElement signInButton = findElement( driver, wait, By.xpath( "//span[text()='Sign in']/.." ) );
+        signInButton.click();
+        // Must pass ExpectedCondition directly — `d -> stalenessOf(btn)` is always truthy and returns immediately.
+        wait.until( stalenessOf( signInButton ) );
+
+        // Wait until password submit navigates away (2FA, admin, captcha, or error page).
+        wait.until( d -> {
+            String url = d.getCurrentUrl();
+            return url != null && false == url.contains( "/sign-in/password" );
+        } );
+
+        if ( isTwoFactorPage( driver.getCurrentUrl() ) ) {
+            completeTwoFactorVerification( driver, wait );
+            wait.until( d -> false == isTwoFactorPage( d.getCurrentUrl() ) );
+        }
+    }
+
+    /**
+     * True when Booking.com is showing an SMS/phone 2FA or auth-assurance challenge.
+     */
+    private static boolean isTwoFactorPage( String url ) {
+        return url != null && (
+                url.startsWith( "https://account.booking.com/sign-in/verification" )
+                        || url.startsWith( "https://secure-admin.booking.com/2fa/" )
+                        || url.contains( "account.booking.com/auth-assurance" ) );
+    }
+
+    /**
+     * Completes SMS or phone verification when on a Booking.com 2FA / auth-assurance page.
+     * Mode is controlled by WP option {@code hbo_bdc_verificationmode} ({@code sms} or {@code phone}).
+     */
+    private void completeTwoFactorVerification( WebDriver driver, WebDriverWait wait ) {
+        LOGGER.info( "BDC verification required at {}", driver.getCurrentUrl() );
+        List<WebElement> phoneLinks = driver.findElements(
+                By.xpath( "//a[contains(@class, 'nw-call-verification-link')] | //input[@value='call']" ) );
+        List<WebElement> smsLinks = driver.findElements(
+                By.xpath( "//a[contains(@class, 'nw-sms-verification-link')] | //input[@value='sms']" ) );
+
+        String verificationMode = wordPressDAO.getOption( "hbo_bdc_verificationmode" );
+        if ( "sms".equalsIgnoreCase( verificationMode ) && smsLinks.size() > 0 ) {
+            LOGGER.info( "Performing SMS verification" );
+            smsLinks.get( 0 ).click();
+            WebElement selectedPhone = driver.findElement(
+                    By.xpath( "//*[@id='selected_phone'] | //select[@name='phone_id_sms']" ) );
+            if ( false == selectedPhone.getText().trim().endsWith( "4338" ) ) {
+                throw new MissingUserDataException( "Phone number not registered: " + selectedPhone.getText() );
+            }
+
+            driver.findElement( By.xpath( "//span[text()='Send verification code'] "
+                    + "| //div[contains(@class,'cta-phone')]/input[@value='Send text message']" ) ).click();
+
+            findElement( driver, wait, By.xpath( "//*[@id='sms_code' or @id='ask_pin_input']" ) )
+                    .sendKeys( fetch2FACode() );
+
+            final WebElement nextButton = driver.findElement( By.xpath(
+                    "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" ) );
             nextButton.click();
-            wait.until(d -> stalenessOf(nextButton));
+            wait.until( stalenessOf( nextButton ) );
         }
+        else if ( "phone".equalsIgnoreCase( verificationMode ) && phoneLinks.size() > 0 ) {
+            LOGGER.info( "Performing phone verification" );
+            phoneLinks.get( 0 ).click();
+            WebElement nextButton = driver.findElement( By.xpath( "//span[text()='Call now']/.." ) );
+            nextButton.click();
 
-        if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in/verification" ) ||
-                driver.getCurrentUrl().startsWith( "https://secure-admin.booking.com/2fa/" ) ) {
-            // if this is the first time we're doing this, we'll need to go thru 2FA
-            LOGGER.info( "BDC verification required" );
-            List<WebElement> phoneLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-call-verification-link')] | //input[@value='call']" ) );
-            List<WebElement> smsLinks = driver.findElements( By.xpath( "//a[contains(@class, 'nw-sms-verification-link')] | //input[@value='sms']" ) );
+            findElement( driver, wait, By.xpath( "//*[@id='sms_code' or @id='ask_pin_input']" ) )
+                    .sendKeys( fetch2FACode() );
 
-            String verificationMode = wordPressDAO.getOption( "hbo_bdc_verificationmode" );
-            if ( "sms".equalsIgnoreCase( verificationMode ) && smsLinks.size() > 0 ) {
-                LOGGER.info( "Performing SMS verification" );
-                smsLinks.get( 0 ).click();
-                WebElement selectedPhone = driver.findElement( By.xpath( "//*[@id='selected_phone'] | //select[@name='phone_id_sms']" ) );
-                if ( false == selectedPhone.getText().trim().endsWith( "4338" ) ) {
-                    throw new MissingUserDataException( "Phone number not registered: " + selectedPhone.getText() );
-                }
-
-                driver.findElement( By.xpath( "//span[text()='Send verification code'] "
-                        + "| //div[contains(@class,'cta-phone')]/input[@value='Send text message']" ) ).click();
-
-                // now blank out the code and wait for it to appear
-                findElement( driver, wait, By.xpath( "//*[@id='sms_code' or @id='ask_pin_input']" ) ).sendKeys( fetch2FACode() );
-
-                final WebElement nextButton = driver.findElement( By.xpath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" ) );
-                nextButton.click();
-                wait.until( d -> stalenessOf( nextButton ) );
-            }
-            else if ( "phone".equalsIgnoreCase( verificationMode ) && phoneLinks.size() > 0 ) {
-                LOGGER.info( "Performing phone verification" );
-                phoneLinks.get( 0 ).click();
-                WebElement nextButton = driver.findElement( By.xpath( "//span[text()='Call now']/.." ) );
-                nextButton.click();
-
-                findElement( driver, wait, By.xpath( "//*[@id='sms_code' or @id='ask_pin_input']" ) ).sendKeys( fetch2FACode() );
-
-                final WebElement verifyButton = driver.findElement( By.xpath( "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" ) );
-                verifyButton.click();
-                wait.until( d -> stalenessOf( verifyButton ) );
-            }
-            else {
-                throw new MissingUserDataException( "Verification required for BDC?" );
-            }
+            final WebElement verifyButton = driver.findElement( By.xpath(
+                    "//span[text()='Verify now']/.. | //div[contains(@class,'ctas')]/input[@value='Verify now']" ) );
+            verifyButton.click();
+            wait.until( stalenessOf( verifyButton ) );
         }
-
-        wait.until(d -> urlMatches("https://account.booking.com/sign-in.*"));
+        else {
+            throw new MissingUserDataException( "Verification required for BDC?" );
+        }
     }
 
     /**
@@ -235,16 +263,25 @@ public class BookingComSeleniumScraper {
         LOGGER.info( "Looking up reservation " + reservationId + " using URL " + reservationUrl );
         driver.get( reservationUrl );
 
-        wait.until( d -> {
+        String pageState = wait.until( d -> {
             String url = d.getCurrentUrl();
             if ( url != null && url.contains( "account.booking.com/auth-assurance" ) ) {
-                throw new MissingUserDataException(
-                        "Booking.com auth-assurance required when opening reservation "
-                                + reservationId + ". Re-seed chromeprofile (complete SMS assurance) or retry after manual approval." );
+                return "assurance";
             }
             String title = d.getTitle();
-            return title != null && title.toLowerCase().contains( "reservation detail" );
+            if ( title != null && title.toLowerCase().contains( "reservation detail" ) ) {
+                return "details";
+            }
+            return null;
         } );
+        if ( "assurance".equals( pageState ) ) {
+            LOGGER.info( "Reservation page requires auth-assurance; completing 2FA..." );
+            completeTwoFactorVerification( driver, wait );
+            wait.until( d -> {
+                String title = d.getTitle();
+                return title != null && title.toLowerCase().contains( "reservation detail" );
+            } );
+        }
         LOGGER.info( "Loaded " + driver.getCurrentUrl() );
 
         // multiple places where the booking reference can appear; it should be in one of these
@@ -271,8 +308,9 @@ public class BookingComSeleniumScraper {
      * Looks up a given reservation in BDC and returns the virtual card balance on the booking
      * via the fresa {@code get_reservation_payout} API.
      * <p>
-     * Does not open {@code booking.html} (that page can force auth-assurance SMS); only needs a
-     * warm admin session + property {@code ses}.
+     * Does not open {@code booking.html} (that page may still prompt auth-assurance SMS,
+     * which {@link #lookupReservation} now completes); only needs a warm admin session +
+     * property {@code ses}.
      *
      * @param driver
      * @param wait
@@ -391,7 +429,19 @@ public class BookingComSeleniumScraper {
         if ( "unavailable".equals( pageState ) ) {
             throw new MissingUserDataException( "Credit card details aren't available." );
         }
-        if ( "signin".equals( pageState ) ) {
+        if ( "assurance".equals( pageState ) ) {
+            LOGGER.info( "Secure-admin requires auth-assurance to view card details; completing 2FA..." );
+            completeTwoFactorVerification( driver, wait );
+            pageState = waitForCcDetailsAfterReauth( driver, wait );
+            if ( "unavailable".equals( pageState ) ) {
+                throw new MissingUserDataException( "Credit card details aren't available." );
+            }
+            if ( false == "details".equals( pageState ) ) {
+                LOGGER.error( "Unexpected page after auth-assurance: {} url={}", pageState, driver.getCurrentUrl() );
+                throw new MissingUserDataException( "Expecting credit card details page but not found?" );
+            }
+        }
+        else if ( "signin".equals( pageState ) ) {
             LOGGER.info( "Secure-admin requires re-auth to view card details; signing in..." );
             doLoginForm( driver, wait,
                     wordPressDAO.getMandatoryOption( "hbo_bdc_username" ),
@@ -476,9 +526,10 @@ public class BookingComSeleniumScraper {
     }
 
     /**
-     * Waits until the secure-admin page shows card details, a sign-in challenge, or unavailability.
+     * Waits until the secure-admin page shows card details, a sign-in challenge,
+     * an auth-assurance 2FA challenge, or unavailability.
      *
-     * @return one of {@code details}, {@code signin}, {@code unavailable}
+     * @return one of {@code details}, {@code signin}, {@code assurance}, {@code unavailable}
      */
     private String waitForCcDetailsPageState( WebDriver driver, WebDriverWait wait ) {
         final By CC_DETAILS = ccDetailsLocator();
@@ -487,9 +538,12 @@ public class BookingComSeleniumScraper {
 
         return wait.until( d -> {
             String url = d.getCurrentUrl();
-            if ( url.contains( "account.booking.com/sign-in" )
+            if ( url != null && url.contains( "account.booking.com/auth-assurance" ) ) {
+                return "assurance";
+            }
+            if ( url != null && ( url.contains( "account.booking.com/sign-in" )
                     || false == d.findElements( By.id( "loginname" ) ).isEmpty()
-                    || false == d.findElements( CONTINUE_CC ).isEmpty() ) {
+                    || false == d.findElements( CONTINUE_CC ).isEmpty() ) ) {
                 return "signin";
             }
             if ( false == d.findElements( CC_NOT_AVAIL ).isEmpty() ) {

@@ -90,14 +90,19 @@ Do **not** restart processors yet.
 
 Uses the existing `crh-processor` **image**, overrides the command so it does **not** start `RunProcessor`, installs a virtual display + noVNC, mounts the CRH profile dir.
 
+`--entrypoint bash` is required: the image `ENTRYPOINT` (`docker-entrypoint.sh`) always drops to `appuser` via `runuser`, so `apt-get` would fail with `Permission denied` even if you pass `--user root`.
+
+If a previous seed container still exists, remove it first: `docker rm -f crh-chrome-seed`.
+
 ```bash
 docker compose run --rm --no-deps --user root \
+  --entrypoint bash \
   --name crh-chrome-seed \
   -v "$(pwd)/chromeprofile/crh:/app/chromeprofile" \
   -p 6080:6080 \
   -e DISPLAY=:99 \
   crh-processor \
-  bash -lc '
+  -lc '
     set -e
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
@@ -129,7 +134,20 @@ Browser: [http://localhost:6080/vnc.html](http://localhost:6080/vnc.html) → Co
 
 ### 4. Start Chrome with the seed profile
 
-In a **second** SSH session on the host:
+In a **second** SSH session on the host.
+
+If Chrome refuses to start with *“profile appears to be in use by another Google Chrome process”*, you have stale `Singleton*` lock files from a previous container (e.g. a stopped processor). Confirm no Chrome is running, then remove them:
+
+```bash
+# Should show no real chrome process (ignore the seed bash command line)
+docker exec crh-chrome-seed bash -lc 'ps aux | grep -i chrome | grep -v grep; ls -la /app/chromeprofile/Singleton*'
+
+rm -f ~/littlehotelier/chromeprofile/crh/SingletonLock \
+      ~/littlehotelier/chromeprofile/crh/SingletonSocket \
+      ~/littlehotelier/chromeprofile/crh/SingletonCookie
+```
+
+Then launch Chrome:
 
 ```bash
 docker exec -u appuser -e DISPLAY=:99 crh-chrome-seed \

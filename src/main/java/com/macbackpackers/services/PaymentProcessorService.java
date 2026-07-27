@@ -351,6 +351,37 @@ public class PaymentProcessorService {
     }
 
     /**
+     * Finds BDC VCCs that can be charged now and copies card details into Cloudbeds
+     * for any reservation that does not already have a card on file.
+     *
+     * @throws Exception on lookup or card-copy failure
+     */
+    public void copyMissingBdcCardDetailsForChargeableVccs() throws Exception {
+        try ( WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            cloudbedsService.getAllVCCBookingsThatCanBeCharged_LookupViaBDC()
+                    .filter( reservation -> {
+                        if ( reservation.isCardDetailsPresent() ) {
+                            LOGGER.info( "Card details already present for reservation {} (BDC#{}); skipping",
+                                    reservation.getReservationId(), reservation.getThirdPartyIdentifier() );
+                            return false;
+                        }
+                        return true;
+                    } )
+                    .forEach( reservation -> {
+                        try {
+                            LOGGER.info( "Copying BDC card details for reservation {} (BDC#{})",
+                                    reservation.getReservationId(), reservation.getThirdPartyIdentifier() );
+                            copyBdcCardDetailsToCloudbeds( webClient, reservation );
+                        }
+                        catch ( Exception e ) {
+                            throw new RuntimeException( "Failed copying BDC card details for reservation "
+                                    + reservation.getReservationId(), e );
+                        }
+                    } );
+        }
+    }
+
+    /**
      * Opens the Cloudbeds/Stripe 3DS2 approve URL in Chrome and waits until the approved landing page.
      */
     private void approveCloudbedsCardAuthLink( String approveUrl ) throws Exception {

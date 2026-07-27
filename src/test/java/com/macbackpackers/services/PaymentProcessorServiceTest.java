@@ -52,6 +52,11 @@ public class PaymentProcessorServiceTest {
     }
 
     @Test
+    public void testCopyMissingBdcCardDetailsForChargeableVccs() throws Exception {
+        paymentService.copyMissingBdcCardDetailsForChargeableVccs();
+    }
+
+    @Test
     public void testChargeNonRefundableBooking() throws Exception {
         paymentService.chargeNonRefundableBooking( cbWebClient, "11068108" );
     }
