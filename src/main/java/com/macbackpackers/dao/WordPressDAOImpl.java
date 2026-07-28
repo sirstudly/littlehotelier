@@ -470,7 +470,8 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .createQuery( "SELECT id FROM AbstractJob "
                         + "     WHERE status IN (:submittedStatus, :retryStatus) "
                         + "        OR (status = :processingStatus AND processedBy = :processedBy)"
-                        + "     ORDER BY CASE WHEN classname = 'com.macbackpackers.jobs.ShutdownJob' THEN 0 ELSE 1 END, id",
+                        // prioritize CalculateEdinburghVisitorLevyForBookingJob in case staff are making changes to a booking in cloudbeds
+                        + "     ORDER BY CASE WHEN classname IN ('com.macbackpackers.jobs.ShutdownJob','com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob') THEN 0 ELSE 1 END, id",
                         Integer.class )
                 .setParameter( "submittedStatus", JobStatus.submitted )
                 .setParameter( "processingStatus", JobStatus.processing )
