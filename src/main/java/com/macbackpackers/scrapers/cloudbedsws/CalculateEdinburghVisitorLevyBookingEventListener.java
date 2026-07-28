@@ -1,4 +1,3 @@
-
 package com.macbackpackers.scrapers.cloudbedsws;
 
 import java.io.IOException;
@@ -6,7 +5,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.htmlunit.WebClient;
 import org.slf4j.Logger;
@@ -48,9 +46,6 @@ public class CalculateEdinburghVisitorLevyBookingEventListener implements Cloudb
 
     @Autowired
     private ApplicationContext context;
-
-    /** Avoid duplicate inserts when Cloudbeds sends multiple room rows for one booking. */
-    private final Set<String> recentlyEnqueuedReservationIds = ConcurrentHashMap.newKeySet();
 
     @Override
     public void onSnapshot( String propertyId, List<CloudbedsCalendarEvent> events ) {
@@ -113,11 +108,7 @@ public class CalculateEdinburghVisitorLevyBookingEventListener implements Cloudb
     }
 
     private void tryEnqueueCalculateJob( CloudbedsCalendarEvent event, String reservationId ) {
-        if ( recentlyEnqueuedReservationIds.contains( reservationId ) ) {
-            return;
-        }
         if ( dao.hasCalculateEdinburghVisitorLevyJobForReservation( reservationId ) ) {
-            recentlyEnqueuedReservationIds.add( reservationId );
             LOGGER.info( "Skipping CalculateEdinburghVisitorLevyForBookingJob for reservation {} (job already pending)",
                     reservationId );
             return;
@@ -138,7 +129,6 @@ public class CalculateEdinburghVisitorLevyBookingEventListener implements Cloudb
         job.setStatus( JobStatus.submitted );
         job.setReservationId( reservationId );
         dao.insertJob( job );
-        recentlyEnqueuedReservationIds.add( reservationId );
     }
 
     private Set<String> getInclusiveTaxSubSourceIds() {

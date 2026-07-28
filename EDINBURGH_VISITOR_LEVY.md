@@ -350,10 +350,9 @@ The listener does **not** compare folio EVL before enqueueing — that happens i
 | Layer | Behaviour |
 |---|---|
 | Same WebSocket batch | One job per `booking_id` per update (multiple room rows deduped) |
-| In-memory | `recentlyEnqueuedReservationIds` avoids duplicate inserts within the JVM session |
 | Database | `WordPressDAO.hasCalculateEdinburghVisitorLevyJobForReservation()` skips enqueue when a job for that reservation is already **pending** (`submitted`, `processing`, or `retry`) |
 
-There is **no cooldown** on completed or failed jobs — a subsequent `booked` event (e.g. after a room move) may enqueue a fresh job once the previous one has finished.
+There is **no cooldown** on completed or failed jobs — a subsequent `booked` event (e.g. after adding a night or a room move) may enqueue a fresh job once the previous one has finished.
 
 #### Batch vs real-time
 

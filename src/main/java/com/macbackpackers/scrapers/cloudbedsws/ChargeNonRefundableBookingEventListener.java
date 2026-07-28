@@ -1,4 +1,3 @@
-
 package com.macbackpackers.scrapers.cloudbedsws;
 
 import java.io.IOException;
@@ -6,7 +5,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.htmlunit.WebClient;
 import org.slf4j.Logger;
@@ -47,9 +45,6 @@ public class ChargeNonRefundableBookingEventListener implements CloudbedsEventLi
     @Autowired
     private ApplicationContext context;
 
-    /** Avoid duplicate inserts when Cloudbeds sends multiple room rows for one booking. */
-    private final Set<String> recentlyEnqueuedReservationIds = ConcurrentHashMap.newKeySet();
-
     @Override
     public void onSnapshot( String propertyId, List<CloudbedsCalendarEvent> events ) {
         // intentionally ignored: only react to live booking changes, not the bulk snapshot
@@ -82,11 +77,7 @@ public class ChargeNonRefundableBookingEventListener implements CloudbedsEventLi
             if ( false == reservationIdsSeenInBatch.add( reservationId ) ) {
                 continue;
             }
-            if ( recentlyEnqueuedReservationIds.contains( reservationId ) ) {
-                continue;
-            }
             if ( dao.hasChargeNonRefundableJobForReservation( reservationId ) ) {
-                recentlyEnqueuedReservationIds.add( reservationId );
                 LOGGER.info( "Skipping ChargeNonRefundableBookingJob for reservation {} (charge attempted within last {} hours or job pending)",
                         reservationId, WordPressDAO.NON_REFUNDABLE_CHARGE_COOLDOWN_HOURS );
                 continue;
@@ -108,7 +99,6 @@ public class ChargeNonRefundableBookingEventListener implements CloudbedsEventLi
             chargeJob.getDependentJobs().add( evlJob );
         }
         dao.insertJob( chargeJob );
-        recentlyEnqueuedReservationIds.add( reservationId );
     }
 
     private Set<String> getEligibleSubSourceIds() {
