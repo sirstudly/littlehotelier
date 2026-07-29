@@ -7,6 +7,7 @@ import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Transient;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.macbackpackers.beans.JobStatus;
@@ -31,18 +32,32 @@ public class CreatePrepaidChargeJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
 
-        Set<String> reservationIds = cloudbedsService.getAllVCCBookingsThatCanBeCharged();
-        // BDC VCC expire 1 year after checkout; include those that have recently checked out if there's a chargeable amount still
-        cloudbedsService.getAllVCCBookingsThatCanBeCharged_LookupViaBDC( LocalDate.now().plusDays( 375 ) )
-                .map( Reservation::getReservationId )
-                .forEach( reservationIds::add );
+        if ( StringUtils.isBlank( dao.getOptionNoCache( "hbo_bdc_username" ) ) ) {
+            // BDC login not available; check BDC bookings which checkin/checkout for today
+            cloudbedsService.getAllVCCBookingsThatCanBeCharged()
+                    .stream()
+                    .forEach( r -> {
+                        LOGGER.info( "Creating a PrepaidChargeJob for booking " + r );
+                        PrepaidChargeJob chargeJob = new PrepaidChargeJob();
+                        chargeJob.setStatus( JobStatus.submitted );
+                        chargeJob.setReservationId( r );
+                        dao.insertJob( chargeJob );
+                    } );
+        }
+        else {
+            Set<String> reservationIds = cloudbedsService.getAllVCCBookingsThatCanBeCharged();
+            // BDC VCC expire 1 year after checkout; include those that have recently checked out if there's a chargeable amount still
+            cloudbedsService.getAllVCCBookingsThatCanBeCharged_LookupViaBDC( LocalDate.now().plusDays( 375 ) )
+                    .map( Reservation::getReservationId )
+                    .forEach( reservationIds::add );
 
-        reservationIds.forEach( r -> {
-            LOGGER.info( "Creating a PrepaidChargeJob for booking " + r );
-            PrepaidChargeJob chargeJob = new PrepaidChargeJob();
-            chargeJob.setStatus( JobStatus.submitted );
-            chargeJob.setReservationId( r );
-            dao.insertJob( chargeJob );
-        } );
+            reservationIds.forEach( r -> {
+                LOGGER.info( "Creating a PrepaidChargeJob for booking " + r );
+                PrepaidChargeJob chargeJob = new PrepaidChargeJob();
+                chargeJob.setStatus( JobStatus.submitted );
+                chargeJob.setReservationId( r );
+                dao.insertJob( chargeJob );
+            } );
+        }
     }
 }
