@@ -302,7 +302,7 @@ public interface WordPressDAO {
     Optional<ResetCloudbedsSessionJob> fetchResetCloudbedsSessionJob();
 
     /**
-     * Returns a list of active jobs to schedule with the scheduler.
+     * Returns a list of active scheduled job definitions.
      * 
      * @return non-null list of jobs
      */

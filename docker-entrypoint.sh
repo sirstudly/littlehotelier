@@ -14,4 +14,5 @@ if [ -d /home/appuser/.ssh ]; then
   find /home/appuser/.ssh -type f -exec chmod 600 {} +
 fi
 
-exec runuser -u appuser -- "$@"
+# Drop privileges and replace this process so the app becomes PID 1 and receives SIGTERM.
+exec setpriv --reuid=appuser --regid=appuser --init-groups -- "$@"

@@ -1,4 +1,3 @@
-
 package com.macbackpackers;
 
 import com.macbackpackers.dao.WordPressDAO;
@@ -22,6 +21,7 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.convert.support.DefaultConversionService;
+import sun.misc.Signal;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,6 +29,7 @@ import java.nio.channels.FileLock;
 import java.util.Date;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * The main bootstrap for running all available jobs.
@@ -59,6 +60,8 @@ public class RunProcessor
     
     // make sure only one instance is running by checking a file-level lock
     private boolean checkLock = true;
+
+    private final AtomicBoolean cleanedUp = new AtomicBoolean( false );
 
     /**
      * Returns whether or not to check the lock before starting.
@@ -96,7 +99,6 @@ public class RunProcessor
     public void runInServerMode() throws Exception {
         acquireLock();
         dao.resetAllProcessingJobsToSubmitted();
-//        scheduler.reloadScheduledJobs(); // load and start the scheduler
 
         // keep a permanent connection to the Cloudbeds calendar to monitor bookings (logging-only for now)
         if ( dao.isCloudbeds() ) {
@@ -148,10 +150,20 @@ public class RunProcessor
     }
 
     /**
-     * Cleanup any resources before shutting down.
+     * Requests a graceful drain-and-exit of the server-mode job loop.
+     */
+    public void requestShutdown() {
+        processorService.requestShutdown();
+    }
+
+    /**
+     * Cleanup any resources before shutting down. Safe to call more than once.
      */
     public void shutdown() {
-        LOGGER.info( "Shutting down... Closing WebDriver pool." );
+        if ( !cleanedUp.compareAndSet( false, true ) ) {
+            return;
+        }
+        LOGGER.info( "Shutting down... Closing WebSocket monitor and WebDriver pool." );
         try {
             cloudbedsWebSocketService.stopMonitoring();
         }
@@ -236,8 +248,12 @@ public class RunProcessor
         }
 
         try {
-            // Add a shutdown hook to clean up any open resources
-            Runtime.getRuntime().addShutdownHook( new Thread( () -> processor.shutdown() ) );
+            // Replace default SIGTERM handling so we can drain in-flight jobs before exiting.
+            // Without this, the JVM tears down while workers may still hold WebDrivers.
+            Signal.handle( new Signal( "TERM" ), signal -> {
+                LOGGER.info( "Received SIGTERM; requesting graceful shutdown" );
+                processor.requestShutdown();
+            } );
 
             // server-mode: keep the processor running
             if ( line.hasOption( "S" ) ) {
@@ -257,7 +273,14 @@ public class RunProcessor
             LOGGER.error( "Unexpected error", th );
         }
         finally {
-            processor.releaseExclusivityLock();
+            try {
+                processor.releaseExclusivityLock();
+            }
+            catch ( IOException ex ) {
+                LOGGER.error( "Error releasing exclusivity lock", ex );
+            }
+            // Close WS/drivers only after the job loop has returned (drain complete)
+            processor.shutdown();
             context.close();
             LOGGER.info( "Finished processor... " + new Date() );
             System.exit(0);

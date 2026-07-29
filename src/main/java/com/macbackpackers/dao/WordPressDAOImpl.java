@@ -461,7 +461,6 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Override
     public synchronized AbstractJob getNextJobToProcess() {
-        // shutdown job has priority if present
         // include any jobs that have been tagged as processing by us
         // (since there should only ever be 1 unique one; we'll be re-running these jobs)
         String thisProcessorId = getUniqueProcessorId();
@@ -471,7 +470,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "     WHERE status IN (:submittedStatus, :retryStatus) "
                         + "        OR (status = :processingStatus AND processedBy = :processedBy)"
                         // prioritize CalculateEdinburghVisitorLevyForBookingJob in case staff are making changes to a booking in cloudbeds
-                        + "     ORDER BY CASE WHEN classname IN ('com.macbackpackers.jobs.ShutdownJob','com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob') THEN 0 ELSE 1 END, id",
+                        + "     ORDER BY CASE WHEN classname = 'com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob' THEN 0 ELSE 1 END, id",
                         Integer.class )
                 .setParameter( "submittedStatus", JobStatus.submitted )
                 .setParameter( "processingStatus", JobStatus.processing )

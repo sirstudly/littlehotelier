@@ -22,8 +22,7 @@ import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.dao.WordPressDAO;
 
 /**
- * Bootstrap for inserting a Job using the ScheduledJob table (rather than using the internal
- * SchedulerService).
+ * Bootstrap for inserting a Job using the ScheduledJob table.
  *
  */
 @Component

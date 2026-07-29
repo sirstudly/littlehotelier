@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class ProcessorService {
@@ -69,6 +70,31 @@ public class ProcessorService {
 
     @Autowired
     private GenericObjectPool<WebDriver> driverFactory;
+
+    private final AtomicBoolean shutdownRequested = new AtomicBoolean( false );
+
+    private volatile Thread loopThread;
+
+    /**
+     * Requests a graceful shutdown: stop claiming new jobs, finish in-flight work, then exit the
+     * processing loop.
+     */
+    public void requestShutdown() {
+        if ( shutdownRequested.compareAndSet( false, true ) ) {
+            LOGGER.info( "Graceful shutdown requested" );
+            Thread t = loopThread;
+            if ( t != null ) {
+                t.interrupt();
+            }
+        }
+    }
+
+    /**
+     * @return true if a graceful shutdown has been requested
+     */
+    public boolean isShutdownRequested() {
+        return shutdownRequested.get();
+    }
 
     /**
      * Checks for any jobs that need to be run ('submitted') and processes them.
@@ -190,38 +216,76 @@ public class ProcessorService {
 
     /**
      * Process all jobs. If no jobs are available to be run, then pause for a configured period
-     * before checking again.
-     * 
+     * before checking again. Returns when {@link #requestShutdown()} is called and in-flight
+     * workers have finished (or the drain timeout elapses).
      */
     public void processJobsLoopIndefinitely() {
-        // start thread pool
+        loopThread = Thread.currentThread();
         ExecutorService executor = Executors.newFixedThreadPool( threadCount );
         CyclicBarrier barrier = new CyclicBarrier( threadCount );
-        
-        while ( true ) {
+
+        try {
+            while ( !shutdownRequested.get() ) {
+                try {
+                    initCloudbeds();
+                }
+                catch ( Throwable th ) {
+                    LOGGER.error( "Failed to initialise cloudbeds.. Have we been logged out?", th );
+                }
+                if ( shutdownRequested.get() ) {
+                    break;
+                }
+                try {
+                    createOverdueScheduledJobs();
+                }
+                catch ( Throwable th ) {
+                    LOGGER.error( "Error creating overdue scheduled jobs", th );
+                }
+                if ( shutdownRequested.get() ) {
+                    break;
+                }
+                for ( int i = 0 ; i < threadCount ; i++ ) {
+                    if ( shutdownRequested.get() ) {
+                        break;
+                    }
+                    JobProcessorThread th = new JobProcessorThread( barrier );
+                    autowireBeanFactory.autowireBean( th );
+                    executor.execute( th );
+                }
+                if ( shutdownRequested.get() ) {
+                    break;
+                }
+                try {
+                    LOGGER.info( "Waiting for {} seconds before checking again for new jobs", repeatIntervalMillis / 1000 );
+                    Thread.sleep( repeatIntervalMillis ); // wait then repeat loop
+                }
+                catch ( InterruptedException e ) {
+                    Thread.currentThread().interrupt();
+                    LOGGER.info( "Job loop interrupted; exiting" );
+                    break;
+                }
+            }
+        }
+        finally {
+            LOGGER.info( "Draining job executor; waiting for in-flight jobs to finish..." );
+            executor.shutdown();
             try {
-                initCloudbeds();
-            }
-            catch ( Throwable th ) {
-                LOGGER.error( "Failed to initialise cloudbeds.. Have we been logged out?", th );
-            }
-            try {
-                createOverdueScheduledJobs();
-            }
-            catch ( Throwable th ) {
-                LOGGER.error( "Error creating overdue scheduled jobs", th );
-            }
-            for ( int i = 0 ; i < threadCount ; i++ ) {
-                JobProcessorThread th = new JobProcessorThread( barrier );
-                autowireBeanFactory.autowireBean( th );
-                executor.execute( th );
-            }
-            try {
-                LOGGER.info( "Waiting for {} seconds before checking again for new jobs", repeatIntervalMillis / 1000 );
-                Thread.sleep( repeatIntervalMillis ); // wait then repeat loop
+                // Leave headroom under docker stop_grace_period (5m) for cleanup after drain
+                if ( !executor.awaitTermination( 4, TimeUnit.MINUTES ) ) {
+                    LOGGER.warn( "Jobs still running after 4 minutes; waiting 30s more before force shutdown" );
+                    if ( !executor.awaitTermination( 30, TimeUnit.SECONDS ) ) {
+                        LOGGER.warn( "Forcing job executor shutdown" );
+                        executor.shutdownNow();
+                    }
+                }
+                else {
+                    LOGGER.info( "All job workers terminated" );
+                }
             }
             catch ( InterruptedException e ) {
-                // ignore
+                LOGGER.warn( "Interrupted while draining job executor; forcing shutdown" );
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
             }
         }
     }

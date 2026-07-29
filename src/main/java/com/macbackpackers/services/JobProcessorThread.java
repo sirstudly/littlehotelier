@@ -43,14 +43,27 @@ public class JobProcessorThread implements Runnable {
     public void run() {
         while ( true ) {
             try {
+                if ( processorService.isShutdownRequested() ) {
+                    LOGGER.info( "Shutdown requested; worker {} exiting", Thread.currentThread().getName() );
+                    break;
+                }
+
                 // find and run all submitted jobs
-                for ( AbstractJob job = processorService.getNextJobToProcess() ; job != null ; job = processorService.getNextJobToProcess() ) {
+                for ( AbstractJob job = processorService.getNextJobToProcess() ;
+                        job != null ;
+                        job = processorService.isShutdownRequested() ? null : processorService.getNextJobToProcess() ) {
                     LOGGER.info( "LOCKED job " + job.getId() + " by " + Thread.currentThread().getName() );
                     processorService.processJob( job );
 
                     // before we continue with any other jobs (possibly ones we just created),
                     // reset the barrier (so we release any suspended threads so they can help us out)
                     barrier.reset();
+                }
+
+                if ( processorService.isShutdownRequested() ) {
+                    LOGGER.info( "Shutdown requested after draining claimed jobs; worker {} exiting",
+                            Thread.currentThread().getName() );
+                    break;
                 }
                 
                 // no more jobs to run at the moment; wait until all jobs are also at this point
@@ -61,10 +74,17 @@ public class JobProcessorThread implements Runnable {
                 break;
             }
             catch ( InterruptedException e ) {
-                // ignored
+                if ( processorService.isShutdownRequested() ) {
+                    LOGGER.info( "Worker {} interrupted during shutdown; exiting", Thread.currentThread().getName() );
+                    break;
+                }
                 LOGGER.debug( "Thread interrupted, ignoring..." );
             }
             catch ( BrokenBarrierException ex ) {
+                if ( processorService.isShutdownRequested() ) {
+                    LOGGER.info( "Barrier broken during shutdown; worker {} exiting", Thread.currentThread().getName() );
+                    break;
+                }
                 // ordinarily if any other threads terminate abruptly, this will be thrown
                 // but since we catch all other exceptions, the only way this is thrown
                 // is if we call reset() on the barrier (which we do once we finish a task)

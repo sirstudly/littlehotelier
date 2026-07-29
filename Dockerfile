@@ -82,5 +82,6 @@ ENV CHROME_BINARY_PATH=/usr/bin/google-chrome-stable
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
-# Run the application with config directory and processor ID from environment
-CMD ["sh", "-c", "java -server $JAVA_OPTS -Dchrome.binary.path=$CHROME_BINARY_PATH -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE} -jar lilhotelier.jar com.macbackpackers.RunProcessor -S"]
+# Run the application with config directory and processor ID from environment.
+# Use exec so java replaces the shell and becomes PID 1 (receives docker stop SIGTERM).
+CMD ["sh", "-c", "exec java -server $JAVA_OPTS -Dchrome.binary.path=$CHROME_BINARY_PATH -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE} -jar lilhotelier.jar com.macbackpackers.RunProcessor -S"]
