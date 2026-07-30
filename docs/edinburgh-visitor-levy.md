@@ -85,22 +85,35 @@ The guest-facing total is shown when clicking the **(?)** icon next to the subto
 
 #ronbot automatically posts a folio adjustment to correct the levy on Hostelworld bookings at the time of booking.
 
-### Extensions added in Cloudbeds
+### Stay length changes in Cloudbeds
 
-When staff extend a Hostelworld stay in Cloudbeds, `channel_price_listed` / `channel_balance` stay on the **original** HW amounts. Extra room rates on the folio are hotel-side (no HW commission).
+When staff extend or shorten a Hostelworld stay in Cloudbeds, `channel_price_listed` / `channel_balance` stay on the **original** HW amounts. #ronbot applies a single rate delta:
 
-#ronbot adds that surplus to the levy base at face value:
+`rateDelta = Cloudbeds rates total − channel_balance`  
+`levy base = (listed + rateDelta) × (eligible rates / all rates)`
+
+**Extension** (extra hotel-side nights, no HW commission on them):
 
 | Item | Amount |
 |---|---:|
 | Original listed price | £60.76 |
 | Cloudbeds net rates (original) | £49.82 (`channel_balance`) |
 | Extension night rate | £21.00 |
-| Surplus (`rates total − channel_balance`) | £21.00 |
+| rateDelta | +£21.00 |
 | Levy base | £60.76 + £21.00 = **£81.76** |
 | **Correct EVL** | 5% × £81.76 = **£4.09** |
 
-Without this, the job would force EVL back to `5% × listed` only and claw back Cloudbeds’ exclusive EVL on the extension nights.
+**Shortening** (nights removed; HW commission is **not** refunded):
+
+| Item | Amount |
+|---|---:|
+| Original listed price | £60.76 |
+| Remaining Cloudbeds net rate | £24.91 |
+| rateDelta | −£24.91 |
+| Levy base | £60.76 − £24.91 = **£35.85** (= remaining net + full original commission) |
+| **Correct EVL** | 5% × £35.85 = **£1.79** |
+
+Without the rate delta, the job would force EVL to `5% × listed` only — clawing back extension EVL, or leaving shortened stays overcharged.
 
 ---
 
@@ -159,7 +172,7 @@ Agoda / Priceline use the same **inclusive** tax and calculation as Booking.com.
 
 For all booking sources above, the processor:
 
-1. **Corrects Hostelworld levies** when Cloudbeds under-calculates due to commission, and includes hotel-side extension rates above `channel_balance` (see [Hostelworld bookings](#hostelworld-bookings)).
+1. **Corrects Hostelworld levies** when Cloudbeds under-calculates due to commission, and applies a rate delta for hotel-side extensions or shortenings vs `channel_balance` (see [Hostelworld bookings](#hostelworld-bookings)).
 2. **Reduces EVL** when a stay exceeds **five eligible nights** (Cloudbeds does not reliably enforce the night cap).
 3. **Logs Booking.com and Agoda / Priceline discrepancies** without writing folio changes, because the channel total is fixed and coordinated EVL/VAT/room-rate adjustments would be required.
 4. On **OTA stays over five nights**, may log that Cloudbeds / the channel over-attributed levy — manual guest refund may still be needed (Booking.com documents this; Agoda has no equivalent EVL-specific guidance).
@@ -173,7 +186,7 @@ Adjustment notes on the folio are suffixed with `-RONBOT` for traceability.
 | Source | Cloudbeds tax | Levy base | EVL line includes VAT? | Council remittance |
 |---|---|---|---|---|
 | Direct / walk-in | Exclusive 5% | Guest accommodation total (incl. room VAT) | Yes | EVL ÷ 1.2 |
-| Hostelworld | Exclusive 5% | Listed guest price (incl. commission) + Cloudbeds extension surplus | Yes | EVL ÷ 1.2 |
+| Hostelworld | Exclusive 5% | Listed guest price ± Cloudbeds rate delta vs `channel_balance` | Yes | EVL ÷ 1.2 |
 | Booking.com | Inclusive 6% of net | Per-person nightly rate (fixed OTA total) | Yes | EVL ÷ 1.2 |
 | Agoda / Priceline | Inclusive 6% of net | Per-person nightly rate (fixed OTA total) | Yes | EVL ÷ 1.2 |
 

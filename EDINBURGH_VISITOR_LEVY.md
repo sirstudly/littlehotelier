@@ -203,16 +203,16 @@ Per-person rate sum = £149.43; × 2 guests = £298.86.
 
 ### Hostelworld (exclusive tax)
 
-Cloudbeds `detailed_rates` are **net** (post-commission). Use **channel listed price** for levy base, plus any hotel-side extension rates above the original HW net:
+Cloudbeds `detailed_rates` are **net** (post-commission). Use **channel listed price** plus the delta between current CB rates and the original HW net (extensions and shortenings; commission is not refunded on shorten):
 
 ```
 priceListed = channel_price_listed
            OR channel_balance + channel_commission
 hwNetAnchor = channel_balance
            OR priceListed − channel_commission
-           OR allNetRates          # no surplus detectable
-surplus = max(0, allNetRates − hwNetAnchor)
-levyBase = (priceListed + surplus) × (eligibleNetRates / allNetRates)
+           OR allNetRates          # no delta detectable
+rateDelta = allNetRates − hwNetAnchor
+levyBase = (priceListed + rateDelta) × (eligibleNetRates / allNetRates)
 expectedLevy = round(levyBase × 5%, 2)
 ```
 
@@ -223,7 +223,10 @@ expectedLevy = round(levyBase × 5%, 2)
 → **£4.70**
 
 **Example:** Extension in Cloudbeds — listed £60.76, `channel_balance` £49.82, rates £24.91 + £24.91 + £21.00  
-→ surplus = £21.00 → levyBase = £81.76 → **£4.09**
+→ rateDelta = £21.00 → levyBase = £81.76 → **£4.09**
+
+**Example:** Shortened in Cloudbeds — listed £60.76, `channel_balance` £49.82, one night £24.91 left  
+→ rateDelta = −£24.91 → levyBase = £35.85 → **£1.79**
 
 ---
 
@@ -443,7 +446,7 @@ Use Cloudbeds **Invoice Footer** (Settings → Finance → Invoices) for static 
 |---|---|
 | **Booking.com** | 5% attributed in rate from 1 Oct 2025; **cannot cap at 5 nights** — provider must refund excess; rates must include levy |
 | **Agoda / Priceline** | EVL baked into fixed OTA total (inclusive tax); hotel and channel collect — same calculation as BDC |
-| **Hostelworld** | Listed price in `channel_price_listed` / balance+commission; hotel-side extensions = surplus over `channel_balance` at face value |
+| **Hostelworld** | Listed price in `channel_price_listed` / balance+commission; rate delta vs `channel_balance` for hotel-side extensions (+) or shortenings (−; commission retained) |
 | **Airbnb** | No auto-tool yet; build into calendar pricing |
 | **Direct** | Exclusive EVL tax on source |
 
@@ -468,6 +471,7 @@ BDC partner hub: [Edinburgh Visitor Levy](https://partner.booking.com/en-gb/help
 | HWL partial eligibility | £5.88 |
 | HWL Cloudbeds extension (listed £60.76 + surplus £21) | £4.09 |
 | HWL extension + partial eligibility | £4.17 |
+| HWL Cloudbeds shortening (listed £60.76 − £24.91) | £1.79 |
 | Straddling 24 Jul (2 of 4 nights) | £10.00 |
 | 7 nights capped at 5 | £15.00 |
 | Exempt / canceled | £0 |
@@ -495,7 +499,7 @@ Run: `mvn test -Dtest=EdinburghVisitorLevyBookingCriteriaTest`
 ## Known limitations & future work
 
 1. **Inclusive-tax OTA adjustments are log-only** (BDC, Agoda, Agoda / Priceline) — fixed channel total requires coordinated EVL/VAT/room-rate changes.
-2. **HWL** uses aggregate 5% on `(listed + extension surplus)` prorated by eligible/all rates, not per-night inclusive-OTA rounding.
+2. **HWL** uses aggregate 5% on `(listed + rateDelta)` prorated by eligible/all rates, not per-night inclusive-OTA rounding. Positive delta = extension; negative = shortening with commission retained.
 3. **Inclusive OTA guest count** relies on `detailed_rates.adults/kids` or reservation guest count — verify when Cloudbeds sends `adults:0`.
 4. **Inclusive OTA VAT-on-levy** is inside the 6% EVL line; room VAT is a separate folio line. Council remittance = EVL ÷ 1.2.
 5. **5-night cap** on inclusive OTAs: channel may attribute levy for whole stay; manual refund + our job logs discrepancy.

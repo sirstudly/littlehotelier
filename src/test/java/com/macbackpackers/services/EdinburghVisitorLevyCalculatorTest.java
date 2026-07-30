@@ -204,7 +204,7 @@ public class EdinburghVisitorLevyCalculatorTest {
                 reservation, gson, STAY_DATE_FROM );
 
         assertThat( calculation.isHostelworldUsesListedPrice(), is( true ) );
-        assertThat( calculation.getHostelworldExtensionSurplus(), comparesEqualTo( new BigDecimal( "21.00" ) ) );
+        assertThat( calculation.getHostelworldRateDelta(), comparesEqualTo( new BigDecimal( "21.00" ) ) );
         assertThat( calculation.getLevyBase(), comparesEqualTo( new BigDecimal( "81.76" ) ) );
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "4.09" ) ) );
         assertThat( EdinburghVisitorLevyCalculator.buildAdjustmentNote( calculation ),
@@ -213,7 +213,7 @@ public class EdinburghVisitorLevyCalculatorTest {
     }
 
     @Test
-    public void testHostelworldExtensionSurplusFromListedMinusCommissionWhenBalanceMissing() {
+    public void testHostelworldRateDeltaFromListedMinusCommissionWhenBalanceMissing() {
         Reservation reservation = reservationWithRates(
                 "Hostelworld", "2026-07-28", "2026-07-31", "2026-07-24",
                 rateLine( "2026-07-28", "24.91" ),
@@ -225,12 +225,12 @@ public class EdinburghVisitorLevyCalculatorTest {
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
                 reservation, gson, STAY_DATE_FROM );
 
-        assertThat( calculation.getHostelworldExtensionSurplus(), comparesEqualTo( new BigDecimal( "21.00" ) ) );
+        assertThat( calculation.getHostelworldRateDelta(), comparesEqualTo( new BigDecimal( "21.00" ) ) );
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "4.09" ) ) );
     }
 
     @Test
-    public void testHostelworldExtensionSurplusProratedForPartialEligibility() {
+    public void testHostelworldRateDeltaProratedForPartialEligibility() {
         Reservation reservation = reservationWithRates(
                 "Hostelworld", "2026-07-22", "2026-07-26", "2025-11-01",
                 rateLine( "2026-07-22", "50.00" ),
@@ -244,11 +244,32 @@ public class EdinburghVisitorLevyCalculatorTest {
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
                 reservation, gson, STAY_DATE_FROM );
 
-        // surplus = 171 - 150 = 21; eligible = 50 + 21 = 71; all = 171
+        // rateDelta = 171 - 150 = 21; eligible = 50 + 21 = 71; all = 171
         // levyBase = (180 + 21) * 71 / 171 = 83.4561... → EVL 4.17
         assertThat( calculation.getEligibleNights().size(), is( 2 ) );
-        assertThat( calculation.getHostelworldExtensionSurplus(), comparesEqualTo( new BigDecimal( "21.00" ) ) );
+        assertThat( calculation.getHostelworldRateDelta(), comparesEqualTo( new BigDecimal( "21.00" ) ) );
         assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "4.17" ) ) );
+    }
+
+    @Test
+    public void testHostelworldShorteningReducesLevyBaseKeepingCommission() {
+        // Original HWL 60.76 / 2 nights (balance 49.82); shortened to 1 night in Cloudbeds
+        Reservation reservation = reservationWithRates(
+                "Hostelworld", "2026-07-28", "2026-07-29", "2026-07-24",
+                rateLine( "2026-07-28", "24.91" ) );
+        reservation.setChannelPriceListed( new BigDecimal( "60.76" ) );
+        reservation.setChannelBalance( new BigDecimal( "49.82" ) );
+        reservation.setChannelCommission( new BigDecimal( "10.94" ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM );
+
+        assertThat( calculation.getHostelworldRateDelta(), comparesEqualTo( new BigDecimal( "-24.91" ) ) );
+        assertThat( calculation.getLevyBase(), comparesEqualTo( new BigDecimal( "35.85" ) ) );
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "1.79" ) ) );
+        assertThat( EdinburghVisitorLevyCalculator.buildAdjustmentNote( calculation ),
+                is( "Visitor levy only applies to the first 5 nights. Charge for the first 1 nights is 35.85 "
+                        + "(HWL price listed + shortening 24.91) @ 5% = 1.79. -RONBOT" ) );
     }
 
     @Test
