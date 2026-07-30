@@ -189,6 +189,69 @@ public class EdinburghVisitorLevyCalculatorTest {
     }
 
     @Test
+    public void testHostelworldExtensionAddsSurplusToLevyBase() {
+        // Kyubeen Lee: original HWL 60.76 / 2 nights; 3rd night 21.00 added in Cloudbeds
+        Reservation reservation = reservationWithRates(
+                "Hostelworld", "2026-07-28", "2026-07-31", "2026-07-24",
+                rateLine( "2026-07-28", "24.91" ),
+                rateLine( "2026-07-29", "24.91" ),
+                rateLine( "2026-07-30", "21.00" ) );
+        reservation.setChannelPriceListed( new BigDecimal( "60.76" ) );
+        reservation.setChannelBalance( new BigDecimal( "49.82" ) );
+        reservation.setChannelCommission( new BigDecimal( "10.94" ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM );
+
+        assertThat( calculation.isHostelworldUsesListedPrice(), is( true ) );
+        assertThat( calculation.getHostelworldExtensionSurplus(), comparesEqualTo( new BigDecimal( "21.00" ) ) );
+        assertThat( calculation.getLevyBase(), comparesEqualTo( new BigDecimal( "81.76" ) ) );
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "4.09" ) ) );
+        assertThat( EdinburghVisitorLevyCalculator.buildAdjustmentNote( calculation ),
+                is( "Visitor levy only applies to the first 5 nights. Charge for the first 3 nights is 81.76 "
+                        + "(HWL price listed + extension 21.00) @ 5% = 4.09. -RONBOT" ) );
+    }
+
+    @Test
+    public void testHostelworldExtensionSurplusFromListedMinusCommissionWhenBalanceMissing() {
+        Reservation reservation = reservationWithRates(
+                "Hostelworld", "2026-07-28", "2026-07-31", "2026-07-24",
+                rateLine( "2026-07-28", "24.91" ),
+                rateLine( "2026-07-29", "24.91" ),
+                rateLine( "2026-07-30", "21.00" ) );
+        reservation.setChannelPriceListed( new BigDecimal( "60.76" ) );
+        reservation.setChannelCommission( new BigDecimal( "10.94" ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM );
+
+        assertThat( calculation.getHostelworldExtensionSurplus(), comparesEqualTo( new BigDecimal( "21.00" ) ) );
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "4.09" ) ) );
+    }
+
+    @Test
+    public void testHostelworldExtensionSurplusProratedForPartialEligibility() {
+        Reservation reservation = reservationWithRates(
+                "Hostelworld", "2026-07-22", "2026-07-26", "2025-11-01",
+                rateLine( "2026-07-22", "50.00" ),
+                rateLine( "2026-07-23", "50.00" ),
+                rateLine( "2026-07-24", "50.00" ),
+                rateLine( "2026-07-25", "21.00" ) );
+        reservation.setChannelPriceListed( new BigDecimal( "180.00" ) );
+        reservation.setChannelBalance( new BigDecimal( "150.00" ) );
+        reservation.setChannelCommission( new BigDecimal( "30.00" ) );
+
+        LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
+                reservation, gson, STAY_DATE_FROM );
+
+        // surplus = 171 - 150 = 21; eligible = 50 + 21 = 71; all = 171
+        // levyBase = (180 + 21) * 71 / 171 = 83.4561... → EVL 4.17
+        assertThat( calculation.getEligibleNights().size(), is( 2 ) );
+        assertThat( calculation.getHostelworldExtensionSurplus(), comparesEqualTo( new BigDecimal( "21.00" ) ) );
+        assertThat( calculation.getExpectedLevy(), comparesEqualTo( new BigDecimal( "4.17" ) ) );
+    }
+
+    @Test
     public void testStayStraddlingLevyStartDate() {
         Reservation reservation = reservationWithRates(
                 "Walk-In", "2026-07-22", "2026-07-26", "2025-11-01",

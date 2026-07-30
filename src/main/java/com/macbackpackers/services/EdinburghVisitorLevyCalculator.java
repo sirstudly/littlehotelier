@@ -82,20 +82,30 @@ public final class EdinburghVisitorLevyCalculator {
         private final BigDecimal levyBase;
         private final List<LevyNight> eligibleNights;
         private final boolean hostelworldUsesListedPrice;
+        private final BigDecimal hostelworldExtensionSurplus;
         private final boolean canceledOrNoShow;
         private final boolean longTermResident;
 
         public LevyCalculation( BigDecimal expectedLevy, BigDecimal levyBase, List<LevyNight> eligibleNights,
                 boolean hostelworldUsesListedPrice, boolean canceledOrNoShow ) {
-            this( expectedLevy, levyBase, eligibleNights, hostelworldUsesListedPrice, canceledOrNoShow, false );
+            this( expectedLevy, levyBase, eligibleNights, hostelworldUsesListedPrice, BigDecimal.ZERO,
+                    canceledOrNoShow, false );
         }
 
         public LevyCalculation( BigDecimal expectedLevy, BigDecimal levyBase, List<LevyNight> eligibleNights,
                 boolean hostelworldUsesListedPrice, boolean canceledOrNoShow, boolean longTermResident ) {
+            this( expectedLevy, levyBase, eligibleNights, hostelworldUsesListedPrice, BigDecimal.ZERO,
+                    canceledOrNoShow, longTermResident );
+        }
+
+        public LevyCalculation( BigDecimal expectedLevy, BigDecimal levyBase, List<LevyNight> eligibleNights,
+                boolean hostelworldUsesListedPrice, BigDecimal hostelworldExtensionSurplus,
+                boolean canceledOrNoShow, boolean longTermResident ) {
             this.expectedLevy = expectedLevy;
             this.levyBase = levyBase;
             this.eligibleNights = eligibleNights;
             this.hostelworldUsesListedPrice = hostelworldUsesListedPrice;
+            this.hostelworldExtensionSurplus = hostelworldExtensionSurplus;
             this.canceledOrNoShow = canceledOrNoShow;
             this.longTermResident = longTermResident;
         }
@@ -114,6 +124,10 @@ public final class EdinburghVisitorLevyCalculator {
 
         public boolean isHostelworldUsesListedPrice() {
             return hostelworldUsesListedPrice;
+        }
+
+        public BigDecimal getHostelworldExtensionSurplus() {
+            return hostelworldExtensionSurplus;
         }
 
         public boolean isCanceledOrNoShow() {
@@ -179,12 +193,20 @@ public final class EdinburghVisitorLevyCalculator {
             BigDecimal priceListed = resolveHostelworldPriceListed( reservation );
             BigDecimal allNightsTotal = ratesByDate.values().stream()
                     .reduce( BigDecimal.ZERO, BigDecimal::add );
+            BigDecimal extensionSurplus = BigDecimal.ZERO;
             if ( priceListed != null && allNightsTotal.compareTo( BigDecimal.ZERO ) > 0 ) {
                 hostelworldUsesListedPrice = true;
-                levyBase = priceListed.multiply( eligibleTotal )
+                BigDecimal hwNetAnchor = resolveHostelworldNetAnchor( reservation, allNightsTotal );
+                extensionSurplus = allNightsTotal.subtract( hwNetAnchor ).max( BigDecimal.ZERO );
+                levyBase = priceListed.add( extensionSurplus )
+                        .multiply( eligibleTotal )
                         .divide( allNightsTotal, 10, RoundingMode.HALF_UP );
             }
             expectedLevy = levyBase.multiply( LEVY_RATE ).setScale( 2, RoundingMode.HALF_UP );
+            return new LevyCalculation( expectedLevy.setScale( 2, RoundingMode.HALF_UP ),
+                    levyBase.setScale( 2, RoundingMode.HALF_UP ),
+                    eligibleNights, hostelworldUsesListedPrice,
+                    extensionSurplus.setScale( 2, RoundingMode.HALF_UP ), false, false );
         }
         else {
             levyBase = BigDecimal.ZERO;
@@ -273,6 +295,20 @@ public final class EdinburghVisitorLevyCalculator {
         return null;
     }
 
+    /**
+     * Original Hostelworld net room revenue in Cloudbeds (ex-commission). Rates above this
+     * are treated as hotel-side extensions and added to the levy base at face value.
+     */
+    static BigDecimal resolveHostelworldNetAnchor( Reservation reservation, BigDecimal allNightsTotal ) {
+        if ( reservation.getChannelBalance() != null ) {
+            return reservation.getChannelBalance();
+        }
+        if ( reservation.getChannelPriceListed() != null && reservation.getChannelCommission() != null ) {
+            return reservation.getChannelPriceListed().subtract( reservation.getChannelCommission() );
+        }
+        return allNightsTotal;
+    }
+
     static List<LevyNight> getEligibleNights( Map<LocalDate, BigDecimal> ratesByDate,
             LocalDate checkoutDate, LocalDate stayDateFrom ) {
         List<LevyNight> eligibleNights = new ArrayList<>();
@@ -314,7 +350,15 @@ public final class EdinburghVisitorLevyCalculator {
         note.append( "Charge for the first " ).append( calculation.getEligibleNights().size() ).append( " nights is " );
         note.append( calculation.getLevyBase() );
         if ( calculation.isHostelworldUsesListedPrice() ) {
-            note.append( " (HWL price listed)" );
+            if ( calculation.getHostelworldExtensionSurplus() != null
+                    && calculation.getHostelworldExtensionSurplus().compareTo( BigDecimal.ZERO ) > 0 ) {
+                note.append( " (HWL price listed + extension " )
+                        .append( calculation.getHostelworldExtensionSurplus() )
+                        .append( ")" );
+            }
+            else {
+                note.append( " (HWL price listed)" );
+            }
         }
         note.append( " @ 5% = " ).append( calculation.getExpectedLevy() );
         note.append( ". -RONBOT" );
