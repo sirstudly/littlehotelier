@@ -397,13 +397,23 @@ public class ProcessorService {
             int exitVal = p.waitFor();
             LOGGER.info( "GZipped file completed with exit code(" + exitVal + ")" );
 
-            pb = new ProcessBuilder( "scp", localLogDirectory + "/job-" + jobId + ".gz", destinationLogLocation );
-            pb.redirectOutput( new File( localLogDirectory + "/job-" + jobId + ".scp.out" ) );
-            pb.redirectError( new File( localLogDirectory + "/job-" + jobId + ".scp.err" ) );
-            LOGGER.info( "Copying log file" );
-            p = pb.start();
-            exitVal = p.waitFor();
-            LOGGER.info( "Log file copy completed with exit code(" + exitVal + ")" );
+            final int MAX_ATTEMPTS = 3;
+            for ( int attempt = 1 ; attempt <= MAX_ATTEMPTS ; attempt++ ) {
+                pb = new ProcessBuilder( "scp", localLogDirectory + "/job-" + jobId + ".gz", destinationLogLocation );
+                pb.redirectOutput( new File( localLogDirectory + "/job-" + jobId + ".scp.out" ) );
+                pb.redirectError( new File( localLogDirectory + "/job-" + jobId + ".scp.err" ) );
+                LOGGER.info( "Copying log file (attempt " + attempt + "/" + MAX_ATTEMPTS + ")" );
+                p = pb.start();
+                exitVal = p.waitFor();
+                LOGGER.info( "Log file copy completed with exit code(" + exitVal + ")" );
+                if ( exitVal == 0 ) {
+                    break;
+                }
+                if ( attempt < MAX_ATTEMPTS ) {
+                    LOGGER.warn( "scp failed with exit code(" + exitVal + "); retrying in 5s..." );
+                    Thread.sleep( 5000 );
+                }
+            }
         }
     }
 
