@@ -1,100 +1,119 @@
 package com.macbackpackers.services;
 
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import com.macbackpackers.jobs.AbstractJob;
 
 /**
- * Takes a job from the job queue and processes it.
+ * Claims jobs from the queue and processes them until idle (batch) or shutdown (continuous).
  */
 public class JobProcessorThread implements Runnable {
 
-    private static final Logger LOGGER =  LoggerFactory.getLogger( JobProcessorThread.class );
+    private static final Logger LOGGER = LoggerFactory.getLogger( JobProcessorThread.class );
 
-    @Autowired
-    private ProcessorService processorService;
-    
-    // assuming we use a threadpool to run all the outstanding jobs,
-    // we can terminate the thread pool once all threads try to retrieve a job
-    // to run but can't find one
-    // this barrier will synchronize at the point where all threads terminate
-    // and check that we have nothing left to do
-    private CyclicBarrier barrier;
+    /** Default idle backoff when the queue is empty in continuous (server) mode. */
+    public static final long DEFAULT_IDLE_SLEEP_MILLIS = 3_000L;
+
+    /** Slice size so shutdown is observed quickly while idling. */
+    public static final long DEFAULT_IDLE_SLICE_MILLIS = 500L;
+
+    /** Brief pause before re-claiming in batch mode so sibling-created jobs are picked up. */
+    public static final long DEFAULT_BATCH_RECHECK_MILLIS = 500L;
+
+    private final ProcessorService processorService;
+    private final boolean continuous;
+    private final long idleSleepMillis;
+    private final long idleSliceMillis;
+    private final long batchRecheckMillis;
 
     /**
-     * Default constructor.
-     * 
-     * @param barrier the common barrier used for all threads within this pool
+     * @param processorService job claim/process collaborator
+     * @param continuous true for server mode (idle-sleep forever until shutdown); false for batch
      */
-    public JobProcessorThread( CyclicBarrier barrier ) {
-        this.barrier = barrier;
+    public JobProcessorThread( ProcessorService processorService, boolean continuous ) {
+        this( processorService, continuous,
+                DEFAULT_IDLE_SLEEP_MILLIS, DEFAULT_IDLE_SLICE_MILLIS, DEFAULT_BATCH_RECHECK_MILLIS );
     }
 
     /**
-     * Process all jobs. If no jobs are available to be run, then pause for a configured period
-     * before checking again.
+     * @param processorService job claim/process collaborator
+     * @param continuous true for server mode
+     * @param idleSleepMillis total idle sleep when continuous and queue empty
+     * @param idleSliceMillis max sleep slice while checking shutdown
+     * @param batchRecheckMillis pause before batch idle recheck
      */
+    public JobProcessorThread( ProcessorService processorService, boolean continuous,
+            long idleSleepMillis, long idleSliceMillis, long batchRecheckMillis ) {
+        this.processorService = processorService;
+        this.continuous = continuous;
+        this.idleSleepMillis = idleSleepMillis;
+        this.idleSliceMillis = idleSliceMillis;
+        this.batchRecheckMillis = batchRecheckMillis;
+    }
+
     @Override
     public void run() {
-        while ( true ) {
-            try {
-                if ( processorService.isShutdownRequested() ) {
-                    LOGGER.info( "Shutdown requested; worker {} exiting", Thread.currentThread().getName() );
-                    break;
-                }
+        String workerName = Thread.currentThread().getName();
+        LOGGER.info( "Worker {} started (continuous={})", workerName, continuous );
+        try {
+            while ( !processorService.isShutdownRequested() ) {
+                try {
+                    AbstractJob job = processorService.getNextJobToProcess();
+                    if ( job != null ) {
+                        LOGGER.info( "LOCKED job {} by {}", job.getId(), workerName );
+                        processorService.processJob( job );
+                        continue;
+                    }
 
-                // find and run all submitted jobs
-                for ( AbstractJob job = processorService.getNextJobToProcess() ;
-                        job != null ;
-                        job = processorService.isShutdownRequested() ? null : processorService.getNextJobToProcess() ) {
-                    LOGGER.info( "LOCKED job " + job.getId() + " by " + Thread.currentThread().getName() );
-                    processorService.processJob( job );
+                    if ( continuous ) {
+                        idleSleep( idleSleepMillis );
+                        continue;
+                    }
 
-                    // before we continue with any other jobs (possibly ones we just created),
-                    // reset the barrier (so we release any suspended threads so they can help us out)
-                    barrier.reset();
-                }
-
-                if ( processorService.isShutdownRequested() ) {
-                    LOGGER.info( "Shutdown requested after draining claimed jobs; worker {} exiting",
-                            Thread.currentThread().getName() );
+                    // Batch mode: briefly recheck so child jobs created by siblings are claimed
+                    idleSleep( batchRecheckMillis );
+                    if ( processorService.isShutdownRequested() ) {
+                        break;
+                    }
+                    job = processorService.getNextJobToProcess();
+                    if ( job != null ) {
+                        LOGGER.info( "LOCKED job {} by {}", job.getId(), workerName );
+                        processorService.processJob( job );
+                        continue;
+                    }
+                    if ( processorService.hasOutstandingJobs() ) {
+                        // Dependents or sibling in-flight work may still produce claimable jobs
+                        continue;
+                    }
+                    LOGGER.info( "Worker {} exiting; queue idle", workerName );
                     break;
                 }
-                
-                // no more jobs to run at the moment; wait until all jobs are also at this point
-                barrier.await();
-                
-                // if we manage to get here, then all other threads have also called await()
-                // ie. we have no jobs remaining; so our job is done
-                break;
-            }
-            catch ( InterruptedException e ) {
-                if ( processorService.isShutdownRequested() ) {
-                    LOGGER.info( "Worker {} interrupted during shutdown; exiting", Thread.currentThread().getName() );
+                catch ( InterruptedException e ) {
+                    Thread.currentThread().interrupt();
+                    LOGGER.info( "Worker {} interrupted; exiting", workerName );
                     break;
                 }
-                LOGGER.debug( "Thread interrupted, ignoring..." );
-            }
-            catch ( BrokenBarrierException ex ) {
-                if ( processorService.isShutdownRequested() ) {
-                    LOGGER.info( "Barrier broken during shutdown; worker {} exiting", Thread.currentThread().getName() );
-                    break;
+                catch ( Exception ex ) {
+                    LOGGER.error( "Unexpected error in worker {}; continuing", workerName, ex );
                 }
-                // ordinarily if any other threads terminate abruptly, this will be thrown
-                // but since we catch all other exceptions, the only way this is thrown
-                // is if we call reset() on the barrier (which we do once we finish a task)
-                // and so allow other threads to handle any added tasks
-                LOGGER.debug( "Cyclic barrier opened; checking for any outstanding tasks" );
             }
-            catch ( Exception ex ) {
-                LOGGER.error( "Received error but continuing...", ex );
-            }
+        }
+        finally {
+            LOGGER.info( "Worker {} stopped", workerName );
         }
     }
 
+    /**
+     * Sleeps up to {@code totalMillis} in slices so {@link ProcessorService#isShutdownRequested()}
+     * is observed promptly.
+     */
+    private void idleSleep( long totalMillis ) throws InterruptedException {
+        long remaining = totalMillis;
+        while ( remaining > 0 && !processorService.isShutdownRequested() ) {
+            long slice = Math.min( idleSliceMillis, remaining );
+            Thread.sleep( slice );
+            remaining -= slice;
+        }
+    }
 }

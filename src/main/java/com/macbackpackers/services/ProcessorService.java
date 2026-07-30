@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Timestamp;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -107,13 +106,9 @@ public class ProcessorService {
             return;
         }
 
-        // start thread pool
         ExecutorService executor = Executors.newFixedThreadPool( threadCount );
-        CyclicBarrier barrier = new CyclicBarrier( threadCount );
         for ( int i = 0 ; i < threadCount ; i++ ) {
-            JobProcessorThread th = new JobProcessorThread( barrier );
-            autowireBeanFactory.autowireBean( th );
-            executor.execute( th );
+            executor.execute( new JobProcessorThread( this, false ) );
         }
         LOGGER.info( "Finished thread pool creation." );
 
@@ -128,7 +123,8 @@ public class ProcessorService {
             }
         }
         catch ( InterruptedException e ) {
-            // ignored
+            Thread.currentThread().interrupt();
+            LOGGER.warn( "Interrupted while waiting for batch workers to finish" );
         }
     }
 
@@ -175,6 +171,13 @@ public class ProcessorService {
     }
 
     /**
+     * @return true if any jobs are still outstanding (submitted/retry/etc.)
+     */
+    public boolean hasOutstandingJobs() {
+        return dao.getOutstandingJobCount() > 0;
+    }
+
+    /**
      * Make sure we can connect to Cloudbeds (if applicable). Email support if 3 failed logins in a
      * row.
      *
@@ -215,14 +218,18 @@ public class ProcessorService {
     }
 
     /**
-     * Process all jobs. If no jobs are available to be run, then pause for a configured period
-     * before checking again. Returns when {@link #requestShutdown()} is called and in-flight
-     * workers have finished (or the drain timeout elapses).
+     * Process all jobs. Coordinator refreshes Cloudbeds session and overdue schedules on an
+     * interval while a fixed pool of continuous workers claim and run jobs. Returns when
+     * {@link #requestShutdown()} is called and in-flight workers have finished (or the drain
+     * timeout elapses).
      */
     public void processJobsLoopIndefinitely() {
         loopThread = Thread.currentThread();
         ExecutorService executor = Executors.newFixedThreadPool( threadCount );
-        CyclicBarrier barrier = new CyclicBarrier( threadCount );
+        for ( int i = 0 ; i < threadCount ; i++ ) {
+            executor.execute( new JobProcessorThread( this, true ) );
+        }
+        LOGGER.info( "Started {} continuous job workers", threadCount );
 
         try {
             while ( !shutdownRequested.get() ) {
@@ -244,30 +251,20 @@ public class ProcessorService {
                 if ( shutdownRequested.get() ) {
                     break;
                 }
-                for ( int i = 0 ; i < threadCount ; i++ ) {
-                    if ( shutdownRequested.get() ) {
-                        break;
-                    }
-                    JobProcessorThread th = new JobProcessorThread( barrier );
-                    autowireBeanFactory.autowireBean( th );
-                    executor.execute( th );
-                }
-                if ( shutdownRequested.get() ) {
-                    break;
-                }
                 try {
-                    LOGGER.info( "Waiting for {} seconds before checking again for new jobs", repeatIntervalMillis / 1000 );
-                    Thread.sleep( repeatIntervalMillis ); // wait then repeat loop
+                    LOGGER.info( "Waiting for {} seconds before next coordinator cycle", repeatIntervalMillis / 1000 );
+                    Thread.sleep( repeatIntervalMillis );
                 }
                 catch ( InterruptedException e ) {
                     Thread.currentThread().interrupt();
-                    LOGGER.info( "Job loop interrupted; exiting" );
+                    LOGGER.info( "Coordinator loop interrupted; exiting" );
                     break;
                 }
             }
         }
         finally {
             LOGGER.info( "Draining job executor; waiting for in-flight jobs to finish..." );
+            // Workers observe shutdownRequested via sliced idle sleeps and exit cooperatively
             executor.shutdown();
             try {
                 // Leave headroom under docker stop_grace_period (5m) for cleanup after drain
