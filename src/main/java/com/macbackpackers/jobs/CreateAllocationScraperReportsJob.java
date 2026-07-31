@@ -19,6 +19,11 @@ import com.macbackpackers.beans.JobStatus;
 public class CreateAllocationScraperReportsJob extends AbstractJob {
 
     @Override
+    public int getPriority() {
+        return 99; // demote with allocation scraper workers
+    }
+
+    @Override
     @Transactional // no re-run on this job; all must go thru or nothing
     public void processJob() throws Exception {
         // first we consolidate results from all AllocationScraperWorkerJobs

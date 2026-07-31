@@ -32,6 +32,11 @@ public class CloudbedsAllocationScraperWorkerJob extends AbstractJob {
     private WebClient webClient;
 
     @Override
+    public int getPriority() {
+        return 99; // demote; allocation scrapes can wait behind transactional work
+    }
+
+    @Override
     public void resetJob() throws Exception {
         dao.deleteAllocations( getId() );
     }

@@ -26,6 +26,12 @@ public class CalculateEdinburghVisitorLevyForBookingJob extends AbstractJob {
     private EdinburghVisitorLevyService edinburghVisitorLevyService;
 
     @Override
+    public int getPriority() {
+        // Run ahead of other work so staff edits to a booking aren't blocked waiting on the queue
+        return -1;
+    }
+
+    @Override
     public void processJob() throws Exception {
         edinburghVisitorLevyService.processVisitorLevyForBooking( cbWebClient, getReservationId() );
     }

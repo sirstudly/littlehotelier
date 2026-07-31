@@ -49,6 +49,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -465,12 +466,11 @@ public class WordPressDAOImpl implements WordPressDAO {
         // (since there should only ever be 1 unique one; we'll be re-running these jobs)
         String thisProcessorId = getUniqueProcessorId();
         LOGGER.info( "Getting next job for " + thisProcessorId );
-        List<Integer> jobs = em
+        List<Integer> jobIds = em
                 .createQuery( "SELECT id FROM AbstractJob "
                         + "     WHERE status IN (:submittedStatus, :retryStatus) "
                         + "        OR (status = :processingStatus AND processedBy = :processedBy)"
-                        // prioritize CalculateEdinburghVisitorLevyForBookingJob in case staff are making changes to a booking in cloudbeds
-                        + "     ORDER BY CASE WHEN classname = 'com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob' THEN 0 ELSE 1 END, id",
+                        + "     ORDER BY id",
                         Integer.class )
                 .setParameter( "submittedStatus", JobStatus.submitted )
                 .setParameter( "processingStatus", JobStatus.processing )
@@ -480,9 +480,15 @@ public class WordPressDAOImpl implements WordPressDAO {
                 // this will eventually be picked up by the same thread and be run again
                 .setParameter( "processedBy", thisProcessorId )
                 .getResultList();
-        
-        forAllJobs: for ( int jobId : jobs ) {
-            AbstractJob job = fetchJobById( jobId ); // fetch by primary key
+
+        // Sort by AbstractJob.getPriority() (lower first), then id — priority lives on the job class
+        List<AbstractJob> jobs = jobIds.stream()
+                .map( this::fetchJobById )
+                .sorted( Comparator.comparingInt( AbstractJob::getPriority )
+                        .thenComparingInt( AbstractJob::getId ) )
+                .collect( Collectors.toList() );
+
+        forAllJobs: for ( AbstractJob job : jobs ) {
             // first check that all dependent jobs have completed successfully
             for ( Job dependentJob : job.getDependentJobs() ) {
                 switch ( dependentJob.getStatus() ) {

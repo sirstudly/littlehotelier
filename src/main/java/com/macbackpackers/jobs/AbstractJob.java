@@ -61,6 +61,16 @@ public abstract class AbstractJob extends Job {
     public abstract void processJob() throws Exception;
 
     /**
+     * Queue priority when selecting the next job to process. Lower values run first.
+     * Override in subclasses to promote or demote relative to the default.
+     *
+     * @return priority (default {@code 0})
+     */
+    public int getPriority() {
+        return 0;
+    }
+
+    /**
      * Returns the number of attempts to run this job before aborting with a failure.
      * 
      * @return retry count
