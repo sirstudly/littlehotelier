@@ -38,6 +38,7 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         insertSplitRoomReportJob();
         insertUnpaidDepositReportJob();
         insertGroupBookingsReportJob();
+        insertMostlyFullDormReportJob();
         insertBlacklistEmailJob();
     }
 
@@ -69,6 +70,16 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         groupBookingRptJob.setStatus( JobStatus.submitted );
         groupBookingRptJob.setAllocationScraperJobId( getAllocationScraperJobId() );
         dao.insertJob( groupBookingRptJob );
+    }
+
+    /**
+     * Creates an additional job to run the mostly-full dorm report.
+     */
+    private void insertMostlyFullDormReportJob() {
+        MostlyFullDormReportJob mostlyFullDormRptJob = new MostlyFullDormReportJob();
+        mostlyFullDormRptJob.setStatus( JobStatus.submitted );
+        mostlyFullDormRptJob.setAllocationScraperJobId( getAllocationScraperJobId() );
+        dao.insertJob( mostlyFullDormRptJob );
     }
 
     /**

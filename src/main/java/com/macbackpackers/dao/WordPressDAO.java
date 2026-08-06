@@ -21,6 +21,7 @@ import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobScheduler;
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.beans.MostlyFullDormReportEntry;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
 import com.macbackpackers.beans.ScheduledJob;
@@ -405,6 +406,14 @@ public interface WordPressDAO {
     List<UnpaidDepositReportEntry> fetchUnpaidDepositReport( int allocationScraperJobId );
 
     /**
+     * Returns the mostly-full dorm report rows for the given allocation scraper job.
+     *
+     * @param allocationScraperJobId job ID of the allocation scraper job to use data from
+     * @return mostly-full dorm report entries
+     */
+    List<MostlyFullDormReportEntry> fetchMostlyFullDormReport( int allocationScraperJobId );
+
+    /**
      * Returns a List of all BDC bookings which use a prepaid "virtual" CC and where there is still a balance
      * outstanding. The data is retrieved from the last successful AllocationScraperJob.
      * 
@@ -444,6 +453,13 @@ public interface WordPressDAO {
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from
      */
     void runGroupBookingsReport( int allocationScraperJobId );
+
+    /**
+     * Creates a report with guest dorm bookings where guest count is one less than room capacity.
+     *
+     * @param allocationScraperJobId job ID of the allocation scraper job to use data from
+     */
+    void runMostlyFullDormReport( int allocationScraperJobId );
 
     /**
      * Updates the bed count report table for the given job ID.

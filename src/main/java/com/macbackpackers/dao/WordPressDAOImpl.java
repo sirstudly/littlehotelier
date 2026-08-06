@@ -19,6 +19,7 @@ import com.macbackpackers.beans.SendEmailEntry;
 import com.macbackpackers.beans.StripeRefund;
 import com.macbackpackers.beans.StripeTransaction;
 import com.macbackpackers.beans.UnpaidDepositReportEntry;
+import com.macbackpackers.beans.MostlyFullDormReportEntry;
 import com.macbackpackers.exceptions.IncorrectNumberOfRecordsUpdatedException;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.jobs.AbstractJob;
@@ -683,6 +684,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                 "wp_lh_rpt_split_rooms",
                 "wp_lh_rpt_unpaid_deposit",
                 "wp_lh_group_bookings",
+                "wp_lh_rpt_mostly_full_dorms",
                 "wp_lh_calendar" );
 
         // now delete from jobs
@@ -952,6 +954,15 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( "jobId", allocationScraperJobId )
                 .getResultList();
     }
+
+    @Override
+    public List<MostlyFullDormReportEntry> fetchMostlyFullDormReport( int allocationScraperJobId ) {
+        LOGGER.info( "Fetching mostly-full dorm report for allocation job id " + allocationScraperJobId );
+        return em.createQuery(
+                "FROM MostlyFullDormReportEntry WHERE jobId = :jobId", MostlyFullDormReportEntry.class )
+                .setParameter( "jobId", allocationScraperJobId )
+                .getResultList();
+    }
     
     @Override
     public List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithOutstandingBalance() {
@@ -1048,6 +1059,23 @@ public class WordPressDAOImpl implements WordPressDAO {
         em.createNativeQuery( sql.getProperty( "group.bookings" ) )
             .setParameter( "jobId", allocationScraperJobId )
             .setParameter( "groupSize", getGroupBookingSize() )
+            .setParameter( "propertyManager", StringUtils.defaultIfBlank( getOption( "hbo_property_manager" ), "n/a" ) )
+            .executeUpdate();
+    }
+
+    @Override
+    public void runMostlyFullDormReport( int allocationScraperJobId ) {
+        LOGGER.info( "Running mostly-full dorm report for job id: " + allocationScraperJobId );
+
+        // first remove any previous data in case we're running this again
+        int rowsDeleted = em
+                .createNativeQuery( "DELETE FROM wp_lh_rpt_mostly_full_dorms WHERE job_id = :jobId" )
+                .setParameter( "jobId", allocationScraperJobId )
+                .executeUpdate();
+        LOGGER.info( "Deleted " + rowsDeleted + " previous records from wp_lh_rpt_mostly_full_dorms" );
+
+        em.createNativeQuery( sql.getProperty( "mostly.full.dorms" ) )
+            .setParameter( "jobId", allocationScraperJobId )
             .setParameter( "propertyManager", StringUtils.defaultIfBlank( getOption( "hbo_property_manager" ), "n/a" ) )
             .executeUpdate();
     }

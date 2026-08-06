@@ -9,6 +9,7 @@ import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.JobStatus;
+import com.macbackpackers.beans.MostlyFullDormReportEntry;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.RoomBedLookup;
 import com.macbackpackers.beans.StripeTransaction;
@@ -26,6 +27,7 @@ import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.ChargeHostelworldLateCancellationJob;
 import com.macbackpackers.jobs.ChargeRemainingBalanceForBookingJob;
 import com.macbackpackers.jobs.CreateFixedRateReservationJob;
+import com.macbackpackers.jobs.MostlyFullDormReportJob;
 import com.macbackpackers.jobs.PrepaidChargeJob;
 import com.macbackpackers.jobs.SendCovidPrestayEmailJob;
 import com.macbackpackers.jobs.SendGmailJob;
@@ -768,6 +770,46 @@ public class CloudbedsService {
                     if( replacementFn != null ) {
                         j.setReplacementMap( replacementFn.apply( r ) );
                     }
+                    dao.insertJob( j );
+                } );
+    }
+
+    /**
+     * Creates jobs for emailing guests from the latest mostly-full dorm report.
+     * Requires WP option {@code hbo_mostly_full_dorm_email_template} (Cloudbeds template name).
+     *
+     * @param webClient web client instance to use
+     * @throws IOException on failure loading reservations or template
+     */
+    public void createSendMostlyFullDormEmailJobs( WebClient webClient ) throws IOException {
+        String emailTemplate = dao.getOption( "hbo_mostly_full_dorm_email_template" );
+        if ( StringUtils.isBlank( emailTemplate ) ) {
+            throw new MissingUserDataException( "Missing or blank option hbo_mostly_full_dorm_email_template" );
+        }
+        scraper.fetchEmailTemplate( webClient, emailTemplate ); // fail early if template missing
+
+        MostlyFullDormReportJob reportJob = dao.getLastCompletedJobOfType( MostlyFullDormReportJob.class );
+        if ( reportJob == null ) {
+            throw new MissingUserDataException( "No completed MostlyFullDormReportJob found" );
+        }
+
+        dao.fetchMostlyFullDormReport( reportJob.getAllocationScraperJobId() ).stream()
+                .map( MostlyFullDormReportEntry::getReservationId )
+                .filter( Objects::nonNull )
+                .distinct()
+                .map( reservationId -> scraper.getReservationRetry( webClient, String.valueOf( reservationId ) ) )
+                .filter( r -> false == r.containsNote( emailTemplate + " email sent." ) )
+                .filter( r -> r.getEmail() != null && r.getEmail().contains( "@" ) )
+                .forEach( r -> {
+                    LOGGER.info( "Creating SendTemplatedEmailJob for mostly-full dorm Res #" + r.getReservationId()
+                            + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
+                            + " from " + r.getCheckinDate() + " to " + r.getCheckoutDate() );
+                    SendTemplatedEmailJob j = new SendTemplatedEmailJob();
+                    autowireBeanFactory.autowireBean( j );
+                    j.setStatus( JobStatus.submitted );
+                    j.setReservationId( r.getReservationId() );
+                    j.setEmailTemplate( emailTemplate );
+                    j.setNoteArchived( true );
                     dao.insertJob( j );
                 } );
     }

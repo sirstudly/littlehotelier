@@ -174,6 +174,27 @@ CREATE TABLE `wp_lh_group_bookings` (
   FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+CREATE TABLE `wp_lh_rpt_mostly_full_dorms` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `job_id` bigint(20) unsigned NOT NULL,
+  `reservation_id` bigint(20) unsigned DEFAULT NULL,
+  `guest_name` TEXT,
+  `booking_reference` varchar(50) DEFAULT NULL,
+  `booking_source` varchar(50) DEFAULT NULL,
+  `checkin_date` datetime NOT NULL,
+  `checkout_date` datetime NOT NULL,
+  `booked_date` timestamp NULL DEFAULT NULL,
+  `payment_outstanding` decimal(10,2) DEFAULT NULL,
+  `data_href` varchar(255) DEFAULT NULL,
+  `num_guests` int(10) unsigned NOT NULL DEFAULT '0',
+  `room_capacity` smallint(6) DEFAULT NULL,
+  `notes` text,
+  `viewed_yn` char(1) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `job_id_idx` (`job_id`),
+  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 
 CREATE TABLE `wp_lh_rpt_guest_comments` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
