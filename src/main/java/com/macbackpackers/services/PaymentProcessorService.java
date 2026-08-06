@@ -739,23 +739,23 @@ public class PaymentProcessorService {
     private BigDecimal getLateCancellationAmountToCharge( Reservation cbReservation ) {
 
         // august for HSH/RMB - charge the full amount
-        if ( cbReservation.isCheckinDateInAugust() && false == wordpressDAO.getOption( "siteurl" ).contains( "castlerock" ) ) {
-            if ( cbReservation.getBalanceDue().compareTo( BigDecimal.ZERO ) <= 0 ) {
-                throw new IllegalStateException( "Some weirdness here. Outstanding balance must be greater than 0." );
+        // 2026-03-24: Cloudbeds no longer keeps the balance due for cancellations; so amount due could be 0.
+        final String siteUrl = wordpressDAO.getOption( "siteurl" );
+        if ( cbReservation.isCheckinDateInAugust() && ( siteUrl.contains( "highstreet" ) || siteUrl.contains( "royalmile" ) ) ) {
+            BigDecimal amountPaid = cbReservation.getPaidValue() != null ? cbReservation.getPaidValue() : BigDecimal.ZERO;
+            BigDecimal amountToCharge = cbReservation.getChannelBalance().subtract( amountPaid );
+            if ( amountToCharge.compareTo( MINIMUM_CHARGE_AMOUNT ) <= 0 ) {
+                throw new IllegalStateException( "Some weirdness here. Outstanding balance must be greater than " + MINIMUM_CHARGE_AMOUNT );
             }
-            return cbReservation.getBalanceDue();
+            return amountToCharge;
         }
 
         // otherwise, for non-August or CRH (incl. August) - just the first night
         BigDecimal firstNightAmount = cbReservation.getRateFirstNight( gson );
         LOGGER.info( "First night due: " + firstNightAmount );
-        if ( firstNightAmount.compareTo( BigDecimal.ZERO ) <= 0 ) {
-            throw new IllegalStateException( "Some weirdness here. First night amount must be greater than 0." );
+        if ( firstNightAmount.compareTo( MINIMUM_CHARGE_AMOUNT ) <= 0 ) {
+            throw new IllegalStateException( "Some weirdness here. First night amount must be greater than " + MINIMUM_CHARGE_AMOUNT );
         }
-        // 2026-03-24: Cloudbeds no longer keeps the balance due for cancellations; so amount due could be 0.
-//        if ( firstNightAmount.compareTo( cbReservation.getRoomsTotal() ) > 0 ) {
-//            throw new IllegalStateException( "Some weirdness here. First night amount exceeds total for accommodation." );
-//        }
         return firstNightAmount;
     }
 
