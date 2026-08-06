@@ -698,12 +698,18 @@ public class PaymentProcessorService {
      * @throws IOException on i/o error
      */
     public synchronized void processHostelworldLateCancellationCharge( WebClient webClient, String reservationId ) throws IOException {
-        LOGGER.info( "Processing payment for 1st night of booking: " + reservationId );
+        LOGGER.info( "Processing late cancellation payment for booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
         // check if we've paid anything
         if ( false == BigDecimal.ZERO.equals( cbReservation.getPaidValue() ) ) {
             LOGGER.info( "Booking has already been charged " + cbReservation.getPaidValue() );
+            return;
+        }
+
+        // check if we've refunded anything
+        if ( cloudbedsService.isExistsRefund( webClient, cbReservation ) ) {
+            LOGGER.warn( "Booking was previously refunded?? Not doing anything." );
             return;
         }
 

@@ -37,7 +37,8 @@ public class CreateChargeHostelworldLateCancellationJob extends AbstractJob {
     @Transactional
     public void processJob() throws Exception {
         final LocalDate now = LocalDate.now();
-        if ( dao.getOption( "siteurl" ).contains( "castlerock" ) ) {
+        final String siteUrl = dao.getOption( "siteurl" );
+        if ( siteUrl.contains( "castlerock" ) ) {
             // may need adjustment depending on year
             if ( now.getYear() > 2027 && now.getMonth() == Month.AUGUST ) {
                 throw new UnrecoverableFault( "Fringe dates not set for year " + now.getYear() + ". Please update CreateChargeHostelworldLateCancellationJob." );
@@ -50,7 +51,7 @@ public class CreateChargeHostelworldLateCancellationJob extends AbstractJob {
                             && now.getYear() == 2027
                             && now.getDayOfMonth() >= 7 /* && day <= 31 (implicit) */ ) ) {
                 cbService.createChargeHostelworldLateCancellationJobsForAugust( cbWebClient,
-                        now.minusDays( 5 ), now );
+                        now.minusDays( 4 ), now );
             }
             else {
                 cbService.createChargeHostelworldLateCancellationJobs( cbWebClient,
@@ -58,8 +59,14 @@ public class CreateChargeHostelworldLateCancellationJob extends AbstractJob {
             }
         }
         else {
-            cbService.createChargeHostelworldLateCancellationJobs( cbWebClient,
-                    now.minusDays( 4 ), now );
+            if ( siteUrl.contains( "lochside" ) || now.getMonth() != Month.AUGUST ) {
+                cbService.createChargeHostelworldLateCancellationJobs( cbWebClient,
+                        now.minusDays( 4 ), now );
+            }
+            else { // HSH/RMB in August
+                cbService.createChargeHostelworldLateCancellationJobsForAugust( cbWebClient,
+                        now.minusDays( 4 ), now );
+            }
         }
     }
 
