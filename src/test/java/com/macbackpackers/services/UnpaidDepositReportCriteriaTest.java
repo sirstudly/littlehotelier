@@ -67,24 +67,34 @@ public class UnpaidDepositReportCriteriaTest {
     }
 
     @Test
-    public void testUnpaidDepositReportSqlUsesHotelCollectSourcesAndEvlFilter() {
+    public void testUnpaidDepositReportSqlUsesBareSourcesHotelCollectAndEvlFilter() {
         assertThat( unpaidDepositReportSql,
                 containsString( "payment_outstanding > COALESCE(f.visitor_levy_total, 0)" ) );
+        assertThat( unpaidDepositReportSql, containsString( "hotel_collect_yn = 'Y'" ) );
 
+        // reservation detail API stores bare source names
+        assertThat( unpaidDepositReportSql, containsString( "IN ('Booking.com', 'Expedia')" ) );
         assertThat( unpaidDepositReportSql,
-                containsString( "Booking.com (Hotel Collect Booking)" ) );
+                containsString( "IN ('Hostelworld & Hostelbookers', 'Booking.com', 'Hostelworld')" ) );
         assertThat( unpaidDepositReportSql,
-                containsString( "Expedia (Hotel Collect Booking)" ) );
-        assertThat( unpaidDepositReportSql,
-                containsString( "Hostelworld & Hostelbookers (Hotel Collect Booking)" ) );
-        assertThat( unpaidDepositReportSql,
-                containsString( "Hostelworld (Hotel Collect Booking)" ) );
+                containsString( "rate_plan_name LIKE '%Non-refundable%' OR f.rate_plan_name = 'nonref'" ) );
 
+        assertThat( unpaidDepositReportSql, not( containsString( "Hotel Collect Booking" ) ) );
         assertThat( unpaidDepositReportSql, not( containsString( "Channel Collect Booking" ) ) );
-        // legacy bare source names should no longer be used as exact matches
-        assertThat( unpaidDepositReportSql,
-                not( containsString( "IN ('Booking.com', 'Expedia')" ) ) );
-        assertThat( unpaidDepositReportSql,
-                not( containsString( "IN ('Hostelworld & Hostelbookers', 'Booking.com', 'Hostelworld')" ) ) );
+    }
+
+    @Test
+    public void testAllocationMapsHotelCollectFromReservation() throws IOException {
+        String json = IOUtils.toString(
+                getClass().getClassLoader().getResourceAsStream( "get_reservation_cloudbeds_hotel_collect.json" ),
+                StandardCharsets.UTF_8 );
+        Reservation reservation = gson.fromJson( json, Reservation.class );
+
+        Allocation allocation = new Allocation();
+        allocation.setBookingSource( reservation.getSourceName() );
+        allocation.setHotelCollect( reservation.isHotelCollectBooking() );
+
+        assertThat( allocation.getBookingSource(), is( "Booking.com" ) );
+        assertThat( allocation.isHotelCollect(), is( true ) );
     }
 }

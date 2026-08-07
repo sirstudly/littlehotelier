@@ -1179,6 +1179,7 @@ public class CloudbedsService {
                 a.setBookingReference( 
                         StringUtils.defaultIfBlank( r.getThirdPartyIdentifier(), r.getIdentifier() ) );
                 a.setBookingSource( r.getSourceName() );
+                a.setHotelCollect( r.isHotelCollectBooking() );
                 a.setCheckinDate( LocalDate.parse( br.getStartDate() ) );
                 a.setCheckoutDate( LocalDate.parse( br.getEndDate() ) );
                 a.setDataHref( "/connect/" + scraper.getPropertyId() + "#/reservations/" + r.getReservationId());

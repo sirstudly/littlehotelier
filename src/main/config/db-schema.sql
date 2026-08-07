@@ -20,6 +20,7 @@ CREATE TABLE `wp_lh_calendar` (
   `lh_status` varchar(50) DEFAULT NULL,
   `booking_reference` varchar(50) DEFAULT NULL,
   `booking_source` varchar(50) DEFAULT NULL,
+  `hotel_collect_yn` char(1) DEFAULT NULL,
   `booked_date` timestamp NULL DEFAULT NULL,
   `eta` varchar(50) DEFAULT NULL,
   `notes` text,
@@ -599,4 +600,5 @@ CREATE TABLE `wp_lh_cleaner_task` (
 
 -- Production migration: folio EVL snapshot for unpaid deposit report filtering
 -- ALTER TABLE `wp_lh_calendar` ADD COLUMN `visitor_levy_total` decimal(10,2) DEFAULT 0 AFTER `payment_outstanding`;
+-- ALTER TABLE `wp_lh_calendar` ADD COLUMN `hotel_collect_yn` char(1) DEFAULT NULL AFTER `booking_source`;
 

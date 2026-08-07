@@ -103,6 +103,10 @@ public class Allocation {
     @Column( name = "booking_source" )
     private String bookingSource;
 
+    @Column( name = "hotel_collect_yn" )
+    @Convert(converter = YesNoConverter.class)
+    private Boolean hotelCollect;
+
     @Column( name = "booked_date" )
     private java.util.Date bookedDate;
 
@@ -316,6 +320,14 @@ public class Allocation {
         this.bookingSource = bookingSource;
     }
 
+    public Boolean isHotelCollect() {
+        return hotelCollect;
+    }
+
+    public void setHotelCollect( Boolean hotelCollect ) {
+        this.hotelCollect = hotelCollect;
+    }
+
     public java.util.Date getBookedDate() {
         return bookedDate;
     }
@@ -461,6 +473,7 @@ public class Allocation {
                 .append( "status", status )
                 .append( "bookingReference", bookingReference )
                 .append( "bookingSource", bookingSource )
+                .append( "hotelCollect", hotelCollect )
                 .append( "bookedDate", bookedDate )
                 .append( "eta", eta )
                 .append( "notes", notes )
