@@ -1222,10 +1222,7 @@ public class CloudbedsService {
         }
         else {
             gmailService.sendEmail( txn.getEmail(), txn.getFirstName() + " " + txn.getLastName(), template.getSubject(),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                    renderEmailHtml( template, template.getEmailBody()
                                     .replace( "[vendor tx code]", txn.getVendorTxCode() )
                                     .replace( "[payment total]", scraper.getCurrencyFormat().format( txn.getPaymentAmount() ) )
                                     .replace( "[card type]", StringUtils.upperCase( txn.getCardType() ) )
@@ -1282,10 +1279,7 @@ public class CloudbedsService {
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                     template.getSubject().replace( "[conf number]", res.getIdentifier() ),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                    renderEmailHtml( template, template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[first night charge]", "£" + scraper.getCurrencyFormat().format( amount ) ) ) );
             scraper.addNote( webClient, reservationId, note );
@@ -1339,10 +1333,7 @@ public class CloudbedsService {
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                     template.getSubject().replace( "[conf number]", res.getIdentifier() ),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                    renderEmailHtml( template, template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[charge amount]", "£" + scraper.getCurrencyFormat().format( amount ) ) ) );
             scraper.addArchivedNote( webClient, reservationId, note );
@@ -1399,10 +1390,7 @@ public class CloudbedsService {
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                     template.getSubject().replace( "[conf number]", res.getIdentifier() ),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                    renderEmailHtml( template, template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[charge amount]", "£" + scraper.getCurrencyFormat().format( amount ) )
                                     .replace( "[payment URL]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) ) );
@@ -1457,10 +1445,7 @@ public class CloudbedsService {
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                     template.getSubject().replace( "[conf number]", res.getIdentifier() ),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                    renderEmailHtml( template, template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[charge amount]", "£" + scraper.getCurrencyFormat().format( amount ) ) ) );
             scraper.addArchivedNote( webClient, reservationId, note );
@@ -1490,10 +1475,7 @@ public class CloudbedsService {
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                     template.getSubject().replace( "[conf number]", res.getIdentifier() ),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                    renderEmailHtml( template, template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[charge amount]", "£" + scraper.getCurrencyFormat().format( amount ) ) ) );
             scraper.addNote( webClient, reservationId, note );
@@ -1520,10 +1502,7 @@ public class CloudbedsService {
             String bookingURL = generateUniqueBookingURL( reservationId );
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                     template.getSubject().replace( "[conf number]", res.getIdentifier() ),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                    renderEmailHtml( template, template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[booking URL]", "<a href='" + bookingURL + "'>" + bookingURL + "</a>" ) ) );
 
@@ -1590,10 +1569,7 @@ public class CloudbedsService {
             String bookingURL = dao.getBookingsURL() + lookupKey;
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                     template.getSubject().replace( "[conf number]", res.getIdentifier() ),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                    renderEmailHtml( template, template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[booking URL]", "<a href='" + bookingURL + "'>" + bookingURL + "</a>" ) ) );
             scraper.addArchivedNote( webClient, reservationId, note );
@@ -1613,10 +1589,7 @@ public class CloudbedsService {
             String paymentURL = dao.getBookingPaymentsURL() + lookupKey;
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                     template.getSubject().replace( "[conf number]", res.getIdentifier() ),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                    renderEmailHtml( template, template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[booking URL]", "<a href='" + bookingURL + "'>" + bookingURL + "</a>" )
                                     .replace( "[payment URL]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) ) );
@@ -1672,10 +1645,7 @@ public class CloudbedsService {
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                     template.getSubject().replace( "[conf number]", res.getIdentifier() ),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                    renderEmailHtml( template, template.getEmailBody()
                                     .replace( "[first name]", res.getFirstName() )
                                     .replace( "[charge amount]", "£" + scraper.getCurrencyFormat().format( amount ) )
                                     .replace( "[payment URL]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) ) );
@@ -1697,10 +1667,7 @@ public class CloudbedsService {
         String paymentURL = generateUniquePaymentURL( reservationId, null );
         gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                 template.getSubject().replace( "[conf number]", res.getIdentifier() ),
-                IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                        .replace( "__IMG_ALIGN__", template.getTopImageAlign() )
-                        .replace( "__IMG_SRC__", template.getTopImageSrc() )
-                        .replace( "__EMAIL_CONTENT__", template.getEmailBody()
+                renderEmailHtml( template, template.getEmailBody()
                                 .replace( "[first name]", res.getFirstName() )
                                 .replace( "[start date]", DD_MMM_YYYY.format( res.getCheckinDateAsLocalDate() ) )
                                 .replace( "[nights]", res.getNights() )
@@ -1755,10 +1722,7 @@ public class CloudbedsService {
         else {
             gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
                     template.getSubject().replace( "[conf number]", res.getIdentifier() ),
-                    IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
-                            .replace( "__IMG_ALIGN__", template.getTopImageAlign() == null ? "0" : template.getTopImageAlign() )
-                            .replace( "__IMG_SRC__", template.getTopImageSrc() == null ? "about:blank" : template.getTopImageSrc() )
-                            .replace( "__EMAIL_CONTENT__", template.getEmailBody() ),
+                    renderEmailHtml( template, template.getEmailBody() ),
                     b -> replaceMap.keySet().stream().reduce( b.replace( "[first name]", res.getFirstName() ),
                             ( str, key ) -> str.replaceAll( key, replaceMap.get( key ) ) ) );
 
@@ -1769,6 +1733,25 @@ public class CloudbedsService {
                 scraper.addNote( webClient, reservationId, note );
             }
         }
+    }
+
+    /**
+     * Renders the Gmail HTML wrapper around email content.
+     * Omits the top image row when the template has no image.
+     */
+    private String renderEmailHtml( EmailTemplateInfo template, String emailContent ) throws IOException {
+        String imgRow = "";
+        if ( StringUtils.isNotBlank( template.getTopImageSrc() ) ) {
+            String align = template.getTopImageAlign() == null ? "0" : template.getTopImageAlign();
+            imgRow = "<tr>\n"
+                    + "<td align=\"" + align + "\" style=\"width: 100.0%;border: 1.0px solid rgb(204,204,204);\" valign=\"middle\">"
+                    + "<img class=\"banner\" height=\"80\" src=\"" + template.getTopImageSrc()
+                    + "\" style=\"display: block;border: none;outline: none;text-decoration: none;\"/></td>\n"
+                    + "</tr>\n";
+        }
+        return IOUtils.resourceToString( "/sth_email_template.html", StandardCharsets.UTF_8 )
+                .replace( "__IMG_ROW__", imgRow )
+                .replace( "__EMAIL_CONTENT__", emailContent );
     }
 
     /**
