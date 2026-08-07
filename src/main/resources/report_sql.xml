@@ -44,34 +44,15 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
         INSERT INTO wp_lh_rpt_unpaid_deposit( job_id, guest_name, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn, created_date )
         SELECT f.job_id, GROUP_CONCAT( DISTINCT f.guest_name ) `guest_name`, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn, MAX(f.created_date) `created_date`
           FROM wp_lh_calendar f
-          LEFT OUTER JOIN wp_lh_rpt_guest_comments c ON f.reservation_id = c.reservation_id
          WHERE f.job_id = :jobId
-           AND f.hotel_collect_yn = 'Y'
-           AND f.payment_outstanding &gt; COALESCE(f.visitor_levy_total, 0)
-           AND ((       f.payment_total = f.payment_outstanding
-                    AND f.payment_total &gt; 0
-                    AND f.booking_source IN ('Booking.com', 'Expedia')
-                    AND ((c.comments IS NULL OR 
-                            (c.comments NOT LIKE '%You have received a virtual credit card for this reservation%'
-                         AND c.comments NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'
-                         AND c.comments NOT LIKE '%The VCC shown is still not active.%'))
-                         -- include migrated records
-                         AND (f.notes IS NULL OR 
-                             (f.notes NOT LIKE '%You have received a virtual credit card for this reservation%'
-                         AND f.notes NOT LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'))))
-               /* OR ( -- VCC charge date seems erratic; disabling since it can be found out easy enough on BDC site
-                       -- any prepaid bookings with a checkin date of today or earlier should be charged in full by now
-                        f.payment_outstanding &gt; 0
-                    AND f.booking_source IN ('Booking.com')
-                    AND f.checkin_date &lt; NOW()
-                    AND (   c.comments LIKE '%You have received a virtual credit card for this reservation%'
-                         OR c.comments LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%'
-                         OR c.comments LIKE '%The VCC shown is still not active.%')) */
+           AND f.payment_total = f.payment_outstanding -- nothing's been charged
+           AND f.hotel_collect_yn = '1'
+           AND f.payment_total &gt; 0
+           AND f.booked_date &lt; DATE_SUB(NOW(), INTERVAL 2 DAY) -- leave a window until we process it
+           AND ( f.booking_source IN ('Booking.com', 'Expedia')
                OR ( -- include non-refundable bookings
                         f.booking_source IN ('Hostelworld &amp; Hostelbookers', 'Booking.com', 'Hostelworld')
                     AND (f.rate_plan_name LIKE '%Non-refundable%' OR f.rate_plan_name = 'nonref')
-                    AND f.payment_outstanding &gt; 0
-                    AND f.booked_date &lt; DATE_SUB(NOW(), INTERVAL 2 DAY) -- leave a window until we process it
                    ))
          GROUP BY f.reservation_id, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn;
     </entry>
