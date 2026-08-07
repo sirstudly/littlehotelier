@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -22,8 +23,8 @@ import com.macbackpackers.beans.cloudbeds.responses.Reservation;
  */
 public final class EdinburghVisitorLevyCalculator {
 
-    public static final String EXCLUSIVE_TAX_LABEL = "Edinburgh Visitor Levy 2026";
-    public static final String INCLUSIVE_TAX_LABEL = "Edinburgh Visitor Levy (Inclusive)";
+    private static final String VISITOR_LEVY_LABEL_MARKER = "edinburgh visitor levy";
+    private static final String INCLUSIVE_LABEL_MARKER = "inclusive";
 
     private static final BigDecimal LEVY_RATE = new BigDecimal( "0.05" );
     private static final BigDecimal BDC_INCLUSIVE_LEVY_RATE = new BigDecimal( "0.06" );
@@ -396,8 +397,31 @@ public final class EdinburghVisitorLevyCalculator {
         return expectedVat.setScale( 2, RoundingMode.HALF_UP );
     }
 
+    /**
+     * True when a Cloudbeds tax/fee name is an Edinburgh Visitor Levy line (any year/variant).
+     */
+    public static boolean isVisitorLevyLabel( String name ) {
+        return name != null && name.toLowerCase( Locale.ROOT ).contains( VISITOR_LEVY_LABEL_MARKER );
+    }
+
+    /**
+     * True when a Cloudbeds tax/fee name is the inclusive EVL variant.
+     */
+    public static boolean isInclusiveVisitorLevyLabel( String name ) {
+        return isVisitorLevyLabel( name )
+                && name.toLowerCase( Locale.ROOT ).contains( INCLUSIVE_LABEL_MARKER );
+    }
+
+    /**
+     * True when a Cloudbeds tax/fee name is the exclusive EVL variant.
+     */
+    public static boolean isExclusiveVisitorLevyLabel( String name ) {
+        return isVisitorLevyLabel( name )
+                && false == name.toLowerCase( Locale.ROOT ).contains( INCLUSIVE_LABEL_MARKER );
+    }
+
     public static BigDecimal getVisitorLevyTotal( Reservation reservation ) {
-        return reservation.getVisitorLevyTotal( EXCLUSIVE_TAX_LABEL, INCLUSIVE_TAX_LABEL );
+        return reservation.getVisitorLevyTotal();
     }
 
     /**

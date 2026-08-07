@@ -29,9 +29,6 @@ import static org.hamcrest.Matchers.not;
  */
 public class UnpaidDepositReportCriteriaTest {
 
-    private static final String EXCLUSIVE_TAX_LABEL = "Edinburgh Visitor Levy 2026";
-    private static final String INCLUSIVE_TAX_LABEL = "Edinburgh Visitor Levy 2026 (Inclusive)";
-
     private Gson gson;
     private String unpaidDepositReportSql;
 
@@ -55,7 +52,7 @@ public class UnpaidDepositReportCriteriaTest {
                 StandardCharsets.UTF_8 );
         Reservation reservation = gson.fromJson( json, Reservation.class );
 
-        BigDecimal visitorLevy = reservation.getVisitorLevyTotal( EXCLUSIVE_TAX_LABEL, INCLUSIVE_TAX_LABEL );
+        BigDecimal visitorLevy = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( reservation );
 
         Allocation allocation = new Allocation();
         allocation.setPaymentOutstanding( reservation.getBalanceDue() );

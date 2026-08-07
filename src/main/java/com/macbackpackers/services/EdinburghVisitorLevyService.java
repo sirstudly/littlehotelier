@@ -44,12 +44,6 @@ public class EdinburghVisitorLevyService {
     @Value( "${evl.enabled:false}" )
     private boolean evlEnabled;
 
-    @Value( "${evl.tax.exclusive.label:Edinburgh Visitor Levy 2026}" )
-    private String exclusiveTaxLabel;
-
-    @Value( "${evl.tax.inclusive.label:Edinburgh Visitor Levy (Inclusive)}" )
-    private String inclusiveTaxLabel;
-
     @Value( "${evl.stay.date.from:2026-07-24}" )
     private String stayDateFrom;
 
@@ -202,7 +196,7 @@ public class EdinburghVisitorLevyService {
         LevyCalculation calculation = EdinburghVisitorLevyCalculator.calculate(
                 reservation, gson, getStayDateFrom() );
 
-        BigDecimal currentLevy = reservation.getVisitorLevyTotal( exclusiveTaxLabel, inclusiveTaxLabel );
+        BigDecimal currentLevy = reservation.getVisitorLevyTotal();
         BigDecimal expectedLevy = calculation.getExpectedLevy();
         BigDecimal delta = expectedLevy.subtract( currentLevy ).setScale( 2, RoundingMode.HALF_UP );
 
@@ -246,11 +240,11 @@ public class EdinburghVisitorLevyService {
             return;
         }
 
-        int voided = cloudbedsScraper.voidVoidableVisitorLevyTransactions( webClient, reservation, exclusiveTaxLabel, inclusiveTaxLabel );
+        int voided = cloudbedsScraper.voidVoidableVisitorLevyTransactions( webClient, reservation );
         LOGGER.info( "Voided {} EVL folio line(s) on canceled/no-show reservation {}", voided, reservation.getReservationId() );
 
         Reservation refreshed = cloudbedsScraper.getReservationRetry( webClient, reservation.getReservationId() );
-        BigDecimal remainingLevy = refreshed.getVisitorLevyTotal( exclusiveTaxLabel, inclusiveTaxLabel );
+        BigDecimal remainingLevy = refreshed.getVisitorLevyTotal();
         if ( EdinburghVisitorLevyCalculator.isWithinTolerance( assessment.getExpectedLevy().subtract( remainingLevy ) ) ) {
             LOGGER.info( "Visitor levy cleared for canceled/no-show reservation {}", reservation.getReservationId() );
         }
@@ -282,14 +276,11 @@ public class EdinburghVisitorLevyService {
             return;
         }
 
-        String taxLabel = EdinburghVisitorLevyCalculator.useInclusiveTax( reservation )
-                ? inclusiveTaxLabel : exclusiveTaxLabel;
-        String taxId = cloudbedsScraper.resolveTaxIdByLabel( webClient, taxLabel );
+        String taxId = cloudbedsScraper.resolveVisitorLevyTaxId( webClient, false );
 
         String note = EdinburghVisitorLevyCalculator.buildAdjustmentNote( assessment.getCalculation() );
         BigDecimal delta = assessment.getDelta();
-        if ( cloudbedsScraper.tryVoidMatchingVisitorLevyTransaction(
-                webClient, reservation, exclusiveTaxLabel, inclusiveTaxLabel, delta ) ) {
+        if ( cloudbedsScraper.tryVoidMatchingVisitorLevyTransaction( webClient, reservation, delta ) ) {
             LOGGER.info( "Voided matching EVL line instead of posting delta {} on reservation {}",
                     delta, reservation.getReservationId() );
             Reservation refreshed = cloudbedsScraper.getReservationRetry( webClient, reservation.getReservationId() );

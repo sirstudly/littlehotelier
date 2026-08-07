@@ -28,6 +28,7 @@ import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.cloudbedsws.EdinburghVisitorLevyBookingCriteria;
 import com.macbackpackers.scrapers.cloudbedsws.NonRefundableBookingCriteria;
+import com.macbackpackers.services.EdinburghVisitorLevyCalculator;
 import org.apache.commons.lang3.StringUtils;
 import org.htmlunit.Page;
 import org.htmlunit.WebClient;
@@ -554,25 +555,46 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Resolves a property tax ID by matching the English label in cached property content.
+     * Resolves a property tax ID for the Edinburgh Visitor Levy by matching English labels that
+     * contain "edinburgh visitor levy" (and "inclusive" when {@code inclusive} is true). Prefers
+     * active taxes whose name does not contain "Before" (archived renames).
      */
-    public String resolveTaxIdByLabel( WebClient webClient, String label ) throws IOException {
+    public String resolveVisitorLevyTaxId( WebClient webClient, boolean inclusive ) throws IOException {
         JsonObject propertyContent = getPropertyContent( webClient );
-        if ( false == propertyContent.has( "taxes" ) ) {
-            throw new MissingUserDataException( "No taxes configured in property content" );
+        return findVisitorLevyTaxId( propertyContent, inclusive )
+                .orElseThrow( () -> new MissingUserDataException(
+                        "Unable to resolve " + ( inclusive ? "inclusive" : "exclusive" )
+                                + " Edinburgh Visitor Levy tax ID from property content" ) );
+    }
+
+    /**
+     * Finds an EVL tax ID in property-content JSON. Prefer names without {@code Before}.
+     */
+    public static Optional<String> findVisitorLevyTaxId( JsonObject propertyContent, boolean inclusive ) {
+        if ( propertyContent == null || false == propertyContent.has( "taxes" ) ) {
+            return Optional.empty();
         }
-        Optional<String> taxId = StreamSupport.stream(
+        List<JsonObject> matches = StreamSupport.stream(
                 propertyContent.get( "taxes" ).getAsJsonArray().spliterator(), false )
                 .map( JsonElement::getAsJsonObject )
                 .filter( tax -> tax.has( "name_langs" )
-                        && tax.get( "name_langs" ).getAsJsonObject().has( "en" )
-                        && label.equals( tax.get( "name_langs" ).getAsJsonObject().get( "en" ).getAsString() ) )
-                .map( tax -> tax.get( "id" ).getAsString() )
-                .findFirst();
-        if ( false == taxId.isPresent() ) {
-            throw new MissingUserDataException( "Unable to resolve tax ID for label: " + label );
+                        && tax.get( "name_langs" ).getAsJsonObject().has( "en" ) )
+                .filter( tax -> {
+                    String name = tax.get( "name_langs" ).getAsJsonObject().get( "en" ).getAsString();
+                    return inclusive
+                            ? EdinburghVisitorLevyCalculator.isInclusiveVisitorLevyLabel( name )
+                            : EdinburghVisitorLevyCalculator.isExclusiveVisitorLevyLabel( name );
+                } )
+                .collect( Collectors.toList() );
+        if ( matches.isEmpty() ) {
+            return Optional.empty();
         }
-        return taxId.get();
+        JsonObject preferred = matches.stream()
+                .filter( tax -> false == tax.get( "name_langs" ).getAsJsonObject().get( "en" )
+                        .getAsString().toLowerCase( Locale.ROOT ).contains( "before" ) )
+                .findFirst()
+                .orElse( matches.get( 0 ) );
+        return Optional.of( preferred.get( "id" ).getAsString() );
     }
 
     /**
@@ -643,10 +665,9 @@ public class CloudbedsScraper {
      * @return {@code true} if a matching line was voided
      */
     public boolean tryVoidMatchingVisitorLevyTransaction( WebClient webClient, Reservation res,
-            String exclusiveTaxLabel, String inclusiveTaxLabel, BigDecimal delta ) throws IOException {
+            BigDecimal delta ) throws IOException {
         List<TransactionRecord> transactions = getTransactionsByReservation( webClient, res.getReservationId() );
-        Optional<TransactionRecord> match = findVoidableVisitorLevyTransactionForDelta(
-                transactions, exclusiveTaxLabel, inclusiveTaxLabel, delta );
+        Optional<TransactionRecord> match = findVoidableVisitorLevyTransactionForDelta( transactions, delta );
         if ( false == match.isPresent() ) {
             return false;
         }
@@ -660,11 +681,9 @@ public class CloudbedsScraper {
      *
      * @return number of folio lines voided
      */
-    public int voidVoidableVisitorLevyTransactions( WebClient webClient, Reservation res,
-            String exclusiveTaxLabel, String inclusiveTaxLabel ) throws IOException {
+    public int voidVoidableVisitorLevyTransactions( WebClient webClient, Reservation res ) throws IOException {
         List<TransactionRecord> voidable = listVoidableVisitorLevyTransactions(
-                getTransactionsByReservation( webClient, res.getReservationId() ),
-                exclusiveTaxLabel, inclusiveTaxLabel );
+                getTransactionsByReservation( webClient, res.getReservationId() ) );
         String reservationId = res.getReservationId();
         int voided = 0;
         for ( TransactionRecord txn : voidable ) {
@@ -687,12 +706,11 @@ public class CloudbedsScraper {
     /**
      * Returns voidable visitor-levy folio lines (adjustments before tax charges).
      */
-    static List<TransactionRecord> listVoidableVisitorLevyTransactions( List<TransactionRecord> records,
-            String exclusiveTaxLabel, String inclusiveTaxLabel ) {
+    static List<TransactionRecord> listVoidableVisitorLevyTransactions( List<TransactionRecord> records ) {
         List<TransactionRecord> adjustments = new ArrayList<>();
         List<TransactionRecord> taxes = new ArrayList<>();
         for ( TransactionRecord record : records ) {
-            if ( false == isVoidableVisitorLevyTransaction( record, exclusiveTaxLabel, inclusiveTaxLabel ) ) {
+            if ( false == isVoidableVisitorLevyTransaction( record ) ) {
                 continue;
             }
             if ( "adjustment".equalsIgnoreCase( record.getType() ) ) {
@@ -714,11 +732,10 @@ public class CloudbedsScraper {
      * {@code C = -delta}. When multiple lines match, returns the most recent.
      */
     static Optional<TransactionRecord> findVoidableVisitorLevyTransactionForDelta(
-            List<TransactionRecord> records, String exclusiveTaxLabel, String inclusiveTaxLabel,
-            BigDecimal delta ) {
+            List<TransactionRecord> records, BigDecimal delta ) {
         BigDecimal targetContribution = delta.negate().setScale( 2, RoundingMode.HALF_UP );
         return records.stream()
-                .filter( record -> isVoidableVisitorLevyTransaction( record, exclusiveTaxLabel, inclusiveTaxLabel ) )
+                .filter( CloudbedsScraper::isVoidableVisitorLevyTransaction )
                 .filter( record -> record.getVisitorLevyContribution().compareTo( targetContribution ) == 0 )
                 .max( Comparator.comparing( CloudbedsScraper::parseTransactionDatetime ) );
     }
@@ -736,16 +753,11 @@ public class CloudbedsScraper {
         }
     }
 
-    private static boolean isVoidableVisitorLevyTransaction( TransactionRecord record,
-            String exclusiveTaxLabel, String inclusiveTaxLabel ) {
+    private static boolean isVoidableVisitorLevyTransaction( TransactionRecord record ) {
         if ( record == null || record.isVoided() || false == record.isVoidable() ) {
             return false;
         }
-        String description = record.getDescription();
-        if ( description == null ) {
-            return false;
-        }
-        if ( false == description.equals( exclusiveTaxLabel ) && false == description.equals( inclusiveTaxLabel ) ) {
+        if ( false == EdinburghVisitorLevyCalculator.isVisitorLevyLabel( record.getDescription() ) ) {
             return false;
         }
         String type = record.getType();

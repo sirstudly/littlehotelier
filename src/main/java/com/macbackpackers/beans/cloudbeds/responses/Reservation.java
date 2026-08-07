@@ -20,6 +20,7 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
+import com.macbackpackers.services.EdinburghVisitorLevyCalculator;
 
 public class Reservation extends CloudbedsJsonResponse {
 
@@ -509,15 +510,15 @@ public class Reservation extends CloudbedsJsonResponse {
     }
 
     /**
-     * Returns the visitor levy total from balance_details.tax_breakdown for the given tax labels.
+     * Returns the visitor levy total from balance_details.tax_breakdown for any
+     * Edinburgh Visitor Levy tax line (matched by label substring, not year-specific name).
      */
-    public BigDecimal getVisitorLevyTotal( String... levyLabels ) {
+    public BigDecimal getVisitorLevyTotal() {
         if ( balanceDetails == null || balanceDetails.getTaxBreakdown() == null ) {
             return BigDecimal.ZERO.setScale( 2, RoundingMode.HALF_UP );
         }
-        List<String> labels = Arrays.asList( levyLabels );
         return balanceDetails.getTaxBreakdown().stream()
-                .filter( item -> labels.contains( item.getName() ) )
+                .filter( item -> EdinburghVisitorLevyCalculator.isVisitorLevyLabel( item.getName() ) )
                 .map( TaxBreakdownItem::getAmount )
                 .filter( amount -> amount != null )
                 .reduce( BigDecimal.ZERO, BigDecimal::add )

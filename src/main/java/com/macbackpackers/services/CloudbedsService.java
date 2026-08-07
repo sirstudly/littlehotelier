@@ -169,12 +169,6 @@ public class CloudbedsService {
     @Value( "${chromescraper.maxwait.seconds:60}" )
     private int chromeMaxWaitSeconds;
 
-    @Value( "${evl.tax.exclusive.label:Edinburgh Visitor Levy 2026}" )
-    private String exclusiveTaxLabel;
-
-    @Value( "${evl.tax.inclusive.label:Edinburgh Visitor Levy (Inclusive)}" )
-    private String inclusiveTaxLabel;
-
     private final DateTimeFormatter DD_MMM_YYYY = DateTimeFormatter.ofPattern( "dd-MMM-yyyy" );
 
     // all allowable characters for lookup key
@@ -1194,7 +1188,7 @@ public class CloudbedsService {
                 a.setNumberGuests( r.getAdultsNumber() + r.getKidsNumber() );
                 a.setPaymentOutstanding( r.getBalanceDue() );
                 a.setPaymentTotal( r.getGrandTotal() );
-                a.setVisitorLevyTotal( r.getVisitorLevyTotal( exclusiveTaxLabel, inclusiveTaxLabel ) );
+                a.setVisitorLevyTotal( EdinburghVisitorLevyCalculator.getVisitorLevyTotal( r ) );
                 a.setReservationId( Integer.parseInt( r.getReservationId() ) );
                 a.setRoom( bed.getRoom() );
                 a.setRoomId( br.getRoomId() );

@@ -19,6 +19,7 @@ import com.macbackpackers.beans.cloudbeds.responses.BalanceDetails;
 import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TaxBreakdownItem;
+import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.services.EdinburghVisitorLevyCalculator.LevyCalculation;
 import com.macbackpackers.services.EdinburghVisitorLevyCalculator.LevyNight;
 
@@ -381,15 +382,8 @@ public class EdinburghVisitorLevyCalculatorTest {
                 StandardCharsets.UTF_8 );
         JsonObject propertyContent = gson.fromJson( json, JsonObject.class );
 
-        String exclusiveTaxId = propertyContent.get( "taxes" ).getAsJsonArray().asList().stream()
-                .map( e -> e.getAsJsonObject() )
-                .filter( tax -> "Edinburgh Visitor Levy 2026".equals(
-                        tax.get( "name_langs" ).getAsJsonObject().get( "en" ).getAsString() ) )
-                .map( tax -> tax.get( "id" ).getAsString() )
-                .findFirst()
-                .orElseThrow( () -> new IllegalStateException( "tax not found" ) );
-
-        assertThat( exclusiveTaxId, is( "824186" ) );
+        assertThat( CloudbedsScraper.findVisitorLevyTaxId( propertyContent, false ).get(), is( "824186" ) );
+        assertThat( CloudbedsScraper.findVisitorLevyTaxId( propertyContent, true ).get(), is( "824360" ) );
     }
 
     @Test
@@ -410,9 +404,28 @@ public class EdinburghVisitorLevyCalculatorTest {
         balanceDetails.setTaxBreakdown( Arrays.asList( inclusive, exclusive, vat ) );
         baseReservation.setBalanceDetails( balanceDetails );
 
-        assertThat( baseReservation.getVisitorLevyTotal(
-                "Edinburgh Visitor Levy 2026", "Edinburgh Visitor Levy (Inclusive)" ),
+        assertThat( baseReservation.getVisitorLevyTotal(), comparesEqualTo( new BigDecimal( "1.44" ) ) );
+        assertThat( EdinburghVisitorLevyCalculator.getVisitorLevyTotal( baseReservation ),
                 comparesEqualTo( new BigDecimal( "1.44" ) ) );
+    }
+
+    @Test
+    public void testVisitorLevyTotalMatchesYearAndInclusiveVariants() {
+        TaxBreakdownItem yearInclusive = new TaxBreakdownItem();
+        yearInclusive.setName( "Edinburgh Visitor Levy 2026 (Inclusive)" );
+        yearInclusive.setAmount( new BigDecimal( "0.50" ) );
+
+        TaxBreakdownItem futureExclusive = new TaxBreakdownItem();
+        futureExclusive.setName( "Edinburgh Visitor Levy 2027" );
+        futureExclusive.setAmount( new BigDecimal( "1.00" ) );
+
+        BalanceDetails balanceDetails = new BalanceDetails();
+        balanceDetails.setTaxBreakdown( Arrays.asList( yearInclusive, futureExclusive ) );
+        baseReservation.setBalanceDetails( balanceDetails );
+
+        assertThat( baseReservation.getVisitorLevyTotal(), comparesEqualTo( new BigDecimal( "1.50" ) ) );
+        assertThat( EdinburghVisitorLevyCalculator.isInclusiveVisitorLevyLabel( yearInclusive.getName() ), is( true ) );
+        assertThat( EdinburghVisitorLevyCalculator.isExclusiveVisitorLevyLabel( futureExclusive.getName() ), is( true ) );
     }
 
     @Test

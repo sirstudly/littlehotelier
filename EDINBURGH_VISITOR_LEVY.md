@@ -49,18 +49,18 @@ Known examples (from HAR captures in this repo):
 | High Street Hostel (HSH) | 17959 | `824362` | `824364` | Edinburgh Visitor Levy 2026 (Inclusive) |
 | Castle Rock Hostel (CRH) | 17363 | not captured | not captured | verify in Cloudbeds |
 
-The exclusive label **Edinburgh Visitor Levy 2026** has been consistent where seen; the **inclusive label can differ by property** (RMB vs HSH above). If `resolveTaxIdByLabel()` fails on a property, check the exact label in Cloudbeds and set `evl.tax.inclusive.label` in that property's `application-*.properties` profile.
+Exact year wording can differ by property (and will change over time). Matching is by **substring**, not exact label — see [Runtime resolution](#runtime-resolution-not-hardcoded-ids).
 
 ### Runtime resolution (not hardcoded IDs)
 
-Tax IDs for API calls are resolved at runtime by **English label** via `CloudbedsScraper.resolveTaxIdByLabel()` (cached property content from `getPropertyContent`). Labels come from:
+Tax IDs for API calls are resolved at runtime via `CloudbedsScraper.resolveVisitorLevyTaxId(webClient, inclusive)` from cached property content (`getPropertyContent`):
 
-```properties
-evl.tax.exclusive.label=Edinburgh Visitor Levy 2026
-evl.tax.inclusive.label=Edinburgh Visitor Levy (Inclusive)
-```
+- **Any EVL line:** English name contains `edinburgh visitor levy` (case-insensitive)
+- **Inclusive:** also contains `inclusive`
+- **Exclusive:** EVL match and does **not** contain `inclusive`
+- Prefer names that do **not** contain `Before` (archived Cloudbeds renames)
 
-(`application.properties` defaults — override per profile if Cloudbeds uses a different inclusive name.)
+Folio totals use the same matching via `Reservation.getVisitorLevyTotal()` / `EdinburghVisitorLevyCalculator.isVisitorLevyLabel()`.
 
 Do not hardcode numeric IDs in production code. Tests/fixtures may use RMB IDs: `src/test/resources/get_property_content_taxes.json`.
 
@@ -87,7 +87,7 @@ Calculate...BookingEventListener ────┘  (real-time, on `booked` WS eve
                                   ▼
                             CloudbedsScraper
                               - getReservationRetry
-                              - resolveTaxIdByLabel
+                              - resolveVisitorLevyTaxId
                               - addVisitorLevyCharge  → add_new_fee_or_tax
                               - adjustVisitorLevyCharge → add_new_adjust
 ```
@@ -110,8 +110,8 @@ Calculate...BookingEventListener ────┘  (real-time, on `booked` WS eve
 
 | Class | Change |
 |---|---|
-| `Reservation` | `channelPriceListed`, `channelCommission`, `channelBalance`; `getVisitorLevyTotal()` reads `balance_details.tax_breakdown` |
-| `CloudbedsScraper` | `resolveTaxIdByLabel`, `addVisitorLevyCharge`, `adjustVisitorLevyCharge` |
+| `Reservation` | `channelPriceListed`, `channelCommission`, `channelBalance`; `getVisitorLevyTotal()` reads `balance_details.tax_breakdown` via substring label match |
+| `CloudbedsScraper` | `resolveVisitorLevyTaxId`, `addVisitorLevyCharge`, `adjustVisitorLevyCharge` |
 | `CloudbedsJsonRequestFactory` | `createAddNewFeeOrTaxRequest`, `createAddNewAdjustRequest` |
 | `PaymentProcessorService` | Non-refundable charges use `getBalanceDueExcludingVisitorLevy()`; skips if already paid |
 | `CalculateEdinburghVisitorLevyBookingEventListener` | `@Component` `CloudbedsEventListener`; auto-registered via Spring `List<CloudbedsEventListener>` in `CloudbedsWebSocketService` |
@@ -126,8 +126,6 @@ Set in `application.properties` (override per profile in `application-*.properti
 
 ```properties
 evl.enabled=false
-evl.tax.exclusive.label=Edinburgh Visitor Levy 2026
-evl.tax.inclusive.label=Edinburgh Visitor Levy 2026 (Inclusive)
 evl.stay.date.from=2026-07-24
 ```
 
@@ -504,7 +502,7 @@ Run: `mvn test -Dtest=EdinburghVisitorLevyBookingCriteriaTest`
 4. **Inclusive OTA VAT-on-levy** is inside the 6% EVL line; room VAT is a separate folio line. Council remittance = EVL ÷ 1.2.
 5. **5-night cap** on inclusive OTAs: channel may attribute levy for whole stay; manual refund + our job logs discrepancy.
 6. **PaymentProcessorService** `paidValue > 0` early return — may need revisiting for partial payments.
-7. **Per-property tax labels** — inclusive EVL name may differ (e.g. RMB vs HSH); verify Cloudbeds and set `evl.tax.inclusive.label` per profile if needed.
+7. **Tax labels** — matched by substring (`edinburgh visitor levy`, plus `inclusive` for inclusive); year renames should not require code/config changes.
 
 ---
 
@@ -512,16 +510,15 @@ Run: `mvn test -Dtest=EdinburghVisitorLevyBookingCriteriaTest`
 
 ```java
 EdinburghVisitorLevyCalculator.useInclusiveTax(reservation)
-// true  → inclusive label (evl.tax.inclusive.label) → BDC, Agoda, Agoda / Priceline
-// false → exclusive label (evl.tax.exclusive.label) → direct, HWL, walk-in
+// true  → inclusive EVL tax (name contains "edinburgh visitor levy" + "inclusive") → BDC, Agoda, Agoda / Priceline
+// false → exclusive EVL tax (name contains "edinburgh visitor levy", not "inclusive") → direct, HWL, walk-in
 ```
 
-Numeric `tax_*` IDs differ per property; the service resolves them via label at runtime.
+Numeric `tax_*` IDs differ per property; the service resolves them via substring match at runtime.
 
 Current levy on folio:
 
 ```java
-reservation.getVisitorLevyTotal(
-    EdinburghVisitorLevyCalculator.EXCLUSIVE_TAX_LABEL,
-    EdinburghVisitorLevyCalculator.INCLUSIVE_TAX_LABEL)
+reservation.getVisitorLevyTotal()
+// or EdinburghVisitorLevyCalculator.getVisitorLevyTotal(reservation)
 ```

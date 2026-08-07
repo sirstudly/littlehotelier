@@ -1,4 +1,3 @@
-
 package com.macbackpackers.scrapers;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -11,12 +10,15 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 
 public class CloudbedsScraperVisitorLevyVoidTest {
 
     private static final String EXCLUSIVE_LABEL = "Edinburgh Visitor Levy 2026";
     private static final String INCLUSIVE_LABEL = "Edinburgh Visitor Levy (Inclusive)";
+    private static final String FUTURE_EXCLUSIVE_LABEL = "Edinburgh Visitor Levy 2027";
 
     @Test
     public void listVoidableVisitorLevyTransactions_returnsAdjustmentsBeforeTaxes() {
@@ -24,7 +26,7 @@ public class CloudbedsScraperVisitorLevyVoidTest {
         TransactionRecord tax = evlTransaction( "tax-1", "tax", EXCLUSIVE_LABEL, false, true );
 
         List<TransactionRecord> voidable = CloudbedsScraper.listVoidableVisitorLevyTransactions(
-                Arrays.asList( tax, adjustment ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL );
+                Arrays.asList( tax, adjustment ) );
 
         assertThat( voidable.size(), is( 2 ) );
         assertThat( voidable.get( 0 ).getId(), is( "adj-1" ) );
@@ -38,7 +40,7 @@ public class CloudbedsScraperVisitorLevyVoidTest {
         TransactionRecord vat = evlTransaction( "vat", "tax", "VAT", false, true );
 
         List<TransactionRecord> voidable = CloudbedsScraper.listVoidableVisitorLevyTransactions(
-                Arrays.asList( voided, notVoidable, vat ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL );
+                Arrays.asList( voided, notVoidable, vat ) );
 
         assertThat( voidable.isEmpty(), is( true ) );
     }
@@ -48,10 +50,21 @@ public class CloudbedsScraperVisitorLevyVoidTest {
         TransactionRecord inclusive = evlTransaction( "inc-1", "adjustment", INCLUSIVE_LABEL, false, true );
 
         List<TransactionRecord> voidable = CloudbedsScraper.listVoidableVisitorLevyTransactions(
-                Arrays.asList( inclusive ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL );
+                Arrays.asList( inclusive ) );
 
         assertThat( voidable.size(), is( 1 ) );
         assertThat( voidable.get( 0 ).getId(), is( "inc-1" ) );
+    }
+
+    @Test
+    public void listVoidableVisitorLevyTransactions_matchesFutureYearLabel() {
+        TransactionRecord futureYear = evlTransaction( "tax-2027", "tax", FUTURE_EXCLUSIVE_LABEL, false, true );
+
+        List<TransactionRecord> voidable = CloudbedsScraper.listVoidableVisitorLevyTransactions(
+                Arrays.asList( futureYear ) );
+
+        assertThat( voidable.size(), is( 1 ) );
+        assertThat( voidable.get( 0 ).getId(), is( "tax-2027" ) );
     }
 
     @Test
@@ -60,7 +73,7 @@ public class CloudbedsScraperVisitorLevyVoidTest {
         adjustment.setCredit( "-£0.24" );
 
         Optional<TransactionRecord> match = CloudbedsScraper.findVoidableVisitorLevyTransactionForDelta(
-                Arrays.asList( adjustment ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL, new BigDecimal( "0.24" ) );
+                Arrays.asList( adjustment ), new BigDecimal( "0.24" ) );
 
         assertThat( match.isPresent(), is( true ) );
         assertThat( match.get().getId(), is( "adj-1" ) );
@@ -72,7 +85,7 @@ public class CloudbedsScraperVisitorLevyVoidTest {
         tax.setCredit( "£0.24" );
 
         Optional<TransactionRecord> match = CloudbedsScraper.findVoidableVisitorLevyTransactionForDelta(
-                Arrays.asList( tax ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL, new BigDecimal( "-0.24" ) );
+                Arrays.asList( tax ), new BigDecimal( "-0.24" ) );
 
         assertThat( match.isPresent(), is( true ) );
         assertThat( match.get().getId(), is( "tax-1" ) );
@@ -84,7 +97,7 @@ public class CloudbedsScraperVisitorLevyVoidTest {
         tax.setCredit( "£0.12" );
 
         Optional<TransactionRecord> match = CloudbedsScraper.findVoidableVisitorLevyTransactionForDelta(
-                Arrays.asList( tax ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL, new BigDecimal( "0.24" ) );
+                Arrays.asList( tax ), new BigDecimal( "0.24" ) );
 
         assertThat( match.isPresent(), is( false ) );
     }
@@ -99,7 +112,7 @@ public class CloudbedsScraperVisitorLevyVoidTest {
         newer.setDatetimeTransaction( "02/06/2026 10:00:00" );
 
         Optional<TransactionRecord> match = CloudbedsScraper.findVoidableVisitorLevyTransactionForDelta(
-                Arrays.asList( older, newer ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL, new BigDecimal( "0.24" ) );
+                Arrays.asList( older, newer ), new BigDecimal( "0.24" ) );
 
         assertThat( match.isPresent(), is( true ) );
         assertThat( match.get().getId(), is( "adj-new" ) );
@@ -115,9 +128,57 @@ public class CloudbedsScraperVisitorLevyVoidTest {
         vat.setCredit( "-£0.24" );
 
         Optional<TransactionRecord> match = CloudbedsScraper.findVoidableVisitorLevyTransactionForDelta(
-                Arrays.asList( voided, notVoidable, vat ), EXCLUSIVE_LABEL, INCLUSIVE_LABEL, new BigDecimal( "0.24" ) );
+                Arrays.asList( voided, notVoidable, vat ), new BigDecimal( "0.24" ) );
 
         assertThat( match.isPresent(), is( false ) );
+    }
+
+    @Test
+    public void findVisitorLevyTaxId_resolvesExclusiveAndInclusiveBySubstring() {
+        JsonObject propertyContent = propertyContentWithTaxes(
+                tax( "1", "VAT" ),
+                tax( "824186", "Edinburgh Visitor Levy 2026" ),
+                tax( "824360", "Edinburgh Visitor Levy (Inclusive)" ) );
+
+        assertThat( CloudbedsScraper.findVisitorLevyTaxId( propertyContent, false ).get(), is( "824186" ) );
+        assertThat( CloudbedsScraper.findVisitorLevyTaxId( propertyContent, true ).get(), is( "824360" ) );
+    }
+
+    @Test
+    public void findVisitorLevyTaxId_prefersActiveNameOverBeforeRename() {
+        JsonObject propertyContent = propertyContentWithTaxes(
+                tax( "old", "Edinburgh Visitor Levy 2026 (Before 05/07/2026 12:51 PM)" ),
+                tax( "active", "Edinburgh Visitor Levy 2027" ) );
+
+        assertThat( CloudbedsScraper.findVisitorLevyTaxId( propertyContent, false ).get(), is( "active" ) );
+    }
+
+    @Test
+    public void findVisitorLevyTaxId_matchesInclusiveWithYearInName() {
+        JsonObject propertyContent = propertyContentWithTaxes(
+                tax( "excl", "Edinburgh Visitor Levy 2026" ),
+                tax( "incl", "Edinburgh Visitor Levy 2026 (Inclusive)" ) );
+
+        assertThat( CloudbedsScraper.findVisitorLevyTaxId( propertyContent, true ).get(), is( "incl" ) );
+    }
+
+    private static JsonObject propertyContentWithTaxes( JsonObject... taxes ) {
+        JsonObject propertyContent = new JsonObject();
+        JsonArray taxArray = new JsonArray();
+        for ( JsonObject tax : taxes ) {
+            taxArray.add( tax );
+        }
+        propertyContent.add( "taxes", taxArray );
+        return propertyContent;
+    }
+
+    private static JsonObject tax( String id, String englishName ) {
+        JsonObject tax = new JsonObject();
+        tax.addProperty( "id", id );
+        JsonObject nameLangs = new JsonObject();
+        nameLangs.addProperty( "en", englishName );
+        tax.add( "name_langs", nameLangs );
+        return tax;
     }
 
     private static TransactionRecord evlTransaction( String id, String type, String description,
