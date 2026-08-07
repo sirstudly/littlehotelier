@@ -798,6 +798,7 @@ public class CloudbedsService {
                 .filter( Objects::nonNull )
                 .distinct()
                 .map( reservationId -> scraper.getReservationRetry( webClient, String.valueOf( reservationId ) ) )
+                .filter( r -> false == r.isCheckinDateTodayOrInPast() )
                 .filter( r -> false == r.containsNote( emailTemplate + " email sent." ) )
                 .filter( r -> r.getEmail() != null && r.getEmail().contains( "@" ) )
                 .forEach( r -> {

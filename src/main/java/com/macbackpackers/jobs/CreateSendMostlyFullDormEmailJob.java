@@ -16,8 +16,8 @@ import com.macbackpackers.services.CloudbedsService;
  *
  */
 @Entity
-@DiscriminatorValue( value = "com.macbackpackers.jobs.CreateSendEmailMostlyFullDormJob" )
-public class CreateSendEmailMostlyFullDormJob extends AbstractJob {
+@DiscriminatorValue( value = "com.macbackpackers.jobs.CreateSendMostlyFullDormEmailJob" )
+public class CreateSendMostlyFullDormEmailJob extends AbstractJob {
 
     @Autowired
     @Transient
