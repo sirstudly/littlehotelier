@@ -256,7 +256,9 @@ public class ProcessorService {
                     Thread.sleep( repeatIntervalMillis );
                 }
                 catch ( InterruptedException e ) {
-                    Thread.currentThread().interrupt();
+                    // Do not restore the interrupt flag here: requestShutdown() interrupts this
+                    // thread only to wake sleep. Restoring it would make awaitTermination below
+                    // throw immediately and force-kill in-flight jobs.
                     LOGGER.info( "Coordinator loop interrupted; exiting" );
                     break;
                 }
@@ -266,6 +268,9 @@ public class ProcessorService {
             LOGGER.info( "Draining job executor; waiting for in-flight jobs to finish..." );
             // Workers observe shutdownRequested via sliced idle sleeps and exit cooperatively
             executor.shutdown();
+            // Clear any leftover interrupt from waking the coordinator sleep so we can actually
+            // wait for workers (up to docker stop_grace_period).
+            Thread.interrupted();
             try {
                 // Leave headroom under docker stop_grace_period (5m) for cleanup after drain
                 if ( !executor.awaitTermination( 4, TimeUnit.MINUTES ) ) {
