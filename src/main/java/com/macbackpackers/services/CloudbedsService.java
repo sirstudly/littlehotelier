@@ -776,15 +776,14 @@ public class CloudbedsService {
 
     /**
      * Creates jobs for emailing guests from the latest mostly-full dorm report.
-     * Requires WP option {@code hbo_mostly_full_dorm_email_template} (Cloudbeds template name).
      *
      * @param webClient web client instance to use
+     * @param emailTemplate Cloudbeds email template name (must not be blank)
      * @throws IOException on failure loading reservations or template
      */
-    public void createSendMostlyFullDormEmailJobs( WebClient webClient ) throws IOException {
-        String emailTemplate = dao.getOption( "hbo_mostly_full_dorm_email_template" );
+    public void createSendMostlyFullDormEmailJobs( WebClient webClient, String emailTemplate ) throws IOException {
         if ( StringUtils.isBlank( emailTemplate ) ) {
-            throw new MissingUserDataException( "Missing or blank option hbo_mostly_full_dorm_email_template" );
+            throw new MissingUserDataException( "Missing or blank email template" );
         }
         scraper.fetchEmailTemplate( webClient, emailTemplate ); // fail early if template missing
 
