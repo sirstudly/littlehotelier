@@ -79,6 +79,9 @@ public class Allocation {
     @Column( name = "payment_outstanding" )
     private BigDecimal paymentOutstanding;
 
+    @Column( name = "visitor_levy_total" )
+    private BigDecimal visitorLevyTotal;
+
     @Column( name = "rate_plan_name" )
     private String ratePlanName;
 
@@ -247,6 +250,14 @@ public class Allocation {
 
     public void setPaymentOutstanding( String paymentOutstanding ) {
         setPaymentOutstanding( new BigDecimal( paymentOutstanding.replaceAll( "\u00A3", "" ) ) ); // strip pound
+    }
+
+    public BigDecimal getVisitorLevyTotal() {
+        return visitorLevyTotal;
+    }
+
+    public void setVisitorLevyTotal( BigDecimal visitorLevyTotal ) {
+        this.visitorLevyTotal = visitorLevyTotal;
     }
 
     public String getRatePlanName() {
@@ -442,6 +453,7 @@ public class Allocation {
                 .append( "checkoutDate", checkoutDate )
                 .append( "paymentTotal", paymentTotal )
                 .append( "paymentOutstanding", paymentOutstanding )
+                .append( "visitorLevyTotal", visitorLevyTotal )
                 .append( "ratePlanName", ratePlanName )
                 .append( "paymentStatus", paymentStatus )
                 .append( "numberGuests", numberGuests )

@@ -12,6 +12,7 @@ CREATE TABLE `wp_lh_calendar` (
   `checkout_date` datetime NOT NULL,
   `payment_total` decimal(10,2) DEFAULT NULL,
   `payment_outstanding` decimal(10,2) DEFAULT NULL,
+  `visitor_levy_total` decimal(10,2) DEFAULT 0,
   `rate_plan_name` varchar(255) DEFAULT NULL,
   `payment_status` varchar(50) DEFAULT NULL,
   `num_guests` int(10) unsigned DEFAULT NULL,
@@ -595,4 +596,7 @@ CREATE TABLE `wp_lh_cleaner_task` (
   `last_updated_date` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- Production migration: folio EVL snapshot for unpaid deposit report filtering
+-- ALTER TABLE `wp_lh_calendar` ADD COLUMN `visitor_levy_total` decimal(10,2) DEFAULT 0 AFTER `payment_outstanding`;
 
