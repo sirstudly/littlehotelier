@@ -17,6 +17,7 @@ import com.macbackpackers.beans.bdc.BookingComRefundRequest;
 import com.macbackpackers.beans.bdc.BookingComVCCToCharge;
 import com.macbackpackers.beans.cloudbeds.requests.CustomerInfo;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
+import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Guest;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
@@ -792,7 +793,7 @@ public class CloudbedsService {
             throw new MissingUserDataException( "No completed MostlyFullDormReportJob found" );
         }
 
-        dao.fetchMostlyFullDormReport( reportJob.getAllocationScraperJobId() ).stream()
+        List<Reservation> candidates = dao.fetchMostlyFullDormReport( reportJob.getAllocationScraperJobId() ).stream()
                 .map( MostlyFullDormReportEntry::getReservationId )
                 .filter( Objects::nonNull )
                 .distinct()
@@ -800,6 +801,38 @@ public class CloudbedsService {
                 .filter( r -> false == r.isCheckinDateTodayOrInPast() )
                 .filter( r -> false == r.containsNote( emailTemplate + " email sent." ) )
                 .filter( r -> r.getEmail() != null && r.getEmail().contains( "@" ) )
+                .collect( Collectors.toList() );
+
+        if ( candidates.isEmpty() ) {
+            LOGGER.info( "No mostly-full dorm candidates to email." );
+            return;
+        }
+
+        Set<String> roomTypeIds = candidates.stream()
+                .filter( r -> r.getBookingRooms() != null )
+                .flatMap( r -> r.getBookingRooms().stream() )
+                .map( BookingRoom::getRoomTypeId )
+                .filter( StringUtils::isNotBlank )
+                .collect( Collectors.toSet() );
+
+        LocalDate dateStart = candidates.stream()
+                .map( Reservation::getCheckinDateAsLocalDate )
+                .min( LocalDate::compareTo )
+                .orElseThrow();
+        LocalDate dateEnd = candidates.stream()
+                .map( Reservation::getCheckoutDateAsLocalDate )
+                .max( LocalDate::compareTo )
+                .orElseThrow()
+                .minusDays( 1 );
+        if ( dateEnd.isBefore( dateStart ) ) {
+            dateEnd = dateStart;
+        }
+
+        Map<String, Map<LocalDate, Integer>> availability = scraper.fetchAvailability(
+                webClient, dateStart, dateEnd, roomTypeIds );
+
+        candidates.stream()
+                .filter( r -> hasSellableAvailabilityForStay( r, availability ) )
                 .forEach( r -> {
                     LOGGER.info( "Creating SendTemplatedEmailJob for mostly-full dorm Res #" + r.getReservationId()
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
@@ -812,6 +845,44 @@ public class CloudbedsService {
                     j.setNoteArchived( true );
                     dao.insertJob( j );
                 } );
+    }
+
+    /**
+     * True when every distinct room type on the reservation has sellable stock ({@code sell > 0})
+     * for every night from check-in inclusive to check-out exclusive.
+     */
+    private boolean hasSellableAvailabilityForStay( Reservation r,
+            Map<String, Map<LocalDate, Integer>> availability ) {
+        if ( r.getBookingRooms() == null || r.getBookingRooms().isEmpty() ) {
+            LOGGER.info( "Skipping Res #{}: no booking rooms for availability check", r.getReservationId() );
+            return false;
+        }
+        Set<String> roomTypeIds = r.getBookingRooms().stream()
+                .map( BookingRoom::getRoomTypeId )
+                .filter( StringUtils::isNotBlank )
+                .collect( Collectors.toSet() );
+        if ( roomTypeIds.isEmpty() ) {
+            LOGGER.info( "Skipping Res #{}: no room type ids for availability check", r.getReservationId() );
+            return false;
+        }
+        Map<String, String> roomTypeNames = r.getBookingRooms().stream()
+                .filter( br -> StringUtils.isNotBlank( br.getRoomTypeId() ) )
+                .collect( Collectors.toMap( BookingRoom::getRoomTypeId, BookingRoom::getRoomTypeName,
+                        ( a, b ) -> StringUtils.defaultIfBlank( a, b ) ) );
+        LocalDate checkin = r.getCheckinDateAsLocalDate();
+        LocalDate checkout = r.getCheckoutDateAsLocalDate();
+        for ( String roomTypeId : roomTypeIds ) {
+            Map<LocalDate, Integer> byDate = availability.getOrDefault( roomTypeId, Collections.emptyMap() );
+            for ( LocalDate night = checkin; night.isBefore( checkout ); night = night.plusDays( 1 ) ) {
+                int sell = byDate.getOrDefault( night, 0 );
+                if ( sell <= 0 ) {
+                    String roomTypeLabel = StringUtils.defaultIfBlank( roomTypeNames.get( roomTypeId ), "unknown" ) + " (" + roomTypeId + ")";
+                    LOGGER.info( "Skipping Res #{}: no sellable availability for room type {} on {}", r.getReservationId(), roomTypeLabel, night );
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**

@@ -239,6 +239,11 @@ public class CloudbedsServiceTest {
     }
 
     @Test
+    public void testCreateSendMostlyFullDormEmailJob() throws Exception {
+        cloudbedsService.createSendMostlyFullDormEmailJobs( webClient, "Booking an entire room for your group" );
+    }
+
+    @Test
     public void testCreateBdcManualChargeJobs() throws Exception {
         // read each line in file
         IOUtils.readLines( this.getClass().getResourceAsStream( "/bdc_reservations_import.csv" ), Charset.defaultCharset() )

@@ -223,6 +223,38 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Live sellable/free bed counts per room type and night.
+     *
+     * @param dateStart inclusive start date
+     * @param dateEnd inclusive end date (last night)
+     * @param roomTypeIds Cloudbeds room type ids
+     * @param billingPortalId
+     * @param frontVersion
+     * @return POST request for {@code /connect/availability/get}
+     * @throws IOException invalid URL
+     */
+    public WebRequest createGetAvailability( LocalDate dateStart, LocalDate dateEnd,
+            java.util.Collection<String> roomTypeIds, String billingPortalId, String frontVersion ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/availability/get" );
+        List<NameValuePair> params = new ArrayList<>();
+        params.add( new NameValuePair( "property_id", getPropertyId() ) );
+        params.add( new NameValuePair( "group_id", getPropertyId() ) );
+        params.add( new NameValuePair( "date_start", YYYY_MM_DD.format( dateStart ) ) );
+        params.add( new NameValuePair( "date_end", YYYY_MM_DD.format( dateEnd ) ) );
+        for ( String roomTypeId : roomTypeIds ) {
+            params.add( new NameValuePair( "rate_ids[]", "0-" + roomTypeId ) );
+        }
+        params.add( new NameValuePair( "suppress_client_errors", "true" ) );
+        params.add( new NameValuePair( "csrf_accessa", dao.getCsrfToken() ) );
+        params.add( new NameValuePair( "billing_portal_id", billingPortalId ) );
+        params.add( new NameValuePair( "version", getVersionForRequest( webRequest ) ) );
+        params.add( new NameValuePair( "frontVersion", frontVersion ) );
+        params.add( new NameValuePair( "is_bp_setup_completed", "1" ) );
+        webRequest.setRequestParameters( params );
+        return webRequest;
+    }
+
+    /**
      * Ping responds with pong. Doesn't require a login.
      * 
      * @return web request

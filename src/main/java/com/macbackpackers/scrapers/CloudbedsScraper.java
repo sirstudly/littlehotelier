@@ -52,11 +52,14 @@ import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
@@ -816,6 +819,65 @@ public class CloudbedsScraper {
     public JsonObject fetchRoomTypesFindOne( WebClient webClient, String roomTypeId ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createRoomTypesFindOneRequest( roomTypeId, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         return doRequest( webClient, requestSettings );
+    }
+
+    /**
+     * Live sellable bed counts per room type and night from {@code /connect/availability/get}.
+     * Closed or missing nights are treated as 0 sellable beds.
+     *
+     * @param webClient client
+     * @param dateStart inclusive start (first night)
+     * @param dateEnd inclusive end (last night)
+     * @param roomTypeIds Cloudbeds room type ids
+     * @return map of roomTypeId → (date → sell count)
+     * @throws IOException on transport / API failure
+     */
+    public Map<String, Map<LocalDate, Integer>> fetchAvailability( WebClient webClient,
+            LocalDate dateStart, LocalDate dateEnd, Collection<String> roomTypeIds ) throws IOException {
+        if ( roomTypeIds == null || roomTypeIds.isEmpty() ) {
+            return Collections.emptyMap();
+        }
+        WebRequest requestSettings = jsonRequestFactory.createGetAvailability(
+                dateStart, dateEnd, roomTypeIds, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        JsonObject response = doRequest( webClient, requestSettings );
+        Map<String, Map<LocalDate, Integer>> result = new HashMap<>();
+        if ( response.get( "data" ) == null || !response.get( "data" ).isJsonObject() ) {
+            return result;
+        }
+        JsonObject data = response.getAsJsonObject( "data" );
+        for ( Entry<String, JsonElement> rateEntry : data.entrySet() ) {
+            // keys are "0-<roomTypeId>"
+            String rateKey = rateEntry.getKey();
+            String roomTypeId = rateKey.contains( "-" ) ? rateKey.substring( rateKey.indexOf( '-' ) + 1 ) : rateKey;
+            if ( !rateEntry.getValue().isJsonObject() ) {
+                continue;
+            }
+            JsonObject rateObj = rateEntry.getValue().getAsJsonObject();
+            if ( rateObj.get( "available" ) == null || !rateObj.get( "available" ).isJsonObject() ) {
+                continue;
+            }
+            Map<LocalDate, Integer> byDate = new HashMap<>();
+            for ( Entry<String, JsonElement> dayEntry : rateObj.getAsJsonObject( "available" ).entrySet() ) {
+                if ( !dayEntry.getValue().isJsonObject() ) {
+                    byDate.put( LocalDate.parse( dayEntry.getKey() ), 0 );
+                    continue;
+                }
+                JsonObject day = dayEntry.getValue().getAsJsonObject();
+                boolean closed = day.has( "closed" ) && !day.get( "closed" ).isJsonNull() && day.get( "closed" ).getAsBoolean();
+                int sell = 0;
+                if ( !closed && day.has( "sell" ) && !day.get( "sell" ).isJsonNull() ) {
+                    try {
+                        sell = Integer.parseInt( day.get( "sell" ).getAsString() );
+                    }
+                    catch ( NumberFormatException ex ) {
+                        sell = 0;
+                    }
+                }
+                byDate.put( LocalDate.parse( dayEntry.getKey() ), sell );
+            }
+            result.put( roomTypeId, byDate );
+        }
+        return result;
     }
 
     /**
