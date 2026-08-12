@@ -571,6 +571,16 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Resolves a property tax ID whose English name equals {@code exactName} exactly.
+     */
+    public String resolveTaxIdByExactEnglishName( WebClient webClient, String exactName ) throws IOException {
+        JsonObject propertyContent = getPropertyContent( webClient );
+        return findTaxIdByExactEnglishName( propertyContent, exactName )
+                .orElseThrow( () -> new MissingUserDataException(
+                        "Unable to resolve tax ID for exact name \"" + exactName + "\" from property content" ) );
+    }
+
+    /**
      * Finds an EVL tax ID in property-content JSON. Prefer names without {@code Before}.
      */
     public static Optional<String> findVisitorLevyTaxId( JsonObject propertyContent, boolean inclusive ) {
@@ -598,6 +608,24 @@ public class CloudbedsScraper {
                 .findFirst()
                 .orElse( matches.get( 0 ) );
         return Optional.of( preferred.get( "id" ).getAsString() );
+    }
+
+    /**
+     * Finds a tax ID whose English {@code name_langs.en} equals {@code exactName} exactly.
+     */
+    public static Optional<String> findTaxIdByExactEnglishName( JsonObject propertyContent, String exactName ) {
+        if ( propertyContent == null || false == propertyContent.has( "taxes" ) || exactName == null ) {
+            return Optional.empty();
+        }
+        return StreamSupport.stream( propertyContent.get( "taxes" ).getAsJsonArray().spliterator(), false )
+                .map( JsonElement::getAsJsonObject )
+                .filter( tax -> tax.has( "name_langs" )
+                        && tax.get( "name_langs" ).getAsJsonObject().has( "en" )
+                        && tax.has( "id" ) )
+                .filter( tax -> exactName.equals(
+                        tax.get( "name_langs" ).getAsJsonObject().get( "en" ).getAsString() ) )
+                .map( tax -> tax.get( "id" ).getAsString() )
+                .findFirst();
     }
 
     /**
@@ -696,7 +724,7 @@ public class CloudbedsScraper {
         return voided;
     }
 
-    private void voidVisitorLevyTransaction( WebClient webClient, String reservationId, TransactionRecord txn )
+    public void voidVisitorLevyTransaction( WebClient webClient, String reservationId, TransactionRecord txn )
             throws IOException {
         if ( "adjustment".equalsIgnoreCase( txn.getType() ) ) {
             voidAdjustment( webClient, reservationId, txn.getId() );
@@ -727,6 +755,43 @@ public class CloudbedsScraper {
         result.addAll( adjustments );
         result.addAll( taxes );
         return result;
+    }
+
+    /**
+     * Returns voidable tax/adjustment folio lines whose description equals {@code exactDescription}
+     * (adjustments before tax charges).
+     */
+    public static List<TransactionRecord> listVoidableTransactionsWithDescription( List<TransactionRecord> records,
+            String exactDescription ) {
+        List<TransactionRecord> adjustments = new ArrayList<>();
+        List<TransactionRecord> taxes = new ArrayList<>();
+        for ( TransactionRecord record : records ) {
+            if ( false == isVoidableTransactionWithDescription( record, exactDescription ) ) {
+                continue;
+            }
+            if ( "adjustment".equalsIgnoreCase( record.getType() ) ) {
+                adjustments.add( record );
+            }
+            else if ( "tax".equalsIgnoreCase( record.getType() ) ) {
+                taxes.add( record );
+            }
+        }
+        List<TransactionRecord> result = new ArrayList<>( adjustments.size() + taxes.size() );
+        result.addAll( adjustments );
+        result.addAll( taxes );
+        return result;
+    }
+
+    private static boolean isVoidableTransactionWithDescription( TransactionRecord record,
+            String exactDescription ) {
+        if ( record == null || record.isVoided() || false == record.isVoidable() ) {
+            return false;
+        }
+        if ( exactDescription == null || false == exactDescription.equals( record.getDescription() ) ) {
+            return false;
+        }
+        String type = record.getType();
+        return "adjustment".equalsIgnoreCase( type ) || "tax".equalsIgnoreCase( type );
     }
 
     /**

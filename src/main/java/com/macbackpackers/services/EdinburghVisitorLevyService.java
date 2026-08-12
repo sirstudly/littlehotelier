@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import com.google.gson.Gson;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.cloudbedsws.CloudbedsCalendarEvent;
@@ -226,6 +227,84 @@ public class EdinburghVisitorLevyService {
         }
 
         applyVisitorLevyAdjustment( webClient, reservation, assessment );
+    }
+
+    /**
+     * Returns bookings in the given checkin-date range (all statuses) that have at least one
+     * voidable folio line labeled exactly {@link EdinburghVisitorLevyCalculator#LEGACY_EXCLUSIVE_LABEL}.
+     */
+    public List<Customer> findReservationsWithLegacyEvlFolioLines( WebClient webClient,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
+        List<Customer> results = new ArrayList<>();
+        for ( Customer customer : cloudbedsScraper.getReservations( webClient,
+                null, null, checkinDateStart, checkinDateEnd, null, null,
+                null, null, ALL_STATUSES ) ) {
+            if ( hasVoidableLegacyEvlFolioLines( webClient, customer.getId() ) ) {
+                results.add( customer );
+            }
+        }
+        return results;
+    }
+
+    /**
+     * True when the reservation has at least one voidable tax/adjustment folio line labeled
+     * exactly {@link EdinburghVisitorLevyCalculator#LEGACY_EXCLUSIVE_LABEL}.
+     */
+    public boolean hasVoidableLegacyEvlFolioLines( WebClient webClient, String reservationId )
+            throws IOException {
+        return false == listVoidableLegacyEvlFolioLines( webClient, reservationId ).isEmpty();
+    }
+
+    private List<TransactionRecord> listVoidableLegacyEvlFolioLines( WebClient webClient, String reservationId )
+            throws IOException {
+        return CloudbedsScraper.listVoidableTransactionsWithDescription(
+                cloudbedsScraper.getTransactionsByReservation( webClient, reservationId ),
+                EdinburghVisitorLevyCalculator.LEGACY_EXCLUSIVE_LABEL );
+    }
+
+    /**
+     * Voids voidable folio lines labeled exactly {@link EdinburghVisitorLevyCalculator#LEGACY_EXCLUSIVE_LABEL}
+     * and re-posts each line's amount under {@link EdinburghVisitorLevyCalculator#GENERIC_EXCLUSIVE_LABEL}.
+     */
+    public synchronized void voidAndResubmitLegacyEvlFolio( WebClient webClient, String reservationId )
+            throws IOException {
+        List<TransactionRecord> legacyLines = listVoidableLegacyEvlFolioLines( webClient, reservationId );
+
+        if ( legacyLines.isEmpty() ) {
+            LOGGER.info( "No voidable legacy EVL folio lines on reservation {}", reservationId );
+            return;
+        }
+
+        String targetTaxId = cloudbedsScraper.resolveTaxIdByExactEnglishName( webClient,
+                EdinburghVisitorLevyCalculator.GENERIC_EXCLUSIVE_LABEL );
+        LOGGER.info( "Migrating {} legacy EVL folio line(s) on reservation {} to tax ID {}",
+                legacyLines.size(), reservationId, targetTaxId );
+
+        final String migrationNote = "Legacy " + EdinburghVisitorLevyCalculator.LEGACY_EXCLUSIVE_LABEL + " migration";
+        for ( TransactionRecord txn : legacyLines ) {
+            BigDecimal amount = txn.getVisitorLevyContribution();
+            String type = txn.getType();
+            cloudbedsScraper.voidVisitorLevyTransaction( webClient, reservationId, txn );
+
+            if ( amount.compareTo( BigDecimal.ZERO ) == 0 ) {
+                LOGGER.info( "Skipped resubmit of zero-amount {} line {} on reservation {}",
+                        type, txn.getId(), reservationId );
+                continue;
+            }
+
+            Reservation reservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+
+            if ( "adjustment".equalsIgnoreCase( type ) ) {
+                // Cloudbeds add_new_adjust takes a positive amount that reduces the tax (negative folio credit)
+                cloudbedsScraper.adjustVisitorLevyCharge( webClient, reservation, targetTaxId,
+                        amount.abs(), migrationNote );
+            }
+            else {
+                cloudbedsScraper.addVisitorLevyCharge( webClient, reservation, targetTaxId, amount.abs() );
+            }
+            LOGGER.info( "Resubmitted {} {} under {} on reservation {}",
+                    type, amount, EdinburghVisitorLevyCalculator.GENERIC_EXCLUSIVE_LABEL, reservationId );
+        }
     }
 
     private void processCanceledOrNoShowVisitorLevy( WebClient webClient, Reservation reservation,

@@ -26,6 +26,12 @@ public final class EdinburghVisitorLevyCalculator {
     private static final String VISITOR_LEVY_LABEL_MARKER = "edinburgh visitor levy";
     private static final String INCLUSIVE_LABEL_MARKER = "inclusive";
 
+    /** Exclusive EVL tax name used before the generic rename (folio lines to migrate away from). */
+    public static final String LEGACY_EXCLUSIVE_LABEL = "Edinburgh Visitor Levy 2026";
+
+    /** Generic exclusive EVL tax name to post migrated folio lines under. */
+    public static final String GENERIC_EXCLUSIVE_LABEL = "Edinburgh Visitor Levy";
+
     private static final BigDecimal LEVY_RATE = new BigDecimal( "0.05" );
     private static final BigDecimal BDC_INCLUSIVE_LEVY_RATE = new BigDecimal( "0.06" );
     private static final BigDecimal ROOM_VAT_RATE = new BigDecimal( "0.20" );

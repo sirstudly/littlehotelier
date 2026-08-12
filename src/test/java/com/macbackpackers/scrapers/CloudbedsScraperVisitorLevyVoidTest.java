@@ -162,6 +162,43 @@ public class CloudbedsScraperVisitorLevyVoidTest {
         assertThat( CloudbedsScraper.findVisitorLevyTaxId( propertyContent, true ).get(), is( "incl" ) );
     }
 
+    @Test
+    public void listVoidableTransactionsWithDescription_includesExactLabelOnly() {
+        TransactionRecord matchingAdj = evlTransaction( "adj-1", "adjustment", EXCLUSIVE_LABEL, false, true );
+        TransactionRecord matchingTax = evlTransaction( "tax-1", "tax", EXCLUSIVE_LABEL, false, true );
+        TransactionRecord inclusive = evlTransaction( "inc-1", "tax",
+                "Edinburgh Visitor Levy 2026 (Inclusive)", false, true );
+        TransactionRecord before = evlTransaction( "before-1", "tax",
+                "Edinburgh Visitor Levy 2026 (Before 05/07/2026 12:51 PM)", false, true );
+        TransactionRecord bare = evlTransaction( "bare-1", "tax", "Edinburgh Visitor Levy", false, true );
+        TransactionRecord voided = evlTransaction( "voided", "tax", EXCLUSIVE_LABEL, true, true );
+        TransactionRecord locked = evlTransaction( "locked", "tax", EXCLUSIVE_LABEL, false, false );
+
+        List<TransactionRecord> voidable = CloudbedsScraper.listVoidableTransactionsWithDescription(
+                Arrays.asList( matchingTax, inclusive, before, bare, voided, locked, matchingAdj ),
+                EXCLUSIVE_LABEL );
+
+        assertThat( voidable.size(), is( 2 ) );
+        assertThat( voidable.get( 0 ).getId(), is( "adj-1" ) );
+        assertThat( voidable.get( 1 ).getId(), is( "tax-1" ) );
+    }
+
+    @Test
+    public void findTaxIdByExactEnglishName_resolvesGenericLabelOnly() {
+        JsonObject propertyContent = propertyContentWithTaxes(
+                tax( "legacy", "Edinburgh Visitor Levy 2026" ),
+                tax( "before", "Edinburgh Visitor Levy (Before 07/06/2026 03:43 PM)" ),
+                tax( "generic", "Edinburgh Visitor Levy" ),
+                tax( "incl", "Edinburgh Visitor Levy 2026 (Inclusive)" ) );
+
+        assertThat( CloudbedsScraper.findTaxIdByExactEnglishName(
+                propertyContent, "Edinburgh Visitor Levy" ).get(), is( "generic" ) );
+        assertThat( CloudbedsScraper.findTaxIdByExactEnglishName(
+                propertyContent, "Edinburgh Visitor Levy 2026" ).get(), is( "legacy" ) );
+        assertThat( CloudbedsScraper.findTaxIdByExactEnglishName(
+                propertyContent, "Missing Tax" ).isPresent(), is( false ) );
+    }
+
     private static JsonObject propertyContentWithTaxes( JsonObject... taxes ) {
         JsonObject propertyContent = new JsonObject();
         JsonArray taxArray = new JsonArray();
