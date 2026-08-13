@@ -50,7 +50,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -461,63 +460,78 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .executeUpdate();
     }
 
+    /**
+     * SQL CASE matching {@link AbstractJob#getPriority()} overrides (lower runs first).
+     * Keep in sync with job subclasses that override getPriority().
+     */
+    static final String JOB_PRIORITY_SQL_CASE =
+            "CASE j.`classname` "
+                    + "WHEN 'com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob' THEN -1 "
+                    + "WHEN 'com.macbackpackers.jobs.CloudbedsAllocationScraperWorkerJob' THEN 99 "
+                    + "WHEN 'com.macbackpackers.jobs.CreateAllocationScraperReportsJob' THEN 99 "
+                    + "ELSE 0 END";
+
     @Override
     public synchronized AbstractJob getNextJobToProcess() {
         // include any jobs that have been tagged as processing by us
         // (since there should only ever be 1 unique one; we'll be re-running these jobs)
         String thisProcessorId = getUniqueProcessorId();
         LOGGER.info( "Getting next job for " + thisProcessorId );
-        List<Integer> jobIds = em
-                .createQuery( "SELECT id FROM AbstractJob "
-                        + "     WHERE status IN (:submittedStatus, :retryStatus) "
-                        + "        OR (status = :processingStatus AND processedBy = :processedBy)"
-                        + "     ORDER BY id",
-                        Integer.class )
-                .setParameter( "submittedStatus", JobStatus.submitted )
-                .setParameter( "processingStatus", JobStatus.processing )
-                .setParameter( "retryStatus", JobStatus.retry )
-                // processedBy includes name of current thread
-                // if we terminated the job prematurely (and are now re-running it)
-                // this will eventually be picked up by the same thread and be run again
+
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        abortJobsWithFailedOrAbortedParents( now );
+
+        // Single eligible job by priority then id — avoid N+1 fetch of the entire submitted queue
+        @SuppressWarnings( "unchecked" )
+        List<Number> jobIds = em.createNativeQuery(
+                "SELECT j.`job_id` FROM `wp_lh_jobs` j "
+                        + " WHERE (j.`status` IN ('submitted', 'retry') "
+                        + "        OR (j.`status` = 'processing' AND j.`processed_by` = :processedBy))"
+                        + "   AND NOT EXISTS ("
+                        + "         SELECT 1 FROM `wp_lh_job_dependency` d "
+                        + "           JOIN `wp_lh_jobs` p ON p.`job_id` = d.`depends_on_job_id` "
+                        + "          WHERE d.`job_id` = j.`job_id` "
+                        + "            AND p.`status` IN ('submitted', 'retry', 'processing')"
+                        + "       )"
+                        + " ORDER BY " + JOB_PRIORITY_SQL_CASE + ", j.`job_id`" )
                 .setParameter( "processedBy", thisProcessorId )
+                .setMaxResults( 1 )
                 .getResultList();
 
-        // Sort by AbstractJob.getPriority() (lower first), then id — priority lives on the job class
-        List<AbstractJob> jobs = jobIds.stream()
-                .map( this::fetchJobById )
-                .sorted( Comparator.comparingInt( AbstractJob::getPriority )
-                        .thenComparingInt( AbstractJob::getId ) )
-                .collect( Collectors.toList() );
-
-        forAllJobs: for ( AbstractJob job : jobs ) {
-            // first check that all dependent jobs have completed successfully
-            for ( Job dependentJob : job.getDependentJobs() ) {
-                switch ( dependentJob.getStatus() ) {
-                    case submitted:
-                    case retry:
-                    case processing:
-                        continue forAllJobs; // need to wait until parent job finishes
-                    case failed:
-                    case aborted:
-                        // parent job failed/aborted so we abort this job and continue looking...
-                        job.setStatus( JobStatus.aborted );
-                        continue forAllJobs;
-                    default: // (completed)
-                        // ok; just check remaining dependent jobs
-                }
-            }
-
-            LOGGER.debug( "Attempting to lock job " + job.getId() );
-            Timestamp now = new Timestamp( System.currentTimeMillis() );
-            job.setStatus( JobStatus.processing );
-            job.setJobStartDate( now );
-            job.setJobEndDate( null );
-            job.setProcessedBy( thisProcessorId );
-            job.setLastUpdatedDate( now );
-            return job; // all dependent jobs are completed; this is the one 
+        if ( jobIds.isEmpty() ) {
+            LOGGER.info( "No more jobs to process..." );
+            return null;
         }
-        LOGGER.info( "No more jobs to process..." );
-        return null; // we couldn't find a job to process
+
+        AbstractJob job = fetchJobById( jobIds.get( 0 ).intValue() );
+        LOGGER.debug( "Attempting to lock job " + job.getId() );
+        job.setStatus( JobStatus.processing );
+        job.setJobStartDate( now );
+        job.setJobEndDate( null );
+        job.setProcessedBy( thisProcessorId );
+        job.setLastUpdatedDate( now );
+        return job;
+    }
+
+    /**
+     * Marks submitted/retry jobs as aborted when any dependency parent has failed or been aborted.
+     */
+    private void abortJobsWithFailedOrAbortedParents( Timestamp now ) {
+        int aborted = em.createNativeQuery(
+                "UPDATE `wp_lh_jobs` j "
+                        + "   SET j.`status` = 'aborted', j.`last_updated_date` = :now "
+                        + " WHERE j.`status` IN ('submitted', 'retry') "
+                        + "   AND EXISTS ("
+                        + "         SELECT 1 FROM `wp_lh_job_dependency` d "
+                        + "           JOIN `wp_lh_jobs` p ON p.`job_id` = d.`depends_on_job_id` "
+                        + "          WHERE d.`job_id` = j.`job_id` "
+                        + "            AND p.`status` IN ('failed', 'aborted')"
+                        + "       )" )
+                .setParameter( "now", now )
+                .executeUpdate();
+        if ( aborted > 0 ) {
+            LOGGER.info( "Aborted {} job(s) whose dependency parents failed or were aborted", aborted );
+        }
     }
 
     @Override

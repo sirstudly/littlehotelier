@@ -74,6 +74,9 @@ public class ProcessorService {
 
     private volatile Thread loopThread;
 
+    /** Serializes remote log copies without blocking job claim/process workers. */
+    private volatile ExecutorService logCopyExecutor;
+
     /**
      * Requests a graceful shutdown: stop claiming new jobs, finish in-flight work, then exit the
      * processing loop.
@@ -106,6 +109,7 @@ public class ProcessorService {
             return;
         }
 
+        ensureLogCopyExecutor();
         ExecutorService executor = Executors.newFixedThreadPool( threadCount );
         for ( int i = 0 ; i < threadCount ; i++ ) {
             executor.execute( new JobProcessorThread( this, false ) );
@@ -125,6 +129,9 @@ public class ProcessorService {
         catch ( InterruptedException e ) {
             Thread.currentThread().interrupt();
             LOGGER.warn( "Interrupted while waiting for batch workers to finish" );
+        }
+        finally {
+            drainLogCopyExecutor();
         }
     }
 
@@ -225,6 +232,7 @@ public class ProcessorService {
      */
     public void processJobsLoopIndefinitely() {
         loopThread = Thread.currentThread();
+        ensureLogCopyExecutor();
         ExecutorService executor = Executors.newFixedThreadPool( threadCount );
         for ( int i = 0 ; i < threadCount ; i++ ) {
             executor.execute( new JobProcessorThread( this, true ) );
@@ -289,6 +297,9 @@ public class ProcessorService {
                 executor.shutdownNow();
                 Thread.currentThread().interrupt();
             }
+            finally {
+                drainLogCopyExecutor();
+            }
         }
     }
 
@@ -346,10 +357,7 @@ public class ProcessorService {
         }
         finally {
             try {
-                copyJobLogToRemoteHost( job.getId() );
-            }
-            catch ( Throwable th ) {
-                LOGGER.error( "Failed to copy log for job " + job.getId(), th );
+                scheduleJobLogCopy( job.getId() );
             }
             finally {
                 MDC.remove( "jobId" );
@@ -380,14 +388,78 @@ public class ProcessorService {
     }
 
     /**
+     * Queues remote log copy on a dedicated single-thread executor so workers can claim the next
+     * job without waiting on gzip/scp. Copies remain serialized (one at a time).
+     *
+     * @param jobId ID of the job whose log should be copied
+     */
+    void scheduleJobLogCopy( int jobId ) {
+        ensureLogCopyExecutor();
+        logCopyExecutor.execute( () -> {
+            MDC.put( "jobId", String.valueOf( jobId ) );
+            try {
+                copyJobLogToRemoteHost( jobId );
+            }
+            catch ( Throwable th ) {
+                LOGGER.error( "Failed to copy log for job " + jobId, th );
+            }
+            finally {
+                MDC.remove( "jobId" );
+            }
+        } );
+    }
+
+    private void ensureLogCopyExecutor() {
+        ExecutorService existing = logCopyExecutor;
+        if ( existing != null && !existing.isShutdown() ) {
+            return;
+        }
+        synchronized ( this ) {
+            if ( logCopyExecutor == null || logCopyExecutor.isShutdown() ) {
+                logCopyExecutor = Executors.newSingleThreadExecutor( r -> {
+                    Thread t = new Thread( r, "job-log-copy" );
+                    t.setDaemon( true );
+                    return t;
+                } );
+            }
+        }
+    }
+
+    /**
+     * Stops accepting new log copies and waits for in-flight gzip/scp work to finish.
+     */
+    void drainLogCopyExecutor() {
+        ExecutorService executor = logCopyExecutor;
+        if ( executor == null ) {
+            return;
+        }
+        LOGGER.info( "Draining job log copy executor..." );
+        executor.shutdown();
+        try {
+            if ( !executor.awaitTermination( 1, TimeUnit.MINUTES ) ) {
+                LOGGER.warn( "Log copies still running after 1 minute; forcing shutdown" );
+                executor.shutdownNow();
+            }
+            else {
+                LOGGER.info( "Job log copy executor drained" );
+            }
+        }
+        catch ( InterruptedException e ) {
+            LOGGER.warn( "Interrupted while draining log copy executor; forcing shutdown" );
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
      * Copies the log file from this host to the remote host in {@code destinationLogLocation}.
-     * Synchronized so only one copy job to take place at a time system-wide.
-     * 
+     * Invoked only from the log-copy executor so scp work does not block job claiming.
+     *
      * @param jobId ID of the job to copy
      * @throws InterruptedException on process timeout
      * @throws IOException on copy error
      */
-    private synchronized void copyJobLogToRemoteHost( int jobId ) throws InterruptedException, IOException {
+    private void copyJobLogToRemoteHost( int jobId ) throws InterruptedException, IOException {
 
         String destinationLogLocation = dao.getOption( "hbo_processor_copy_job_log_to" );
         if ( StringUtils.isNotBlank( destinationLogLocation ) ) {
