@@ -62,12 +62,12 @@ public abstract class AbstractJob extends Job {
 
     /**
      * Queue priority when selecting the next job to process. Lower values run first.
-     * Override in subclasses to promote or demote relative to the default.
+     * Defined in {@link JobPriorities} (also used by claim SQL).
      *
      * @return priority (default {@code 0})
      */
     public int getPriority() {
-        return 0;
+        return JobPriorities.forClass( getClass() );
     }
 
     /**

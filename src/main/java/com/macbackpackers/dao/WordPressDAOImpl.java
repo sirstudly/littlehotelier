@@ -25,6 +25,7 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob;
+import com.macbackpackers.jobs.JobPriorities;
 import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringEscapeUtils;
@@ -461,17 +462,6 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .executeUpdate();
     }
 
-    /**
-     * SQL CASE matching {@link AbstractJob#getPriority()} overrides (lower runs first).
-     * Keep in sync with job subclasses that override getPriority().
-     */
-    static final String JOB_PRIORITY_SQL_CASE =
-            "CASE j.`classname` "
-                    + "WHEN 'com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob' THEN -1 "
-                    + "WHEN 'com.macbackpackers.jobs.CloudbedsAllocationScraperWorkerJob' THEN 99 "
-                    + "WHEN 'com.macbackpackers.jobs.CreateAllocationScraperReportsJob' THEN 99 "
-                    + "ELSE 0 END";
-
     @Override
     public synchronized AbstractJob getNextJobToProcess() {
         // include any jobs that have been tagged as processing by us
@@ -494,7 +484,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "          WHERE d.`job_id` = j.`job_id` "
                         + "            AND p.`status` IN ('submitted', 'retry', 'processing')"
                         + "       )"
-                        + " ORDER BY " + JOB_PRIORITY_SQL_CASE + ", j.`job_id`" )
+                        + " ORDER BY " + JobPriorities.sqlCaseExpression( "j.`classname`" ) + ", j.`job_id`" )
                 .setParameter( "processedBy", thisProcessorId )
                 .setMaxResults( 1 )
                 .getResultList();

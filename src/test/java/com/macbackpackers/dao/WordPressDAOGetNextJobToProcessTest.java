@@ -31,6 +31,7 @@ import com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob;
 import com.macbackpackers.jobs.CloudbedsAllocationScraperWorkerJob;
 import com.macbackpackers.jobs.CreateAllocationScraperReportsJob;
 import com.macbackpackers.jobs.HousekeepingJob;
+import com.macbackpackers.jobs.JobPriorities;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
@@ -66,14 +67,22 @@ public class WordPressDAOGetNextJobToProcessTest {
 
     @Test
     public void prioritySqlCaseMatchesJavaPriorityOverrides() {
-        String sqlCase = WordPressDAOImpl.JOB_PRIORITY_SQL_CASE;
+        String sqlCase = JobPriorities.sqlCaseExpression( "j.`classname`" );
         assertTrue( sqlCase.contains( CalculateEdinburghVisitorLevyForBookingJob.class.getName() ) );
         assertTrue( sqlCase.contains( CloudbedsAllocationScraperWorkerJob.class.getName() ) );
         assertTrue( sqlCase.contains( CreateAllocationScraperReportsJob.class.getName() ) );
+        assertEquals( JobPriorities.forClass( CalculateEdinburghVisitorLevyForBookingJob.class ),
+                new CalculateEdinburghVisitorLevyForBookingJob().getPriority() );
+        assertEquals( JobPriorities.forClass( CloudbedsAllocationScraperWorkerJob.class ),
+                new CloudbedsAllocationScraperWorkerJob().getPriority() );
+        assertEquals( JobPriorities.forClass( CreateAllocationScraperReportsJob.class ),
+                new CreateAllocationScraperReportsJob().getPriority() );
         assertEquals( -1, new CalculateEdinburghVisitorLevyForBookingJob().getPriority() );
         assertEquals( 99, new CloudbedsAllocationScraperWorkerJob().getPriority() );
         assertEquals( 99, new CreateAllocationScraperReportsJob().getPriority() );
         assertEquals( 0, new HousekeepingJob().getPriority() );
+        assertTrue( sqlCase.contains( "THEN -1" ) );
+        assertTrue( sqlCase.contains( "THEN 99" ) );
     }
 
     @Test
