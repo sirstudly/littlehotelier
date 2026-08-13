@@ -10,7 +10,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
@@ -36,7 +35,6 @@ public class CreateCalculateEdinburghVisitorLevyForBookingJob extends AbstractJo
     private EdinburghVisitorLevyService edinburghVisitorLevyService;
 
     @Override
-    @Transactional
     public void processJob() throws Exception {
         if ( false == dao.isCloudbeds() ) {
             return;
@@ -48,6 +46,8 @@ public class CreateCalculateEdinburghVisitorLevyForBookingJob extends AbstractJo
         LocalDate checkinDateEnd = getCheckinDateEnd();
         validateDateRanges( bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd );
 
+        // No outer @Transactional: each insertJob commits via WordPressDAO so child jobs
+        // become visible to other processors as soon as a mismatch is discovered.
         edinburghVisitorLevyService.findReservationsRequiringVisitorLevyAdjustment(
                 cbWebClient, bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd )
                 .forEach( entry -> createCalculateJob( entry.getCustomer() ) );

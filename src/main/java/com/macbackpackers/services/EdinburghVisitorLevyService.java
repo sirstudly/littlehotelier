@@ -2,6 +2,7 @@
 package com.macbackpackers.services;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -9,6 +10,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
+import java.util.stream.Stream;
 
 import org.htmlunit.WebClient;
 import org.slf4j.Logger;
@@ -18,6 +21,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.google.common.util.concurrent.Striped;
 import com.google.gson.Gson;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
@@ -34,6 +38,9 @@ public class EdinburghVisitorLevyService {
     private static final String ALL_STATUSES = null;
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+
+    /** Serializes folio mutations per reservation so different bookings can run in parallel. */
+    private final Striped<Lock> reservationLocks = Striped.lock( 64 );
 
     @Autowired
     private CloudbedsScraper cloudbedsScraper;
@@ -111,39 +118,44 @@ public class EdinburghVisitorLevyService {
      * Returns bookings matching the given booking-date and/or checkin-date range that are
      * potentially levy-eligible and whose folio EVL differs from the calculated amount
      * (outside tolerance). When both ranges are set, Cloudbeds applies both filters (AND).
+     * <p>
+     * Assessments are performed lazily as the stream is consumed (one-shot; do not reuse).
+     * I/O failures during assessment are wrapped in {@link UncheckedIOException}.
      */
-    public List<CustomerLevyAssessment> findReservationsRequiringVisitorLevyAdjustment( WebClient webClient,
+    public Stream<CustomerLevyAssessment> findReservationsRequiringVisitorLevyAdjustment( WebClient webClient,
             LocalDate bookingDateStart, LocalDate bookingDateEnd,
             LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
-        List<CustomerLevyAssessment> results = new ArrayList<>();
-        for ( CustomerLevyAssessment entry : assessReservationsInDateRange(
-                webClient, bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd ) ) {
-            if ( entry.getAssessment().needsAdjustment() ) {
-                results.add( entry );
-            }
-        }
-        return results;
+        return assessReservationsInDateRange(
+                webClient, bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd )
+                .filter( entry -> entry.getAssessment().needsAdjustment() );
     }
 
     /**
      * Assesses visitor levy for all potentially eligible bookings matching the given booking-date
      * and/or checkin-date range (all reservation statuses, including canceled and no_show).
      * When both ranges are set, Cloudbeds applies both filters (AND).
+     * <p>
+     * Assessments are performed lazily as the stream is consumed (one-shot; do not reuse).
+     * I/O failures during assessment are wrapped in {@link UncheckedIOException}.
      */
-    public List<CustomerLevyAssessment> assessReservationsInDateRange( WebClient webClient,
+    public Stream<CustomerLevyAssessment> assessReservationsInDateRange( WebClient webClient,
             LocalDate bookingDateStart, LocalDate bookingDateEnd,
             LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
-        List<CustomerLevyAssessment> results = new ArrayList<>();
-        for ( Customer customer : cloudbedsScraper.getReservations( webClient,
+        return cloudbedsScraper.getReservations( webClient,
                 null, null, checkinDateStart, checkinDateEnd, null, null,
-                bookingDateStart, bookingDateEnd, ALL_STATUSES ) ) {
-            if ( false == isPotentiallyEligible( customer ) ) {
-                continue;
-            }
-            LevyAssessment assessment = assessVisitorLevyForBooking( webClient, customer.getId() );
-            results.add( new CustomerLevyAssessment( customer, assessment ) );
-        }
-        return results;
+                bookingDateStart, bookingDateEnd, ALL_STATUSES )
+                .stream()
+                .filter( this::isPotentiallyEligible )
+                .map( customer -> {
+                    try {
+                        LevyAssessment assessment = assessVisitorLevyForBooking( webClient, customer.getId() );
+                        return new CustomerLevyAssessment( customer, assessment );
+                    }
+                    catch ( IOException e ) {
+                        throw new UncheckedIOException(
+                                "Failed assessing visitor levy for reservation " + customer.getId(), e );
+                    }
+                } );
     }
 
     /**
@@ -204,7 +216,11 @@ public class EdinburghVisitorLevyService {
         return new LevyAssessment( reservation.getReservationId(), calculation, currentLevy, expectedLevy, delta );
     }
 
-    public synchronized void processVisitorLevyForBooking( WebClient webClient, String reservationId ) throws IOException {
+    public void processVisitorLevyForBooking( WebClient webClient, String reservationId ) throws IOException {
+        withReservationLock( reservationId, () -> processVisitorLevyForBookingLocked( webClient, reservationId ) );
+    }
+
+    private void processVisitorLevyForBookingLocked( WebClient webClient, String reservationId ) throws IOException {
         if ( false == evlEnabled ) {
             LOGGER.info( "Skipping visitor levy for reservation {} (evl.enabled=false)", reservationId );
             return;
@@ -266,7 +282,12 @@ public class EdinburghVisitorLevyService {
      * Voids voidable folio lines labeled exactly {@link EdinburghVisitorLevyCalculator#LEGACY_EXCLUSIVE_LABEL}
      * and re-posts each line's amount under {@link EdinburghVisitorLevyCalculator#GENERIC_EXCLUSIVE_LABEL}.
      */
-    public synchronized void voidAndResubmitLegacyEvlFolio( WebClient webClient, String reservationId )
+    public void voidAndResubmitLegacyEvlFolio( WebClient webClient, String reservationId )
+            throws IOException {
+        withReservationLock( reservationId, () -> voidAndResubmitLegacyEvlFolioLocked( webClient, reservationId ) );
+    }
+
+    private void voidAndResubmitLegacyEvlFolioLocked( WebClient webClient, String reservationId )
             throws IOException {
         List<TransactionRecord> legacyLines = listVoidableLegacyEvlFolioLines( webClient, reservationId );
 
@@ -304,6 +325,22 @@ public class EdinburghVisitorLevyService {
             }
             LOGGER.info( "Resubmitted {} {} under {} on reservation {}",
                     type, amount, EdinburghVisitorLevyCalculator.GENERIC_EXCLUSIVE_LABEL, reservationId );
+        }
+    }
+
+    @FunctionalInterface
+    private interface ReservationLockWork {
+        void run() throws IOException;
+    }
+
+    private void withReservationLock( String reservationId, ReservationLockWork work ) throws IOException {
+        Lock lock = reservationLocks.get( reservationId );
+        lock.lock();
+        try {
+            work.run();
+        }
+        finally {
+            lock.unlock();
         }
     }
 

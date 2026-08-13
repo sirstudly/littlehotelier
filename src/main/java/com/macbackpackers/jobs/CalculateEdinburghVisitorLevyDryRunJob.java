@@ -1,6 +1,7 @@
 package com.macbackpackers.jobs;
 
 import java.time.LocalDate;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
@@ -45,21 +46,22 @@ public class CalculateEdinburghVisitorLevyDryRunJob extends AbstractJob {
         LocalDate checkinDateEnd = getCheckinDateEnd();
         validateDateRanges( bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd );
 
-        int needingAdjustment = 0;
-        int checked = 0;
+        AtomicInteger needingAdjustment = new AtomicInteger();
+        AtomicInteger checked = new AtomicInteger();
 
-        for ( EdinburghVisitorLevyService.CustomerLevyAssessment entry
-                : edinburghVisitorLevyService.assessReservationsInDateRange(
-                cbWebClient, bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd ) ) {
-            edinburghVisitorLevyService.logDryRunAssessment( entry.getCustomer(), entry.getAssessment() );
-            checked++;
-            if ( entry.getAssessment().needsAdjustment() ) {
-                needingAdjustment++;
-            }
-        }
+        edinburghVisitorLevyService.assessReservationsInDateRange(
+                cbWebClient, bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd )
+                .forEach( entry -> {
+                    edinburghVisitorLevyService.logDryRunAssessment( entry.getCustomer(), entry.getAssessment() );
+                    checked.incrementAndGet();
+                    if ( entry.getAssessment().needsAdjustment() ) {
+                        needingAdjustment.incrementAndGet();
+                    }
+                } );
 
         LOGGER.info( "Visitor levy dry run booking {} to {}, checkin {} to {}: {} reservations checked, {} need adjustment",
-                bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd, checked, needingAdjustment );
+                bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd,
+                checked.get(), needingAdjustment.get() );
     }
 
     private static void validateDateRanges( LocalDate bookingDateStart, LocalDate bookingDateEnd,
