@@ -188,7 +188,7 @@ public class PaymentProcessorService {
             LOGGER.info( ex.getMessage() );
             cloudbedsScraper.addNote( webClient, reservationId,
                     "Pending deposit of £" + cloudbedsScraper.getCurrencyFormat().format( depositAmount )
-                            + " will post automatically when customer confirms via email." );
+                            + CloudbedsScraper.NOTE_WILL_POST_AUTOMATICALLY );
         }
         catch ( RecordPaymentFailedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
@@ -479,9 +479,8 @@ public class PaymentProcessorService {
             return;
         }
 
-        final String WILL_POST_AUTOMATICALLY = " will post automatically when customer confirms via email.";
         try {
-            if ( cbReservation.containsNote( WILL_POST_AUTOMATICALLY ) ) {
+            if ( cbReservation.containsNote( CloudbedsScraper.NOTE_WILL_POST_AUTOMATICALLY ) ) {
                 LOGGER.info( "We've already been thru this before; yet there is still a balance owing..." );
                 throw new RecordPaymentFailedException( "Payment previously attempted but was never charged successfully..." );
             }
@@ -517,7 +516,7 @@ public class PaymentProcessorService {
             LOGGER.info( ex.getMessage() );
             cloudbedsScraper.addNote( webClient, reservationId,
                     "Non-refundable amount of £" + cloudbedsScraper.getCurrencyFormat().format( amountToCharge )
-                            + WILL_POST_AUTOMATICALLY );
+                            + CloudbedsScraper.NOTE_WILL_POST_AUTOMATICALLY );
         }
         catch ( RecordPaymentFailedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );

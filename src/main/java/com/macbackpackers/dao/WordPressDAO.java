@@ -204,6 +204,14 @@ public interface WordPressDAO {
             String reservationId );
 
     /**
+     * Returns true if a pending {@code ArchiveAllTransactionNotesJob} already exists for the given
+     * reservation (status {@code submitted}, {@code processing}, or {@code retry}).
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    boolean hasArchiveAllTransactionNotesJobForReservation( String reservationId );
+
+    /**
      * Returns the number of jobs at 'submitted' or 'processing'.
      * 
      * @return number of jobs

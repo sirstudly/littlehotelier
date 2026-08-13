@@ -104,6 +104,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
 import static com.macbackpackers.jobs.HostelworldReportPaymentIssueJob.REPORTED_CARD_PAYMENT_ISSUE_NOTE;
+import static com.macbackpackers.scrapers.CloudbedsScraper.NOTE_WILL_POST_AUTOMATICALLY;
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED;
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER;
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED;
@@ -1139,7 +1140,8 @@ public class CloudbedsService {
                             || n.getNotes().contains( TEMPLATE_DEPOSIT_CHARGE_DECLINED + " email sent." )
                             || n.getNotes().contains( TEMPLATE_PAYMENT_LINK + " email sent." )
                             || n.getNotes().contains( TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER + " email sent." )
-                            || n.getNotes().contains( REPORTED_CARD_PAYMENT_ISSUE_NOTE ) )
+                            || n.getNotes().contains( REPORTED_CARD_PAYMENT_ISSUE_NOTE )
+                            || n.getNotes().contains( NOTE_WILL_POST_AUTOMATICALLY ) )
                     .forEach( n -> {
                         try {
                             LOGGER.info( "Archiving note: " + n.getNotes() );

@@ -95,7 +95,7 @@ public class CreateDepositChargeJob extends AbstractJob {
                 .filter( p -> false == p.isPrepaid() )
                 .filter( p -> false == p.isNonRefundable() ) // non-refundables are processed by CreateChargeNonRefundableBookingJob
                 .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
-                .filter( p -> false == p.containsNote( "will post automatically when customer confirms via email" ) ) // we haven't already tried to charge
+                .filter( p -> false == p.containsNote( CloudbedsScraper.NOTE_WILL_POST_AUTOMATICALLY ) ) // we haven't already tried to charge
                 .forEach( p -> {
                     LOGGER.info( "Creating a DepositChargeJob for " + p.getSourceName() + " #"
                             + p.getThirdPartyIdentifier() + " (" + p.getStatus() + ")" );

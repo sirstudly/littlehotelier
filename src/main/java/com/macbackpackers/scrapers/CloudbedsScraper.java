@@ -94,6 +94,8 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED_PREPAID = "Group Booking Approval Required PREPAID";
     public static final String TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER = "Group Booking Payment Reminder";
     public static final String TEMPLATE_GUEST_REGISTRATION_REQUEST = "Guest Registration Request";
+    /** Suffix on pending CNP notes waiting for guest email confirmation. */
+    public static final String NOTE_WILL_POST_AUTOMATICALLY = " will post automatically when customer confirms via email.";
     public static final double DEFAULT_RATE_LIMIT = 1.0; // requests per second
 
     /** Expire email template cache entries after this many minutes without access. */
