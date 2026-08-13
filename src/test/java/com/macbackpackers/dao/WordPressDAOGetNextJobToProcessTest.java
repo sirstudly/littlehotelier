@@ -55,7 +55,7 @@ public class WordPressDAOGetNextJobToProcessTest {
         setField( dao, "em", em );
         setField( dao, "processorId", "test-processor" );
 
-        when( em.createNativeQuery( contains( "SET j.`status` = 'aborted'" ) ) ).thenReturn( abortQuery );
+        when( em.createNativeQuery( contains( "SET `status` = 'aborted'" ) ) ).thenReturn( abortQuery );
         when( abortQuery.setParameter( eq( "now" ), any( Timestamp.class ) ) ).thenReturn( abortQuery );
         when( abortQuery.executeUpdate() ).thenReturn( 0 );
 
@@ -132,7 +132,8 @@ public class WordPressDAOGetNextJobToProcessTest {
         verify( em, times( 2 ) ).createNativeQuery( contains( "wp_lh_job_dependency" ) );
         verify( em ).createNativeQuery( contains( "CalculateEdinburghVisitorLevyForBookingJob" ) );
         verify( em ).createNativeQuery( contains( "NOT EXISTS" ) );
-        verify( em ).createNativeQuery( contains( "SET j.`status` = 'aborted'" ) );
+        verify( em ).createNativeQuery( contains( "SET `status` = 'aborted'" ) );
+        verify( em ).createNativeQuery( contains( "AS doomed" ) );
     }
 
     private static void setField( Object target, String name, Object value ) throws Exception {

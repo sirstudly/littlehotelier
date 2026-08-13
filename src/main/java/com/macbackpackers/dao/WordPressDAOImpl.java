@@ -515,17 +515,21 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     /**
      * Marks submitted/retry jobs as aborted when any dependency parent has failed or been aborted.
+     * Uses a derived-table subquery so MySQL 5.5 allows updating {@code wp_lh_jobs} while reading it
+     * ("You can't specify target table for update in FROM clause").
      */
     private void abortJobsWithFailedOrAbortedParents( Timestamp now ) {
         int aborted = em.createNativeQuery(
-                "UPDATE `wp_lh_jobs` j "
-                        + "   SET j.`status` = 'aborted', j.`last_updated_date` = :now "
-                        + " WHERE j.`status` IN ('submitted', 'retry') "
-                        + "   AND EXISTS ("
-                        + "         SELECT 1 FROM `wp_lh_job_dependency` d "
-                        + "           JOIN `wp_lh_jobs` p ON p.`job_id` = d.`depends_on_job_id` "
-                        + "          WHERE d.`job_id` = j.`job_id` "
-                        + "            AND p.`status` IN ('failed', 'aborted')"
+                "UPDATE `wp_lh_jobs` "
+                        + "   SET `status` = 'aborted', `last_updated_date` = :now "
+                        + " WHERE `status` IN ('submitted', 'retry') "
+                        + "   AND `job_id` IN ("
+                        + "         SELECT `job_id` FROM ("
+                        + "             SELECT DISTINCT d.`job_id` "
+                        + "               FROM `wp_lh_job_dependency` d "
+                        + "               JOIN `wp_lh_jobs` p ON p.`job_id` = d.`depends_on_job_id` "
+                        + "              WHERE p.`status` IN ('failed', 'aborted')"
+                        + "         ) AS doomed"
                         + "       )" )
                 .setParameter( "now", now )
                 .executeUpdate();
