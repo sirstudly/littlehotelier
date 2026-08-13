@@ -28,6 +28,7 @@ import com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob;
 import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringEscapeUtils;
+import org.hibernate.Hibernate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -504,6 +505,9 @@ public class WordPressDAOImpl implements WordPressDAO {
         }
 
         AbstractJob job = fetchJobById( jobIds.get( 0 ).intValue() );
+        // Claim no longer iterates dependentJobs in Java (SQL handles eligibility); initialize here
+        // so processJob() can read them after this @Transactional method returns.
+        Hibernate.initialize( job.getDependentJobs() );
         LOGGER.debug( "Attempting to lock job " + job.getId() );
         job.setStatus( JobStatus.processing );
         job.setJobStartDate( now );
