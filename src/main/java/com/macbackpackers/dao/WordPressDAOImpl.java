@@ -35,11 +35,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.jdbc.IncorrectResultSetColumnCountException;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
@@ -57,7 +62,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -74,6 +81,9 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @PersistenceContext
     private EntityManager em;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
     
     @Autowired
     @Qualifier( "reportsSQL" )
@@ -90,6 +100,11 @@ public class WordPressDAOImpl implements WordPressDAO {
     private static final Cache<String, String> WP_OPTIONS_CACHE = CacheBuilder.newBuilder()
             .expireAfterAccess( WP_OPTIONS_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES )
             .build();
+
+    /** Min interval between abort-failed-parent sweeps (claim path; reduces lock contention). */
+    private static final long ABORT_FAILED_PARENTS_MIN_INTERVAL_MS = 30_000L;
+
+    private final AtomicLong lastAbortFailedParentsAt = new AtomicLong( 0 );
 
     @Override
     public boolean isCloudbeds() {
@@ -242,9 +257,38 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    @Transactional( propagation = Propagation.NOT_SUPPORTED )
     public int insertJob( Job job ) {
-        em.persist( job );
-        return job.getId();
+        // Own short transactions per attempt so MySQL deadlocks on wp_lh_job_dependency
+        // (common under concurrent claim + insert) can be retried cleanly.
+        TransactionTemplate tt = new TransactionTemplate( transactionManager );
+        tt.setPropagationBehavior( TransactionDefinition.PROPAGATION_REQUIRES_NEW );
+        final int maxAttempts = 3;
+        for ( int attempt = 1 ; attempt <= maxAttempts ; attempt++ ) {
+            try {
+                return tt.execute( status -> {
+                    em.persist( job );
+                    em.flush();
+                    return job.getId();
+                } );
+            }
+            catch ( CannotAcquireLockException ex ) {
+                if ( attempt == maxAttempts ) {
+                    throw ex;
+                }
+                long sleepMs = 50L * attempt + ThreadLocalRandom.current().nextInt( 50 );
+                LOGGER.warn( "Deadlock inserting job (attempt {}/{}); retrying in {}ms",
+                        attempt, maxAttempts, sleepMs );
+                try {
+                    Thread.sleep( sleepMs );
+                }
+                catch ( InterruptedException ie ) {
+                    Thread.currentThread().interrupt();
+                    throw ex;
+                }
+            }
+        }
+        throw new IllegalStateException( "insertJob retry loop exited without result" );
     }
 
     @Override
@@ -487,7 +531,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         LOGGER.info( "Getting next job for " + thisProcessorId );
 
         Timestamp now = new Timestamp( System.currentTimeMillis() );
-        abortJobsWithFailedOrAbortedParents( now );
+        maybeAbortJobsWithFailedOrAbortedParents( now );
 
         // Single eligible job by priority then id — avoid N+1 fetch of the entire submitted queue
         @SuppressWarnings( "unchecked" )
@@ -522,6 +566,22 @@ public class WordPressDAOImpl implements WordPressDAO {
         job.setProcessedBy( thisProcessorId );
         job.setLastUpdatedDate( now );
         return job;
+    }
+
+    /**
+     * Throttled wrapper: abort sweep locks {@code wp_lh_job_dependency} / {@code wp_lh_jobs} and
+     * races with concurrent {@link #insertJob} dependency inserts under multi-worker load.
+     */
+    private void maybeAbortJobsWithFailedOrAbortedParents( Timestamp now ) {
+        long last = lastAbortFailedParentsAt.get();
+        long t = now.getTime();
+        if ( t - last < ABORT_FAILED_PARENTS_MIN_INTERVAL_MS ) {
+            return;
+        }
+        if ( !lastAbortFailedParentsAt.compareAndSet( last, t ) ) {
+            return; // another thread just ran / claimed the slot
+        }
+        abortJobsWithFailedOrAbortedParents( now );
     }
 
     /**

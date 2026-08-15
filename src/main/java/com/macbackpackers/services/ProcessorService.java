@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.context.ApplicationContext;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Service;
 
 import javax.mail.MessagingException;
@@ -328,8 +329,8 @@ public class ProcessorService {
                 if ( i == job.getRetryCount() - 1 ) {
 
                     // catch SNI errors and random connection errors and retry later
-                    if ( !( ex instanceof GoogleJsonResponseException ) && ( ex instanceof IOException || ex instanceof TimeoutException || ex instanceof IORuntimeException || ex instanceof ApiConnectionException ) ) {
-                        LOGGER.info( "Maximum number of attempts reached. Connection error on job " + job.getId() + ". Setting status to RETRY" );
+                    if ( !( ex instanceof GoogleJsonResponseException ) && ( ex instanceof IOException || ex instanceof TimeoutException || ex instanceof IORuntimeException || ex instanceof ApiConnectionException || ex instanceof CannotAcquireLockException ) ) {
+                        LOGGER.info( "Maximum number of attempts reached. Transient error on job " + job.getId() + ". Setting status to RETRY" );
                         dao.updateJobStatusToRetry( job.getId() );
                     }
                     else {

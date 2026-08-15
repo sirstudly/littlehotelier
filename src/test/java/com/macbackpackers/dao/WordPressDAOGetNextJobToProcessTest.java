@@ -80,7 +80,9 @@ public class WordPressDAOGetNextJobToProcessTest {
         assertEquals( -1, new CalculateEdinburghVisitorLevyForBookingJob().getPriority() );
         assertEquals( 99, new CloudbedsAllocationScraperWorkerJob().getPriority() );
         assertEquals( 99, new CreateAllocationScraperReportsJob().getPriority() );
-        assertEquals( 0, new HousekeepingJob().getPriority() );
+        assertEquals( 99, new HousekeepingJob().getPriority() );
+        assertEquals( JobPriorities.DEFAULT_PRIORITY,
+                JobPriorities.forClassName( "com.macbackpackers.jobs.DoesNotExistJob" ) );
         assertTrue( sqlCase.contains( "THEN -1" ) );
         assertTrue( sqlCase.contains( "THEN 99" ) );
     }
