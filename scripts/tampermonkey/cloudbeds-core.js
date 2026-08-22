@@ -20,7 +20,7 @@
 
     if (window.CB) { return; } // already initialised in this sandbox
 
-    var CORE_VERSION = '1.3';
+    var CORE_VERSION = '1.4';
     // One visible line so we can confirm in DevTools which core build is running.
     console.info('[CB] cloudbeds-core v' + CORE_VERSION + ' loaded');
 
@@ -121,6 +121,8 @@
     // fn(ctx, meta) may return a Promise; resolve with false to allow retry on the
     // next route change (e.g. waitFor timed out). meta.skipExisting is true when
     // navigating booking→booking so waiters ignore stale DOM from the previous one.
+    // Re-entering a previously completed booking (via a different booking in between)
+    // clears completedFor for that id so injected UI can be restored after Vue swaps.
     function onReservation(key, fn) {
         var completedFor = {};
         var inFlightFor = {};
@@ -134,6 +136,10 @@
             var skipExisting = (prevId !== null && prevId !== id);
             if (prevId && prevId !== id) {
                 delete inFlightFor[prevId]; // abandon wait for previous booking
+                // Booking→booking revisit: Vue wipes injected UI, so allow the
+                // handler to run again even if this id previously completed.
+                // Same-id locationchange spam still hits completedFor/inFlight.
+                delete completedFor[id];
             }
             prevId = id;
 

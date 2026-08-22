@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cloudbeds Display Guest Registration Complete
 // @namespace    http://cloudbeds.com/
-// @version      0.1
+// @version      0.2
 // @updateURL    https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsDisplayGuestRegistrationComplete.js
 // @downloadURL  https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsDisplayGuestRegistrationComplete.js
 // @description  Show guest identity-document registration status next to the reservation guest name.
@@ -28,6 +28,7 @@
 
     var keepAliveObserver = null;
     var keepAliveReservationId = null;
+    var pendingTitleWaitId = null;
 
     function isBlank(value) {
         return value == null || String(value).trim() === '';
@@ -99,7 +100,9 @@
         window.dispatchEvent(new CustomEvent(DATA_EVENT, {
             detail: { reservationId: reservationId }
         }));
-        tryInject(reservationId);
+        // XHR often arrives before .page-title h3; inject when ready and keep alive
+        // even if onReservation already finished (or raced ahead).
+        scheduleInject(reservationId);
     }
 
     function installXhrHook() {
@@ -176,6 +179,32 @@
         var h3 = document.querySelector('.page-title h3');
         if (!h3) { return false; }
         return ensureMessage(h3, message);
+    }
+
+    // Inject now if the title exists; otherwise wait for it (XHR/title race).
+    function scheduleInject(reservationId) {
+        if (!reservationId) { return; }
+        if (String(CB.context().reservationId) !== String(reservationId)) { return; }
+
+        if (tryInject(reservationId)) {
+            if (String(keepAliveReservationId) !== String(reservationId)) {
+                startKeepAlive(reservationId);
+            }
+            return;
+        }
+
+        if (pendingTitleWaitId === reservationId) { return; }
+        pendingTitleWaitId = reservationId;
+        CB.waitFor('.page-title h3', { timeout: 30000, settle: 200 }).then(function (h3) {
+            if (pendingTitleWaitId === reservationId) {
+                pendingTitleWaitId = null;
+            }
+            if (!h3) { return; }
+            if (String(CB.context().reservationId) !== String(reservationId)) { return; }
+            if (tryInject(reservationId)) {
+                startKeepAlive(reservationId);
+            }
+        });
     }
 
     function waitForCache(reservationId, timeoutMs) {
@@ -257,11 +286,9 @@
 
     CB.onReservation('guest-reg-complete', function (ctx, meta) {
         stopKeepAlive();
+        pendingTitleWaitId = null;
 
         var reservationId = String(ctx.reservationId);
-        // Drop stale cache from a previous visit so we prefer a fresh get_reservation.
-        // Keep it if the XHR already arrived before onReservation ran (document-start race).
-        // No delete here: XHR may have populated cache already for this id.
 
         return CB.waitFor('.page-title h3', {
             skipExisting: !!(meta && meta.skipExisting),
