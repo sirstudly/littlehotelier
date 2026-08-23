@@ -695,6 +695,14 @@ public interface WordPressDAO {
     void insertBookingLookupKey( String reservationId, String key, BigDecimal paymentRequested );
 
     /**
+     * Returns the most recently created lookup key for the reservation, if any.
+     *
+     * @param reservationId the unique cloudbeds reference
+     * @return lookup key, or null if none exists
+     */
+    String findLatestBookingLookupKey( String reservationId );
+
+    /**
      * Checks whether we've already sent an email (or are ready to send) an email to the
      * given address.
      * @param email address to send to

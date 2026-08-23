@@ -23,6 +23,7 @@ import com.macbackpackers.jobs.SendDepositChargeDeclinedEmailJob;
 import com.macbackpackers.jobs.SendDepositChargeSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendHostelworldLateCancellationEmailJob;
 import com.macbackpackers.jobs.SendNonRefundableDeclinedEmailJob;
+import com.macbackpackers.jobs.SendNonRefundableDeclinedFinalWarningEmailJob;
 import com.macbackpackers.jobs.SendNonRefundableSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendRefundSuccessfulEmailJob;
 import com.macbackpackers.jobs.SendStripePaymentConfirmationEmailJob;
@@ -479,8 +480,17 @@ public class PaymentProcessorService {
             return;
         }
 
+        boolean firstDeclinedSent = cloudbedsScraper.getEmailLastSentDate( webClient, reservationId,
+                CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED ).isPresent() ||
+                cbReservation.containsNote( CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED );
+        boolean finalWarningSent = cbReservation.containsNote(
+                CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED_FINAL_WARNING );
+        boolean finalAttempt = StringUtils.isNotBlank( wordpressDAO.getOption( "hbo_nonref_cancel_window_hours" ) )
+                && firstDeclinedSent && false == finalWarningSent;
+
         try {
-            if ( cbReservation.containsNote( CloudbedsScraper.NOTE_WILL_POST_AUTOMATICALLY ) ) {
+            if ( cbReservation.containsNote( CloudbedsScraper.NOTE_WILL_POST_AUTOMATICALLY )
+                    && false == finalAttempt ) {
                 LOGGER.info( "We've already been thru this before; yet there is still a balance owing..." );
                 throw new RecordPaymentFailedException( "Payment previously attempted but was never charged successfully..." );
             }
@@ -517,16 +527,14 @@ public class PaymentProcessorService {
             cloudbedsScraper.addNote( webClient, reservationId,
                     "Non-refundable amount of £" + cloudbedsScraper.getCurrencyFormat().format( amountToCharge )
                             + CloudbedsScraper.NOTE_WILL_POST_AUTOMATICALLY );
+            if ( finalAttempt ) {
+                enqueueNonRefundableFinalWarning( reservationId, amountToCharge, ex.getMessage(), cbReservation );
+            }
         }
         catch ( RecordPaymentFailedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
 
-            if ( cloudbedsScraper.getEmailLastSentDate( webClient, reservationId,
-                    CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED ).isPresent() ||
-                    cbReservation.containsNote( CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED ) ) {
-                LOGGER.info( "Declined payment email already sent. Not going to do it again..." );
-            }
-            else {
+            if ( false == firstDeclinedSent ) {
                 LOGGER.info( "Sending declined payment email" );
                 String paymentURL = cloudbedsService.generateUniquePaymentURL( reservationId, null );
 
@@ -537,16 +545,42 @@ public class PaymentProcessorService {
                 job.setStatus( JobStatus.submitted );
                 wordpressDAO.insertJob( job );
 
-                if ( Arrays.asList( "Hostelworld & Hostelbookers", "Hostelworld" ).contains( cbReservation.getSourceName() )
-                        && StringUtils.isNotBlank( wordpressDAO.getOption( "hbo_hw_password" ) ) ) {
-                    HostelworldReportPaymentIssueJob paymentIssueJob = new HostelworldReportPaymentIssueJob();
-                    paymentIssueJob.setReservationId( reservationId );
-                    paymentIssueJob.setEmailConfirmToSelf( true );
-                    paymentIssueJob.setCardIssue( resolveHostelworldCardIssue( payEx.getMessage() ) );
-                    paymentIssueJob.setStatus( JobStatus.submitted );
-                    wordpressDAO.insertJob( paymentIssueJob );
-                }
+                enqueueHostelworldPaymentIssueIfApplicable( reservationId, payEx.getMessage(), cbReservation );
             }
+            else if ( finalAttempt ) {
+                enqueueNonRefundableFinalWarning( reservationId, amountToCharge, payEx.getMessage(), cbReservation );
+            }
+            else {
+                LOGGER.info( "Declined payment email already sent. Not going to do it again..." );
+            }
+        }
+    }
+
+    private void enqueueNonRefundableFinalWarning( String reservationId, BigDecimal amountToCharge,
+            String paymentFailureMessage, Reservation cbReservation ) {
+        LOGGER.info( "Sending declined payment final warning email" );
+        String paymentURL = cloudbedsService.generateUniquePaymentURL( reservationId, null );
+
+        SendNonRefundableDeclinedFinalWarningEmailJob job = new SendNonRefundableDeclinedFinalWarningEmailJob();
+        job.setReservationId( reservationId );
+        job.setAmount( amountToCharge );
+        job.setPaymentURL( paymentURL );
+        job.setStatus( JobStatus.submitted );
+        wordpressDAO.insertJob( job );
+
+        enqueueHostelworldPaymentIssueIfApplicable( reservationId, paymentFailureMessage, cbReservation );
+    }
+
+    private void enqueueHostelworldPaymentIssueIfApplicable( String reservationId, String paymentFailureMessage,
+            Reservation cbReservation ) {
+        if ( Arrays.asList( "Hostelworld & Hostelbookers", "Hostelworld" ).contains( cbReservation.getSourceName() )
+                && StringUtils.isNotBlank( wordpressDAO.getOption( "hbo_hw_password" ) ) ) {
+            HostelworldReportPaymentIssueJob paymentIssueJob = new HostelworldReportPaymentIssueJob();
+            paymentIssueJob.setReservationId( reservationId );
+            paymentIssueJob.setEmailConfirmToSelf( true );
+            paymentIssueJob.setCardIssue( resolveHostelworldCardIssue( paymentFailureMessage ) );
+            paymentIssueJob.setStatus( JobStatus.submitted );
+            wordpressDAO.insertJob( paymentIssueJob );
         }
     }
 

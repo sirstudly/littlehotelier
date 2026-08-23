@@ -1396,6 +1396,19 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    @SuppressWarnings( "unchecked" )
+    public String findLatestBookingLookupKey( String reservationId ) {
+        List<String> keys = em.createNativeQuery(
+                        "SELECT lookup_key FROM wp_booking_lookup_key "
+                                + " WHERE reservation_id = :reservationId "
+                                + " ORDER BY created_date DESC" )
+                .setParameter( "reservationId", reservationId )
+                .setMaxResults( 1 )
+                .getResultList();
+        return keys.isEmpty() ? null : keys.get( 0 );
+    }
+
+    @Override
     public boolean doesSendEmailEntryExist( String email ) {
         return em.createQuery( "SELECT COUNT(*) FROM SendEmailEntry WHERE email = :email", Number.class )
                 .setParameter( "email", email )

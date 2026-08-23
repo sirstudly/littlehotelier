@@ -108,6 +108,7 @@ import static com.macbackpackers.scrapers.CloudbedsScraper.NOTE_WILL_POST_AUTOMA
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_DEPOSIT_CHARGE_DECLINED;
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER;
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED;
+import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED_FINAL_WARNING;
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_DECLINED;
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_LINK;
 import static com.macbackpackers.services.PaymentProcessorService.CHARGE_REMAINING_BALANCE_NOTE;
@@ -1137,6 +1138,7 @@ public class CloudbedsService {
                     .filter( n -> n.getNotes().contains( "Failed to charge booking:" )
                             || n.getNotes().contains( TEMPLATE_PAYMENT_DECLINED + " email sent." )
                             || n.getNotes().contains( TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED + " email sent." )
+                            || n.getNotes().contains( TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED_FINAL_WARNING + " email sent." )
                             || n.getNotes().contains( TEMPLATE_DEPOSIT_CHARGE_DECLINED + " email sent." )
                             || n.getNotes().contains( TEMPLATE_PAYMENT_LINK + " email sent." )
                             || n.getNotes().contains( TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER + " email sent." )
@@ -1455,6 +1457,34 @@ public class CloudbedsService {
     public void sendNonRefundableDeclinedGmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException, MessagingException {
 
         EmailTemplateInfo template = scraper.getNonRefundableDeclinedEmailTemplate( webClient );
+        Reservation res = scraper.getReservationRetry( webClient, reservationId );
+        final String note = template.getTemplateName() + " email sent.";
+
+        if ( res.containsNote( note ) ) {
+            LOGGER.info( template.getTemplateName() + " email already sent. Doing nothing." );
+        }
+        else {
+            gmailService.sendEmail( res.getEmail(), res.getFirstName() + " " + res.getLastName(),
+                    template.getSubject().replace( "[conf number]", res.getIdentifier() ),
+                    renderEmailHtml( template, template.getEmailBody()
+                                    .replace( "[first name]", res.getFirstName() )
+                                    .replace( "[charge amount]", "£" + scraper.getCurrencyFormat().format( amount ) )
+                                    .replace( "[payment URL]", "<a href='" + paymentURL + "'>" + paymentURL + "</a>" ) ) );
+            scraper.addNote( webClient, reservationId, note + " " + paymentURL );
+        }
+    }
+
+    /**
+     * Sends a final-warning email after a second failed non-refundable charge attempt.
+     *
+     * @param webClient web client instance to use
+     * @param reservationId associated reservation
+     * @param amount amount being charged
+     * @param paymentURL the payment URL to include in the email
+     */
+    public void sendNonRefundableDeclinedFinalWarningGmail( WebClient webClient, String reservationId, BigDecimal amount, String paymentURL ) throws IOException, MessagingException {
+
+        EmailTemplateInfo template = scraper.getNonRefundableDeclinedFinalWarningEmailTemplate( webClient );
         Reservation res = scraper.getReservationRetry( webClient, reservationId );
         final String note = template.getTemplateName() + " email sent.";
 
@@ -2003,6 +2033,11 @@ public class CloudbedsService {
      * @return payment URL
      */
     public String generateUniquePaymentURL( String reservationId, BigDecimal paymentRequested ) {
+        String existingKey = dao.findLatestBookingLookupKey( reservationId );
+        if ( StringUtils.isNotBlank( existingKey ) ) {
+            LOGGER.info( "Reusing existing payment URL for reservation {}", reservationId );
+            return dao.getBookingPaymentsURL() + existingKey;
+        }
         String lookupKey = generateRandomLookupKey( LOOKUPKEY_LENGTH );
         String paymentURL = dao.getBookingPaymentsURL() + lookupKey;
         dao.insertBookingLookupKey( reservationId, lookupKey, paymentRequested );

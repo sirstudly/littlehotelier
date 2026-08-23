@@ -82,6 +82,7 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_HWL_CANCELLATION_CHARGE = "Hostelworld Cancellation Charge";
     public static final String TEMPLATE_NON_REFUNDABLE_CHARGE_SUCCESSFUL = "Non-Refundable Charge Successful";
     public static final String TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED = "Non-Refundable Charge Declined";
+    public static final String TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED_FINAL_WARNING = "Non-Refundable Charge Declined FINAL WARNING";
     public static final String TEMPLATE_STRIPE_PAYMENT_CONFIRMATION = "Stripe Payment Confirmation";
     public static final String TEMPLATE_DEPOSIT_CHARGE_SUCCESSFUL = "Deposit Charge Successful";
     public static final String TEMPLATE_DEPOSIT_CHARGE_DECLINED = "Deposit Charge Declined";
@@ -1625,6 +1626,17 @@ public class CloudbedsScraper {
      */
     public EmailTemplateInfo getNonRefundableDeclinedEmailTemplate( WebClient webClient ) throws IOException {
         return fetchEmailTemplate( webClient, TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED );
+    }
+
+    /**
+     * Retrieves the final-warning email template after a second non-refundable charge decline.
+     *
+     * @param webClient web client instance to use
+     * @return non-null email template
+     * @throws IOException
+     */
+    public EmailTemplateInfo getNonRefundableDeclinedFinalWarningEmailTemplate( WebClient webClient ) throws IOException {
+        return fetchEmailTemplate( webClient, TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED_FINAL_WARNING );
     }
 
     /**
