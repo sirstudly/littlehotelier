@@ -5,6 +5,7 @@ import io.github.bonigarcia.wdm.WebDriverManager;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
+import org.apache.commons.lang3.StringUtils;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeDriverService;
@@ -18,7 +19,10 @@ import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A factory for creating WebDriver instances logged into LittleHotelier.
@@ -38,6 +42,13 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
     @Value( "${chromescraper.driver.verbose:false}" )
     private boolean chromeDriverVerbose;
 
+    /**
+     * Optional Chrome user-agent. Spaces are allowed here (unlike {@code chromescraper.driver.options},
+     * which is split on whitespace). Leave blank to keep Chrome's default (HeadlessChrome when headless).
+     */
+    @Value( "${chromescraper.driver.useragent:}" )
+    private String chromeUserAgent;
+
     @Value( "${processor.job.log.localdir:logs}" )
     private String logDir;
 
@@ -49,6 +60,12 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
         ChromeOptions options = new ChromeOptions();
         List<String> optionValues = new ArrayList<>(Arrays.asList(chromeOptions.split( " " )));
         options.addArguments( optionValues.toArray(new String[optionValues.size()]) );
+        options.addArguments( "--disable-blink-features=AutomationControlled" );
+        options.setExperimentalOption( "excludeSwitches", Collections.singletonList( "enable-automation" ) );
+        options.setExperimentalOption( "useAutomationExtension", false );
+        if ( StringUtils.isNotBlank( chromeUserAgent ) ) {
+            options.addArguments( "--user-agent=" + chromeUserAgent.trim() );
+        }
 
         // Use Chrome for Testing binary if specified
         String chromeBinaryPath = System.getProperty("chrome.binary.path");
@@ -77,6 +94,7 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
 
         // configure wait-time when finding elements on the page
         driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(maxWaitSeconds));
+        applyAutomationHiding( driver );
 
         return driver;
     }
@@ -92,6 +110,53 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
     @Override
     public void destroyObject( PooledObject<WebDriver> pooledObj ) throws Exception {
         pooledObj.getObject().quit();
+    }
+
+    /**
+     * ChromeDriver always adds {@code --enable-automation} unless excluded above. CDP still patches
+     * {@code navigator.webdriver} and aligns client hints with a headed Chrome UA when configured.
+     */
+    private void applyAutomationHiding( ChromeDriver driver ) {
+        Map<String, Object> webdriverPatch = new HashMap<>();
+        webdriverPatch.put( "source",
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});" );
+        driver.executeCdpCommand( "Page.addScriptToEvaluateOnNewDocument", webdriverPatch );
+        if ( StringUtils.isBlank( chromeUserAgent ) ) {
+            return;
+        }
+        String ua = chromeUserAgent.trim();
+        List<Map<String, String>> brands = new ArrayList<>();
+        brands.add( brand( "Not:A-Brand", "99" ) );
+        brands.add( brand( "Google Chrome", "151" ) );
+        brands.add( brand( "Chromium", "151" ) );
+        List<Map<String, String>> fullVersionList = new ArrayList<>();
+        fullVersionList.add( brand( "Not:A-Brand", "10.0.1.4" ) );
+        fullVersionList.add( brand( "Google Chrome", "151.0.7922.138" ) );
+        fullVersionList.add( brand( "Chromium", "151.0.7922.138" ) );
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put( "brands", brands );
+        metadata.put( "fullVersionList", fullVersionList );
+        metadata.put( "platform", "Linux" );
+        metadata.put( "platformVersion", "6.8.0" );
+        metadata.put( "architecture", "x86" );
+        metadata.put( "model", "" );
+        metadata.put( "mobile", Boolean.FALSE );
+        metadata.put( "bitness", "64" );
+        metadata.put( "wow64", Boolean.FALSE );
+        Map<String, Object> uaOverride = new HashMap<>();
+        uaOverride.put( "userAgent", ua );
+        uaOverride.put( "platform", "Linux x86_64" );
+        uaOverride.put( "userAgentMetadata", metadata );
+        driver.executeCdpCommand( "Network.setUserAgentOverride", uaOverride );
+        driver.executeCdpCommand( "Emulation.setUserAgentOverride", uaOverride );
+        LOGGER.info( "Chrome user-agent override: {}", ua );
+    }
+
+    private static Map<String, String> brand( String name, String version ) {
+        Map<String, String> brand = new HashMap<>();
+        brand.put( "brand", name );
+        brand.put( "version", version );
+        return brand;
     }
 
 }
