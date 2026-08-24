@@ -18,6 +18,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.bdc.BookingComRefundRequest;
 import com.macbackpackers.beans.bdc.BookingComVCCToCharge;
 import com.macbackpackers.services.BasicCardMask;
 import org.apache.commons.lang3.StringUtils;
@@ -108,5 +109,12 @@ public class BookingComSeleniumScraperTest {
         List<BookingComVCCToCharge> bookings = scraper.getAllVCCBookingsThatCanBeCharged( driver, wait );
         LOGGER.info( "Found {} bookings", bookings.size() );
         bookings.forEach( b -> LOGGER.info( "{}", b ) );
+    }
+
+    @Test
+    public void testGetAllVCCBookingsThatMustBeRefunded() throws Exception {
+        List<BookingComRefundRequest> bookings = scraper.getAllVCCBookingsThatMustBeRefunded( driver, wait );
+        LOGGER.info( "Found {} refunds", bookings.size() );
+        bookings.forEach( b -> LOGGER.info( "{} {} {}", b.getBookingRef(), b.getReason(), b.getRefundAmount() ) );
     }
 }

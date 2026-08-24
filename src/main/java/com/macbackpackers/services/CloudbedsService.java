@@ -630,30 +630,36 @@ public class CloudbedsService {
 
     /**
      * Returns all reservations for BDC with virtual cards that need to be refunded.
+     * Looks up refundable VCCs via Selenium + fresa {@code vccs_to_refund} API, then maps to Cloudbeds.
      *
      * @return List<BookingComRefundRequest> bdc refunds with associated cloudbeds reservation ids
-     * @throws IOException
+     * @throws Exception
      */
-    public List<BookingComRefundRequest> getAllVCCBookingsThatMustBeRefunded() throws IOException {
-        try (WebClient webClient = appContext.getBean("webClientForBDC", WebClient.class)) {
-            return bdcScraper.getAllVCCBookingsThatMustBeRefunded(webClient)
-                    .stream()
-                    .map(rr -> {
-                        Optional<Reservation> r = getReservationForBDC(rr.getBookingRef());
-                        if (r.isPresent()) {
-                            // save the cloudbeds id
-                            rr.setReservationId(r.get().getReservationId());
-                            LOGGER.info("Found BDC reservation {} - {} with VCC for {} {}",
-                                    r.get().getThirdPartyIdentifier(), r.get().getReservationId(),
-                                    r.get().getFirstName(), r.get().getLastName());
-                        }
-                        else {
-                            LOGGER.error("Unable to find BDC reservation {}", rr.getBookingRef());
-                        }
-                        return rr;
-                    })
-                    .collect(Collectors.toList());
+    public List<BookingComRefundRequest> getAllVCCBookingsThatMustBeRefunded() throws Exception {
+        List<BookingComRefundRequest> refunds;
+        WebDriver driver = webDriverPool.borrowObject();
+        try {
+            WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
+            refunds = bdcSeleniumScraper.getAllVCCBookingsThatMustBeRefunded( driver, wait );
         }
+        finally {
+            webDriverPool.returnObject( driver );
+        }
+        return refunds.stream()
+                .map( rr -> {
+                    Optional<Reservation> r = getReservationForBDC( rr.getBookingRef() );
+                    if ( r.isPresent() ) {
+                        rr.setReservationId( r.get().getReservationId() );
+                        LOGGER.info( "Found BDC reservation {} - {} with VCC refund {} for {} {}",
+                                r.get().getThirdPartyIdentifier(), r.get().getReservationId(),
+                                rr.getRefundAmount(), r.get().getFirstName(), r.get().getLastName() );
+                    }
+                    else {
+                        LOGGER.error( "Unable to find BDC reservation {}", rr.getBookingRef() );
+                    }
+                    return rr;
+                } )
+                .collect( Collectors.toList() );
     }
 
     /**

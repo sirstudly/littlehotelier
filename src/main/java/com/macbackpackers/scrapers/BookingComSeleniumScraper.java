@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import com.macbackpackers.beans.AmazonWafChallengeParams;
 import com.macbackpackers.beans.AmazonWafSolution;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.bdc.BookingComRefundRequest;
 import com.macbackpackers.beans.bdc.BookingComVCCToCharge;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
@@ -822,6 +823,101 @@ public class BookingComSeleniumScraper {
 
         LOGGER.info( "Found {} chargeable VCC bookings for hotel_id={}", chargeable.size(), hotelId );
         return chargeable;
+    }
+
+    /**
+     * Searches for all VCC bookings that must be refunded via the extranet fresa JSON API
+     * ({@code vccs_to_refund}), not the SPA table DOM.
+     *
+     * @param driver
+     * @param wait
+     * @return non-null list of BDC refunds (booking ref, reason, amount)
+     * @throws IOException
+     */
+    public List<BookingComRefundRequest> getAllVCCBookingsThatMustBeRefunded( WebDriver driver, WebDriverWait wait )
+            throws IOException {
+        doLogin( driver, wait );
+
+        String hotelId = wordPressDAO.getMandatoryOption( "hbo_bdc_hotel_id" );
+        String ses = ensureSessionForHotel( driver, wait, hotelId );
+        String hotelAccountId = resolveHotelAccountId( driver, wait, hotelId, ses );
+
+        List<BookingComRefundRequest> refunds = new ArrayList<>();
+        int page = 1;
+        final int limit = 50;
+        boolean lastPage = false;
+        while ( false == lastPage ) {
+            String apiUrl = MessageFormat.format(
+                    "https://admin.booking.com/fresa/extranet/payments/vccs_to_refund?lang=en&hotel_id={0}&ses={1}&limit={2}&page={3}{4}",
+                    hotelId, ses, String.valueOf( limit ), String.valueOf( page ),
+                    hotelAccountId == null ? "" : "&hotel_account_id=" + hotelAccountId );
+            LOGGER.info( "Fetching VCCs to refund page {}: {}", page, apiUrl );
+            String json = fetchJsonInBrowser( driver, apiUrl );
+            LOGGER.debug( "vccs_to_refund response: {}", json );
+
+            JsonObject root = JsonParser.parseString( json ).getAsJsonObject();
+            refunds.addAll( parseVccsToRefundPage( root ) );
+            JsonObject data = root.getAsJsonObject( "data" );
+            JsonObject pagination = data == null ? null : data.getAsJsonObject( "pagination" );
+            lastPage = pagination == null || pagination.get( "is_last_page" ).getAsInt() == 1;
+            page++;
+        }
+
+        LOGGER.info( "Found {} VCC refunds for hotel_id={}", refunds.size(), hotelId );
+        return refunds;
+    }
+
+    /**
+     * Parses one {@code vccs_to_refund} page. Skips zero amounts and already-confirmed rows.
+     */
+    List<BookingComRefundRequest> parseVccsToRefundPage( JsonObject root ) throws IOException {
+        if ( root == null || root.get( "success" ) == null || root.get( "success" ).getAsInt() != 1 ) {
+            throw new IOException( "Unexpected vccs_to_refund response: " + root );
+        }
+        JsonObject data = root.getAsJsonObject( "data" );
+        JsonArray vccs = data == null ? null : data.getAsJsonArray( "vccs" );
+        List<BookingComRefundRequest> refunds = new ArrayList<>();
+        if ( vccs == null ) {
+            return refunds;
+        }
+        for ( JsonElement elem : vccs ) {
+            JsonObject vcc = elem.getAsJsonObject();
+            if ( vcc.has( "is_action_confirmed" ) && false == vcc.get( "is_action_confirmed" ).isJsonNull()
+                    && vcc.get( "is_action_confirmed" ).getAsInt() == 1 ) {
+                continue;
+            }
+            JsonObject amountObj = vcc.getAsJsonObject( "amount_to_refund" );
+            if ( amountObj == null || amountObj.get( "amount" ) == null ) {
+                continue;
+            }
+            BigDecimal amount = amountObj.get( "amount" ).getAsBigDecimal();
+            if ( amount.compareTo( BigDecimal.ZERO ) <= 0 ) {
+                continue;
+            }
+            String bookingRef = vcc.get( "hres_id" ).getAsString();
+            refunds.add( new BookingComRefundRequest( bookingRef, refundReasonFromVcc( vcc ), amount ) );
+        }
+        return refunds;
+    }
+
+    private static String refundReasonFromVcc( JsonObject vcc ) {
+        JsonElement fm = vcc.get( "is_force_majeure" );
+        if ( fm != null && false == fm.isJsonNull() ) {
+            if ( fm.isJsonPrimitive() && fm.getAsJsonPrimitive().isNumber() && fm.getAsInt() == 1 ) {
+                return "Force majeure";
+            }
+            if ( fm.isJsonPrimitive() && fm.getAsJsonPrimitive().isBoolean() && fm.getAsBoolean() ) {
+                return "Force majeure";
+            }
+            if ( fm.isJsonPrimitive() && "1".equals( fm.getAsString() ) ) {
+                return "Force majeure";
+            }
+        }
+        JsonElement due = vcc.get( "due_date_to_refund_vcc" );
+        if ( due != null && false == due.isJsonNull() && StringUtils.isNotBlank( due.getAsString() ) ) {
+            return "Refund due by " + due.getAsString();
+        }
+        return "VCC refund";
     }
 
     /**
