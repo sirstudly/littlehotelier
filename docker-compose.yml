@@ -12,6 +12,7 @@ services:
       - SE_SCREEN_WIDTH=1920
       - SE_SCREEN_HEIGHT=1080
       - DISPLAY=:99
+      - HOME=/home/appuser
       - SPRING_PROFILES_ACTIVE=crh
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
     volumes:
@@ -54,6 +55,7 @@ services:
       - SE_SCREEN_WIDTH=1920
       - SE_SCREEN_HEIGHT=1080
       - DISPLAY=:99
+      - HOME=/home/appuser
       - SPRING_PROFILES_ACTIVE=hsh
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
     volumes:
@@ -96,6 +98,7 @@ services:
       - SE_SCREEN_WIDTH=1920
       - SE_SCREEN_HEIGHT=1080
       - DISPLAY=:99
+      - HOME=/home/appuser
       - SPRING_PROFILES_ACTIVE=rmb
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
     volumes:
@@ -138,6 +141,7 @@ services:
       - SE_SCREEN_WIDTH=1920
       - SE_SCREEN_HEIGHT=1080
       - DISPLAY=:99
+      - HOME=/home/appuser
       - SPRING_PROFILES_ACTIVE=lsh
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
     volumes:

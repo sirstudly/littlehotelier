@@ -15,4 +15,14 @@ if [ -d /home/appuser/.ssh ]; then
 fi
 
 # Drop privileges and replace this process so the app becomes PID 1 and receives SIGTERM.
+# setpriv keeps the parent env; without this Chrome inherits HOME=/root and exits
+# (mkdir /root: Permission denied; chrome_crashpad_handler: --database is required).
+export HOME=/home/appuser
+export USER=appuser
+export XDG_CONFIG_HOME=/home/appuser/.config
+export XDG_CACHE_HOME=/home/appuser/.cache
+export XDG_DATA_HOME=/home/appuser/.local/share
+mkdir -p "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME/applications" /tmp/chrome-crash
+chown -R appuser:appuser /home/appuser /tmp/chrome-crash
+
 exec setpriv --reuid=appuser --regid=appuser --init-groups -- "$@"
