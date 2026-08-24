@@ -167,12 +167,11 @@ public class BookingComSeleniumScraper {
         // Cookie-bag inject reloads the page: captcha clears but the wizard resets to username, so we
         // re-submit username after a successful solve. May hit captcha again (especially without a
         // matching hbo_2captcha_proxy).
-        for ( int captchaGate = 0 ; captchaGate < 3 ; captchaGate++ ) {
+        for ( int captchaGate = 0 ; captchaGate < 8 ; captchaGate++ ) {
             wait.until( d -> isAwsWafChallenge( d )
                     || false == d.findElements( By.id( "password" ) ).isEmpty()
                     || isLoggedInUrl( d.getCurrentUrl() )
-                    || isTwoFactorPage( d.getCurrentUrl() )
-                    || false == d.findElements( By.id( "loginname" ) ).isEmpty() );
+                    || isTwoFactorPage( d.getCurrentUrl() ) );
 
             if ( false == driver.findElements( By.id( "password" ) ).isEmpty()
                     || isLoggedInUrl( driver.getCurrentUrl() )
@@ -189,7 +188,7 @@ public class BookingComSeleniumScraper {
                 catch ( Exception e ) {
                     LOGGER.warn( "AWS WAF solve after username failed (gate {}): {}",
                             captchaGate + 1, e.toString() );
-                    if ( captchaGate >= 2 ) {
+                    if ( captchaGate >= 7 ) {
                         if ( e instanceof IOException ) {
                             throw (IOException) e;
                         }
@@ -204,6 +203,10 @@ public class BookingComSeleniumScraper {
                 break;
             }
 
+            if ( isAwsWafChallenge( driver ) ) {
+                continue;
+            }
+
             if ( false == driver.findElements( By.id( "loginname" ) ).isEmpty() ) {
                 LOGGER.info( "BDC sign-in on username form after captcha gate {}; re-submitting username...",
                         captchaGate + 1 );
@@ -216,6 +219,16 @@ public class BookingComSeleniumScraper {
                 continue;
             }
             break;
+        }
+        if ( isAwsWafChallenge( driver ) ) {
+            throw new UnrecoverableFault( "AWS WAF still present after username captcha gates" );
+        }
+        if ( false == driver.findElements( By.id( "loginname" ) ).isEmpty()
+                && driver.findElements( By.id( "password" ) ).isEmpty()
+                && false == isLoggedInUrl( driver.getCurrentUrl() )
+                && false == isTwoFactorPage( driver.getCurrentUrl() ) ) {
+            throw new UnrecoverableFault(
+                    "BDC still on username form after captcha gates (WAF token likely rejected)" );
         }
         wait.until( d -> false == d.findElements( By.id( "password" ) ).isEmpty()
                 || isLoggedInUrl( d.getCurrentUrl() )
@@ -1081,22 +1094,10 @@ public class BookingComSeleniumScraper {
                     AmazonWafSolution solution = captchaSolverService.solveAmazonWaf( webClient, params );
                     injectAmazonWafSolution( driver, solution );
                 }
-                try {
-                    new WebDriverWait( driver, Duration.ofSeconds( 20 ) )
-                            .until( d -> false == isAwsWafChallenge( d ) );
-                }
-                catch ( TimeoutException te ) {
-                    if ( isAwsWafChallenge( driver ) ) {
-                        LOGGER.warn( "AWS WAF still showing after inject (challenge likely rotated); retrying with fresh params" );
-                        lastFailure = new IOException( "AWS WAF challenge still present after inject", te );
-                        saveAwsWafDebugArtifacts( driver, attempt );
-                        continue;
-                    }
-                    throw te;
-                }
-                if ( isAwsWafTimeoutMessage( driver ) && isAwsWafChallenge( driver ) ) {
-                    LOGGER.warn( "AWS WAF timeout copy still visible; retrying" );
-                    lastFailure = new IOException( "AWS WAF captcha still shows timeout after inject" );
+                if ( false == waitForAwsWafToStayCleared( driver ) ) {
+                    LOGGER.warn( "AWS WAF returned after inject (or never left); retrying with fresh params" );
+                    lastFailure = new IOException( "AWS WAF challenge still present after inject" );
+                    saveAwsWafDebugArtifacts( driver, attempt );
                     continue;
                 }
                 LOGGER.info( "AWS WAF challenge cleared after attempt {}", attempt );
@@ -1117,6 +1118,25 @@ public class BookingComSeleniumScraper {
             throw lastFailure;
         }
         throw new UnrecoverableFault( "Failed to solve AWS WAF captcha" );
+    }
+
+    /**
+     * True when the visual challenge stays gone long enough that jsapi has had time to remount.
+     * A reload with no {@code awswaf-captcha} yet would otherwise look like success.
+     */
+    private boolean waitForAwsWafToStayCleared( WebDriver driver ) {
+        try {
+            new WebDriverWait( driver, Duration.ofSeconds( 8 ) )
+                    .until( d -> false == isAwsWafChallenge( d ) );
+        }
+        catch ( TimeoutException e ) {
+            return false;
+        }
+        sleep( 4 );
+        if ( isAwsWafTimeoutMessage( driver ) && isAwsWafChallenge( driver ) ) {
+            return false;
+        }
+        return false == isAwsWafChallenge( driver );
     }
 
     private boolean isAwsWafTimeoutMessage( WebDriver driver ) {
@@ -1191,33 +1211,14 @@ public class BookingComSeleniumScraper {
 
     private void injectAmazonWafSolution( WebDriver driver, AmazonWafSolution solution ) {
         LOGGER.info( "Injecting AWS WAF solution taskId={}", solution.getTaskId() );
-        Map<String, String> cookies = new java.util.LinkedHashMap<>( solution.getCookies() );
-        if ( StringUtils.isNotBlank( solution.getExistingToken() )
-                && false == cookies.containsKey( "aws-waf-token" ) ) {
-            cookies.put( "aws-waf-token", solution.getExistingToken() );
-        }
-
-        boolean cookieBagSolution = false == cookies.isEmpty()
+        Map<String, String> parsedCookies = new java.util.LinkedHashMap<>( solution.getCookies() );
+        boolean cookieBagSolution = false == parsedCookies.isEmpty()
                 && StringUtils.isBlank( solution.getCaptchaVoucher() );
 
         if ( cookieBagSolution ) {
-            applyBookingWafCookies( driver, cookies );
-            try {
-                ( (JavascriptExecutor) driver ).executeScript(
-                        "var token = arguments[0];"
-                                + "try {"
-                                + "  var el = document.querySelector('awswaf-captcha');"
-                                + "  if (el && el.config && typeof el.config.onSuccess === 'function' && token) {"
-                                + "    el.config.onSuccess(token);"
-                                + "  }"
-                                + "} catch (e) {}",
-                        solution.getExistingToken() );
-            }
-            catch ( Exception e ) {
-                LOGGER.debug( "awswaf-captcha.onSuccess after cookie set: {}", e.toString() );
-            }
-            LOGGER.info( "AWS WAF cookies applied on {} names={}; reloading",
-                    driver.getCurrentUrl(), cookies.keySet() );
+            applyBookingWafCookies( driver, parsedCookies );
+            tryOnSuccess( driver, solution.getExistingToken() );
+            LOGGER.info( "AWS WAF cookie-bag applied names={}; reloading", parsedCookies.keySet() );
             driver.navigate().refresh();
             sleep( 2 );
             return;
@@ -1249,20 +1250,38 @@ public class BookingComSeleniumScraper {
                         + "} catch (e) { console && console.log && console.log(e); }"
                         + "return applied;",
                 solution.getCaptchaVoucher(), solution.getExistingToken() );
-        LOGGER.info( "AWS WAF solution applied via: {}", applied );
-        if ( StringUtils.isNotBlank( solution.getExistingToken() ) ) {
-            java.util.Map<String, String> tokenCookie = new java.util.LinkedHashMap<>();
-            tokenCookie.put( "aws-waf-token", solution.getExistingToken() );
-            applyBookingWafCookies( driver, tokenCookie );
-        }
+        LOGGER.info( "AWS WAF opaque token applied via: {}", applied );
         if ( applied == null || Boolean.FALSE.equals( applied ) || "".equals( applied ) ) {
             if ( StringUtils.isBlank( solution.getExistingToken() ) ) {
                 throw new UnrecoverableFault( "Unable to inject AWS WAF solution into page" );
             }
-            LOGGER.warn( "No WAF JS callback available; applied aws-waf-token cookie only" );
+            LOGGER.warn( "No WAF JS callback; setting aws-waf-token cookie as fallback" );
+            java.util.Map<String, String> tokenCookie = new java.util.LinkedHashMap<>();
+            tokenCookie.put( "aws-waf-token", solution.getExistingToken() );
+            applyBookingWafCookies( driver, tokenCookie );
+            driver.navigate().refresh();
         }
-        driver.navigate().refresh();
         sleep( 2 );
+    }
+
+    private void tryOnSuccess( WebDriver driver, String token ) {
+        if ( StringUtils.isBlank( token ) ) {
+            return;
+        }
+        try {
+            ( (JavascriptExecutor) driver ).executeScript(
+                    "var token = arguments[0];"
+                            + "try {"
+                            + "  var el = document.querySelector('awswaf-captcha');"
+                            + "  if (el && el.config && typeof el.config.onSuccess === 'function') {"
+                            + "    el.config.onSuccess(token);"
+                            + "  }"
+                            + "} catch (e) {}",
+                    token );
+        }
+        catch ( Exception e ) {
+            LOGGER.debug( "awswaf-captcha.onSuccess: {}", e.toString() );
+        }
     }
 
     /**
