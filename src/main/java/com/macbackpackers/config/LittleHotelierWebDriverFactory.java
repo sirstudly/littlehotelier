@@ -7,10 +7,14 @@ import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeDriverService;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,11 +27,19 @@ import java.util.List;
 @Component
 public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebDriver> {
 
+    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+
     @Value( "${chromescraper.maxwait.seconds:60}" )
     private int maxWaitSeconds;
 
     @Value( "${chromescraper.driver.options:user-data-dir=chromeprofile --headless --disable-gpu --start-maximized --ignore-certificate-errors --remote-allow-origins=*}" )
     private String chromeOptions;
+
+    @Value( "${chromescraper.driver.verbose:false}" )
+    private boolean chromeDriverVerbose;
+
+    @Value( "${processor.job.log.localdir:logs}" )
+    private String logDir;
 
     @Override
     public WebDriver create() throws Exception {
@@ -44,31 +56,24 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
             options.setBinary(chromeBinaryPath);
         }
 
-        ChromeDriver driver = new ChromeDriver( options );
-
-        // https://bot.sannysoft.com/
-        // https://stackoverflow.com/a/69533548
-        // https://stackoverflow.com/questions/33225947/can-a-website-detect-when-you-are-using-selenium-with-chromedriver/52108199#52108199
-        // https://piprogramming.org/articles/How-to-make-Selenium-undetectable-and-stealth--7-Ways-to-hide-your-Bot-Automation-from-Detection-0000000017.html
-        //  - see undetected-chromedriver but only python support
-        // https://www.npmjs.com/package/puppeteer-extra-plugin-stealth
-        // https://scrapeops.io/blog/the-state-of-web-scraping-2022/
-        /*
-        Map<String, Object> params = new HashMap<String, Object>();
-        params.put("source", "Object.defineProperty(Navigator.prototype, 'webdriver', {\n" +
-                "        set: undefined,\n" +
-                "        enumerable: true,\n" +
-                "        configurable: true,\n" +
-                "        get: new Proxy(\n" +
-                "            Object.getOwnPropertyDescriptor(Navigator.prototype, 'webdriver').get,\n" +
-                "            { apply: (target, thisArg, args) => {\n" +
-                "                Reflect.apply(target, thisArg, args);\n" +
-                "                return false;\n" +
-                "            }}\n" +
-                "        )\n" +
-                "    });");
-        driver.executeCdpCommand("Page.addScriptToEvaluateOnNewDocument", params);
-         */
+        boolean verbose = chromeDriverVerbose
+                || Boolean.parseBoolean( System.getProperty( "webdriver.chrome.verboseLogging", "false" ) );
+        ChromeDriver driver;
+        if ( verbose ) {
+            File logFile = new File( logDir, "chromedriver.log" );
+            logFile.getParentFile().mkdirs();
+            LOGGER.info( "ChromeDriver verbose log: {}", logFile.getAbsolutePath() );
+            options.addArguments( "--enable-logging", "--v=1" );
+            ChromeDriverService service = new ChromeDriverService.Builder()
+                    .withVerbose( true )
+                    .withLogFile( logFile )
+                    .withAppendLog( true )
+                    .build();
+            driver = new ChromeDriver( service, options );
+        }
+        else {
+            driver = new ChromeDriver( options );
+        }
 
         // configure wait-time when finding elements on the page
         driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(maxWaitSeconds));
