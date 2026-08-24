@@ -1,0 +1,33 @@
+services:
+  bdc-forward-proxy:
+    build: .
+    container_name: bdc-forward-proxy
+    restart: unless-stopped
+    environment:
+      PROXY_USER: ${PROXY_USER}
+      PROXY_PASS: ${PROXY_PASS}
+    ports:
+      - "127.0.0.1:3128:3128"
+    networks:
+      - proxy-net
+
+  tunnel:
+    build:
+      context: .
+      dockerfile: Dockerfile.tunnel
+    container_name: bdc-proxy-tunnel
+    restart: unless-stopped
+    depends_on:
+      - bdc-forward-proxy
+    environment:
+      TUNNEL_HOST: ${TUNNEL_HOST}
+      TUNNEL_SSH_PORT: ${TUNNEL_SSH_PORT:-22}
+      TUNNEL_USER: ${TUNNEL_USER}
+    volumes:
+      - ${TUNNEL_SSH_KEY}:/id_ed25519:ro
+    networks:
+      - proxy-net
+
+networks:
+  proxy-net:
+    driver: bridge

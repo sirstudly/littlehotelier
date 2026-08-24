@@ -4,19 +4,27 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.macbackpackers.beans.AmazonWafChallengeParams;
+import com.macbackpackers.beans.AmazonWafSolution;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.beans.bdc.BookingComVCCToCharge;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.services.BasicCardMask;
+import com.macbackpackers.services.CaptchaSolverService;
 import com.macbackpackers.services.PaymentProcessorService;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.htmlunit.BrowserVersion;
+import org.htmlunit.WebClient;
 import org.openqa.selenium.By;
+import org.openqa.selenium.Cookie;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -36,6 +44,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -50,8 +59,16 @@ public class BookingComSeleniumScraper {
     static final String BDC_GROUPS_HOME =
             "https://admin.booking.com/hotel/hoteladmin/groups/home/index.html";
 
+    private static final int AWS_WAF_MAX_ATTEMPTS = 5;
+
+    /** WAF verify POSTs go to www.booking.com; host-only account.booking.com cookies are not sent. */
+    private static final String AWS_WAF_COOKIE_DOMAIN = ".booking.com";
+
     @Autowired
     private WordPressDAO wordPressDAO;
+
+    @Autowired
+    private CaptchaSolverService captchaSolverService;
 
     /**
      * Logs into BDC providing the necessary credentials.
@@ -87,6 +104,15 @@ public class BookingComSeleniumScraper {
         driver.get( BDC_GROUPS_HOME );
         LOGGER.info( "Loading Booking.com website: " + driver.getCurrentUrl() );
 
+        if ( isAwsWafChallenge( driver ) ) {
+            LOGGER.info( "AWS WAF challenge on BDC entry; solving via 2captcha..." );
+            solveAwsWafChallenge( driver, wait );
+            if ( false == isLoggedInUrl( driver.getCurrentUrl() )
+                    && false == StringUtils.startsWith( driver.getCurrentUrl(), "https://account.booking.com/sign-in" ) ) {
+                driver.get( BDC_GROUPS_HOME );
+            }
+        }
+
         if ( driver.getCurrentUrl().startsWith( "https://account.booking.com/sign-in" ) ) {
             LOGGER.info( "Doesn't look like we're logged in. Logging into Booking.com" );
             doLoginForm( driver, wait, username, password );
@@ -117,13 +143,90 @@ public class BookingComSeleniumScraper {
      * @param username user credentials
      * @param password user credentials
      */
-    private void doLoginForm( WebDriver driver, WebDriverWait wait, String username, String password ) {
+    private void doLoginForm( WebDriver driver, WebDriverWait wait, String username, String password )
+            throws IOException {
+
+        if ( isAwsWafChallenge( driver ) ) {
+            LOGGER.info( "AWS WAF challenge before BDC username; solving via 2captcha..." );
+            solveAwsWafChallenge( driver, wait );
+        }
+
+        // WAF solve may already have restored a warm session.
+        if ( isLoggedInUrl( driver.getCurrentUrl() ) ) {
+            return;
+        }
 
         WebElement usernameField = findElement( driver, wait, By.id( "loginname" ) );
         usernameField.sendKeys( username );
         WebElement nextButton = findElement( driver, wait, By.xpath( "//span[text()='Next']/.." ) );
         nextButton.click();
         wait.until( stalenessOf( nextButton ) );
+
+        // Captcha often appears after username (jsapi / awswaf-captcha), before the password field.
+        // Cookie-bag inject reloads the page: captcha clears but the wizard resets to username, so we
+        // re-submit username after a successful solve. May hit captcha again (especially without a
+        // matching hbo_2captcha_proxy).
+        for ( int captchaGate = 0 ; captchaGate < 3 ; captchaGate++ ) {
+            wait.until( d -> isAwsWafChallenge( d )
+                    || false == d.findElements( By.id( "password" ) ).isEmpty()
+                    || isLoggedInUrl( d.getCurrentUrl() )
+                    || isTwoFactorPage( d.getCurrentUrl() )
+                    || false == d.findElements( By.id( "loginname" ) ).isEmpty() );
+
+            if ( false == driver.findElements( By.id( "password" ) ).isEmpty()
+                    || isLoggedInUrl( driver.getCurrentUrl() )
+                    || isTwoFactorPage( driver.getCurrentUrl() ) ) {
+                break;
+            }
+
+            if ( isAwsWafChallenge( driver ) ) {
+                LOGGER.info( "AWS WAF challenge after BDC username; solving via 2captcha (gate {})...",
+                        captchaGate + 1 );
+                try {
+                    solveAwsWafChallenge( driver, wait );
+                }
+                catch ( Exception e ) {
+                    LOGGER.warn( "AWS WAF solve after username failed (gate {}): {}",
+                            captchaGate + 1, e.toString() );
+                    if ( captchaGate >= 2 ) {
+                        if ( e instanceof IOException ) {
+                            throw (IOException) e;
+                        }
+                        throw new IOException( e );
+                    }
+                }
+            }
+
+            if ( false == driver.findElements( By.id( "password" ) ).isEmpty()
+                    || isLoggedInUrl( driver.getCurrentUrl() )
+                    || isTwoFactorPage( driver.getCurrentUrl() ) ) {
+                break;
+            }
+
+            if ( false == driver.findElements( By.id( "loginname" ) ).isEmpty() ) {
+                LOGGER.info( "BDC sign-in on username form after captcha gate {}; re-submitting username...",
+                        captchaGate + 1 );
+                WebElement userAgain = findElement( driver, wait, By.id( "loginname" ) );
+                userAgain.clear();
+                userAgain.sendKeys( username );
+                WebElement nextAgain = findElement( driver, wait, By.xpath( "//span[text()='Next']/.." ) );
+                nextAgain.click();
+                wait.until( stalenessOf( nextAgain ) );
+                continue;
+            }
+            break;
+        }
+        wait.until( d -> false == d.findElements( By.id( "password" ) ).isEmpty()
+                || isLoggedInUrl( d.getCurrentUrl() )
+                || isTwoFactorPage( d.getCurrentUrl() ) );
+
+        if ( isLoggedInUrl( driver.getCurrentUrl() ) || isTwoFactorPage( driver.getCurrentUrl() ) ) {
+            if ( isTwoFactorPage( driver.getCurrentUrl() ) ) {
+                completeTwoFactorVerification( driver, wait );
+                wait.until( d -> false == isTwoFactorPage( d.getCurrentUrl() ) );
+            }
+            return;
+        }
 
         WebElement passwordField = findElement( driver, wait, By.id( "password" ) );
         passwordField.sendKeys( password );
@@ -139,10 +242,25 @@ public class BookingComSeleniumScraper {
             return url != null && false == url.contains( "/sign-in/password" );
         } );
 
+        if ( isAwsWafChallenge( driver ) ) {
+            LOGGER.info( "AWS WAF challenge after BDC password; solving via 2captcha..." );
+            solveAwsWafChallenge( driver, wait );
+        }
+
         if ( isTwoFactorPage( driver.getCurrentUrl() ) ) {
             completeTwoFactorVerification( driver, wait );
             wait.until( d -> false == isTwoFactorPage( d.getCurrentUrl() ) );
+            if ( isAwsWafChallenge( driver ) ) {
+                LOGGER.info( "AWS WAF challenge after BDC 2FA; solving via 2captcha..." );
+                solveAwsWafChallenge( driver, wait );
+            }
         }
+    }
+
+    private static boolean isLoggedInUrl( String url ) {
+        return url != null && (
+                url.startsWith( "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/home.html" )
+                        || url.startsWith( "https://admin.booking.com/hotel/hoteladmin/groups/home/index.html" ) );
     }
 
     /**
@@ -436,38 +554,65 @@ public class BookingComSeleniumScraper {
         LOGGER.info( "Looking up VCC card details " + ccDetailsUrl );
         driver.get( ccDetailsUrl );
 
-        String pageState = waitForCcDetailsPageState( driver, wait );
-        if ( "unavailable".equals( pageState ) ) {
-            throw new MissingUserDataException( "Credit card details aren't available." );
-        }
-        if ( "assurance".equals( pageState ) ) {
-            LOGGER.info( "Secure-admin requires auth-assurance to view card details; completing 2FA..." );
-            completeTwoFactorVerification( driver, wait );
-            pageState = waitForCcDetailsAfterReauth( driver, wait );
+        boolean detailsReady = false;
+        for ( int gate = 0 ; gate < 6 ; gate++ ) {
+            String pageState = waitForCcDetailsPageState( driver, wait );
+            if ( "waf".equals( pageState ) ) {
+                LOGGER.info( "AWS WAF challenge on CC details page; solving via 2captcha..." );
+                solveAwsWafChallenge( driver, wait );
+                continue;
+            }
             if ( "unavailable".equals( pageState ) ) {
                 throw new MissingUserDataException( "Credit card details aren't available." );
             }
-            if ( false == "details".equals( pageState ) ) {
-                LOGGER.error( "Unexpected page after auth-assurance: {} url={}", pageState, driver.getCurrentUrl() );
-                throw new MissingUserDataException( "Expecting credit card details page but not found?" );
+            if ( "assurance".equals( pageState ) ) {
+                LOGGER.info( "Secure-admin requires auth-assurance to view card details; completing 2FA..." );
+                completeTwoFactorVerification( driver, wait );
+                pageState = waitForCcDetailsAfterReauth( driver, wait );
+                if ( "waf".equals( pageState ) ) {
+                    LOGGER.info( "AWS WAF challenge after auth-assurance; solving via 2captcha..." );
+                    solveAwsWafChallenge( driver, wait );
+                    continue;
+                }
+                if ( "unavailable".equals( pageState ) ) {
+                    throw new MissingUserDataException( "Credit card details aren't available." );
+                }
+                if ( false == "details".equals( pageState ) ) {
+                    LOGGER.error( "Unexpected page after auth-assurance: {} url={}", pageState, driver.getCurrentUrl() );
+                    throw new MissingUserDataException( "Expecting credit card details page but not found?" );
+                }
+                detailsReady = true;
+                break;
             }
-        }
-        else if ( "signin".equals( pageState ) ) {
-            LOGGER.info( "Secure-admin requires re-auth to view card details; signing in..." );
-            doLoginForm( driver, wait,
-                    wordPressDAO.getMandatoryOption( "hbo_bdc_username" ),
-                    wordPressDAO.getMandatoryOption( "hbo_bdc_password" ) );
-            pageState = waitForCcDetailsAfterReauth( driver, wait );
-            if ( "unavailable".equals( pageState ) ) {
-                throw new MissingUserDataException( "Credit card details aren't available." );
+            if ( "signin".equals( pageState ) ) {
+                LOGGER.info( "Secure-admin requires re-auth to view card details; signing in..." );
+                doLoginForm( driver, wait,
+                        wordPressDAO.getMandatoryOption( "hbo_bdc_username" ),
+                        wordPressDAO.getMandatoryOption( "hbo_bdc_password" ) );
+                pageState = waitForCcDetailsAfterReauth( driver, wait );
+                if ( "waf".equals( pageState ) ) {
+                    LOGGER.info( "AWS WAF challenge after secure-admin re-auth; solving via 2captcha..." );
+                    solveAwsWafChallenge( driver, wait );
+                    continue;
+                }
+                if ( "unavailable".equals( pageState ) ) {
+                    throw new MissingUserDataException( "Credit card details aren't available." );
+                }
+                if ( false == "details".equals( pageState ) ) {
+                    LOGGER.error( "Unexpected page after secure-admin re-auth: {} url={}", pageState, driver.getCurrentUrl() );
+                    throw new MissingUserDataException( "Expecting credit card details page but not found?" );
+                }
+                detailsReady = true;
+                break;
             }
-            if ( false == "details".equals( pageState ) ) {
-                LOGGER.error( "Unexpected page after secure-admin re-auth: {} url={}", pageState, driver.getCurrentUrl() );
-                throw new MissingUserDataException( "Expecting credit card details page but not found?" );
+            if ( "details".equals( pageState ) ) {
+                detailsReady = true;
+                break;
             }
-        }
-        else if ( false == "details".equals( pageState ) ) {
             LOGGER.error( "Unexpected CC details page state: {} url={}", pageState, driver.getCurrentUrl() );
+            throw new MissingUserDataException( "Expecting credit card details page but not found?" );
+        }
+        if ( false == detailsReady ) {
             throw new MissingUserDataException( "Expecting credit card details page but not found?" );
         }
 
@@ -538,9 +683,9 @@ public class BookingComSeleniumScraper {
 
     /**
      * Waits until the secure-admin page shows card details, a sign-in challenge,
-     * an auth-assurance 2FA challenge, or unavailability.
+     * an auth-assurance 2FA challenge, an AWS WAF captcha, or unavailability.
      *
-     * @return one of {@code details}, {@code signin}, {@code assurance}, {@code unavailable}
+     * @return one of {@code details}, {@code signin}, {@code assurance}, {@code waf}, {@code unavailable}
      */
     private String waitForCcDetailsPageState( WebDriver driver, WebDriverWait wait ) {
         final By CC_DETAILS = ccDetailsLocator();
@@ -548,6 +693,9 @@ public class BookingComSeleniumScraper {
         final By CONTINUE_CC = By.xpath( "//p[normalize-space(text())='Continue to view the credit card details.']" );
 
         return wait.until( d -> {
+            if ( isAwsWafChallenge( d ) ) {
+                return "waf";
+            }
             String url = d.getCurrentUrl();
             if ( url != null && url.contains( "account.booking.com/auth-assurance" ) ) {
                 return "assurance";
@@ -568,12 +716,15 @@ public class BookingComSeleniumScraper {
     }
 
     /**
-     * After OAuth re-auth, wait only for details or unavailability (ignore transient sign-in URLs).
+     * After OAuth re-auth, wait for details, unavailability, or a post-reauth WAF challenge.
      */
     private String waitForCcDetailsAfterReauth( WebDriver driver, WebDriverWait wait ) {
         final By CC_DETAILS = ccDetailsLocator();
         final By CC_NOT_AVAIL = ccUnavailableLocator();
         return wait.until( d -> {
+            if ( isAwsWafChallenge( d ) ) {
+                return "waf";
+            }
             if ( false == d.findElements( CC_NOT_AVAIL ).isEmpty() ) {
                 return "unavailable";
             }
@@ -755,6 +906,334 @@ public class BookingComSeleniumScraper {
             throw new IOException( "Failed fetching " + url + ": " + body );
         }
         return body;
+    }
+
+    /**
+     * True when the current page is showing a visual AWS WAF captcha (not silent token refresh).
+     * <p>
+     * Booking.com currently uses the captcha-sdk {@code jsapi.js} flow, which mounts a custom
+     * {@code awswaf-captcha} element (see {@code booking.com-captcha.at.login.har}). Older pages
+     * use {@code #captcha-container} + {@code window.gokuProps}. {@code challenge.js} alone is
+     * common for silent token refresh and must not count as a visual challenge.
+     */
+    boolean isAwsWafChallenge( WebDriver driver ) {
+        try {
+            Object result = ( (JavascriptExecutor) driver ).executeScript(
+                    "var g = window.gokuProps;"
+                            + "var hasAwsElement = !!document.querySelector('awswaf-captcha');"
+                            + "var hasContainer = !!(document.querySelector('#captcha-container')"
+                            + "  || document.querySelector('#challenge-container')"
+                            + "  || document.querySelector('[id*=\"amzn-captcha\"]')"
+                            + "  || document.querySelector('iframe[src*=\"awswaf\"]')"
+                            + "  || document.querySelector('iframe[src*=\"captcha\"]'));"
+                            + "var hasGoku = !!(g && g.key && (g.iv || g.context));"
+                            + "var scripts = Array.prototype.slice.call(document.querySelectorAll('script[src]'))"
+                            + "  .map(function(s) { return s.src || ''; });"
+                            + "var hasCaptchaJs = scripts.some(function(s) { return s.indexOf('captcha.js') >= 0; });"
+                            + "var hasJsapi = scripts.some(function(s) {"
+                            + "  return s.indexOf('jsapi.js') >= 0 || s.indexOf('captcha-sdk.awswaf.com') >= 0;"
+                            + "});"
+                            + "var visualProblem = false;"
+                            + "try {"
+                            + "  var entries = performance.getEntriesByType('resource') || [];"
+                            + "  for (var i = 0; i < entries.length; i++) {"
+                            + "    var n = entries[i].name || '';"
+                            + "    if (n.indexOf('captcha-sdk.awswaf.com') >= 0 && n.indexOf('problem') >= 0"
+                            + "        && n.indexOf('kind=visual') >= 0) { visualProblem = true; break; }"
+                            + "  }"
+                            + "} catch (e) {}"
+                            + "var bodyText = (document.body && document.body.innerText) ? document.body.innerText : '';"
+                            + "var humanPrompt = /confirm you are human|verify you are human|are you a human|solve this puzzle/i.test(bodyText);"
+                            + "return !!(hasAwsElement"
+                            + "  || (hasJsapi && (visualProblem || humanPrompt || hasContainer))"
+                            + "  || (hasContainer && (hasGoku || hasCaptchaJs || hasJsapi))"
+                            + "  || (hasGoku && (hasCaptchaJs || hasJsapi || humanPrompt)));" );
+            return Boolean.TRUE.equals( result );
+        }
+        catch ( Exception e ) {
+            LOGGER.debug( "AWS WAF detection failed: {}", e.toString() );
+            return false;
+        }
+    }
+
+    /**
+     * Extracts challenge params, solves via 2captcha, injects the token, and waits for the challenge to clear.
+     */
+    void solveAwsWafChallenge( WebDriver driver, WebDriverWait wait ) throws IOException {
+        IOException lastFailure = null;
+        for ( int attempt = 1 ; attempt <= AWS_WAF_MAX_ATTEMPTS ; attempt++ ) {
+            if ( false == isAwsWafChallenge( driver ) ) {
+                if ( attempt == 1 ) {
+                    LOGGER.info( "AWS WAF challenge no longer present before solve" );
+                    return;
+                }
+                // After a failed inject + refresh we often land back on the username form (no captcha).
+                // That is not success — surface the prior failure.
+                if ( lastFailure != null ) {
+                    throw lastFailure;
+                }
+                throw new UnrecoverableFault( "AWS WAF challenge disappeared after failed solve attempt" );
+            }
+            try {
+                AmazonWafChallengeParams params = extractAmazonWafParams( driver );
+                LOGGER.info( "Solving AWS WAF attempt {}/{}: {}", attempt, AWS_WAF_MAX_ATTEMPTS, params );
+                try ( WebClient webClient = new WebClient( BrowserVersion.CHROME ) ) {
+                    webClient.getOptions().setJavaScriptEnabled( false );
+                    webClient.getOptions().setCssEnabled( false );
+                    webClient.getOptions().setThrowExceptionOnFailingStatusCode( false );
+                    webClient.getOptions().setThrowExceptionOnScriptError( false );
+                    AmazonWafSolution solution = captchaSolverService.solveAmazonWaf( webClient, params );
+                    injectAmazonWafSolution( driver, solution );
+                }
+                try {
+                    new WebDriverWait( driver, Duration.ofSeconds( 20 ) )
+                            .until( d -> false == isAwsWafChallenge( d ) );
+                }
+                catch ( TimeoutException te ) {
+                    if ( isAwsWafChallenge( driver ) ) {
+                        LOGGER.warn( "AWS WAF still showing after inject (challenge likely rotated); retrying with fresh params" );
+                        lastFailure = new IOException( "AWS WAF challenge still present after inject", te );
+                        saveAwsWafDebugArtifacts( driver, attempt );
+                        continue;
+                    }
+                    throw te;
+                }
+                if ( isAwsWafTimeoutMessage( driver ) && isAwsWafChallenge( driver ) ) {
+                    LOGGER.warn( "AWS WAF timeout copy still visible; retrying" );
+                    lastFailure = new IOException( "AWS WAF captcha still shows timeout after inject" );
+                    continue;
+                }
+                LOGGER.info( "AWS WAF challenge cleared after attempt {}", attempt );
+                return;
+            }
+            catch ( Exception e ) {
+                lastFailure = e instanceof IOException ? (IOException) e : new IOException( e );
+                LOGGER.warn( "AWS WAF solve attempt {} failed: {}", attempt, e.toString() );
+                saveAwsWafDebugArtifacts( driver, attempt );
+                if ( attempt < AWS_WAF_MAX_ATTEMPTS && isAwsWafChallenge( driver ) ) {
+                    LOGGER.info( "Reloading captcha page to obtain fresh AWS WAF params..." );
+                    driver.navigate().refresh();
+                    sleep( 2 );
+                }
+            }
+        }
+        if ( lastFailure != null ) {
+            throw lastFailure;
+        }
+        throw new UnrecoverableFault( "Failed to solve AWS WAF captcha" );
+    }
+
+    private boolean isAwsWafTimeoutMessage( WebDriver driver ) {
+        try {
+            Object result = ( (JavascriptExecutor) driver ).executeScript(
+                    "var t = (document.body && document.body.innerText) ? document.body.innerText : '';"
+                            + "return /request timed out|please try again|something went wrong/i.test(t);" );
+            return Boolean.TRUE.equals( result );
+        }
+        catch ( Exception e ) {
+            return false;
+        }
+    }
+
+    @SuppressWarnings( "unchecked" )
+    private AmazonWafChallengeParams extractAmazonWafParams( WebDriver driver ) {
+        Object raw = ( (JavascriptExecutor) driver ).executeScript(
+                "var g = window.gokuProps || {};"
+                        + "var scripts = Array.prototype.slice.call(document.querySelectorAll('script[src]'))"
+                        + "  .map(function(s) { return s.src || ''; });"
+                        + "function find(substr) {"
+                        + "  for (var i = 0; i < scripts.length; i++) {"
+                        + "    if (scripts[i].indexOf(substr) >= 0) return scripts[i];"
+                        + "  }"
+                        + "  return null;"
+                        + "}"
+                        + "var key = g.key || null;"
+                        + "var iv = g.iv || null;"
+                        + "var context = g.context || null;"
+                        + "var el = document.querySelector('awswaf-captcha');"
+                        + "if (el && el.config) {"
+                        + "  key = key || el.config.apiKey || el.config.key || null;"
+                        + "}"
+                        + "try {"
+                        + "  var entries = performance.getEntriesByType('resource') || [];"
+                        + "  for (var i = 0; i < entries.length; i++) {"
+                        + "    var n = entries[i].name || '';"
+                        + "    if (n.indexOf('captcha-sdk.awswaf.com') < 0) continue;"
+                        + "    var m = /[?&]api_key=([^&]+)/.exec(n);"
+                        + "    if (m && !key) { key = decodeURIComponent(m[1]); }"
+                        + "  }"
+                        + "} catch (e) {}"
+                        + "return {"
+                        + "  key: key,"
+                        + "  iv: iv,"
+                        + "  context: context,"
+                        + "  challengeScript: find('challenge.js'),"
+                        + "  captchaScript: find('captcha.js'),"
+                        + "  jsapiScript: find('jsapi.js'),"
+                        + "  userAgent: navigator.userAgent || null"
+                        + "};" );
+        if ( false == ( raw instanceof Map ) ) {
+            throw new UnrecoverableFault( "Unable to extract AWS WAF params from page" );
+        }
+        Map<String, Object> map = (Map<String, Object>) raw;
+        String key = map.get( "key" ) == null ? null : map.get( "key" ).toString();
+        String iv = map.get( "iv" ) == null ? null : map.get( "iv" ).toString();
+        String context = map.get( "context" ) == null ? null : map.get( "context" ).toString();
+        String challengeScript = map.get( "challengeScript" ) == null ? null : map.get( "challengeScript" ).toString();
+        String captchaScript = map.get( "captchaScript" ) == null ? null : map.get( "captchaScript" ).toString();
+        String jsapiScript = map.get( "jsapiScript" ) == null ? null : map.get( "jsapiScript" ).toString();
+        String userAgent = map.get( "userAgent" ) == null ? null : map.get( "userAgent" ).toString();
+        if ( StringUtils.isBlank( key ) ) {
+            throw new UnrecoverableFault( "AWS WAF websiteKey missing from page" );
+        }
+        if ( StringUtils.isBlank( jsapiScript ) && ( StringUtils.isBlank( iv ) || StringUtils.isBlank( context ) ) ) {
+            throw new UnrecoverableFault( "AWS WAF iv/context missing and no jsapiScript on page" );
+        }
+        return new AmazonWafChallengeParams( driver.getCurrentUrl(), key, iv, context,
+                challengeScript, captchaScript, jsapiScript, userAgent );
+    }
+
+    private void injectAmazonWafSolution( WebDriver driver, AmazonWafSolution solution ) {
+        LOGGER.info( "Injecting AWS WAF solution taskId={}", solution.getTaskId() );
+        Map<String, String> cookies = new java.util.LinkedHashMap<>( solution.getCookies() );
+        if ( StringUtils.isNotBlank( solution.getExistingToken() )
+                && false == cookies.containsKey( "aws-waf-token" ) ) {
+            cookies.put( "aws-waf-token", solution.getExistingToken() );
+        }
+
+        boolean cookieBagSolution = false == cookies.isEmpty()
+                && StringUtils.isBlank( solution.getCaptchaVoucher() );
+
+        if ( cookieBagSolution ) {
+            applyBookingWafCookies( driver, cookies );
+            try {
+                ( (JavascriptExecutor) driver ).executeScript(
+                        "var token = arguments[0];"
+                                + "try {"
+                                + "  var el = document.querySelector('awswaf-captcha');"
+                                + "  if (el && el.config && typeof el.config.onSuccess === 'function' && token) {"
+                                + "    el.config.onSuccess(token);"
+                                + "  }"
+                                + "} catch (e) {}",
+                        solution.getExistingToken() );
+            }
+            catch ( Exception e ) {
+                LOGGER.debug( "awswaf-captcha.onSuccess after cookie set: {}", e.toString() );
+            }
+            LOGGER.info( "AWS WAF cookies applied on {} names={}; reloading",
+                    driver.getCurrentUrl(), cookies.keySet() );
+            driver.navigate().refresh();
+            sleep( 2 );
+            return;
+        }
+
+        Object applied = ( (JavascriptExecutor) driver ).executeScript(
+                "var voucher = arguments[0];"
+                        + "var token = arguments[1];"
+                        + "var applied = false;"
+                        + "try {"
+                        + "  if (voucher && window.CaptchaScript && typeof window.CaptchaScript.callback === 'function') {"
+                        + "    window.CaptchaScript.callback({ captcha_voucher: voucher, existing_token: token });"
+                        + "    applied = 'CaptchaScript.callback';"
+                        + "  }"
+                        + "} catch (e) { console && console.log && console.log(e); }"
+                        + "try {"
+                        + "  if (!applied && voucher && window.ChallengeScript"
+                        + "      && typeof window.ChallengeScript.submitCaptcha === 'function') {"
+                        + "    window.ChallengeScript.submitCaptcha(voucher, token);"
+                        + "    applied = 'ChallengeScript.submitCaptcha';"
+                        + "  }"
+                        + "} catch (e) { console && console.log && console.log(e); }"
+                        + "try {"
+                        + "  var el = document.querySelector('awswaf-captcha');"
+                        + "  if (!applied && el && el.config && typeof el.config.onSuccess === 'function' && token) {"
+                        + "    el.config.onSuccess(token);"
+                        + "    applied = 'awswaf-captcha.onSuccess';"
+                        + "  }"
+                        + "} catch (e) { console && console.log && console.log(e); }"
+                        + "return applied;",
+                solution.getCaptchaVoucher(), solution.getExistingToken() );
+        LOGGER.info( "AWS WAF solution applied via: {}", applied );
+        if ( StringUtils.isNotBlank( solution.getExistingToken() ) ) {
+            java.util.Map<String, String> tokenCookie = new java.util.LinkedHashMap<>();
+            tokenCookie.put( "aws-waf-token", solution.getExistingToken() );
+            applyBookingWafCookies( driver, tokenCookie );
+        }
+        if ( applied == null || Boolean.FALSE.equals( applied ) || "".equals( applied ) ) {
+            if ( StringUtils.isBlank( solution.getExistingToken() ) ) {
+                throw new UnrecoverableFault( "Unable to inject AWS WAF solution into page" );
+            }
+            LOGGER.warn( "No WAF JS callback available; applied aws-waf-token cookie only" );
+        }
+        driver.navigate().refresh();
+        sleep( 2 );
+    }
+
+    /**
+     * Sets WAF/session cookies for the registrable domain so they are sent to both
+     * {@code account.booking.com} and {@code www.booking.com} challenge endpoints.
+     */
+    void applyBookingWafCookies( WebDriver driver, Map<String, String> cookies ) {
+        for ( Map.Entry<String, String> e : cookies.entrySet() ) {
+            String name = e.getKey();
+            String value = e.getValue();
+            if ( "existing_token".equals( name ) || StringUtils.isBlank( name ) || value == null ) {
+                continue;
+            }
+            String cookieValue = StringUtils.substringBefore( value, ";" );
+            try {
+                try {
+                    driver.manage().deleteCookieNamed( name );
+                }
+                catch ( Exception ignored ) {
+                    // cookie may not exist yet
+                }
+                Cookie cookie = new Cookie.Builder( name, cookieValue )
+                        .domain( AWS_WAF_COOKIE_DOMAIN )
+                        .path( "/" )
+                        .isSecure( true )
+                        .sameSite( "Lax" )
+                        .build();
+                driver.manage().addCookie( cookie );
+            }
+            catch ( Exception ex ) {
+                LOGGER.warn( "Selenium cookie {} failed ({}): falling back to document.cookie", name, ex.toString() );
+                ( (JavascriptExecutor) driver ).executeScript(
+                        "document.cookie = arguments[0] + '=' + arguments[1]"
+                                + " + '; Domain=.booking.com; Path=/; Secure; SameSite=Lax';",
+                        name, cookieValue );
+            }
+        }
+        StringBuilder present = new StringBuilder();
+        for ( Cookie c : driver.manage().getCookies() ) {
+            if ( cookies.containsKey( c.getName() ) || "aws-waf-token".equals( c.getName() ) ) {
+                if ( present.length() > 0 ) {
+                    present.append( ", " );
+                }
+                present.append( c.getName() ).append( "(domain=" ).append( c.getDomain() ).append( ")" );
+            }
+        }
+        LOGGER.info( "WAF cookies now in jar: {}", present );
+    }
+
+    private void saveAwsWafDebugArtifacts( WebDriver driver, int attempt ) {
+        try {
+            File scrFile = ( (TakesScreenshot) driver ).getScreenshotAs( OutputType.FILE );
+            File dest = new File( "logs/bdc-aws-waf-attempt-" + attempt + "-" + System.currentTimeMillis() + ".png" );
+            dest.getParentFile().mkdirs();
+            FileUtils.copyFile( scrFile, dest );
+            LOGGER.info( "Saved AWS WAF debug screenshot to {}", dest.getAbsolutePath() );
+        }
+        catch ( Exception e ) {
+            LOGGER.warn( "Unable to save AWS WAF screenshot: {}", e.toString() );
+        }
+        try {
+            LOGGER.info( "AWS WAF page URL: {}", driver.getCurrentUrl() );
+            LOGGER.debug( "AWS WAF page source: {}", driver.getPageSource() );
+        }
+        catch ( Exception e ) {
+            LOGGER.warn( "Unable to dump AWS WAF page source: {}", e.toString() );
+        }
     }
 
     /**

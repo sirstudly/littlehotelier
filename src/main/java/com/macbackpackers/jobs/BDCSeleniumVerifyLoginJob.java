@@ -13,13 +13,16 @@ import java.time.Duration;
 
 /**
  * Keeps the Booking.com Chrome profile warm by opening groups home via Selenium.
- * Fails loudly if the session is cold (sign-in / captcha) so the profile can be re-seeded.
+ * Cold sessions may auto-recover via 2captcha AWS WAF solve + SMS/phone 2FA
+ * ({@code hbo_bdc_2facode}). Failure means the solver/2FA pipeline is broken — not
+ * necessarily that a manual Chrome profile re-seed is required.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.BDCSeleniumVerifyLoginJob" )
 public class BDCSeleniumVerifyLoginJob extends AbstractJob {
 
-    private static final int MAX_WAIT_SECONDS = 60;
+    /** Allows time for 2captcha (often 30–120s) plus optional 2FA polling. */
+    private static final int MAX_WAIT_SECONDS = 180;
 
     @Autowired
     @Transient

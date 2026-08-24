@@ -1,0 +1,10 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends autossh openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY tunnel-entrypoint.sh /tunnel-entrypoint.sh
+RUN chmod +x /tunnel-entrypoint.sh
+
+ENTRYPOINT ["/tunnel-entrypoint.sh"]

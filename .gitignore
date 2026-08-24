@@ -10,5 +10,6 @@
 /config/
 /.settings
 /credentials
+/proxy/.env
 /.idea
 /.gradle

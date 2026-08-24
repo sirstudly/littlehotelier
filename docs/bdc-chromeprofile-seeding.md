@@ -1,6 +1,6 @@
 # Booking.com Chrome profile seeding (warm session)
 
-Runbook for keeping a durable Chrome `user-data-dir` so Selenium can use Booking.com extranet **without** solving AWS WAF captcha / SMS 2FA on every run.
+Runbook for keeping a durable Chrome `user-data-dir` so Selenium can use Booking.com extranet with fewer AWS WAF / SMS 2FA challenges.
 
 Last validated: July 2026 (CRH on `botpressvm`, multi-property BDC account).
 
@@ -11,7 +11,17 @@ Booking.com extranet login is protected by **AWS WAF** (not PerimeterX). A cold 
 1. Visual captcha
 2. SMS 2FA (and sometimes a second auth-assurance SMS)
 
-A **warm Chrome profile** (cookies + WAF tokens) skips captcha and 2FA on subsequent opens. That is the production strategy; we do **not** automate AWS WAF via 2captcha for this flow.
+Captchas also appear frequently when **viewing credit card details** on secure-admin, even if login itself was warm.
+
+**Production strategy (layered):**
+
+1. **Warm Chrome profile** (cookies + WAF tokens) — preferred; skips most challenges.
+2. **Automated cold recovery** — `BookingComSeleniumScraper` detects AWS WAF, solves via 2captcha (`AmazonTask` / `AmazonTaskProxyless`), then completes SMS/phone 2FA with existing `hbo_bdc_2facode`.
+3. **Manual seed** (this runbook) — first-time profile creation, OS mismatch, or solver/2FA outage.
+
+Prefer configuring `hbo_2captcha_proxy` so egress matches Chrome’s public IP (`AmazonTask`); proxyless works but has higher token-rejection risk on Booking.com.
+
+Login captchas currently use AWS WAF **jsapi** (`awswaf-captcha` custom element + `captcha-sdk.awswaf.com/.../jsapi.js`), not only the older `#captcha-container` / `gokuProps` form. Detection and solve cover both.
 
 VCC discovery uses Selenium + the fresa API after login:
 
@@ -232,8 +242,9 @@ Ensure each DB has `hbo_bdc_hotel_id` set for that property before relying on `g
 
 `BDCSeleniumVerifyLoginJob` (`com.macbackpackers.jobs.BDCSeleniumVerifyLoginJob`) calls `BookingComSeleniumScraper.doLogin` against the Chrome pool. Schedule it like other verify jobs (DB `JobScheduler` / manual insert).
 
-- Success: groups home loads; session stays warm.
-- Failure (redirect to sign-in / captcha): treat as cold profile → re-run this seed runbook; do **not** expect unattended captcha solve.
+- Success: groups home loads; session stays warm (fewer paid captcha solves).
+- Cold login: may auto-recover via 2captcha Amazon WAF + `hbo_bdc_2facode` (allow ~3 minutes).
+- Persistent failure: check 2captcha balance / `hbo_2captcha_api_key` / SMS 2FA pipeline; re-seed only if the Chrome profile is corrupted or first-time setup.
 
 Existing `BDCVerifyLoginJob` still warms **HtmlUnit** `bdc.cookies` only — it does **not** refresh the Chrome profile.
 
@@ -242,6 +253,8 @@ Existing `BDCVerifyLoginJob` still warms **HtmlUnit** `bdc.cookies` only — it 
 | Piece | Location |
 |-------|----------|
 | Selenium login + groups home | `BookingComSeleniumScraper.doLogin` |
+| AWS WAF detect/solve (login + CC view) | `BookingComSeleniumScraper.isAwsWafChallenge` / `solveAwsWafChallenge` |
+| 2captcha Amazon WAF API | `CaptchaSolverService.solveAmazonWaf` |
 | VCC list via fresa JSON | `BookingComSeleniumScraper.getAllVCCBookingsThatCanBeCharged` |
 | Property id | WP/DB option `hbo_bdc_hotel_id` |
 | Chrome options / profile path | `application.properties` → `chromescraper.driver.options` |
@@ -252,12 +265,14 @@ Existing `BDCVerifyLoginJob` still warms **HtmlUnit** `bdc.cookies` only — it 
 
 Re-run the seed procedure when:
 
-- Captcha or sign-in appears again in verify job / manual Chrome
+- First-time profile setup on a host / property
 - Profile dir was deleted or a Mac profile was mistakenly copied in
 - Chrome major upgrade repeatedly breaks the profile (rare; try re-seed on Linux first)
+- 2captcha / 2FA automation is down and you need a temporary warm session
 
 ## Related decisions (2026)
 
 - PerimeterX is gone from this login HAR; AWS WAF is the bot gate.
-- Prefer durable warm profile over 2captcha Amazon WAF automation.
+- Warm profile remains preferred; **2captcha Amazon WAF** covers cold login and card-view challenges.
+- Prefer `hbo_2captcha_proxy` matching Chrome egress (`AmazonTask`) over proxyless.
 - Production VCC discovery may still use Cloudbeds until Selenium path is wired into `CreatePrepaidChargeJob`; the scrape method itself is Selenium + fresa.

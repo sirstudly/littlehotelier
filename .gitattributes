@@ -7,3 +7,6 @@
 *.xml text
 *.sql text
 *.properties text
+*.sh text eol=lf
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
