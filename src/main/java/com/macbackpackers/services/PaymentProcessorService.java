@@ -613,6 +613,18 @@ public class PaymentProcessorService {
      * @throws Exception
      */
     public synchronized void processPrepaidBooking( WebClient webClient, String reservationId ) throws Exception {
+        processPrepaidBooking( webClient, reservationId, null );
+    }
+
+    /**
+     * Does a AUTHORIZE/CAPTURE on the card details on the prepaid BDC booking.
+     *
+     * @param webClient web client for cloudbeds
+     * @param reservationId the unique cloudbeds reservation ID
+     * @param amount optional override; when set, used instead of the VCC balance / balance due
+     * @throws Exception
+     */
+    public synchronized void processPrepaidBooking( WebClient webClient, String reservationId, BigDecimal amount ) throws Exception {
         LOGGER.info( "Processing full payment for booking: " + reservationId );
         Reservation cbReservation = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
@@ -643,15 +655,22 @@ public class PaymentProcessorService {
                 LOGGER.info( "I think this has already been charged... Nothing to do." );
                 return;
             }
-            LOGGER.info( "Looks like a prepaid card... Looking up actual value to charge on BDC" );
             final BigDecimal amountToCharge;
-            WebDriver driver = webDriverPool.borrowObject();
-            try {
-                WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
-                amountToCharge = bdcSeleniumScraper.getVirtualCardBalance( driver, wait, cbReservation.getThirdPartyIdentifier() );
+            if ( amount != null ) {
+                LOGGER.info( "Using specified charge amount of " + cloudbedsScraper.getCurrencyFormat().format( amount ) + "." );
+                amountToCharge = amount;
             }
-            finally {
-                webDriverPool.returnObject( driver );
+            else {
+                LOGGER.info( "Looks like a prepaid card... Looking up actual value to charge on BDC" );
+                WebDriver driver = webDriverPool.borrowObject();
+                try {
+                    WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
+                    amountToCharge = bdcSeleniumScraper.getVirtualCardBalance( driver, wait, cbReservation.getThirdPartyIdentifier() );
+                }
+                finally {
+                    webDriverPool.returnObject( driver );
+                }
+                LOGGER.info( "VCC balance is " + cloudbedsScraper.getCurrencyFormat().format( amountToCharge ) + "." );
             }
             final String MODIFIED_OUTSIDE_OF_BDC = "IMPORTANT: The PREPAID booking seems to have been modified outside of BDC (or payment was incorrectly collected from guest). "
                     + "VCC has been charged for the full amount so any outstanding balance should be PAID BY THE GUEST ON ARRIVAL.";
@@ -680,7 +699,11 @@ public class PaymentProcessorService {
         }
         else {
             try {
-                cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, cbReservation.getBalanceDue() );
+                BigDecimal amountToCharge = amount != null ? amount : cbReservation.getBalanceDue();
+                if ( amount != null ) {
+                    LOGGER.info( "Using specified charge amount of " + cloudbedsScraper.getCurrencyFormat().format( amount ) + "." );
+                }
+                cloudbedsScraper.chargeCardForBooking( webClient, cbReservation, amountToCharge );
             }
             catch( RecordPaymentFailedException rpfe ) {
                 if ( rpfe.getMessage().contains( "insufficient funds" ) && cbReservation.isPossibleHotelCollectSmartFlexReservation() ) {

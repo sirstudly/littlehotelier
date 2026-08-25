@@ -1,9 +1,10 @@
-
 package com.macbackpackers.jobs;
 
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Transient;
+
+import java.math.BigDecimal;
 
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +30,7 @@ public class PrepaidChargeJob extends AbstractJob {
     @Override
     public void processJob() throws Exception {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            paymentProcessor.processPrepaidBooking( webClient, getReservationId() );
+            paymentProcessor.processPrepaidBooking( webClient, getReservationId(), getAmount() );
         }
     }
 
@@ -49,6 +50,26 @@ public class PrepaidChargeJob extends AbstractJob {
      */
     public void setReservationId( String reservationId ) {
         setParameter( "reservation_id", reservationId );
+    }
+
+    /**
+     * Optional charge amount. When set, overrides the VCC balance / balance due in
+     * {@link PaymentProcessorService#processPrepaidBooking} and skips the minimum charge check.
+     *
+     * @return amount to charge, or null to use the default amount
+     */
+    public BigDecimal getAmount() {
+        String amount = getParameter( "amount" );
+        return amount == null ? null : new BigDecimal( amount );
+    }
+
+    /**
+     * Sets an optional charge amount override.
+     *
+     * @param amount amount to charge
+     */
+    public void setAmount( BigDecimal amount ) {
+        setParameter( "amount", amount.toString() );
     }
 
     @Override
