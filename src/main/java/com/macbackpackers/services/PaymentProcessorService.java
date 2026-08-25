@@ -44,7 +44,9 @@ import com.stripe.param.RefundCreateParams;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.htmlunit.WebClient;
+import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -393,6 +395,10 @@ public class PaymentProcessorService {
 
     /**
      * Opens the Cloudbeds/Stripe 3DS2 approve URL in Chrome and waits until the approved landing page.
+     * <p>
+     * Some emails link to a combined request page (Approve and Decline share the same URL). In that
+     * case the browser lands on a page with {@code a.approve} / {@code a.decline}; click Approve
+     * before waiting for {@code /payment/request/approved/}.
      */
     private void approveCloudbedsCardAuthLink( String approveUrl ) throws Exception {
         LOGGER.info( "Opening Cloudbeds 3DS approve URL: {}", approveUrl );
@@ -400,12 +406,27 @@ public class PaymentProcessorService {
         try {
             WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
             driver.get( approveUrl );
-            wait.until( d -> d.getCurrentUrl() != null && d.getCurrentUrl().contains( "/payment/request/approved/" ) );
+            wait.until( d -> {
+                if ( isCardAuthApprovedUrl( d.getCurrentUrl() ) ) {
+                    return true;
+                }
+                List<WebElement> approveLinks = d.findElements( By.cssSelector( "a.approve" ) );
+                return approveLinks.stream().anyMatch( WebElement::isDisplayed );
+            } );
+            if ( false == isCardAuthApprovedUrl( driver.getCurrentUrl() ) ) {
+                LOGGER.info( "Combined 3DS approve/decline page; clicking Approve" );
+                driver.findElement( By.cssSelector( "a.approve" ) ).click();
+                wait.until( d -> isCardAuthApprovedUrl( d.getCurrentUrl() ) );
+            }
             LOGGER.info( "3DS card auth approved: {}", driver.getCurrentUrl() );
         }
         finally {
             webDriverPool.returnObject( driver );
         }
+    }
+
+    private static boolean isCardAuthApprovedUrl( String url ) {
+        return url != null && url.contains( "/payment/request/approved/" );
     }
 
     /**

@@ -1193,6 +1193,10 @@ public class CloudbedsScraper {
      * <p>
      * Cloudbeds {@code event_date} is minute-precision ({@code dd/MM/yyyy hh:mm a}); {@code notBefore}
      * is truncated to the minute so a card add in the same minute as the email is still matched.
+     * <p>
+     * The Approve button may link directly to {@code .../payment/request/.../approve}, or to a
+     * combined request page ({@code .../payment/request/{id}/{uuid}}) that then requires a second
+     * Approve click.
      *
      * @param webClient
      * @param reservationId
@@ -1202,8 +1206,6 @@ public class CloudbedsScraper {
      */
     public String findLatestCardAuthApproveUrl( WebClient webClient, String reservationId, LocalDateTime notBefore )
             throws IOException {
-        final Pattern APPROVE_HREF = Pattern.compile(
-                "href=\"(https://[^\"]+/payment/request/[^\"]+/approve)\"", Pattern.CASE_INSENSITIVE );
         final DateTimeFormatter EVENT_DATE = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a", Locale.ENGLISH );
         final LocalDateTime notBeforeMinute = notBefore.truncatedTo( ChronoUnit.MINUTES );
         final int maxAttempts = 15;
@@ -1238,9 +1240,8 @@ public class CloudbedsScraper {
                             throw new IOException( "email_view missing email for id=" + emailId );
                         }
                         String message = view.getAsJsonObject( "email" ).get( "message" ).getAsString();
-                        Matcher m = APPROVE_HREF.matcher( message );
-                        if ( m.find() ) {
-                            String approveUrl = m.group( 1 ).replace( "\\/", "/" );
+                        String approveUrl = extractCardAuthApproveUrl( message );
+                        if ( approveUrl != null ) {
                             LOGGER.info( "Extracted 3DS approve URL: {}", approveUrl );
                             return approveUrl;
                         }
@@ -1259,6 +1260,23 @@ public class CloudbedsScraper {
         }
         throw lastError != null ? lastError
                 : new IOException( "Timed out waiting for card auth email on reservation " + reservationId );
+    }
+
+    /**
+     * Extracts the Cloudbeds payment-request URL from the Approve button in a card-auth email body.
+     *
+     * @param html email HTML (or JSON-escaped HTML)
+     * @return URL, or {@code null} if not found
+     */
+    static String extractCardAuthApproveUrl( String html ) {
+        if ( StringUtils.isBlank( html ) ) {
+            return null;
+        }
+        String unescaped = html.replace( "\\/", "/" );
+        Matcher m = Pattern.compile(
+                "href=\"(https://[^\"]+/payment/request/[^\"]+)\"[^>]*>\\s*Approve",
+                Pattern.CASE_INSENSITIVE ).matcher( unescaped );
+        return m.find() ? m.group( 1 ) : null;
     }
 
     private void sleepQuietly( int seconds ) {
