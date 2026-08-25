@@ -84,7 +84,56 @@ If that host has no inbound public port (**CGNAT**), you cannot bind the proxy o
   → internet                       (processor host WAN = Chrome’s IP)
 ```
 
-**Public door (not a proxy):** any always-on host with a public IP (or a forwarded WAN port). SSH should be key-only for a dedicated tunnel user. If SSH is not on port 22 at the WAN, map that in the edge firewall. Forward the proxy port (Compose default **3128**) to the reverse-tunnel host’s LAN address. `sshd` needs **`GatewayPorts clientspecified`** (or `yes`) so `-R 0.0.0.0:3128` is reachable on the LAN, not only `127.0.0.1`.
+**Public door (not a proxy):** any always-on Linux host with a public IP (or a forwarded WAN port). It runs **sshd only** — no proxy software. Example setup on Ubuntu (adjust ports if the edge firewall remaps them):
+
+1. **Tunnel-only user** (no password, key auth):
+
+```bash
+sudo adduser --disabled-password --gecos "" tunnel
+sudo mkdir -p /home/tunnel/.ssh
+sudo chmod 700 /home/tunnel/.ssh
+```
+
+2. **Key on the processor host**, pubkey on the public door:
+
+```bash
+# on the processor host
+ssh-keygen -t ed25519 -f ~/.ssh/bdc-proxy-vps -N ""
+cat ~/.ssh/bdc-proxy-vps.pub
+```
+
+```bash
+# on the public door (paste the pubkey)
+echo 'ssh-ed25519 AAAA… comment' | sudo tee /home/tunnel/.ssh/authorized_keys
+sudo chown -R tunnel:tunnel /home/tunnel/.ssh
+sudo chmod 600 /home/tunnel/.ssh/authorized_keys
+```
+
+3. **Allow reverse tunnels to bind on all interfaces** (otherwise `-R` only listens on `127.0.0.1` and 2captcha cannot reach it):
+
+```bash
+echo 'GatewayPorts clientspecified' | sudo tee /etc/ssh/sshd_config.d/gatewayports.conf
+sudo systemctl reload ssh   # or: sudo systemctl reload sshd
+sudo sshd -T | grep -i gatewayports   # expect: gatewayports clientspecified
+```
+
+4. **Harden SSH** (optional but recommended). Live settings beat config-file grep:
+
+```bash
+sudo sshd -T | grep -E '^(passwordauthentication|permitrootlogin|pubkeyauthentication|port) '
+```
+
+Aim for `passwordauthentication no`, `permitrootlogin no` (or `prohibit-password`), `pubkeyauthentication yes`. Drop-ins under `/etc/ssh/sshd_config.d/` can contradict `/etc/ssh/sshd_config`; **`sshd -T` is the source of truth**.
+
+5. **UFW** — allow SSH and the proxy port (Compose default **3128**). `ufw allow OpenSSH` only opens the port sshd actually listens on (often 22); if WAN SSH is remapped by an edge firewall, open that WAN port there too:
+
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 3128/tcp
+sudo ufw status verbose
+```
+
+6. **Edge NAT / port forward** (if the public door is behind a router): forward WAN TCP **3128** → the Linux host’s LAN address:3128. If SSH is not on WAN port 22, forward that as well. After `autossh -R` is up, `ss -tlnp | grep 3128` on the public door should show a listener on `0.0.0.0:3128` (not only `127.0.0.1`).
 
 **Forward proxy (the real hop):** authenticated **3proxy** HTTP CONNECT on the processor host. Debian has no `3proxy` package; `proxy/Dockerfile` builds **3proxy 0.9.5** from source. Config is `proxy/3proxy.cfg.template` (`users …:CL:…`, `auth strong`, `proxy -n -p3128 -a`). Host bind is **`127.0.0.1:3128`** only; 2captcha never talks to that loopback — it uses the public tunnel.
 
