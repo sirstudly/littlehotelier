@@ -1,7 +1,11 @@
 package com.macbackpackers.scrapers;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -38,5 +42,19 @@ public class AwsWafChallengeDetectionTest {
     @Test
     public void detectsLegacyGokuCaptchaContainer() {
         assertTrue( detect( false, true, true, true, false, false, false ) );
+    }
+
+    @Test
+    public void filterAmazonWafCookies_dropsFingerprintCookies() {
+        Map<String, String> bag = new LinkedHashMap<>();
+        bag.put( "existing_token", "tok-abc" );
+        bag.put( "aws-waf-token", "tok-abc" );
+        bag.put( "thx_guid", "guid123" );
+        bag.put( "bkng_bfp", "deadbeef" );
+        Map<String, String> filtered = BookingComSeleniumScraper.filterAmazonWafCookies( bag );
+        assertEquals( "tok-abc", filtered.get( "aws-waf-token" ) );
+        assertEquals( "tok-abc", filtered.get( "existing_token" ) );
+        assertFalse( filtered.containsKey( "thx_guid" ) );
+        assertFalse( filtered.containsKey( "bkng_bfp" ) );
     }
 }

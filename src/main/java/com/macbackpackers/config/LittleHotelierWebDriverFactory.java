@@ -124,6 +124,14 @@ public class LittleHotelierWebDriverFactory extends BasePooledObjectFactory<WebD
         if ( StringUtils.isBlank( chromeUserAgent ) ) {
             return;
         }
+        // application.properties ships a Linux UA for Docker. Applying that plus
+        // Emulation.setUserAgentOverride(platform=Linux) on macOS makes Booking's WAF
+        // reject otherwise-valid tokens (this Mac test logged X11 Linux on chromedriver mac64).
+        if ( false == "Linux".equalsIgnoreCase( System.getProperty( "os.name" ) ) ) {
+            LOGGER.info( "Skipping Linux user-agent override on {} (chromescraper.driver.useragent is for Docker)",
+                    System.getProperty( "os.name" ) );
+            return;
+        }
         String ua = chromeUserAgent.trim();
         List<Map<String, String>> brands = new ArrayList<>();
         brands.add( brand( "Not:A-Brand", "99" ) );

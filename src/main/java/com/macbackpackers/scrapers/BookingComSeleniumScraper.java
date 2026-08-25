@@ -1166,6 +1166,9 @@ public class BookingComSeleniumScraper {
                         + "var key = g.key || null;"
                         + "var iv = g.iv || null;"
                         + "var context = g.context || null;"
+                        + "var challengeScript = find('challenge.js');"
+                        + "var captchaScript = find('captcha.js');"
+                        + "var jsapiScript = find('jsapi.js');"
                         + "var el = document.querySelector('awswaf-captcha');"
                         + "if (el && el.config) {"
                         + "  key = key || el.config.apiKey || el.config.key || null;"
@@ -1174,18 +1177,22 @@ public class BookingComSeleniumScraper {
                         + "  var entries = performance.getEntriesByType('resource') || [];"
                         + "  for (var i = 0; i < entries.length; i++) {"
                         + "    var n = entries[i].name || '';"
-                        + "    if (n.indexOf('captcha-sdk.awswaf.com') < 0) continue;"
-                        + "    var m = /[?&]api_key=([^&]+)/.exec(n);"
-                        + "    if (m && !key) { key = decodeURIComponent(m[1]); }"
+                        + "    if (n.indexOf('captcha-sdk.awswaf.com') >= 0) {"
+                        + "      var m = /[?&]api_key=([^&]+)/.exec(n);"
+                        + "      if (m && !key) { key = decodeURIComponent(m[1]); }"
+                        + "    }"
+                        + "    if (!challengeScript && n.indexOf('challenge.js') >= 0) challengeScript = n;"
+                        + "    if (!captchaScript && n.indexOf('/captcha.js') >= 0) captchaScript = n;"
+                        + "    if (!jsapiScript && n.indexOf('jsapi.js') >= 0) jsapiScript = n;"
                         + "  }"
                         + "} catch (e) {}"
                         + "return {"
                         + "  key: key,"
                         + "  iv: iv,"
                         + "  context: context,"
-                        + "  challengeScript: find('challenge.js'),"
-                        + "  captchaScript: find('captcha.js'),"
-                        + "  jsapiScript: find('jsapi.js'),"
+                        + "  challengeScript: challengeScript,"
+                        + "  captchaScript: captchaScript,"
+                        + "  jsapiScript: jsapiScript,"
                         + "  userAgent: navigator.userAgent || null"
                         + "};" );
         if ( false == ( raw instanceof Map ) ) {
@@ -1212,13 +1219,16 @@ public class BookingComSeleniumScraper {
     private void injectAmazonWafSolution( WebDriver driver, AmazonWafSolution solution ) {
         LOGGER.info( "Injecting AWS WAF solution taskId={}", solution.getTaskId() );
         Map<String, String> parsedCookies = new java.util.LinkedHashMap<>( solution.getCookies() );
-        boolean cookieBagSolution = false == parsedCookies.isEmpty()
-                && StringUtils.isBlank( solution.getCaptchaVoucher() );
+        boolean cookieInject = StringUtils.isBlank( solution.getCaptchaVoucher() )
+                && ( false == parsedCookies.isEmpty() || StringUtils.isNotBlank( solution.getExistingToken() ) );
 
-        if ( cookieBagSolution ) {
-            applyBookingWafCookies( driver, parsedCookies );
-            tryOnSuccess( driver, solution.getExistingToken() );
-            LOGGER.info( "AWS WAF cookie-bag applied names={}; reloading", parsedCookies.keySet() );
+        if ( cookieInject ) {
+            Map<String, String> wafOnly = filterAmazonWafCookies( parsedCookies );
+            if ( wafOnly.isEmpty() && StringUtils.isNotBlank( solution.getExistingToken() ) ) {
+                wafOnly.put( "aws-waf-token", solution.getExistingToken() );
+            }
+            applyBookingWafCookies( driver, wafOnly );
+            LOGGER.info( "AWS WAF token cookie applied names={}; reloading (skip onSuccess)", wafOnly.keySet() );
             driver.navigate().refresh();
             sleep( 2 );
             return;
@@ -1264,24 +1274,34 @@ public class BookingComSeleniumScraper {
         sleep( 2 );
     }
 
-    private void tryOnSuccess( WebDriver driver, String token ) {
-        if ( StringUtils.isBlank( token ) ) {
-            return;
+    /**
+     * Keep only AWS WAF token cookies. 2captcha jsapi bags also include fingerprint
+     * cookies ({@code thx_guid}, {@code bkng_bfp}) from the worker browser; writing those
+     * over Chrome's ThreatMetrix session makes Booking remount the captcha.
+     */
+    static Map<String, String> filterAmazonWafCookies( Map<String, String> cookies ) {
+        Map<String, String> filtered = new java.util.LinkedHashMap<>();
+        if ( cookies == null ) {
+            return filtered;
         }
-        try {
-            ( (JavascriptExecutor) driver ).executeScript(
-                    "var token = arguments[0];"
-                            + "try {"
-                            + "  var el = document.querySelector('awswaf-captcha');"
-                            + "  if (el && el.config && typeof el.config.onSuccess === 'function') {"
-                            + "    el.config.onSuccess(token);"
-                            + "  }"
-                            + "} catch (e) {}",
-                    token );
+        for ( Map.Entry<String, String> e : cookies.entrySet() ) {
+            String name = e.getKey();
+            if ( name == null ) {
+                continue;
+            }
+            String lower = name.toLowerCase();
+            if ( "aws-waf-token".equals( lower ) || "existing_token".equals( lower )
+                    || lower.startsWith( "aws-waf-" ) ) {
+                filtered.put( name, e.getValue() );
+            }
         }
-        catch ( Exception e ) {
-            LOGGER.debug( "awswaf-captcha.onSuccess: {}", e.toString() );
+        if ( filtered.isEmpty() ) {
+            String token = cookies.get( "existing_token" );
+            if ( StringUtils.isNotBlank( token ) ) {
+                filtered.put( "aws-waf-token", token );
+            }
         }
+        return filtered;
     }
 
     /**

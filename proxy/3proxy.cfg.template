@@ -6,5 +6,10 @@ log /dev/stdout
 logformat "- +_L%t.%. %N.%p %E %U %C:%c %R:%r %O %I %h %T"
 users ${PROXY_USER}:CL:${PROXY_PASS}
 auth strong
-allow ${PROXY_USER}
+# Restrict egress to Booking.com + AWS WAF + the fingerprint/IP-check hosts the AmazonTask
+# worker hits while loading account.booking.com. Without this, 2captcha reuses these
+# credentials as a general exit node (geetest, Arkose, GMX, etc.) and poisons this IP.
+# Blocking ThreatMetrix / ipify caused "solved" tokens that Chrome still rejected.
+allow ${PROXY_USER} * *.booking.com,booking.com,*.awswaf.com,awswaf.com,*.bstatic.com,*.online-metrix.net,online-metrix.net,api.ipify.org,ifconfig.me,icanhazip.com 80,443
+deny *
 proxy -n -p3128 -a

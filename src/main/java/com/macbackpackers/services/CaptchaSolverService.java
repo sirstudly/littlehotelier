@@ -395,6 +395,9 @@ public class CaptchaSolverService {
             task.addProperty( "userAgent", params.getUserAgent() );
         }
         if ( params.isJsapi() ) {
+            // Do not also send challenge.js: workers then hit classic captcha.awswaf.com
+            // (41bcdd…) instead of captcha-sdk (d8c14d4960ca) and return a token for the
+            // wrong integration. Chrome's visual widget never accepts it.
             task.addProperty( "jsapiScript", params.getJsapiScript() );
         }
         else {
@@ -536,7 +539,8 @@ public class CaptchaSolverService {
             throw new UnrecoverableFault( "2captcha Amazon WAF ready but empty solution: " + responseBody );
         }
         AmazonWafSolution parsed = new AmazonWafSolution( taskId, voucher, token, cookies );
-        LOGGER.info( "Parsed Amazon WAF solution {}", parsed );
+        LOGGER.info( "Parsed Amazon WAF solution {} tokenLen={}", parsed,
+                token == null ? 0 : token.length() );
         return parsed;
     }
 
