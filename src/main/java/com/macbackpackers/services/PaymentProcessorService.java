@@ -320,11 +320,11 @@ public class PaymentProcessorService {
             ccDetails.setName( ccDetails.getName().replace( "(", "" ).replace( ")", "" ) );
         }
 
-        LOGGER.info( "BDC card copy with 3DS bypass for reservation {} (email {} -> {})", reservationId, originalEmail, bypassEmail );
-        cloudbedsScraper.updateGuestReservationEmail( webClient, reservationId, guestId, bypassEmail );
-
         Exception primaryFailure = null;
         try {
+            LOGGER.info( "BDC card copy with 3DS bypass for reservation {} (email {} -> {})", reservationId, originalEmail, bypassEmail );
+            cloudbedsScraper.updateGuestReservationEmail( webClient, reservationId, guestId, bypassEmail );
+
             LocalDateTime cardAddedAt = LocalDateTime.now();
             cloudbedsScraper.addCardDetails( webClient, reservationId, ccDetails );
 
