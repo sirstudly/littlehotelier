@@ -745,25 +745,45 @@ public class PaymentProcessorService {
         }
 
         List<TransactionRecord> records = cloudbedsScraper.getTransactionsForRefund(webClient, reservationId);
-        if (records.stream()
-                .map(txn -> txn.getCardNumber())
+        // Refund modal includes rate/tax rows with blank card_number; only real card last-4s count.
+        List<TransactionRecord> cardPayments = listCardBackedRefundPayments(records);
+        long distinctCards = cardPayments.stream()
+                .map(TransactionRecord::getCardNumber)
                 .distinct()
-                .collect(Collectors.toList())
-                .size() > 1) {
+                .count();
+        if (distinctCards > 1) {
             throw new UnrecoverableFault("Multiple cards are available to refund against. Please refund manually.");
         }
 
         // find the transaction record that matches the amount exactly
-        Optional<TransactionRecord> txnRecord = records.stream().filter(txn -> txn.getDebitAsBigDecimal().equals(amountToRefund)).findFirst();
+        Optional<TransactionRecord> txnRecord = cardPayments.stream()
+                .filter(txn -> txn.getDebitAsBigDecimal().equals(amountToRefund))
+                .findFirst();
 
         // otherwise, find the first transaction that is large enough that we can refund it
         if (false == txnRecord.isPresent()) {
-            txnRecord = records.stream().filter(txn -> txn.getDebitAsBigDecimal().compareTo(amountToRefund) >= 0).findFirst();
+            txnRecord = cardPayments.stream()
+                    .filter(txn -> txn.getDebitAsBigDecimal().compareTo(amountToRefund) >= 0)
+                    .findFirst();
         }
         if (false == txnRecord.isPresent()) {
             throw new MissingUserDataException("Unable to find suitable transaction to refund against!");
         }
-        cloudbedsScraper.processRefund(webClient, txnRecord.get(), amountToRefund, description);
+        if (cbReservation.getBookingRooms() == null || cbReservation.getBookingRooms().isEmpty()) {
+            throw new MissingUserDataException("No booking room found for reservation " + reservationId);
+        }
+        String bookingRoomId = cbReservation.getBookingRooms().get(0).getId();
+        cloudbedsScraper.processRefund(webClient, txnRecord.get(), bookingRoomId, amountToRefund, description);
+    }
+
+    /**
+     * Refund-modal payloads include rate/tax rows with blank {@code card_number}. Those must not count
+     * as additional cards when deciding whether a prepaid refund can be automated.
+     */
+    static List<TransactionRecord> listCardBackedRefundPayments(List<TransactionRecord> records) {
+        return records.stream()
+                .filter(txn -> StringUtils.isNotBlank(txn.getCardNumber()))
+                .collect(Collectors.toList());
     }
 
     /**

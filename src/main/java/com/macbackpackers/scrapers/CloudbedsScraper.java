@@ -1005,13 +1005,15 @@ public class CloudbedsScraper {
      * 
      * @param webClient web client instance to use
      * @param authTxn original transaction
+     * @param bookingRoomId reservation room allocation to attach the refund to
      * @param amount amount to add
      * @param description description of payment
      * @throws IOException on page load failure
      */
-    public void processRefund( WebClient webClient, TransactionRecord authTxn, BigDecimal amount, String description ) throws IOException {
+    public void processRefund( WebClient webClient, TransactionRecord authTxn, String bookingRoomId,
+            BigDecimal amount, String description ) throws IOException {
         WebRequest requestSettings = jsonRequestFactory.createAddNewProcessRefundRequest(
-                authTxn, amount, description, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+                authTxn, amount, bookingRoomId, description );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 

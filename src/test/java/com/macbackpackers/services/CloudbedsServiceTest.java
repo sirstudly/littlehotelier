@@ -11,6 +11,8 @@ import java.util.Optional;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.jobs.ChargeCustomAmountForBookingJob;
+import com.macbackpackers.jobs.PrepaidChargeJob;
+import com.macbackpackers.jobs.PrepaidRefundJob;
 import com.macbackpackers.utils.AnyByteStringToStringConverter;
 import org.apache.commons.io.IOUtils;
 import org.htmlunit.WebClient;
@@ -241,6 +243,43 @@ public class CloudbedsServiceTest {
     @Test
     public void testCreateSendMostlyFullDormEmailJob() throws Exception {
         cloudbedsService.createSendMostlyFullDormEmailJobs( webClient, "Booking an entire room for your group" );
+    }
+
+    @Test
+    public void testCreatePrepaidJobs() throws Exception {
+        testCreatePrepaidChargeJobs();
+        testCreatePrepaidRefundJobs();
+    }
+
+    @Test
+    public void testCreatePrepaidChargeJobs() throws Exception {
+        cloudbedsService.getAllChargeableVCCsFromBDC()
+                .forEach( vcc -> {
+                    cloudbedsService.getReservationForBDC( vcc.getBookingRef() )
+                            .ifPresentOrElse( r -> {
+                                LOGGER.info( "Creating a PrepaidChargeJob for {} - {} {} for {}",
+                                        r.getReservationId(), r.getFirstName(), r.getLastName(), vcc.getAmount() );
+                                PrepaidChargeJob chargeJob = new PrepaidChargeJob();
+                                chargeJob.setStatus( JobStatus.submitted );
+                                chargeJob.setReservationId( r.getReservationId() );
+                                chargeJob.setAmount( vcc.getAmount() );
+                                dao.insertJob( chargeJob );
+                            }, () -> LOGGER.error( "Unable to find BDC booking {}", vcc.getBookingRef() ) );
+                } );
+    }
+
+    @Test
+    public void testCreatePrepaidRefundJobs() throws Exception {
+        cloudbedsService.getAllVCCBookingsThatMustBeRefunded()
+                .forEach( r -> {
+                    LOGGER.info( "Creating a PrepaidRefundJob for booking " + r );
+                    PrepaidRefundJob refundJob = new PrepaidRefundJob();
+                    refundJob.setStatus( JobStatus.submitted );
+                    refundJob.setReservationId( r.getReservationId() );
+                    refundJob.setAmount( r.getRefundAmount() );
+                    refundJob.setReason( r.getReason() );
+                    dao.insertJob( refundJob );
+                } );
     }
 
     @Test
