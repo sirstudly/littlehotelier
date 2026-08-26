@@ -562,6 +562,23 @@ public class CloudbedsService {
     }
 
     /**
+     * Returns all BDC virtual cards that can be charged, as scraped from Booking.com via Selenium.
+     *
+     * @return chargeable VCCs from BDC
+     * @throws Exception
+     */
+    public List<BookingComVCCToCharge> getAllChargeableVCCsFromBDC() throws Exception {
+        WebDriver driver = webDriverPool.borrowObject();
+        try {
+            WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
+            return bdcSeleniumScraper.getAllVCCBookingsThatCanBeCharged( driver, wait );
+        }
+        finally {
+            webDriverPool.returnObject( driver );
+        }
+    }
+
+    /**
      * Returns all reservations for BDC with virtual cards that can be charged immediately.
      * Looks up chargeable VCCs via Selenium + fresa API, then maps to Cloudbeds reservation ids.
      * No charge-before date filter is applied.
@@ -583,15 +600,7 @@ public class CloudbedsService {
      */
     public Stream<Reservation> getAllVCCBookingsThatCanBeCharged_LookupViaBDC( LocalDate chargeBeforeMax )
             throws Exception {
-        List<BookingComVCCToCharge> vccs;
-        WebDriver driver = webDriverPool.borrowObject();
-        try {
-            WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( chromeMaxWaitSeconds ) );
-            vccs = bdcSeleniumScraper.getAllVCCBookingsThatCanBeCharged( driver, wait );
-        }
-        finally {
-            webDriverPool.returnObject( driver );
-        }
+        List<BookingComVCCToCharge> vccs = getAllChargeableVCCsFromBDC();
         return vccs.stream()
                 .filter( vcc -> chargeBeforeMax == null || vcc.getChargeBeforeDate().isBefore( chargeBeforeMax ) )
                 .peek( vcc -> LOGGER.info( "Chargeable BDC VCC {}: amount={}, chargeBefore={}",
