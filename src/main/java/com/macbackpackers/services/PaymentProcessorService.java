@@ -295,7 +295,7 @@ public class PaymentProcessorService {
             throws Exception {
         final String reservationId = cbReservation.getReservationId();
         final String guestId = cbReservation.getCustomerId();
-        final String originalEmail = cbReservation.getEmail();
+        String originalEmail = cbReservation.getEmail();
         final String bypassEmail = wordpressDAO.getMandatoryOption( "hbo_support_email" );
 
         LOGGER.info( "Retrieving BDC customer card details for BDC#" + cbReservation.getThirdPartyIdentifier() );
@@ -337,6 +337,10 @@ public class PaymentProcessorService {
         finally {
             try {
                 LOGGER.info( "Restoring original guest email on reservation {} to {}", reservationId, originalEmail );
+                if ( "N/A".equalsIgnoreCase( originalEmail ) ) {
+                    originalEmail = "blackhole@dev.null";
+                    LOGGER.info( "Replacing invalid email N/A with {}", originalEmail );
+                }
                 cloudbedsScraper.updateGuestReservationEmail( webClient, reservationId, guestId, originalEmail );
             }
             catch ( Exception restoreEx ) {
