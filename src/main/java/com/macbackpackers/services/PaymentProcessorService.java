@@ -16,6 +16,7 @@ import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.jobs.ArchiveAllTransactionNotesJob;
 import com.macbackpackers.jobs.BDCMarkCreditCardInvalidJob;
+import com.macbackpackers.jobs.CancelHostelworldBookingJob;
 import com.macbackpackers.jobs.HostelworldAcknowledgeFullPaymentTakenJob;
 import com.macbackpackers.jobs.HostelworldReportPaymentIssueJob;
 import com.macbackpackers.jobs.PrepaidChargeJob;
@@ -64,6 +65,8 @@ import java.math.RoundingMode;
 import java.text.ParseException;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -510,8 +513,7 @@ public class PaymentProcessorService {
                 cbReservation.containsNote( CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED );
         boolean finalWarningSent = cbReservation.containsNote(
                 CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED_FINAL_WARNING );
-        boolean finalAttempt = StringUtils.isNotBlank( wordpressDAO.getOption( "hbo_nonref_cancel_window_hours" ) )
-                && firstDeclinedSent && false == finalWarningSent;
+        boolean finalAttempt = firstDeclinedSent && false == finalWarningSent;
 
         try {
             if ( cbReservation.containsNote( CloudbedsScraper.NOTE_WILL_POST_AUTOMATICALLY )
@@ -555,6 +557,7 @@ public class PaymentProcessorService {
             if ( finalAttempt ) {
                 enqueueNonRefundableFinalWarning( reservationId, amountToCharge, ex.getMessage(), cbReservation );
             }
+            enqueueCancelHostelworldBookingIfDue( cbReservation );
         }
         catch ( RecordPaymentFailedException payEx ) {
             LOGGER.info( "Unable to process payment: " + payEx.getMessage() );
@@ -578,7 +581,73 @@ public class PaymentProcessorService {
             else {
                 LOGGER.info( "Declined payment email already sent. Not going to do it again..." );
             }
+            enqueueCancelHostelworldBookingIfDue( cbReservation );
         }
+    }
+
+    /**
+     * Enqueues {@link CancelHostelworldBookingJob} when the cancel-hours option is set and that many
+     * hours have passed since the final-warning email was recorded on the booking.
+     */
+    private void enqueueCancelHostelworldBookingIfDue( Reservation cbReservation ) {
+        String cancelHoursOpt = wordpressDAO.getOption( "hbo_hwl_cancel_booking_hours" );
+        if ( StringUtils.isBlank( cancelHoursOpt ) ) {
+            return;
+        }
+        if ( false == cbReservation.isHostelworldBooking() ) {
+            return;
+        }
+        if ( StringUtils.isBlank( wordpressDAO.getOption( "hbo_hw_password" ) ) ) {
+            return;
+        }
+        String hwlReservationId = cbReservation.getThirdPartyIdentifier();
+        if ( StringUtils.isBlank( hwlReservationId ) ) {
+            LOGGER.warn( "Reservation {} has no Hostelworld booking reference; cannot enqueue cancel job.",
+                    cbReservation.getReservationId() );
+            return;
+        }
+        if ( wordpressDAO.isHostelworldCancelBookingExempt( hwlReservationId ) ) {
+            LOGGER.info( "Booking {} is exempt from automated Hostelworld cancellation.", hwlReservationId );
+            return;
+        }
+        if ( cbReservation.containsNote( CancelHostelworldBookingJob.CANCEL_NOTE ) ) {
+            LOGGER.info( "Reservation {} already has cancel note. Skipping cancel job.",
+                    cbReservation.getReservationId() );
+            return;
+        }
+
+        Optional<LocalDateTime> finalWarningSentAt = getFinalWarningEmailSentAt( cbReservation );
+        if ( false == finalWarningSentAt.isPresent() ) {
+            return;
+        }
+
+        long cancelAfterHours = Long.parseLong( cancelHoursOpt );
+        long hoursSinceWarning = ChronoUnit.HOURS.between( finalWarningSentAt.get(), LocalDateTime.now() );
+        if ( hoursSinceWarning < cancelAfterHours ) {
+            LOGGER.info( "Final warning sent at {}; {} of {} hours elapsed. Not cancelling yet.",
+                    finalWarningSentAt.get(), hoursSinceWarning, cancelAfterHours );
+            return;
+        }
+
+        LOGGER.info( "Enqueueing CancelHostelworldBookingJob for {} ({} hours since final warning).",
+                hwlReservationId, hoursSinceWarning );
+        CancelHostelworldBookingJob cancelJob = new CancelHostelworldBookingJob();
+        cancelJob.setHostelworldReservationId( hwlReservationId );
+        cancelJob.setStatus( JobStatus.submitted );
+        wordpressDAO.insertJob( cancelJob );
+    }
+
+    private Optional<LocalDateTime> getFinalWarningEmailSentAt( Reservation reservation ) {
+        if ( reservation.getNotes() == null ) {
+            return Optional.empty();
+        }
+        final DateTimeFormatter noteCreatedFormat = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss" );
+        return reservation.getNotes().stream()
+                .filter( n -> StringUtils.contains( n.getNotes(),
+                        CloudbedsScraper.TEMPLATE_NON_REFUNDABLE_CHARGE_DECLINED_FINAL_WARNING ) )
+                .filter( n -> StringUtils.isNotBlank( n.getCreated() ) )
+                .map( n -> LocalDateTime.parse( n.getCreated(), noteCreatedFormat ) )
+                .max( LocalDateTime::compareTo );
     }
 
     private void enqueueNonRefundableFinalWarning( String reservationId, BigDecimal amountToCharge,
