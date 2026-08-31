@@ -414,6 +414,14 @@ public interface WordPressDAO {
     List<UnpaidDepositReportEntry> fetchUnpaidDepositReport( int allocationScraperJobId );
 
     /**
+     * Returns true if the Hostelworld booking is exempt from automated cancellation.
+     *
+     * @param bookingReference Hostelworld booking reference (Cloudbeds third-party id)
+     * @return true if present in {@code wp_hwl_cancel_booking_exempt}
+     */
+    boolean isHostelworldCancelBookingExempt( String bookingReference );
+
+    /**
      * Returns the mostly-full dorm report rows for the given allocation scraper job.
      *
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from

@@ -1045,6 +1045,15 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public boolean isHostelworldCancelBookingExempt( String bookingReference ) {
+        Number count = (Number) em.createNativeQuery(
+                "SELECT COUNT(1) FROM wp_hwl_cancel_booking_exempt WHERE booking_reference = :bookingReference" )
+                .setParameter( "bookingReference", bookingReference )
+                .getSingleResult();
+        return count.longValue() > 0;
+    }
+
+    @Override
     public List<MostlyFullDormReportEntry> fetchMostlyFullDormReport( int allocationScraperJobId ) {
         LOGGER.info( "Fetching mostly-full dorm report for allocation job id " + allocationScraperJobId );
         return em.createQuery(

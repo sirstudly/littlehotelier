@@ -542,6 +542,31 @@ public class HostelworldScraper {
         }
 
         LOGGER.info( "Reporting card payment issue for HWL-" + bookingRef + ": " + cardIssue );
+        postCancelBooking( webClient, bookingRef, cardIssue, "ccissue", sendEmailCopy,
+                "Reporting card payment issue probably failed..." );
+    }
+
+    /**
+     * Cancels a booking on the Hostelworld portal (payment issue reason).
+     *
+     * @param webClient the logged-in web client
+     * @param bookingRef HWL reservation id (property ID not required)
+     * @throws IOException on page load or request failure
+     */
+    public synchronized void cancelBooking( WebClient webClient, String bookingRef ) throws IOException {
+
+        if ( StringUtils.isBlank( wordPressDAO.getOption( "hbo_hw_password" ) ) ) {
+            LOGGER.info( "Hostelworld password not set. Unable to cancel booking on HWL." );
+            return;
+        }
+
+        LOGGER.info( "Cancelling HWL booking " + bookingRef );
+        postCancelBooking( webClient, bookingRef, "Payment issue", "paymentissue", true,
+                "Cancel booking probably failed..." );
+    }
+
+    private void postCancelBooking( WebClient webClient, String bookingRef, String comment, String reason,
+            boolean sendEmailCopy, String failureMessage ) throws IOException {
 
         String hwlBookingId = stripHostelworldPropertyPrefix( bookingRef );
         String bookingViewUrl = "https://inbox.hostelworld.com/booking/view/" + hwlBookingId;
@@ -551,8 +576,8 @@ public class HostelworldScraper {
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty( "formToken", formToken );
         requestBody.addProperty( "custID", hwlBookingId );
-        requestBody.addProperty( "comment", cardIssue );
-        requestBody.addProperty( "reason", "ccissue" );
+        requestBody.addProperty( "comment", comment );
+        requestBody.addProperty( "reason", reason );
         requestBody.addProperty( "sendEmailCopy", sendEmailCopy );
 
         WebRequest webRequest = createJsonPostRequest( "https://inbox.hostelworld.com/booking/cancel", bookingViewUrl );
@@ -564,7 +589,7 @@ public class HostelworldScraper {
         JsonElement jelement = gson.fromJson( responsePage.getWebResponse().getContentAsString(), JsonElement.class );
         if ( jelement == null || jelement.getAsJsonObject().get( "success" ) == null ) {
             LOGGER.error( responsePage.getWebResponse().getContentAsString() );
-            throw new WebResponseException( "Reporting card payment issue probably failed...", responsePage.getWebResponse() );
+            throw new WebResponseException( failureMessage, responsePage.getWebResponse() );
         }
     }
 

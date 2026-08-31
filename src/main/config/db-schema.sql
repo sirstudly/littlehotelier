@@ -156,6 +156,13 @@ CREATE TABLE `wp_lh_rpt_unpaid_deposit` (
   FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+-- Hostelworld bookings excluded from automated cancellation
+CREATE TABLE `wp_hwl_cancel_booking_exempt` (
+  `booking_reference` varchar(50) NOT NULL,
+  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`booking_reference`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 CREATE TABLE `wp_lh_group_bookings` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `job_id` bigint(20) unsigned NOT NULL,

@@ -1,0 +1,92 @@
+package com.macbackpackers.jobs;
+
+import org.htmlunit.WebClient;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationContext;
+
+import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.scrapers.CloudbedsScraper;
+import com.macbackpackers.scrapers.HostelworldScraper;
+
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Transient;
+
+/**
+ * Cancels a booking on the Hostelworld portal and notes the matching Cloudbeds booking.
+ */
+@Entity
+@DiscriminatorValue( value = "com.macbackpackers.jobs.CancelHostelworldBookingJob" )
+public class CancelHostelworldBookingJob extends AbstractJob {
+
+    public static final String CANCEL_NOTE = "Canceling due to non-payment -RONBOT";
+
+    @Autowired
+    @Transient
+    private HostelworldScraper hostelworldScraper;
+
+    @Autowired
+    @Transient
+    private CloudbedsScraper cloudbedsScraper;
+
+    @Autowired
+    @Transient
+    @Qualifier( "webClientForHostelworld" )
+    private WebClient hwlWebClient;
+
+    @Autowired
+    @Transient
+    private ApplicationContext appContext;
+
+    @Override
+    public void processJob() throws Exception {
+        if ( dao.isHostelworldCancelBookingExempt( getHostelworldReservationId() ) ) {
+            throw new UnrecoverableFault(
+                    "Booking " + getHostelworldReservationId() + " is exempt from automated Hostelworld cancellation." );
+        }
+        try (WebClient cbWebClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
+            Reservation reservation = findCloudbedsReservation( cbWebClient );
+            if ( reservation.containsNote( CANCEL_NOTE ) ) {
+                LOGGER.info( "Reservation {} already has cancel note. Nothing to do.",
+                        reservation.getReservationId() );
+                return;
+            }
+
+            hostelworldScraper.cancelBooking( hwlWebClient, getHostelworldReservationId() );
+            cloudbedsScraper.addNote( cbWebClient, reservation.getReservationId(), CANCEL_NOTE );
+        }
+    }
+
+    private Reservation findCloudbedsReservation( WebClient cbWebClient ) throws Exception {
+        String hwlReservationId = getHostelworldReservationId();
+        return cloudbedsScraper.getReservations( cbWebClient, hwlReservationId ).stream()
+                .filter( c -> c.getSourceName() != null && c.getSourceName().contains( "Hostelworld" ) )
+                .map( c -> cloudbedsScraper.getReservationRetry( cbWebClient, c.getId() ) )
+                .filter( r -> r.getThirdPartyIdentifier().equals( hwlReservationId ) )
+                .findFirst()
+                .orElseThrow( () -> new MissingUserDataException(
+                        "No Cloudbeds Hostelworld booking found for hwl_reservation_id " + hwlReservationId ) );
+    }
+
+    @Override
+    public void finalizeJob() {
+        hwlWebClient.close();
+    }
+
+    public void setHostelworldReservationId( String hwlReservationId ) {
+        setParameter( "hwl_reservation_id", hwlReservationId );
+    }
+
+    public String getHostelworldReservationId() {
+        return getParameter( "hwl_reservation_id" );
+    }
+
+    @Override
+    public int getRetryCount() {
+        return 1; // limit failed attempts
+    }
+
+}
