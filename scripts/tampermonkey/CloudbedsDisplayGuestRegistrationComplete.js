@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cloudbeds Display Guest Registration Complete
 // @namespace    http://cloudbeds.com/
-// @version      0.3
+// @version      0.5
 // @updateURL    https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsDisplayGuestRegistrationComplete.js
 // @downloadURL  https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsDisplayGuestRegistrationComplete.js
 // @description  Show guest identity-document registration status next to the reservation guest name.
@@ -23,8 +23,10 @@
     var MSG_STYLE = 'margin-left: 12px; font-weight: bold; color: #6d4aff;';
     var DATA_EVENT = 'cb:guest-reg-data';
 
-    // reservationId -> status message string
+    // reservationId -> status message string (for waitForCache)
     var cache = {};
+    // reservationId -> snapshot used to rebuild status after guest edits
+    var reservationCache = {};
 
     var keepAliveObserver = null;
     var keepAliveReservationId = null;
@@ -101,18 +103,92 @@
         return null;
     }
 
-    function handleReservationPayload(payload) {
-        var reservation = unwrapReservation(payload);
-        if (!reservation || reservation.reservation_id == null) { return; }
-
-        var reservationId = String(reservation.reservation_id);
-        cache[reservationId] = buildStatusMessage(reservation);
+    function refreshStatus(reservationId) {
+        var res = reservationCache[reservationId];
+        if (!res) { return; }
+        cache[reservationId] = buildStatusMessage(res);
         window.dispatchEvent(new CustomEvent(DATA_EVENT, {
             detail: { reservationId: reservationId }
         }));
-        // XHR often arrives before .page-title h3; inject when ready and keep alive
-        // even if onReservation already finished (or raced ahead).
         scheduleInject(reservationId);
+    }
+
+    function storeReservation(reservation) {
+        var reservationId = String(reservation.reservation_id);
+        reservationCache[reservationId] = {
+            reservation_id: reservationId,
+            adults_number: reservation.adults_number,
+            kids_number: reservation.kids_number,
+            additional_guests: reservation.additional_guests || []
+        };
+        refreshStatus(reservationId);
+    }
+
+    function applyGuestListUpdate(bookingId, guests) {
+        if (!bookingId || !Array.isArray(guests)) { return; }
+        bookingId = String(bookingId);
+        var res = reservationCache[bookingId];
+        if (!res) { return; }
+        res.additional_guests = guests;
+        refreshStatus(bookingId);
+    }
+
+    function parseJsonResponse(text) {
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function bookingIdFromUrl(url) {
+        var match = /[?&]bookingId=(\d+)/.exec(String(url || ''));
+        return match ? match[1] : null;
+    }
+
+    function bookingIdFromFormBody(body) {
+        if (!body) { return null; }
+        var text = typeof body === 'string' ? body : '';
+        var match = /(?:^|&)(?:bookingId|booking_id)=(\d+)/.exec(text);
+        if (match) { return match[1]; }
+        // updateOne sends guest JSON in a `data=` field, then &bookingId=…
+        match = /[?&]bookingId=(\d+)/.exec(text);
+        return match ? match[1] : null;
+    }
+
+    function guestsFromGuestUpdatePayload(payload) {
+        if (!payload || !payload.success) { return null; }
+        if (payload.data && Array.isArray(payload.data.guests)) {
+            return payload.data.guests;
+        }
+        if (Array.isArray(payload.guests)) { return payload.guests; }
+        return null;
+    }
+
+    function handleGuestUpdateResponse(payload, bookingId) {
+        var guests = guestsFromGuestUpdatePayload(payload);
+        if (guests === null) { return; }
+        if (!bookingId && guests[0] && guests[0].booking_id) {
+            bookingId = guests[0].booking_id;
+        }
+        applyGuestListUpdate(bookingId, guests);
+    }
+
+    function handleReservationPayload(payload) {
+        var reservation = unwrapReservation(payload);
+        if (!reservation || reservation.reservation_id == null) { return; }
+        storeReservation(reservation);
+    }
+
+    function isGetReservationUrl(url) {
+        return /\/connect\/reservations\/get_reservation(?:\?|$)/.test(url) ||
+            /\/reservations\/get_reservation(?:\?|$)/.test(url);
+    }
+
+    // Guest Details saves and add/delete guest (HAR: updateOne, addOne, deleteOne).
+    function isGuestReservationMutationUrl(url) {
+        return /\/connect\/guestReservations\/(?:updateOne|addOne|deleteOne)(?:\?|$)/.test(url) ||
+            /\/guestReservations\/(?:updateOne|addOne|deleteOne)(?:\?|$)/.test(url);
     }
 
     function installXhrHook() {
@@ -134,17 +210,27 @@
             return originalOpen.apply(this, arguments);
         };
 
-        XHR.prototype.send = function () {
+        XHR.prototype.send = function (body) {
             var xhr = this;
             var url = xhr.__cbGuestRegUrl || '';
-            if (/\/connect\/reservations\/get_reservation(?:\?|$)/.test(url) ||
-                    /\/reservations\/get_reservation(?:\?|$)/.test(url)) {
+            var bookingId = bookingIdFromUrl(url) || bookingIdFromFormBody(body);
+
+            if (isGetReservationUrl(url)) {
                 xhr.addEventListener('load', function () {
                     if (xhr.status < 200 || xhr.status >= 300) { return; }
-                    try {
-                        handleReservationPayload(JSON.parse(xhr.responseText));
-                    } catch (e) {
-                        console.error('[CB:guest-reg-complete] failed to parse get_reservation', e);
+                    var payload = parseJsonResponse(xhr.responseText);
+                    if (payload) {
+                        handleReservationPayload(payload);
+                    } else {
+                        console.error('[CB:guest-reg-complete] failed to parse get_reservation');
+                    }
+                });
+            } else if (isGuestReservationMutationUrl(url)) {
+                xhr.addEventListener('load', function () {
+                    if (xhr.status < 200 || xhr.status >= 300) { return; }
+                    var payload = parseJsonResponse(xhr.responseText);
+                    if (payload) {
+                        handleGuestUpdateResponse(payload, bookingId);
                     }
                 });
             }
