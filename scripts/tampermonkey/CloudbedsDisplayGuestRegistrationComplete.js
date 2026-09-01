@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cloudbeds Display Guest Registration Complete
 // @namespace    http://cloudbeds.com/
-// @version      0.2
+// @version      0.3
 // @updateURL    https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsDisplayGuestRegistrationComplete.js
 // @downloadURL  https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsDisplayGuestRegistrationComplete.js
 // @description  Show guest identity-document registration status next to the reservation guest name.
@@ -34,12 +34,22 @@
         return value == null || String(value).trim() === '';
     }
 
+    // UK / Ireland: document type + issuing country required; number optional.
+    function isDocumentNumberOptional(guest) {
+        var code = String(guest.document_issuing_country || '').trim().toUpperCase();
+        if (code === 'GB' || code === 'IE') { return true; }
+        var name = String(guest.document_issuing_country_name || '').trim().toLowerCase();
+        return name === 'ireland' ||
+            name === 'united kingdom' ||
+            name === 'united kingdom of great britain and northern ireland';
+    }
+
     function isDocumentComplete(guest) {
         var type = guest.document_type;
         if (isBlank(type) || type === 'na' || type === '-') { return false; }
-        if (isBlank(guest.document_number)) { return false; }
         var country = guest.document_issuing_country;
         if (isBlank(country) || country === 'na') { return false; }
+        if (!isDocumentNumberOptional(guest) && isBlank(guest.document_number)) { return false; }
         return true;
     }
 
