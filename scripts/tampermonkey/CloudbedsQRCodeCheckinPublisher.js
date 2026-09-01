@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cloudbeds QR Code Checkin Publisher
 // @namespace    http://cloudbeds.com/
-// @version      0.4
+// @version      0.5
 // @updateURL    https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsQRCodeCheckinPublisher.js
 // @downloadURL  https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsQRCodeCheckinPublisher.js
 // @description  Push QR code updates onto backoffice site.
@@ -24,7 +24,8 @@
 
         // Only offer publishing for confirmed / confirmation-pending bookings.
         var confirmable = CB.byText(statusSelect, 'button', 'Confirmed').length ||
-            CB.byText(statusSelect, 'button', 'Confirmation Pending').length;
+            CB.byText(statusSelect, 'button', 'Confirmation Pending').length ||
+            CB.byText(statusSelect, 'button', 'In-House').length;
         if (!confirmable) { return; }
 
         var titleEl = document.querySelector("div[class='page-title'] h4");
