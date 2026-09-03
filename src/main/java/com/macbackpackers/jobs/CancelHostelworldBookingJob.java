@@ -45,10 +45,6 @@ public class CancelHostelworldBookingJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        if ( false == isEnabled() ) { // default to false; to be removed once testing is complete
-            throw new UnrecoverableFault( "This job is not currently enabled!" );
-        }
-
         if ( dao.isHostelworldCancelBookingExempt( getHostelworldReservationId() ) ) {
             throw new UnrecoverableFault(
                     "Booking " + getHostelworldReservationId() + " is exempt from automated Hostelworld cancellation." );
@@ -107,14 +103,6 @@ public class CancelHostelworldBookingJob extends AbstractJob {
 
     public String getHostelworldReservationId() {
         return getParameter( "hwl_reservation_id" );
-    }
-
-    public void setEnabled( boolean isEnabled ) {
-        setParameter( "is_enabled", Boolean.toString( isEnabled ) );
-    }
-
-    public boolean isEnabled() {
-        return Boolean.TRUE.toString().equalsIgnoreCase( getParameter( "is_enabled" ) );
     }
 
     @Override

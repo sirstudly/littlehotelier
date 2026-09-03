@@ -1,6 +1,7 @@
 
 package com.macbackpackers.jobs;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import jakarta.persistence.DiscriminatorValue;
@@ -36,6 +37,7 @@ public class CreateChargeNonRefundableBookingJob extends AbstractJob {
                 "Booking.com (Hotel Collect Booking)", "Hostelworld & Hostelbookers (Hotel Collect Booking)", "Hostelworld (Hotel Collect Booking)" )
                 .stream()
                 .filter( p -> false == p.isPaid() )
+                .filter( p -> p.getPaidValue().equals( BigDecimal.ZERO ) )
                 .filter( p -> p.isHotelCollectBooking() )
                 .filter( p -> p.isNonRefundable() )
                 // should we charge cancelled bookings?
