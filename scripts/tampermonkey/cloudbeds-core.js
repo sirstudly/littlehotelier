@@ -20,7 +20,7 @@
 
     if (window.CB) { return; } // already initialised in this sandbox
 
-    var CORE_VERSION = '1.4';
+    var CORE_VERSION = '1.5';
     // One visible line so we can confirm in DevTools which core build is running.
     console.info('[CB] cloudbeds-core v' + CORE_VERSION + ' loaded');
 
@@ -78,17 +78,40 @@
     }
     installLocationChange();
 
+    // propertyIds match /connect/{id} in the URL — preferred over <title> matching
+    // because title is often still generic on cold loads (esp. Firefox) when
+    // onReservation first snapshots context(), long before the SPA sets it.
     var HOSTEL_MAP = [
-        { title: 'Castle Rock', path: 'CRH' },
-        { title: 'High Street', path: 'HSH' },
-        { title: 'Royal Mile', path: 'RMB' },
-        { title: 'Lochside', path: 'LSH' }
+        { title: 'Castle Rock', path: 'CRH', propertyIds: ['17363'] },
+        { title: 'High Street', path: 'HSH', propertyIds: ['17959'] },
+        { title: 'Royal Mile', path: 'RMB', propertyIds: ['18265'] },
+        { title: 'Lochside', path: 'LSH', propertyIds: ['18137'] }
     ];
 
-    // Detect the hostel from the document <title>. Returns the matching map entry
-    // or null when zero / more than one match (mirrors the old $.grep length check).
-    function detectHostel() {
-        var title = document.title || '';
+    // Prefer the page-realm title (unsafeWindow) — Tampermonkey's Firefox sandbox
+    // can lag or disagree with the visible tab title during SPA boot.
+    function pageTitle() {
+        var parts = [];
+        try {
+            if (pageWindow.document && pageWindow.document.title) {
+                parts.push(pageWindow.document.title);
+            }
+        } catch (e) { /* cross-realm access can throw */ }
+        if (document.title) { parts.push(document.title); }
+        return parts.join(' ');
+    }
+
+    // Detect the hostel from property id (preferred) or document <title>.
+    // Returns the matching map entry or null when zero / more than one match.
+    function detectHostel(propertyId) {
+        if (propertyId != null && propertyId !== '') {
+            var id = String(propertyId);
+            var byId = HOSTEL_MAP.filter(function (h) {
+                return (h.propertyIds || []).indexOf(id) !== -1;
+            });
+            if (byId.length === 1) { return byId[0]; }
+        }
+        var title = pageTitle();
         var matches = HOSTEL_MAP.filter(function (h) { return title.indexOf(h.title) !== -1; });
         return matches.length === 1 ? matches[0] : null;
     }
@@ -107,12 +130,13 @@
         var loc = currentLocation();
         var propMatch = /\/connect\/(\d+)/.exec(loc.pathname);
         var resMatch = /#\/reservations\/(\d+)/.exec(loc.hash);
-        var hostel = detectHostel();
+        var propertyId = propMatch ? propMatch[1] : null;
+        var hostel = detectHostel(propertyId);
         return {
             host: loc.host,
-            propertyId: propMatch ? propMatch[1] : null,
+            propertyId: propertyId,
             reservationId: resMatch ? resMatch[1] : null,
-            hostel: hostel,               // { title, path } or null
+            hostel: hostel,               // { title, path, propertyIds } or null
             hostelPath: hostel ? hostel.path : null
         };
     }

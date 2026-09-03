@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cloudbeds QR Code Checkin Publisher
 // @namespace    http://cloudbeds.com/
-// @version      0.5
+// @version      0.6
 // @updateURL    https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsQRCodeCheckinPublisher.js
 // @downloadURL  https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsQRCodeCheckinPublisher.js
 // @description  Push QR code updates onto backoffice site.
@@ -37,12 +37,21 @@
         link.textContent = 'Publish QR Code';
 
         link.addEventListener('click', function () {
-            if (!ctx.hostelPath) { alert('Unable to locate hostel?'); return; }
-            if (!bookingRef) { alert('Unable to locate booking reference?'); return; }
+            // Re-resolve on click: early onReservation ctx can miss hostelPath when
+            // document.title was still generic (common on Firefox cold loads).
+            var live = CB.context();
+            var hostelPath = live.hostelPath || ctx.hostelPath;
+            var ref = bookingRef;
+            if (!ref) {
+                var liveTitle = document.querySelector("div[class='page-title'] h4");
+                ref = liveTitle ? (liveTitle.textContent || '').trim() : '';
+            }
+            if (!hostelPath) { alert('Unable to locate hostel?'); return; }
+            if (!ref) { alert('Unable to locate booking reference?'); return; }
             CB.gmFetch({
                 method: 'GET',
-                url: 'https://wss.backoffice.macbackpackers.com/' + ctx.hostelPath +
-                    '?booking_ref=' + encodeURIComponent(bookingRef)
+                url: 'https://wss.backoffice.macbackpackers.com/' + hostelPath +
+                    '?booking_ref=' + encodeURIComponent(ref)
             }).then(function (r) {
                 alert(r.responseText);
             }).catch(function (r) {
@@ -58,7 +67,9 @@
             skipExisting: !!(meta && meta.skipExisting)
         }).then(function (statusSelect) {
             if (!statusSelect) { return false; }
-            publishQRCode(statusSelect, ctx);
+            // Prefer a fresh context after the reservation UI has settled.
+            var live = CB.context();
+            publishQRCode(statusSelect, live.hostelPath ? live : ctx);
             return true;
         });
     });
