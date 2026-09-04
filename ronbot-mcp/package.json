@@ -1,0 +1,28 @@
+{
+  "name": "ronbot-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP ops server for LittleHotelier / ronbot",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@google-cloud/secret-manager": "^5.6.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "mysql2": "^3.14.1",
+    "zod": "^3.25.28"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

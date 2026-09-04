@@ -1,16 +1,9 @@
-
-package com.macbackpackers.beans.cloudbeds.responses;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-
-import com.google.gson.annotations.SerializedName;
+package com.macbackpackers.ronbot.dto;
 
 /**
- * Corresponds with an entry on the "Folio" page for a booking.
- *
+ * Redacted folio transaction for ronbot responses.
  */
-public class TransactionRecord {
+public class TransactionDto {
 
     private String id;
     private String reservationId;
@@ -18,7 +11,6 @@ public class TransactionRecord {
     private String description;
     private String notes;
     private String type;
-    @SerializedName( "void" )
     private Object voidFlag;
     private Boolean canBeVoided;
     private String debit;
@@ -26,10 +18,8 @@ public class TransactionRecord {
     private String paid;
     private String transactionType;
     private String creditCardType;
-    private String creditCardId;
-    private String cardNumber;
-    private String gatewayAuthorization;
-    private String paymentId;
+    /** Masked / last4 only — never full PAN. */
+    private String cardNumberLast4;
     private String paymentStatus;
     private String gatewayName;
     private String originalDescription;
@@ -46,7 +36,7 @@ public class TransactionRecord {
         return reservationId;
     }
 
-    public void setReservationId(String reservationId) {
+    public void setReservationId( String reservationId ) {
         this.reservationId = reservationId;
     }
 
@@ -98,21 +88,6 @@ public class TransactionRecord {
         this.canBeVoided = canBeVoided;
     }
 
-    public boolean isVoided() {
-        if ( voidFlag instanceof Boolean ) {
-            return Boolean.TRUE.equals( voidFlag );
-        }
-        if ( voidFlag != null ) {
-            String s = voidFlag.toString();
-            return "1".equals( s ) || "true".equalsIgnoreCase( s );
-        }
-        return false;
-    }
-
-    public boolean isVoidable() {
-        return Boolean.TRUE.equals( canBeVoided );
-    }
-
     public String getDebit() {
         return debit;
     }
@@ -127,35 +102,6 @@ public class TransactionRecord {
 
     public void setCredit( String credit ) {
         this.credit = credit;
-    }
-
-    public BigDecimal getDebitAsBigDecimal() {
-        return debit == null ? null : new BigDecimal( debit.replaceAll( "£", "" ) );
-    }
-
-    public BigDecimal getCreditAsBigDecimal() {
-        if ( credit == null || credit.trim().isEmpty() ) {
-            return null;
-        }
-        return new BigDecimal( credit.replaceAll( "£", "" ) );
-    }
-
-    /**
-     * Signed folio amount this EVL tax/adjustment line contributes to the visitor levy total.
-     */
-    public BigDecimal getVisitorLevyContribution() {
-        BigDecimal creditAmount = getCreditAsBigDecimal();
-        if ( creditAmount == null ) {
-            return BigDecimal.ZERO.setScale( 2, RoundingMode.HALF_UP );
-        }
-        return creditAmount.setScale( 2, RoundingMode.HALF_UP );
-    }
-
-    public BigDecimal getPaidAsBigDecimal() {
-        if ( paid == null || paid.trim().isEmpty() ) {
-            return null;
-        }
-        return new BigDecimal( paid.replaceAll( "£", "" ) );
     }
 
     public String getPaid() {
@@ -182,36 +128,12 @@ public class TransactionRecord {
         this.creditCardType = creditCardType;
     }
 
-    public String getCreditCardId() {
-        return creditCardId;
+    public String getCardNumberLast4() {
+        return cardNumberLast4;
     }
 
-    public void setCreditCardId( String creditCardId ) {
-        this.creditCardId = creditCardId;
-    }
-
-    public String getCardNumber() {
-        return cardNumber;
-    }
-
-    public void setCardNumber( String cardNumber ) {
-        this.cardNumber = cardNumber;
-    }
-
-    public String getGatewayAuthorization() {
-        return gatewayAuthorization;
-    }
-
-    public void setGatewayAuthorization( String gatewayAuthorization ) {
-        this.gatewayAuthorization = gatewayAuthorization;
-    }
-
-    public String getPaymentId() {
-        return paymentId;
-    }
-
-    public void setPaymentId( String paymentId ) {
-        this.paymentId = paymentId;
+    public void setCardNumberLast4( String cardNumberLast4 ) {
+        this.cardNumberLast4 = cardNumberLast4;
     }
 
     public String getPaymentStatus() {
@@ -237,5 +159,4 @@ public class TransactionRecord {
     public void setOriginalDescription( String originalDescription ) {
         this.originalDescription = originalDescription;
     }
-
 }

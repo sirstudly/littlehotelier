@@ -27,6 +27,7 @@ import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.context.annotation.Scope;
@@ -42,10 +43,29 @@ import com.macbackpackers.services.BasicCardMask;
 
 @Configuration
 @EnableTransactionManagement
-@ComponentScan( "com.macbackpackers" )
 @Import( { DatabaseConfig.class, ChromeForTestingConfig.class } )
 @PropertySource("classpath:application.properties")
 @PropertySource(value = "classpath:application-${spring.profiles.active}.properties")
+@ComponentScan(
+        basePackages = "com.macbackpackers",
+        excludeFilters = {
+                @ComponentScan.Filter(
+                        type = FilterType.REGEX,
+                        pattern = "com\\.macbackpackers\\.ronbot\\..*"
+                ),
+                @ComponentScan.Filter(
+                        type = FilterType.ASSIGNABLE_TYPE,
+                        classes = {
+                                com.macbackpackers.ronbot.RunRonbotReadApi.class,
+                                com.macbackpackers.ronbot.PropertyContextRegistry.class,
+                                com.macbackpackers.ronbot.RonbotReadController.class,
+                                com.macbackpackers.ronbot.RonbotReadService.class,
+                                com.macbackpackers.ronbot.RonbotAuthFilter.class,
+                                com.macbackpackers.ronbot.RonbotPropertyBootstrap.class
+                        }
+                )
+        }
+)
 public class LittleHotelierConfig {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );

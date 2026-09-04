@@ -230,6 +230,8 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>com.macbackpackers.RunProcessor</mainClass>
+                    <!-- ZIP layout enables PropertiesLauncher so docker can override loader.main -->
+                    <layout>ZIP</layout>
                 </configuration>
             </plugin>
         </plugins>

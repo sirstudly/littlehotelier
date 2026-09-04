@@ -48,8 +48,9 @@ public class DatabaseConfig {
             @Value( "${db.username}" ) String username,
             @Value( "${db.password}" ) String password,
             @Value( "${db.poolsize.min}" ) int minPoolSize,
-            @Value( "${db.poolsize.max}" ) int maxPoolSize ) throws PropertyVetoException {
-        return createDataSource( url, username, password, minPoolSize, maxPoolSize );
+            @Value( "${db.poolsize.max}" ) int maxPoolSize,
+            @Value( "${db.connection.timeout.ms:30000}" ) long connectionTimeoutMs ) throws PropertyVetoException {
+        return createDataSource( url, username, password, minPoolSize, maxPoolSize, connectionTimeoutMs );
     }
 
     @Bean( name = "sharedDataSource" )
@@ -58,11 +59,13 @@ public class DatabaseConfig {
             @Value( "${shareddb.username}" ) String username,
             @Value( "${shareddb.password}" ) String password,
             @Value( "${shareddb.poolsize.min}" ) int minPoolSize,
-            @Value( "${shareddb.poolsize.max}" ) int maxPoolSize ) throws PropertyVetoException {
-        return createDataSource( url, username, password, minPoolSize, maxPoolSize );
+            @Value( "${shareddb.poolsize.max}" ) int maxPoolSize,
+            @Value( "${db.connection.timeout.ms:30000}" ) long connectionTimeoutMs ) throws PropertyVetoException {
+        return createDataSource( url, username, password, minPoolSize, maxPoolSize, connectionTimeoutMs );
     }
 
-    private DataSource createDataSource( String dbUrl, String user, String pass, int minPoolSize, int maxPoolSize ) throws PropertyVetoException {
+    private DataSource createDataSource( String dbUrl, String user, String pass, int minPoolSize, int maxPoolSize,
+            long connectionTimeoutMs ) throws PropertyVetoException {
         HikariConfig config = new HikariConfig();
         config.setDriverClassName( driverClass );
         config.setJdbcUrl( dbUrl );
@@ -70,6 +73,7 @@ public class DatabaseConfig {
         config.setPassword( pass );
         config.setMaximumPoolSize( maxPoolSize );
         config.setMinimumIdle( minPoolSize );
+        config.setConnectionTimeout( connectionTimeoutMs );
         config.setConnectionTestQuery( "SELECT 1" );
         return new HikariDataSource( config );
     }

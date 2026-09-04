@@ -59,6 +59,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -399,6 +400,54 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( "reservationId", reservationId )
                 .getSingleResult();
         return count.longValue() > 0;
+    }
+
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public List<Map<String, Object>> listJobsForReservation( String reservationId, int limit ) {
+        if ( StringUtils.isBlank( reservationId ) ) {
+            return Collections.emptyList();
+        }
+        int capped = Math.max( 1, Math.min( limit, 200 ) );
+        // MySQL 5.5-safe: no CTE. Jobs that mention this reservation_id in params.
+        List<Object[]> rows = em.createNativeQuery(
+                "SELECT j.job_id, j.classname, j.status, j.processed_by, "
+                        + "       j.created_date, j.start_date, j.end_date, j.last_updated_date "
+                        + "  FROM wp_lh_jobs j "
+                        + " WHERE j.job_id IN ( "
+                        + "       SELECT p.job_id FROM wp_lh_job_param p "
+                        + "        WHERE p.name = 'reservation_id' AND p.value = :reservationId "
+                        + " ) "
+                        + " ORDER BY j.job_id DESC "
+                        + " LIMIT " + capped )
+                .setParameter( "reservationId", reservationId )
+                .getResultList();
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for ( Object[] row : rows ) {
+            Map<String, Object> job = new LinkedHashMap<>();
+            Number jobId = (Number) row[0];
+            job.put( "jobId", jobId.intValue() );
+            job.put( "classname", row[1] );
+            job.put( "status", row[2] );
+            job.put( "processedBy", row[3] );
+            job.put( "createdDate", row[4] == null ? null : row[4].toString() );
+            job.put( "startDate", row[5] == null ? null : row[5].toString() );
+            job.put( "endDate", row[6] == null ? null : row[6].toString() );
+            job.put( "lastUpdatedDate", row[7] == null ? null : row[7].toString() );
+
+            List<Object[]> params = em.createNativeQuery(
+                    "SELECT name, value FROM wp_lh_job_param WHERE job_id = :jobId" )
+                    .setParameter( "jobId", jobId.intValue() )
+                    .getResultList();
+            Map<String, String> paramMap = new LinkedHashMap<>();
+            for ( Object[] p : params ) {
+                paramMap.put( String.valueOf( p[0] ), p[1] == null ? null : String.valueOf( p[1] ) );
+            }
+            job.put( "parameters", paramMap );
+            result.add( job );
+        }
+        return result;
     }
 
     @Override

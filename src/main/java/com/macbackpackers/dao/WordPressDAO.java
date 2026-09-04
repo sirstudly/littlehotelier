@@ -212,6 +212,16 @@ public interface WordPressDAO {
     boolean hasArchiveAllTransactionNotesJobForReservation( String reservationId );
 
     /**
+     * Returns jobs that reference the given Cloudbeds reservation id (or optionally a txn id)
+     * via {@code wp_lh_job_param}, newest first.
+     *
+     * @param reservationId Cloudbeds reservation id
+     * @param limit max rows (capped by caller)
+     * @return non-null list of job summaries with parameters
+     */
+    List<Map<String, Object>> listJobsForReservation( String reservationId, int limit );
+
+    /**
      * Returns the number of jobs at 'submitted' or 'processing'.
      * 
      * @return number of jobs

@@ -1,0 +1,22 @@
+{
+  "HousekeepingJob": {
+    "classname": "com.macbackpackers.jobs.HousekeepingJob",
+    "requiredParams": ["selected_date"],
+    "description": "Update housekeeping / allocation tables for a date"
+  },
+  "AllocationScraperJob": {
+    "classname": "com.macbackpackers.jobs.AllocationScraperJob",
+    "requiredParams": ["start_date", "days_ahead"],
+    "description": "Run Booking Reports (allocation scraper)"
+  },
+  "CalculateEdinburghVisitorLevyForBookingJob": {
+    "classname": "com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob",
+    "requiredParams": ["reservation_id"],
+    "description": "Calculate / correct EVL for a Cloudbeds reservation"
+  },
+  "ChargeNonRefundableBookingJob": {
+    "classname": "com.macbackpackers.jobs.ChargeNonRefundableBookingJob",
+    "requiredParams": ["reservation_id"],
+    "description": "Charge non-refundable booking in Cloudbeds"
+  }
+}

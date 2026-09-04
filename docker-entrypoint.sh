@@ -1,6 +1,13 @@
 #!/bin/sh
 set -e
 
+# Docker Desktop's embedded DNS (127.0.0.11) intermittently fails to resolve
+# external hosts (GCP Secret Manager, etc.). When enabled, bypass it.
+# use-vc: force TCP DNS — UDP/53 is often dropped on Docker Desktop networks.
+if [ "${FIX_CONTAINER_DNS:-0}" = "1" ]; then
+  printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\noptions ndots:0 use-vc\n' > /etc/resolv.conf
+fi
+
 # Bind-mounted host dirs are often created as root; ensure appuser can write.
 for dir in /app/config /app/logs /app/chromeprofile; do
   if [ -d "$dir" ]; then

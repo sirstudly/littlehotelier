@@ -1,0 +1,22 @@
+{
+  "crh": {
+    "displayName": "Castle Rock Hostel",
+    "logDir": "/logs/crh",
+    "secretSuffix": "crh"
+  },
+  "hsh": {
+    "displayName": "High Street Hostel",
+    "logDir": "/logs/hsh",
+    "secretSuffix": "hsh"
+  },
+  "rmb": {
+    "displayName": "Royal Mile Backpackers",
+    "logDir": "/logs/rmb",
+    "secretSuffix": "rmb"
+  },
+  "lsh": {
+    "displayName": "Lochside Hostel",
+    "logDir": "/logs/lsh",
+    "secretSuffix": "lsh"
+  }
+}

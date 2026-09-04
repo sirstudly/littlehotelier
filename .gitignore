@@ -13,3 +13,6 @@
 /proxy/.env
 /.idea
 /.gradle
+/.cursor/mcp.json
+/ronbot-mcp/node_modules
+/ronbot-mcp/dist

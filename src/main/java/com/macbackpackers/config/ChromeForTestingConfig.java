@@ -21,8 +21,16 @@ public class ChromeForTestingConfig {
     @Value("${chromescraper.chrome.version:}")
     private String chromeVersion;
 
+    /** When false (ronbot-read-api children), skip WebDriverManager — HtmlUnit only. */
+    @Value("${chrome.for.testing.enabled:true}")
+    private boolean chromeForTestingEnabled;
+
     @PostConstruct
     public void setupChromeForTesting() {
+        if ( !chromeForTestingEnabled ) {
+            LOGGER.info( "Chrome for Testing disabled (chrome.for.testing.enabled=false); skipping WebDriverManager" );
+            return;
+        }
         try {
             LOGGER.info("Setting up Chrome for Testing...");
             
