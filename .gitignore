@@ -10,7 +10,9 @@
 /config/
 /.settings
 /credentials
+/.env
 /proxy/.env
+/ronbot-mcp/.env
 /.idea
 /.gradle
 /.cursor/mcp.json

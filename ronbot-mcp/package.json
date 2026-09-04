@@ -9,10 +9,11 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke:agent": "tsx scripts/smoke-agent-prompt.ts"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "dependencies": {
     "@google-cloud/secret-manager": "^5.6.0",
@@ -21,7 +22,9 @@
     "zod": "^3.25.28"
   },
   "devDependencies": {
+    "@cursor/sdk": "^1.0.31",
     "@types/node": "^22.15.21",
+    "dotenv": "^16.6.1",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }
