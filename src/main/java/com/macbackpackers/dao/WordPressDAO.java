@@ -154,7 +154,7 @@ public interface WordPressDAO {
     int insertJob( Job job );
 
     /** Minimum hours between non-refundable charge attempts for the same reservation. */
-    int NON_REFUNDABLE_CHARGE_COOLDOWN_HOURS = 24;
+    int NON_REFUNDABLE_CHARGE_COOLDOWN_HOURS = 23;
 
     /**
      * Returns true if a {@code ChargeNonRefundableBookingJob} for the given reservation should not
