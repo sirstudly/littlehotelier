@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,6 +22,7 @@ import com.macbackpackers.ronbot.dto.BookingSummaryDto;
 import com.macbackpackers.ronbot.dto.BookingTimelineDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
 
+@Profile( "ronbot-parent" )
 @RestController
 @RequestMapping( "/ronbot" )
 public class RonbotReadController {

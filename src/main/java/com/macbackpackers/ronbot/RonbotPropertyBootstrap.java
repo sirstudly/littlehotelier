@@ -4,6 +4,7 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Profile;
 
 /**
  * Non-web Spring Boot entry for a single property context (crh/hsh/rmb/lsh).
@@ -14,7 +15,10 @@ import org.springframework.context.annotation.FilterType;
  * package scan cannot also pick up parent-only ronbot beans.
  * <p>
  * Excludes use {@link FilterType#ASSIGNABLE_TYPE} (reliable) plus a package REGEX.
+ * {@code ronbot-child} prevents {@code RunProcessor}/{@code SecretsManagerTestApp}
+ * from treating this as another root configuration when they scan the package.
  */
+@Profile( "ronbot-child" )
 @SpringBootConfiguration
 @EnableAutoConfiguration
 @ComponentScan(

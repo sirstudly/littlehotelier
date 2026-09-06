@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -16,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Shared-secret gate for internal MCP → read-api calls.
  * Health endpoint is left open for docker healthchecks.
  */
+@Profile( "ronbot-parent" )
 @Component
 public class RonbotAuthFilter extends OncePerRequestFilter {
 

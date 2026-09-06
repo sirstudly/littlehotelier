@@ -14,6 +14,7 @@ import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfigurat
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.convert.support.DefaultConversionService;
 
 import com.macbackpackers.utils.AnyByteStringToStringConverter;
@@ -28,7 +29,12 @@ import com.macbackpackers.utils.AnyByteStringToStringConverter;
  * <p>
  * Uses {@link SpringBootConfiguration}+{@link EnableAutoConfiguration}+one
  * {@link ComponentScan} so there is no dual scan from {@code @SpringBootApplication}.
+ * <p>
+ * {@code ronbot-parent} keeps this config (and its {@link PropertyContextRegistry} bean)
+ * from being picked up when {@code RunProcessor} / {@code SecretsManagerTestApp} scan
+ * {@code com.macbackpackers} — those entry points must not open every property DB.
  */
+@Profile( "ronbot-parent" )
 @SpringBootConfiguration
 @EnableAutoConfiguration( exclude = {
         DataSourceAutoConfiguration.class,

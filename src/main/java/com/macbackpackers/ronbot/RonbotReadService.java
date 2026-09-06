@@ -13,6 +13,7 @@ import org.htmlunit.WebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import com.macbackpackers.beans.cloudbeds.responses.BookingNote;
@@ -28,6 +29,7 @@ import com.macbackpackers.ronbot.dto.JobHistoryDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 
+@Profile( "ronbot-parent" )
 @Service
 public class RonbotReadService {
 
