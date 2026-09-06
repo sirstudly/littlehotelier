@@ -25,7 +25,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.convert.support.DefaultConversionService;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
@@ -243,6 +242,19 @@ public class CloudbedsServiceTest {
     @Test
     public void testCreateSendMostlyFullDormEmailJob() throws Exception {
         cloudbedsService.createSendMostlyFullDormEmailJobs( webClient, "Booking an entire room for your group" );
+    }
+
+    @Test
+    public void testSyncRoomsFromCloudbeds() throws Exception {
+        cloudbedsService.syncRoomsFromCloudbeds( webClient );
+
+        // manually run this for CRH
+//        update wp_lh_rooms set active_yn = 'N' where room = '21' and room_type = 'MX';
+//        update wp_lh_rooms set active_yn = 'N' where room like 'SPL%' or room = 'PB' or room like 'R52%';
+//        update wp_lh_rooms set room_type = 'DBL' where room in ('53','54','55','71','72','73','78','79');
+//        update wp_lh_rooms set room_type = 'QUAD' where room in ('56','57','74');
+//        update wp_lh_rooms set room_type = 'TRIPLE' where room in ('58','65','77');
+//        update wp_lh_rooms set room_type = 'PAID BEDS' where room = 'PB';
     }
 
     @Test

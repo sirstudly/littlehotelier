@@ -993,10 +993,27 @@ public class WordPressDAOImpl implements WordPressDAO {
     public void replaceAllRoomBeds( List<RoomBed> roomBeds ) {
         int deleted = em.createQuery( "DELETE FROM RoomBed rb WHERE rb.room <> 'Unallocated'" ).executeUpdate();
         LOGGER.info( "replaceAllRoomBeds: cleared {} wp_lh_rooms row(s)", deleted );
-        for ( RoomBed rb : roomBeds ) {
-            em.persist( rb );
+        if ( roomBeds.isEmpty() ) {
+            return;
         }
-        em.flush();
+        // Multi-row INSERT — individual em.persist() hits the 60s txn timeout on large properties
+        final int cols = 7;
+        Query q = em.createNativeQuery(
+                "INSERT INTO wp_lh_rooms (id, room, bed_name, capacity, room_type_id, room_type, active_yn) VALUES "
+                        + StringUtils.repeat( "(?,?,?,?,?,?,?)", ",", roomBeds.size() ) );
+        for ( int i = 0 ; i < roomBeds.size() ; i++ ) {
+            RoomBed rb = roomBeds.get( i );
+            int p = i * cols;
+            q.setParameter( p + 1, rb.getId() );
+            q.setParameter( p + 2, rb.getRoom() );
+            q.setParameter( p + 3, rb.getBedName() );
+            q.setParameter( p + 4, rb.getCapacity() );
+            q.setParameter( p + 5, rb.getRoomTypeId() );
+            q.setParameter( p + 6, rb.getRoomType() );
+            q.setParameter( p + 7, rb.getActive() );
+        }
+        int inserted = q.executeUpdate();
+        LOGGER.info( "replaceAllRoomBeds: inserted {} row(s)", inserted );
     }
 
     /////////////////////////////////////////////////////////////////////
