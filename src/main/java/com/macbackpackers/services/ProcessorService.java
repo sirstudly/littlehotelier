@@ -452,12 +452,15 @@ public class ProcessorService {
         }
     }
 
+    /** Max time to wait for gzip/scp before destroying the child process and retrying. */
+    private static final long LOG_COPY_PROCESS_TIMEOUT_SECONDS = 30;
+
     /**
      * Copies the log file from this host to the remote host in {@code destinationLogLocation}.
      * Invoked only from the log-copy executor so scp work does not block job claiming.
      *
      * @param jobId ID of the job to copy
-     * @throws InterruptedException on process timeout
+     * @throws InterruptedException if interrupted while waiting on a child process
      * @throws IOException on copy error
      */
     private void copyJobLogToRemoteHost( int jobId ) throws InterruptedException, IOException {
@@ -469,8 +472,11 @@ public class ProcessorService {
             pb.redirectInput( new File( localLogDirectory + "/job-" + jobId + ".log" ) );
             pb.redirectOutput( new File( localLogDirectory + "/job-" + jobId + ".gz" ) );
             Process p = pb.start();
-            int exitVal = p.waitFor();
+            int exitVal = waitForProcessOrDestroy( p, "gzip" );
             LOGGER.info( "GZipped file completed with exit code(" + exitVal + ")" );
+            if ( exitVal != 0 ) {
+                throw new IOException( "gzip failed with exit code(" + exitVal + ") for job " + jobId );
+            }
 
             final int MAX_ATTEMPTS = 3;
             for ( int attempt = 1 ; attempt <= MAX_ATTEMPTS ; attempt++ ) {
@@ -479,7 +485,7 @@ public class ProcessorService {
                 pb.redirectError( new File( localLogDirectory + "/job-" + jobId + ".scp.err" ) );
                 LOGGER.info( "Copying log file (attempt " + attempt + "/" + MAX_ATTEMPTS + ")" );
                 p = pb.start();
-                exitVal = p.waitFor();
+                exitVal = waitForProcessOrDestroy( p, "scp" );
                 LOGGER.info( "Log file copy completed with exit code(" + exitVal + ")" );
                 if ( exitVal == 0 ) {
                     break;
@@ -489,6 +495,47 @@ public class ProcessorService {
                     Thread.sleep( 5000 );
                 }
             }
+        }
+    }
+
+    /**
+     * Waits for {@code process} up to {@link #LOG_COPY_PROCESS_TIMEOUT_SECONDS}. On timeout,
+     * destroys the process so the caller can retry / move on instead of blocking forever.
+     *
+     * @param process child process
+     * @param label short name for logging (e.g. gzip, scp)
+     * @return process exit code, or -1 if destroyed after timeout
+     * @throws InterruptedException if interrupted while waiting
+     */
+    int waitForProcessOrDestroy( Process process, String label ) throws InterruptedException {
+        return waitForProcessOrDestroy( process, label, LOG_COPY_PROCESS_TIMEOUT_SECONDS );
+    }
+
+    /**
+     * @param process child process
+     * @param label short name for logging
+     * @param timeoutSeconds max seconds to wait before destroyForcibly
+     * @return process exit code, or -1 if still alive after destroy
+     * @throws InterruptedException if interrupted while waiting
+     */
+    int waitForProcessOrDestroy( Process process, String label, long timeoutSeconds )
+            throws InterruptedException {
+        if ( process.waitFor( timeoutSeconds, TimeUnit.SECONDS ) ) {
+            return process.exitValue();
+        }
+        LOGGER.warn( "{} timed out after {}s; destroying process and continuing",
+                label, timeoutSeconds );
+        process.destroyForcibly();
+        // Brief wait so exitValue is available and the OS can reap the child
+        if ( !process.waitFor( 5, TimeUnit.SECONDS ) ) {
+            LOGGER.warn( "{} still alive after destroyForcibly", label );
+            return -1;
+        }
+        try {
+            return process.exitValue();
+        }
+        catch ( IllegalThreadStateException e ) {
+            return -1;
         }
     }
 
