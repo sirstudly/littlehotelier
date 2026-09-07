@@ -1,0 +1,28 @@
+{
+  "name": "ronbot-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WhatsApp (WAHA) bridge to Cursor SDK + ronbot-ops MCP",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "smoke:triggers": "node --import tsx scripts/smoke-triggers.ts"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "@cursor/sdk": "^1.0.31",
+    "dotenv": "^16.5.0",
+    "zod": "^3.25.28"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

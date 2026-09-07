@@ -261,8 +261,97 @@ services:
         reservations:
           memory: 128M
 
+  # Unofficial WhatsApp Web gateway (burner SIM via QR). See ronbot-bridge/README.md.
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: waha
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - WHATSAPP_DEFAULT_ENGINE=${WAHA_ENGINE:-NOWEB}
+      - WHATSAPP_HOOK_URL=http://ronbot-bridge:8787/webhooks/waha
+      - WHATSAPP_HOOK_EVENTS=message,group.v2.participants
+      - WHATSAPP_RESTART_ALL_SESSIONS=True
+      - WAHA_API_KEY=${WAHA_API_KEY:-}
+      - WAHA_DASHBOARD_USERNAME=${WAHA_DASHBOARD_USERNAME:-admin}
+      - WAHA_DASHBOARD_PASSWORD=${WAHA_DASHBOARD_PASSWORD:-admin}
+      - WAHA_NO_API_KEY=${WAHA_NO_API_KEY:-False}
+    volumes:
+      - waha_sessions:/app/.sessions
+    networks:
+      - macbackpackers-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+  # WhatsApp → Cursor SDK + ronbot-ops MCP bridge
+  ronbot-bridge:
+    build:
+      context: .
+      dockerfile: ronbot-bridge/Dockerfile
+    container_name: ronbot-bridge
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    # Leave Docker embedded DNS (127.0.0.11) intact for service names.
+    # Entrypoint (FIX_CONTAINER_DNS) adds public fallbacks + pins api.cursor.com via DoH.
+    environment:
+      - PORT=8787
+      - FIX_CONTAINER_DNS=1
+      - PIN_CURSOR_API_DNS=1
+      - WAHA_BASE_URL=http://waha:3000
+      - WAHA_API_KEY=${WAHA_API_KEY:-}
+      - WAHA_SESSION=${WAHA_SESSION:-default}
+      - RONBOT_WHATSAPP_GROUPS=${RONBOT_WHATSAPP_GROUPS:-}
+      - RONBOT_MENTION=${RONBOT_MENTION:-@ronbot}
+      - RONBOT_FOLLOWUP_MINUTES=${RONBOT_FOLLOWUP_MINUTES:-15}
+      - CURSOR_API_KEY=${CURSOR_API_KEY:-}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-macbackpackers-backoffice}
+      - RONBOT_READ_API_URL=http://ronbot-read-api:8080
+      - RONBOT_TOKEN=${RONBOT_TOKEN:-}
+      - RONBOT_MCP_ENTRY=/app/ronbot-mcp/dist/index.js
+      - REPO_ROOT=/app/repo
+      - LOG_DIR_CRH=/logs/crh
+      - LOG_DIR_HSH=/logs/hsh
+      - LOG_DIR_RMB=/logs/rmb
+      - LOG_DIR_LSH=/logs/lsh
+      - HOME=/home/node
+    volumes:
+      - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json:ro
+      # JS-only mounts OK from Mac; Linux native node_modules are baked into the image
+      - ./ronbot-mcp/dist:/app/ronbot-mcp/dist:ro
+      - ./ronbot-mcp/config:/app/ronbot-mcp/config:ro
+      # RW: Cursor local agent needs writable cwd/state (SQLite under HOME / workspace)
+      - .:/app/repo
+      - ./logs/crh:/logs/crh:ro
+      - ./logs/hsh:/logs/hsh:ro
+      - ./logs/rmb:/logs/rmb:ro
+      - ./logs/lsh:/logs/lsh:ro
+      - ./ronbot-bridge/config:/app/bridge/config:ro
+      - ronbot_bridge_home:/home/node
+    networks:
+      - macbackpackers-network
+    depends_on:
+      - waha
+      - ronbot-read-api
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
 volumes:
   mysql_data:
+    driver: local
+  waha_sessions:
+    driver: local
+  ronbot_bridge_home:
     driver: local
 
 networks:

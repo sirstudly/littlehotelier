@@ -13,8 +13,13 @@
 /.env
 /proxy/.env
 /ronbot-mcp/.env
+/ronbot-bridge/.env
 /.idea
 /.gradle
 /.cursor/mcp.json
 /ronbot-mcp/node_modules
 /ronbot-mcp/dist
+/ronbot-bridge/node_modules
+/ronbot-bridge/dist
+/waha_sessions
+/.sessions

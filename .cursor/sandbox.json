@@ -1,0 +1,5 @@
+{
+    "networkPolicy": {
+      "default": "allow"
+    }
+}

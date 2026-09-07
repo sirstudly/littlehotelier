@@ -138,6 +138,15 @@ RONBOT_SMOKE_PROPERTY=crh   # default crh
 
 Ensure read-api is up (`docker compose up -d ronbot-read-api`), then `npm run smoke:agent`.
 
+## WhatsApp bridge (Phase 3)
+
+Staff groups / authorized DMs via WAHA + [`ronbot-bridge`](../ronbot-bridge/README.md):
+
+```bash
+(cd ronbot-mcp && npm run build)
+docker compose up -d --build waha ronbot-bridge
+```
+
 ## Security notes
 
 - MCP never calls Cloudbeds directly
