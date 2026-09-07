@@ -1,4 +1,33 @@
 services:
+  # Tailscale egress → MySQL on the tailnet (new-mac-example). Apps use Docker DNS name mysql-tailscale.
+  mysql-tailscale:
+    image: tailscale/tailscale:stable
+    container_name: mysql-tailscale
+    hostname: tailscale-mysql-egress
+    restart: unless-stopped
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_AUTH_ONCE=true
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_HOSTNAME=tailscale-mysql-egress
+      - TS_TAILNET_TARGET_FQDN=new-mac-example.tail2ccb6b.ts.net
+      - TS_ENABLE_HEALTH_CHECK=true
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    networks:
+      - macbackpackers-network
+    healthcheck:
+      test: ["CMD", "tailscale", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
   # Castle Rock Hostel
   crh-processor:
     build:
@@ -15,6 +44,8 @@ services:
       - HOME=/home/appuser
       - SPRING_PROFILES_ACTIVE=crh
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
+      - DB_HOST=mysql-tailscale
+      - SHAREDDB_HOST=mysql-tailscale
     volumes:
       - ./logs/crh:/app/logs
       - ./chromeprofile/crh:/app/chromeprofile
@@ -25,6 +56,8 @@ services:
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
     networks:
       - macbackpackers-network
+    depends_on:
+      - mysql-tailscale
     deploy:
       resources:
         limits:
@@ -58,6 +91,8 @@ services:
       - HOME=/home/appuser
       - SPRING_PROFILES_ACTIVE=hsh
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
+      - DB_HOST=mysql-tailscale
+      - SHAREDDB_HOST=mysql-tailscale
     volumes:
       - ./logs/hsh:/app/logs
       - ./chromeprofile/hsh:/app/chromeprofile
@@ -68,6 +103,8 @@ services:
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
     networks:
       - macbackpackers-network
+    depends_on:
+      - mysql-tailscale
     deploy:
       resources:
         limits:
@@ -101,6 +138,8 @@ services:
       - HOME=/home/appuser
       - SPRING_PROFILES_ACTIVE=rmb
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
+      - DB_HOST=mysql-tailscale
+      - SHAREDDB_HOST=mysql-tailscale
     volumes:
       - ./logs/rmb:/app/logs
       - ./chromeprofile/rmb:/app/chromeprofile
@@ -111,6 +150,8 @@ services:
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
     networks:
       - macbackpackers-network
+    depends_on:
+      - mysql-tailscale
     deploy:
       resources:
         limits:
@@ -144,6 +185,8 @@ services:
       - HOME=/home/appuser
       - SPRING_PROFILES_ACTIVE=lsh
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
+      - DB_HOST=mysql-tailscale
+      - SHAREDDB_HOST=mysql-tailscale
     volumes:
       - ./logs/lsh:/app/logs
       - ./chromeprofile/lsh:/app/chromeprofile
@@ -154,6 +197,8 @@ services:
       - ./credentials/ssh/mediatemple.net_rsa:/home/appuser/.ssh/mediatemple.net_rsa
     networks:
       - macbackpackers-network
+    depends_on:
+      - mysql-tailscale
     deploy:
       resources:
         limits:
@@ -181,10 +226,6 @@ services:
     stop_grace_period: 1m
     ports:
       - "8080:8080"
-    # Prefer public resolvers if Docker's embedded DNS flakes for GCP SM
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     environment:
       - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dhttps.protocols=TLSv1.2,TLSv1.3 -Djava.net.preferIPv4Stack=true
       - HOME=/home/appuser
@@ -193,8 +234,8 @@ services:
       - RONBOT_TOKEN=${RONBOT_TOKEN:-}
       - ronbot.token=${RONBOT_TOKEN:-}
       - ronbot.properties=${RONBOT_PROPERTIES:-crh,hsh,rmb,lsh}
-      # Bypass broken 127.0.0.11 DNS proxy (see docker-entrypoint.sh)
-      - FIX_CONTAINER_DNS=1
+      - DB_HOST=mysql-tailscale
+      - SHAREDDB_HOST=mysql-tailscale
     volumes:
       - ./docker-entrypoint.sh:/docker-entrypoint.sh:ro
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json:ro
@@ -209,6 +250,8 @@ services:
       - ./config/lsh:/app/config/lsh
     networks:
       - macbackpackers-network
+    depends_on:
+      - mysql-tailscale
     deploy:
       resources:
         limits:
@@ -348,6 +391,8 @@ services:
 
 volumes:
   mysql_data:
+    driver: local
+  tailscale_state:
     driver: local
   waha_sessions:
     driver: local
