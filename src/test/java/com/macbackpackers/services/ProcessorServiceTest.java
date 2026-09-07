@@ -15,6 +15,7 @@ import com.macbackpackers.jobs.ArchiveAllTransactionNotesJob;
 import com.macbackpackers.jobs.BedCountReportJob;
 import com.macbackpackers.jobs.CreateCalculateEdinburghVisitorLevyForBookingJob;
 import com.macbackpackers.jobs.CreatePrepaidRefundJob;
+import com.macbackpackers.jobs.CreateVoidAndResubmitLegacyEVLFolioJob;
 import com.macbackpackers.jobs.PrepaidRefundJob;
 import com.macbackpackers.utils.AnyByteStringToStringConverter;
 import org.apache.commons.io.IOUtils;
@@ -390,6 +391,27 @@ public class ProcessorServiceTest {
     }
 
     @Test
+    public void testChargeNonRefundableBookingJobsFromUnpaidDepositReport() {
+        // reservation_ids from unpaid deposit report (Cloudbeds reservation anchors)
+        String[] reservationIds = {
+                "181291620", "182381192", "180609746", "180610098",
+                "181491694", "182553561", "183262870", "184022209", "183117912",
+                "184306108", "180165943", "183587526", "183617428", "182285725",
+                "184028742", "184308392", "183916405", "184044458", "182704611",
+                "184318709", "184041122", "183156988", "184101800", "181549942",
+                "184036559", "183436070", "184046301", "184184195", "180236429",
+                "183038179", "180180102", "180730087", "183409527", "182446820",
+                "182784232", "179786062", "183687123", "184209792"
+        };
+        for ( String reservationId : reservationIds ) {
+            ChargeNonRefundableBookingJob j = new ChargeNonRefundableBookingJob();
+            j.setStatus( JobStatus.submitted );
+            j.setReservationId( reservationId );
+            dao.insertJob( j );
+        }
+    }
+
+    @Test
     public void testCreateChargeNonRefundableBookingJob() throws Exception {
         CreateChargeNonRefundableBookingJob j = new CreateChargeNonRefundableBookingJob();
         autowireBeanFactory.autowireBean( j );
@@ -640,4 +662,18 @@ public class ProcessorServiceTest {
         dao.insertJob( j );
     }
 
+    @Test
+    public void testCreateVoidAndResubmitLegacyEVLFolioJob() throws Exception {
+        // dumps all bookings between date range
+        LocalDate currentDate = LocalDate.parse( "2026-11-01" );
+        LocalDate endDate = LocalDate.parse( "2026-12-28" );
+        while ( currentDate.isBefore( endDate ) ) {
+            CreateVoidAndResubmitLegacyEVLFolioJob workerJob = new CreateVoidAndResubmitLegacyEVLFolioJob();
+            workerJob.setStatus( JobStatus.submitted );
+            workerJob.setCheckinDateStart( currentDate );
+            workerJob.setCheckinDateEnd( currentDate.plusDays( 1 ) );
+            dao.insertJob( workerJob );
+            currentDate = currentDate.plusDays( 2 );
+        }
+    }
 }

@@ -1,5 +1,8 @@
 package com.macbackpackers.services;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -11,7 +14,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -23,24 +25,22 @@ import com.macbackpackers.dao.WordPressDAO;
 public class ProcessorServiceLogCopyTest {
 
     private ProcessorService processor;
-    private WordPressDAO dao;
-
-    @BeforeEach
-    public void setUp() throws Exception {
-        processor = new ProcessorService();
-        dao = mock( WordPressDAO.class );
-        setField( processor, "dao", dao );
-        setField( processor, "localLogDirectory", "/tmp" );
-    }
 
     @AfterEach
     public void tearDown() {
-        processor.drainLogCopyExecutor();
+        if ( processor != null ) {
+            processor.drainLogCopyExecutor();
+        }
     }
 
     @Test
     @Timeout( 5 )
     public void scheduleJobLogCopyDoesNotHoldClaimLock() throws Exception {
+        processor = new ProcessorService();
+        WordPressDAO dao = mock( WordPressDAO.class );
+        setField( processor, "dao", dao );
+        setField( processor, "localLogDirectory", "/tmp" );
+
         CountDownLatch copyStarted = new CountDownLatch( 1 );
         CountDownLatch releaseCopy = new CountDownLatch( 1 );
         AtomicBoolean claimAcquiredWhileCopyRunning = new AtomicBoolean( false );
@@ -67,6 +67,24 @@ public class ProcessorServiceLogCopyTest {
 
         releaseCopy.countDown();
         claimThread.join( 1000L );
+    }
+
+    @Test
+    @Timeout( 5 )
+    public void waitForProcessOrDestroyReturnsExitCodeWhenProcessFinishes() throws Exception {
+        processor = new ProcessorService();
+        Process process = new ProcessBuilder( "true" ).start();
+        assertEquals( 0, processor.waitForProcessOrDestroy( process, "true", 2 ) );
+    }
+
+    @Test
+    @Timeout( 10 )
+    public void waitForProcessOrDestroyDestroysHungProcessAndReturnsNonZero() throws Exception {
+        processor = new ProcessorService();
+        Process process = new ProcessBuilder( "sleep", "60" ).start();
+        int exitVal = processor.waitForProcessOrDestroy( process, "sleep", 1 );
+        assertNotEquals( 0, exitVal, "timed-out process should not look like success" );
+        assertFalse( process.isAlive(), "child should be destroyed after timeout" );
     }
 
     private static void setField( Object target, String name, Object value ) throws Exception {
