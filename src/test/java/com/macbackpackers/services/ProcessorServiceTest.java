@@ -78,7 +78,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @ExtendWith( SpringExtension.class )
 @SpringBootTest( classes = SecretsManagerTestApp.class )
 @TestPropertySource( properties = {
-        "spring.profiles.active=crh"
+        "spring.profiles.active=test,crh"
 } )
 public class ProcessorServiceTest {
 

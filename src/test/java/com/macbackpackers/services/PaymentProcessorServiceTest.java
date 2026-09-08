@@ -24,10 +24,13 @@ import com.stripe.param.ChargeCreateParams;
 import com.stripe.param.RefundCreateParams;
 import com.stripe.param.TokenCreateParams;
 
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicReference;
+
 @ExtendWith( SpringExtension.class )
 @SpringBootTest( classes = SecretsManagerTestApp.class )
 @TestPropertySource( properties = {
-        "spring.profiles.active=crh"
+        "spring.profiles.active=test,rmb"
 } )
 public class PaymentProcessorServiceTest {
 
@@ -48,7 +51,20 @@ public class PaymentProcessorServiceTest {
 
     @Test
     public void testCopyCardDetailsToCloudbeds() throws Exception {
-        paymentService.copyCardDetailsToCloudbeds( cbWebClient, "11109575" );
+        AtomicReference<Exception> thrownEx = new AtomicReference<>();
+        Arrays.asList( "173473217", "177662150" )
+                .forEach( r -> {
+                    try {
+                        paymentService.copyCardDetailsToCloudbeds( cbWebClient, r );
+                    }
+                    catch ( Exception e ) {
+                        LOGGER.error( "OOPS!", e );
+                        thrownEx.set( e );
+                    }
+                } );
+        if ( thrownEx.get() != null ) {
+            throw thrownEx.get();
+        }
     }
 
     @Test

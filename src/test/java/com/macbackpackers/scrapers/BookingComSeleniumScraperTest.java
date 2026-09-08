@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith( SpringExtension.class )
 @SpringBootTest( classes = SecretsManagerTestApp.class )
 @TestPropertySource( properties = {
-        "spring.profiles.active=crh"
+        "spring.profiles.active=test,lsh"
 } )
 public class BookingComSeleniumScraperTest {
 

@@ -48,7 +48,7 @@ import com.macbackpackers.dao.WordPressDAO;
 @ExtendWith( SpringExtension.class )
 @SpringBootTest( classes = SecretsManagerTestApp.class )
 @TestPropertySource( properties = {
-        "spring.profiles.active=lsh"
+        "spring.profiles.active=test,lsh"
 } )
 public class CloudbedsServiceTest {
 
@@ -234,9 +234,9 @@ public class CloudbedsServiceTest {
 
     @Test
     public void testVerifyDatabaseLogins() {
-        LOGGER.info( "db.url = " + dbUrl );
-        LOGGER.info( "db.username = " + dbUsername );
-        LOGGER.info( "db.password = " + dbPassword );
+        LOGGER.info( "db.url is set: {}", dbUrl != null && !dbUrl.isBlank() );
+        LOGGER.info( "db.username is set: {}", dbUsername != null && !dbUsername.isBlank() );
+        LOGGER.info( "db.password is set: {}", dbPassword != null && !dbPassword.isBlank() );
     }
 
     @Test

@@ -17,7 +17,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 @ExtendWith( SpringExtension.class )
 @SpringBootTest( classes = SecretsManagerTestApp.class )
 @TestPropertySource( properties = {
-        "spring.profiles.active=hsh"
+        "spring.profiles.active=test,hsh"
 } )
 public class EdinburghVisitorLevyServiceTest {
 

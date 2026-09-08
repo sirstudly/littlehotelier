@@ -57,7 +57,7 @@ import static org.hamcrest.Matchers.notNullValue;
 @ExtendWith( SpringExtension.class )
 @SpringBootTest( classes = SecretsManagerTestApp.class )
 @TestPropertySource( properties = {
-        "spring.profiles.active=crh"
+        "spring.profiles.active=test,crh"
 } )
 public class CloudbedsScraperTest {
     

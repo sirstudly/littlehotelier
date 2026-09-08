@@ -19,7 +19,7 @@ import com.macbackpackers.config.LittleHotelierConfig;
 @ExtendWith( SpringExtension.class )
 @SpringBootTest( classes = SecretsManagerTestApp.class )
 @TestPropertySource( properties = {
-        "spring.profiles.active=lsh"
+        "spring.profiles.active=test,lsh"
 } )
 public class GmailServiceTest {
 
