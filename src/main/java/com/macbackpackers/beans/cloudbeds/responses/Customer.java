@@ -21,6 +21,8 @@ public class Customer extends CloudbedsJsonResponse {
     private BigDecimal balanceDue;
     private String grandTotal;
     private String id;
+    private String identifier;
+    private String thirdPartyIdentifier;
     private String sourceName;
     private String status;
     private String nights;
@@ -104,6 +106,22 @@ public class Customer extends CloudbedsJsonResponse {
 
     public void setId( String id ) {
         this.id = id;
+    }
+
+    public String getIdentifier() {
+        return identifier;
+    }
+
+    public void setIdentifier( String identifier ) {
+        this.identifier = identifier;
+    }
+
+    public String getThirdPartyIdentifier() {
+        return thirdPartyIdentifier;
+    }
+
+    public void setThirdPartyIdentifier( String thirdPartyIdentifier ) {
+        this.thirdPartyIdentifier = thirdPartyIdentifier;
     }
 
     public String getSourceName() {

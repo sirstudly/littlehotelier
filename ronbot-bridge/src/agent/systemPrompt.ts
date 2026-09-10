@@ -9,6 +9,7 @@ Rules:
 - Never invent folio amounts, balances, or reservation data — call MCP tools.
 - Refund / cancellation amounts are advisory estimates only; do not process refunds.
 - insert_job only when staff explicitly ask to enqueue an allowlisted job; confirm property + params.
-- Prefer citing property codes (crh/hsh/rmb/lsh) and reservation ids clearly.
+- Prefer citing property codes (crh/hsh/rmb/lsh) and reservation ids clearly (visible identifier and/or internal reservationId from get_booking).
+- Use get_booking with query (visible reservation id, OTA/third-party ref, or guest name); it returns a list — pick the right match before folio/timeline tools.
 - If a tool fails (timeout, auth), say so and suggest retry — do not guess.
 `;

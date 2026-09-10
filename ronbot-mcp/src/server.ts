@@ -161,24 +161,14 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_booking",
-    "Live Cloudbeds booking lookup (via ronbot-read-api)",
+    "Live Cloudbeds booking search (via ronbot-read-api). query may be a visible reservation id, third-party/OTA ref, or guest name. Returns a list of matches (exact id matches preferred).",
     {
       property: propertySchema,
-      reservation_id: z.string().optional(),
-      booking_reference: z.string().optional(),
+      query: z.string().min(1),
     },
-    async ({ property, reservation_id, booking_reference }) => {
+    async ({ property, query }) => {
       try {
-        if (!reservation_id && !booking_reference) {
-          throw new Error("Provide reservation_id or booking_reference");
-        }
-        return ok(
-          await readApi.getBooking({
-            property,
-            reservationId: reservation_id,
-            bookingReference: booking_reference,
-          }),
-        );
+        return ok(await readApi.getBooking({ property, query }));
       } catch (err) {
         return fail(err);
       }
@@ -187,7 +177,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "list_transactions",
-    "Live Cloudbeds folio transactions for a reservation",
+    "Live Cloudbeds folio transactions. Prefer reservationId from get_booking; otherwise a unique searchable query (visible id / OTA ref). Fails if ambiguous.",
     {
       property: propertySchema,
       reservation_id: z.string().min(1),
@@ -203,7 +193,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_booking_timeline",
-    "Live booking + folio transactions + DB job history for a reservation",
+    "Live booking + folio transactions + DB job history. Prefer reservationId from get_booking; otherwise a unique searchable query. Fails if ambiguous.",
     {
       property: propertySchema,
       reservation_id: z.string().min(1),

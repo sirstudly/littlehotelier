@@ -52,37 +52,42 @@ public class RonbotReadController {
         return body;
     }
 
-    @GetMapping( "/{property}/reservations/{reservationId}" )
-    public BookingSummaryDto getBookingById(
-            @PathVariable String property,
-            @PathVariable String reservationId ) throws IOException {
-        return readService.getBooking( property, reservationId, null );
-    }
-
+    /**
+     * Search by visible reservation id, third-party/OTA ref, guest name, or internal id.
+     * Returns 0–N matches (empty → 404 via MissingUserDataException).
+     */
     @GetMapping( "/{property}/reservations" )
-    public BookingSummaryDto getBookingByQuery(
+    public List<BookingSummaryDto> searchBookings(
             @PathVariable String property,
-            @RequestParam( name = "reservation_id", required = false ) String reservationId,
-            @RequestParam( name = "booking_reference", required = false ) String bookingReference )
-            throws IOException {
-        if ( StringUtils.isBlank( reservationId ) && StringUtils.isBlank( bookingReference ) ) {
-            throw new IllegalArgumentException( "Provide reservation_id or booking_reference" );
+            @RequestParam( name = "query" ) String query ) throws IOException {
+        if ( StringUtils.isBlank( query ) ) {
+            throw new IllegalArgumentException( "Provide query (visible reservation id, OTA ref, or guest name)" );
         }
-        return readService.getBooking( property, reservationId, bookingReference );
+        return readService.searchBookings( property, query );
     }
 
-    @GetMapping( "/{property}/reservations/{reservationId}/transactions" )
+    /**
+     * Same as {@link #searchBookings} with the path segment as the search query.
+     */
+    @GetMapping( "/{property}/reservations/{query}" )
+    public List<BookingSummaryDto> searchBookingsByPath(
+            @PathVariable String property,
+            @PathVariable String query ) throws IOException {
+        return readService.searchBookings( property, query );
+    }
+
+    @GetMapping( "/{property}/reservations/{query}/transactions" )
     public List<TransactionDto> listTransactions(
             @PathVariable String property,
-            @PathVariable String reservationId ) throws IOException {
-        return readService.listTransactions( property, reservationId );
+            @PathVariable String query ) throws IOException {
+        return readService.listTransactions( property, query );
     }
 
-    @GetMapping( "/{property}/reservations/{reservationId}/timeline" )
+    @GetMapping( "/{property}/reservations/{query}/timeline" )
     public BookingTimelineDto timeline(
             @PathVariable String property,
-            @PathVariable String reservationId ) throws IOException {
-        return readService.getTimeline( property, reservationId );
+            @PathVariable String query ) throws IOException {
+        return readService.getTimeline( property, query );
     }
 
     @ExceptionHandler( IllegalArgumentException.class )

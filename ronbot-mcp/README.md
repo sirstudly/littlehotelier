@@ -18,8 +18,8 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `list_scheduled_jobs` / `get_scheduled_job` | Cron templates |
 | `get_job_queue_stats` | submitted / processing / retry counts |
 | `search_logs` | Grep property log dirs |
-| `get_booking` | Live reservation (read-api) |
-| `list_transactions` | Live folio lines (read-api) |
+| `get_booking` | Live reservation search by visible id / OTA ref / guest name (read-api; returns a list) |
+| `list_transactions` | Live folio lines (read-api; unique match required) |
 | `get_booking_timeline` | Live booking + transactions + job history |
 | `insert_job` | Allowlisted enqueue only |
 
@@ -68,8 +68,9 @@ See [`.cursor/mcp.json`](../.cursor/mcp.json). Point `args` at `ronbot-mcp/dist/
 ### Smoke prompts (IDE chat)
 
 - "How many submitted jobs are queued at hsh?" → `get_job_queue_stats`
-- "What's the live balance for reservation 1234567 at crh?" → `get_booking`
-- "Timeline of events for reservation 1234567 at crh" → `get_booking_timeline`
+- "What's the live balance for reservation 4586958844219 at crh?" → `get_booking` with `query`
+- "Find bookings for Jane Smith at hsh" → `get_booking` with guest name as `query`
+- "Timeline of events for reservation 4586958844219 at crh" → `get_booking_timeline` (unique match)
 - "Run housekeeping for crh for today" → `insert_job` with `HousekeepingJob` / `selected_date`
 
 ## Phase 2: Local SDK `Agent.prompt` smoke

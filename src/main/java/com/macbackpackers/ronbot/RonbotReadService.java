@@ -35,25 +35,97 @@ public class RonbotReadService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( RonbotReadService.class );
 
+    /** Cap full reservation loads when search returns many fuzzy hits (e.g. common names). */
+    private static final int MAX_SEARCH_RESULTS = 20;
+
     private final PropertyContextRegistry propertyContexts;
 
     public RonbotReadService( PropertyContextRegistry propertyContexts ) {
         this.propertyContexts = propertyContexts;
     }
 
-    public BookingSummaryDto getBooking( String property, String reservationId, String bookingReference )
-            throws IOException {
+    /**
+     * Search Cloudbeds reservations by visible identifier, third-party/OTA ref, guest name,
+     * or internal reservation id (same as the Cloudbeds search box).
+     *
+     * @return non-empty list of booking summaries; exact id/identifier/third-party matches preferred
+     */
+    public List<BookingSummaryDto> searchBookings( String property, String query ) throws IOException {
+        String q = StringUtils.trimToNull( query );
+        if ( q == null ) {
+            throw new IllegalArgumentException( "query is required" );
+        }
+
         ConfigurableApplicationContext ctx = propertyContexts.require( property );
         CloudbedsScraper scraper = ctx.getBean( CloudbedsScraper.class );
 
         try ( WebClient webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class ) ) {
-            String resolvedId = resolveReservationId( scraper, webClient, reservationId, bookingReference );
-            Reservation reservation = scraper.getReservationRetry( webClient, resolvedId );
-            return toBookingSummary( property, reservation );
+            LOGGER.info( "Searching Cloudbeds reservations for query={}", q );
+            List<Customer> matches = scraper.getReservations( webClient, q );
+            if ( matches.isEmpty() ) {
+                throw new MissingUserDataException( "No reservation found for query=" + q );
+            }
+
+            List<Customer> exact = matches.stream()
+                    .filter( c -> isExactMatch( q, c ) )
+                    .collect( Collectors.toList() );
+            List<Customer> toLoad = exact.isEmpty() ? matches : exact;
+            if ( toLoad.size() > MAX_SEARCH_RESULTS ) {
+                LOGGER.info( "Truncating search results from {} to {}", toLoad.size(), MAX_SEARCH_RESULTS );
+                toLoad = toLoad.subList( 0, MAX_SEARCH_RESULTS );
+            }
+
+            List<BookingSummaryDto> results = new ArrayList<>();
+            for ( Customer c : toLoad ) {
+                Reservation reservation = scraper.getReservationRetry( webClient, c.getId() );
+                results.add( toBookingSummary( property, reservation ) );
+            }
+            return results;
         }
     }
 
-    public List<TransactionDto> listTransactions( String property, String reservationId ) throws IOException {
+    /**
+     * Resolve a unique reservation for timeline/transactions. Prefers exact id/identifier/third-party
+     * matches; fails if search is ambiguous.
+     */
+    public String requireUniqueReservationId( String property, String query ) throws IOException {
+        String q = StringUtils.trimToNull( query );
+        if ( q == null ) {
+            throw new IllegalArgumentException( "query is required" );
+        }
+
+        ConfigurableApplicationContext ctx = propertyContexts.require( property );
+        CloudbedsScraper scraper = ctx.getBean( CloudbedsScraper.class );
+
+        try ( WebClient webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            List<Customer> matches = scraper.getReservations( webClient, q );
+            if ( matches.isEmpty() ) {
+                throw new MissingUserDataException( "No reservation found for query=" + q );
+            }
+
+            List<Customer> exact = matches.stream()
+                    .filter( c -> isExactMatch( q, c ) )
+                    .collect( Collectors.toList() );
+
+            if ( exact.size() == 1 ) {
+                return exact.get( 0 ).getId();
+            }
+            if ( exact.size() > 1 ) {
+                throw new IllegalArgumentException(
+                        "Ambiguous query=" + q + ": " + exact.size()
+                                + " exact matches. Use get_booking to pick one." );
+            }
+            if ( matches.size() == 1 ) {
+                return matches.get( 0 ).getId();
+            }
+            throw new IllegalArgumentException(
+                    "Ambiguous query=" + q + ": " + matches.size()
+                            + " matches. Use get_booking to pick one." );
+        }
+    }
+
+    public List<TransactionDto> listTransactions( String property, String query ) throws IOException {
+        String reservationId = requireUniqueReservationId( property, query );
         ConfigurableApplicationContext ctx = propertyContexts.require( property );
         CloudbedsScraper scraper = ctx.getBean( CloudbedsScraper.class );
 
@@ -63,7 +135,8 @@ public class RonbotReadService {
         }
     }
 
-    public BookingTimelineDto getTimeline( String property, String reservationId ) throws IOException {
+    public BookingTimelineDto getTimeline( String property, String query ) throws IOException {
+        String reservationId = requireUniqueReservationId( property, query );
         ConfigurableApplicationContext ctx = propertyContexts.require( property );
         CloudbedsScraper scraper = ctx.getBean( CloudbedsScraper.class );
         WordPressDAO dao = ctx.getBean( WordPressDAO.class );
@@ -97,30 +170,10 @@ public class RonbotReadService {
         return timeline;
     }
 
-    private String resolveReservationId( CloudbedsScraper scraper, WebClient webClient,
-            String reservationId, String bookingReference ) throws IOException {
-        if ( StringUtils.isNotBlank( reservationId ) ) {
-            return reservationId.trim();
-        }
-        if ( StringUtils.isBlank( bookingReference ) ) {
-            throw new IllegalArgumentException( "Either reservation_id or booking_reference is required" );
-        }
-        String query = bookingReference.trim();
-        LOGGER.info( "Resolving booking reference {} via Cloudbeds search", query );
-        List<Customer> matches = scraper.getReservations( webClient, query );
-        if ( matches.isEmpty() ) {
-            throw new MissingUserDataException( "No reservation found for booking_reference=" + query );
-        }
-        // Prefer exact identifier / third-party match when search returns multiple hits
-        for ( Customer c : matches ) {
-            Reservation full = scraper.getReservationRetry( webClient, c.getId() );
-            if ( query.equalsIgnoreCase( StringUtils.trimToEmpty( full.getIdentifier() ) )
-                    || query.equalsIgnoreCase( StringUtils.trimToEmpty( full.getThirdPartyIdentifier() ) )
-                    || query.equals( full.getReservationId() ) ) {
-                return full.getReservationId();
-            }
-        }
-        return matches.get( 0 ).getId();
+    static boolean isExactMatch( String query, Customer c ) {
+        return query.equalsIgnoreCase( StringUtils.trimToEmpty( c.getId() ) )
+                || query.equalsIgnoreCase( StringUtils.trimToEmpty( c.getIdentifier() ) )
+                || query.equalsIgnoreCase( StringUtils.trimToEmpty( c.getThirdPartyIdentifier() ) );
     }
 
     private BookingSummaryDto toBookingSummary( String property, Reservation r ) {

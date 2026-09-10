@@ -160,7 +160,7 @@ async function runOptionalBookingSmoke(
   }
 
   const property = process.env.RONBOT_SMOKE_PROPERTY?.trim() || "crh";
-  const bookingPrompt = `Using the ronbot-ops MCP tool get_booking, fetch reservation "${reservation}" for property "${property}". Summarize guest name, status, and balance from the tool result. Do not invent data.`;
+  const bookingPrompt = `Using the ronbot-ops MCP tool get_booking, search with query "${reservation}" for property "${property}". Summarize guest name, status, and balance from the first matching result. Do not invent data.`;
 
   console.log(`Running optional get_booking Agent.prompt (${property} / ${reservation})...`);
   const result = await Agent.prompt(bookingPrompt, agentOptions(mcpEnv, apiKey));

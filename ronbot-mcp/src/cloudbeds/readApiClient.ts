@@ -29,34 +29,39 @@ async function request<T>(path: string): Promise<T> {
   return body as T;
 }
 
+/**
+ * Search live Cloudbeds bookings. `query` may be a visible reservation id,
+ * third-party/OTA reference, guest name, or internal Cloudbeds id.
+ * Returns a list of matching booking summaries (exact id matches preferred).
+ */
 export async function getBooking(params: {
   property: string;
-  reservationId?: string;
-  bookingReference?: string;
+  query: string;
 }): Promise<unknown> {
-  const { property, reservationId, bookingReference } = params;
-  if (reservationId) {
-    return request(`/ronbot/${property}/reservations/${encodeURIComponent(reservationId)}`);
+  const { property, query } = params;
+  if (!query?.trim()) {
+    throw new Error("query is required");
   }
-  if (bookingReference) {
-    const q = new URLSearchParams({ booking_reference: bookingReference });
-    return request(`/ronbot/${property}/reservations?${q}`);
-  }
-  throw new Error("reservation_id or booking_reference is required");
+  const q = new URLSearchParams({ query: query.trim() });
+  return request(`/ronbot/${property}/reservations?${q}`);
 }
 
-export async function listTransactions(property: string, reservationId: string): Promise<unknown> {
+/**
+ * Folio transactions. `query` must resolve to a unique reservation
+ * (prefer the internal reservationId from a prior get_booking result).
+ */
+export async function listTransactions(property: string, query: string): Promise<unknown> {
   return request(
-    `/ronbot/${property}/reservations/${encodeURIComponent(reservationId)}/transactions`,
+    `/ronbot/${property}/reservations/${encodeURIComponent(query)}/transactions`,
   );
 }
 
-export async function getBookingTimeline(
-  property: string,
-  reservationId: string,
-): Promise<unknown> {
+/**
+ * Booking + folio + job history. `query` must resolve uniquely (same as listTransactions).
+ */
+export async function getBookingTimeline(property: string, query: string): Promise<unknown> {
   return request(
-    `/ronbot/${property}/reservations/${encodeURIComponent(reservationId)}/timeline`,
+    `/ronbot/${property}/reservations/${encodeURIComponent(query)}/timeline`,
   );
 }
 
