@@ -24,6 +24,12 @@ public class BookingSummaryDto {
     private BigDecimal grandTotal;
     private BigDecimal balanceDue;
     private BigDecimal paidValue;
+    /** OTA guest-facing listed price (Hostelworld / channel). */
+    private BigDecimal channelPriceListed;
+    /** OTA net / channel_balance anchor used with listed price for HW EVL rate delta. */
+    private BigDecimal channelBalance;
+    /** Sum of Edinburgh Visitor Levy lines on the folio (tax breakdown). */
+    private BigDecimal visitorLevyTotal;
     private String channelPaymentType;
     private String isHotelCollectBooking;
     private Integer adultsNumber;
@@ -154,6 +160,30 @@ public class BookingSummaryDto {
 
     public void setPaidValue( BigDecimal paidValue ) {
         this.paidValue = paidValue;
+    }
+
+    public BigDecimal getChannelPriceListed() {
+        return channelPriceListed;
+    }
+
+    public void setChannelPriceListed( BigDecimal channelPriceListed ) {
+        this.channelPriceListed = channelPriceListed;
+    }
+
+    public BigDecimal getChannelBalance() {
+        return channelBalance;
+    }
+
+    public void setChannelBalance( BigDecimal channelBalance ) {
+        this.channelBalance = channelBalance;
+    }
+
+    public BigDecimal getVisitorLevyTotal() {
+        return visitorLevyTotal;
+    }
+
+    public void setVisitorLevyTotal( BigDecimal visitorLevyTotal ) {
+        this.visitorLevyTotal = visitorLevyTotal;
     }
 
     public String getChannelPaymentType() {

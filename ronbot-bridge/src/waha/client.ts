@@ -36,6 +36,67 @@ export class WahaClient {
     }
   }
 
+  /** Best-effort: show "typing…" in the chat. Failures are ignored. */
+  async startTyping(chatId: string): Promise<void> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/startTyping`, {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify({
+          session: this.session,
+          chatId: normalizeJid(chatId),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.warn(`WAHA startTyping ${res.status}: ${body.slice(0, 200)}`);
+      }
+    } catch (err) {
+      console.warn("WAHA startTyping failed", err);
+    }
+  }
+
+  /** Best-effort: clear typing presence. Failures are ignored. */
+  async stopTyping(chatId: string): Promise<void> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/stopTyping`, {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify({
+          session: this.session,
+          chatId: normalizeJid(chatId),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.warn(`WAHA stopTyping ${res.status}: ${body.slice(0, 200)}`);
+      }
+    } catch (err) {
+      console.warn("WAHA stopTyping failed", err);
+    }
+  }
+
+  /** Session `me` identities (phone + LID) for mention matching. */
+  async getSessionMe(): Promise<{ id?: string; lid?: string; pushName?: string } | null> {
+    const session = encodeURIComponent(this.session);
+    const urls = [
+      `${this.baseUrl}/api/sessions/${session}`,
+      `${this.baseUrl}/api/sessions?all=true`,
+    ];
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { headers: this.headers() });
+        if (!res.ok) continue;
+        const data = (await res.json()) as unknown;
+        const me = pickSessionMe(data, this.session);
+        if (me) return me;
+      } catch {
+        // try next
+      }
+    }
+    return null;
+  }
+
   async getGroupParticipants(groupId: string): Promise<string[]> {
     const id = encodeURIComponent(normalizeJid(groupId));
     const session = encodeURIComponent(this.session);
@@ -95,4 +156,39 @@ function extractOneParticipant(item: unknown): string[] {
     if (typeof v === "string" && v.trim()) ids.push(v.trim());
   }
   return ids;
+}
+
+function pickSessionMe(
+  data: unknown,
+  sessionName: string,
+): { id?: string; lid?: string; pushName?: string } | null {
+  const asMe = (v: unknown) => {
+    if (!v || typeof v !== "object") return null;
+    const me = v as Record<string, unknown>;
+    const id = typeof me.id === "string" ? me.id : undefined;
+    const lid = typeof me.lid === "string" ? me.lid : undefined;
+    const pushName = typeof me.pushName === "string" ? me.pushName : undefined;
+    if (!id && !lid) return null;
+    return { id, lid, pushName };
+  };
+
+  if (Array.isArray(data)) {
+    const match =
+      data.find(
+        (s) =>
+          s &&
+          typeof s === "object" &&
+          (s as { name?: string }).name === sessionName,
+      ) ?? data[0];
+    if (match && typeof match === "object") {
+      return asMe((match as { me?: unknown }).me);
+    }
+    return null;
+  }
+
+  if (data && typeof data === "object") {
+    const o = data as { me?: unknown; name?: string };
+    return asMe(o.me);
+  }
+  return null;
 }

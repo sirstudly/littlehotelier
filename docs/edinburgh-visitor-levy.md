@@ -85,6 +85,16 @@ The guest-facing total is shown when clicking the **(?)** icon next to the subto
 
 #ronbot automatically posts a folio adjustment to correct the levy on Hostelworld bookings at the time of booking.
 
+### Non-refundable deposits and unpaid EVL
+
+Bookings with exclusive EVL intentionally **exclude EVL** when autocharging — the levy is collected when the guest arrives. After a successful room/deposit charge:
+
+- Unpaid **balance due is often entirely (or mostly) the EVL**.
+- Cloudbeds may still show a **smaller EVL folio line** based on net rates (commission deducted) until/unless ronbot corrects it to listed-price EVL.
+- Do not assume “balance = room remainder + tiny EVL line”; compare `balanceDue` with `visitorLevyTotal` / EVL folio lines and `channelPriceListed`.
+- Bookings made early/mid-June may have been charged the whole amount prior to EVL changes were made to the payment portal and this project. There may be a small amount due for Hostelworld bookings made during this period.
+- The original implementation had the EVL line include the year (ie. "Edinburgh Visitor Levy 2026"). This has been replaced with a generic "Edinburgh Visitor Levy" line. There may be existing folio records where we void the legacy line and add back in the EVL line.
+
 ### Stay length changes in Cloudbeds
 
 When staff extend or shorten a Hostelworld stay in Cloudbeds, `channel_price_listed` / `channel_balance` stay on the **original** HW amounts. #ronbot applies a single rate delta:

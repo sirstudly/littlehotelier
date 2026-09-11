@@ -87,6 +87,9 @@ public class RonbotReadService {
     /**
      * Resolve a unique reservation for timeline/transactions. Prefers exact id/identifier/third-party
      * matches; fails if search is ambiguous.
+     * <p>
+     * Tries a direct {@code get_reservation} first (fast when the caller already has the internal id),
+     * then falls back to Cloudbeds search for visible ids / OTA refs / names.
      */
     public String requireUniqueReservationId( String property, String query ) throws IOException {
         String q = StringUtils.trimToNull( query );
@@ -98,6 +101,18 @@ public class RonbotReadService {
         CloudbedsScraper scraper = ctx.getBean( CloudbedsScraper.class );
 
         try ( WebClient webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            try {
+                Reservation direct = scraper.getReservation( webClient, q );
+                if ( direct != null && StringUtils.isNotBlank( direct.getReservationId() ) ) {
+                    LOGGER.info( "Resolved query={} via direct get_reservation id={}", q, direct.getReservationId() );
+                    return direct.getReservationId();
+                }
+            }
+            catch ( Exception ex ) {
+                LOGGER.debug( "Direct get_reservation failed for query={}; falling back to search", q, ex );
+            }
+
+            LOGGER.info( "Resolving unique reservation via Cloudbeds search for query={}", q );
             List<Customer> matches = scraper.getReservations( webClient, q );
             if ( matches.isEmpty() ) {
                 throw new MissingUserDataException( "No reservation found for query=" + q );
@@ -193,6 +208,9 @@ public class RonbotReadService {
         dto.setGrandTotal( r.getGrandTotal() );
         dto.setBalanceDue( r.getBalanceDue() );
         dto.setPaidValue( r.getPaidValue() );
+        dto.setChannelPriceListed( r.getChannelPriceListed() );
+        dto.setChannelBalance( r.getChannelBalance() );
+        dto.setVisitorLevyTotal( r.getVisitorLevyTotal() );
         dto.setChannelPaymentType( r.getChannelPaymentType() );
         dto.setIsHotelCollectBooking( r.getIsHotelCollectBooking() );
         dto.setAdultsNumber( r.getAdultsNumber() );

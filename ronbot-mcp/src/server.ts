@@ -161,7 +161,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_booking",
-    "Live Cloudbeds booking search (via ronbot-read-api). query may be a visible reservation id, third-party/OTA ref, or guest name. Returns a list of matches (exact id matches preferred).",
+    "Live Cloudbeds booking search (via ronbot-read-api). query may be a visible reservation id, third-party/OTA ref, or guest name. Returns a list of matches (exact id matches preferred). For a full story+folio+jobs prefer get_booking_timeline once instead of chaining this with list_transactions.",
     {
       property: propertySchema,
       query: z.string().min(1),
@@ -177,7 +177,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "list_transactions",
-    "Live Cloudbeds folio transactions. Prefer reservationId from get_booking; otherwise a unique searchable query (visible id / OTA ref). Fails if ambiguous.",
+    "Live Cloudbeds folio transactions. Prefer reservationId from get_booking/get_booking_timeline; otherwise a unique searchable query. Fails if ambiguous. Skip if you already called get_booking_timeline.",
     {
       property: propertySchema,
       reservation_id: z.string().min(1),
@@ -193,7 +193,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_booking_timeline",
-    "Live booking + folio transactions + DB job history. Prefer reservationId from get_booking; otherwise a unique searchable query. Fails if ambiguous.",
+    "Preferred one-shot live booking + folio transactions + DB job history. Pass the exact staff ref (visible id / OTA ref / HW number) once; do not also call get_booking or list_transactions, and do not probe spelling variants unless this returns no match. Fails if the query is ambiguous.",
     {
       property: propertySchema,
       reservation_id: z.string().min(1),

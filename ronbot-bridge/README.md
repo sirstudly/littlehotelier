@@ -6,8 +6,8 @@ WhatsApp staff bridge: **WAHA** (unofficial WhatsApp Web HTTP API) → this serv
 
 | Channel | Who | When we reply |
 |---------|-----|----------------|
-| Allowlisted groups (`@g.us`) | Everyone in the group (full context) | `@ronbot` mention, or follow-up within ~15 minutes of our last reply |
-| Private DMs (`@c.us`) | Sender must be a **member of an allowlisted group** | Always (treated as directed at us) |
+| Allowlisted groups (`@g.us`) | Everyone in the group (full context) | WhatsApp @-mention of the bot (LID), text `ronbot` / `@~ronbot`, or follow-up within ~15 minutes of our last reply |
+| Private DMs (`@c.us` / `@lid`) | Sender must be a **member of an allowlisted group** | Always (treated as directed at us) |
 
 Answers use the littlehotelier repo + MCP tools (`get_booking`, `get_booking_timeline`, jobs, logs, allowlisted `insert_job`, etc.).
 

@@ -2,11 +2,15 @@
  * Offline smoke: trigger policy + transcript + JID normalize (no WAHA / Cursor).
  * Run: npx tsx scripts/smoke-triggers.ts
  */
+import { rememberBotIds } from "../src/botIdentity.js";
 import { MembershipCache } from "../src/membership.js";
 import { TranscriptStore } from "../src/transcript.js";
 import { shouldHandle } from "../src/triggers.js";
 import type { NormalizedInbound } from "../src/waha/types.js";
+import { extractMentionedIds } from "../src/waha/types.js";
 import { isAllowlistedGroup, normalizeJid } from "../src/env.js";
+
+rememberBotIds(["447700900010@c.us", "99900011122233@lid"]);
 
 function assert(cond: unknown, msg: string): void {
   if (!cond) throw new Error(msg);
@@ -24,6 +28,7 @@ class FakeMembership extends MembershipCache {
 
 const groupId = "120363999999999999@g.us";
 const member = "447700900001@c.us";
+const memberLid = "99900011122211@lid";
 const stranger = "447700900099@c.us";
 
 // Patch allowlist for this process if empty
@@ -32,7 +37,7 @@ if (!isAllowlistedGroup(groupId)) {
   (config.groups as string[]).push(groupId);
 }
 
-const membership = new FakeMembership(new Set([member]));
+const membership = new FakeMembership(new Set([member, memberLid]));
 const transcript = new TranscriptStore();
 
 function msg(partial: Partial<NormalizedInbound> & Pick<NormalizedInbound, "chatId" | "senderId" | "body" | "isGroup">): NormalizedInbound {
@@ -41,6 +46,7 @@ function msg(partial: Partial<NormalizedInbound> & Pick<NormalizedInbound, "chat
     messageId: partial.messageId ?? `m-${Math.random()}`,
     fromMe: false,
     timestampMs: Date.now(),
+    mentionedIds: [],
     ...partial,
   };
 }
@@ -56,12 +62,53 @@ assert(
 
 assert(
   shouldHandle(
+    msg({
+      chatId: groupId,
+      senderId: member,
+      body: "@99900011122233 looking for a booking?",
+      isGroup: true,
+      mentionedIds: ["99900011122233@lid"],
+    }),
+    membership,
+    transcript,
+  ) === "mention",
+  "group LID @-mention should trigger",
+);
+
+assert(
+  shouldHandle(
+    msg({
+      chatId: groupId,
+      senderId: member,
+      body: "@~ronbot ping",
+      isGroup: true,
+    }),
+    membership,
+    transcript,
+  ) === "mention",
+  "group @~ronbot push-name text should trigger",
+);
+
+assert(
+  shouldHandle(
     msg({ chatId: groupId, senderId: member, body: "unrelated chatter", isGroup: true }),
     membership,
     transcript,
   ) === null,
   "group without mention/follow-up should ignore",
 );
+
+const extractedMentions = extractMentionedIds({
+  _data: {
+    message: {
+      extendedTextMessage: {
+        text: "@99900011122233 hi",
+        contextInfo: { mentionedJid: ["99900011122233@lid"] },
+      },
+    },
+  },
+});
+assert(extractedMentions.includes("99900011122233@lid"), "extract mentionedJid from _data");
 
 transcript.markBotReply(groupId);
 assert(
@@ -80,6 +127,20 @@ assert(
     transcript,
   ) === "dm",
   "authorized DM should always handle",
+);
+
+assert(
+  shouldHandle(
+    msg({
+      chatId: memberLid,
+      senderId: memberLid,
+      body: "could you lookup a booking?",
+      isGroup: false,
+    }),
+    membership,
+    transcript,
+  ) === "dm",
+  "authorized LID DM should handle",
 );
 
 assert(

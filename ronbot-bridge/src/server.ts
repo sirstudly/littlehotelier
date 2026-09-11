@@ -1,9 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { rememberBotIds } from "./botIdentity.js";
 import { config, isAllowlistedGroup, normalizeJid } from "./env.js";
 import { askRonbot, chunkWhatsAppText } from "./agent/runner.js";
 import { MembershipCache } from "./membership.js";
 import { TranscriptStore } from "./transcript.js";
-import { shouldHandle } from "./triggers.js";
+import { isDirectChat, shouldHandle } from "./triggers.js";
 import { WahaClient } from "./waha/client.js";
 import { normalizeInbound, type WahaWebhookEvent } from "./waha/types.js";
 
@@ -36,6 +37,10 @@ function send(res: ServerResponse, status: number, body: unknown): void {
 }
 
 async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
+  if (event.me) {
+    rememberBotIds([event.me.id, event.me.lid]);
+  }
+
   if (event.event === "group.v2.participants") {
     membership.applyParticipantEvent(event);
     return;
@@ -50,7 +55,7 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
   // Always record non-empty inbound into transcript for allowlisted groups / authorized DMs
   const trackGroup = msg.isGroup && isAllowlistedGroup(chatId);
   const trackDm =
-    !msg.isGroup && chatId.endsWith("@c.us") && membership.isAuthorizedDmSender(senderId);
+    !msg.isGroup && isDirectChat(chatId) && membership.isAuthorizedDmSender(senderId);
   if ((trackGroup || trackDm) && msg.body) {
     transcript.append(chatId, {
       at: msg.timestampMs,
@@ -80,7 +85,13 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
   }
 
   processingChats.add(chatId);
+  let typingTimer: ReturnType<typeof setInterval> | undefined;
   try {
+    await waha.startTyping(chatId);
+    typingTimer = setInterval(() => {
+      void waha.startTyping(chatId);
+    }, 15_000);
+
     const context = transcript.formatForPrompt(chatId);
     const prompt = [
       `WhatsApp ${msg.isGroup ? "group" : "DM"} chatId=${chatId}`,
@@ -120,6 +131,8 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
       console.error("error reply failed", sendErr);
     }
   } finally {
+    if (typingTimer) clearInterval(typingTimer);
+    await waha.stopTyping(chatId);
     processingChats.delete(chatId);
   }
 }
@@ -156,7 +169,25 @@ export function startServer(): void {
   server.listen(config.port, () => {
     console.log(`ronbot-bridge listening on :${config.port}`);
     console.log(`allowlisted groups: ${config.groups.length}`);
+    void refreshBotIdentity();
     void membership.refresh(true);
     setInterval(() => void membership.refresh(false), config.membershipRefreshMs);
+    setInterval(() => void refreshBotIdentity(), config.membershipRefreshMs);
   });
+}
+
+async function refreshBotIdentity(): Promise<void> {
+  try {
+    const me = await waha.getSessionMe();
+    if (!me) {
+      console.warn("WAHA session me unavailable — LID mentions may not match until a webhook arrives");
+      return;
+    }
+    rememberBotIds([me.id, me.lid]);
+    console.log(
+      `bot identity: ${[me.pushName, me.id, me.lid].filter(Boolean).join(" / ")}`,
+    );
+  } catch (err) {
+    console.warn("failed to refresh WAHA bot identity", err);
+  }
 }
