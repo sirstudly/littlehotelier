@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.ronbot.dto.AvailabilityDto;
 import com.macbackpackers.ronbot.dto.BookingSummaryDto;
 import com.macbackpackers.ronbot.dto.BookingTimelineDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
@@ -88,6 +89,18 @@ public class RonbotReadController {
             @PathVariable String property,
             @PathVariable String query ) throws IOException {
         return readService.getTimeline( property, query );
+    }
+
+    /**
+     * Live sellable bed/room counts by room type for an inclusive date range.
+     * Defaults: {@code from}=today, {@code to}=today+1 (Europe/London).
+     */
+    @GetMapping( "/{property}/availability" )
+    public AvailabilityDto availability(
+            @PathVariable String property,
+            @RequestParam( name = "from", required = false ) String from,
+            @RequestParam( name = "to", required = false ) String to ) throws IOException {
+        return readService.getAvailability( property, from, to );
     }
 
     @ExceptionHandler( IllegalArgumentException.class )

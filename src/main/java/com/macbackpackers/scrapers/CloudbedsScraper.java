@@ -105,14 +105,14 @@ public class CloudbedsScraper {
     /** Expire booking sub-source id cache entries after this many hours. */
     private static final long BOOKING_SUB_SOURCE_CACHE_HOURS = 24;
 
-    // the last result of getPropertyContent() as it's an expensive operation; refreshed after cache timeout
-    private static volatile JsonObject propertyContent;
-    private static volatile long propertyContentLoadedAtMs;
-    private static final Object propertyContentLock = new Object();
-    // the last version numbers
-    private static JsonObject remoteEntries;
+    // Per-instance caches: must NOT be static. ronbot-read-api hosts all property
+    // contexts in one JVM; a JVM-wide cache would return the wrong hostel's content.
+    private volatile JsonObject propertyContent;
+    private volatile long propertyContentLoadedAtMs;
+    private final Object propertyContentLock = new Object();
+    private JsonObject remoteEntries;
 
-    private static final LoadingCache<String, EmailTemplateInfo> emailTemplateCache = CacheBuilder.newBuilder()
+    private final LoadingCache<String, EmailTemplateInfo> emailTemplateCache = CacheBuilder.newBuilder()
             .expireAfterAccess( EMAIL_TEMPLATE_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES )
             .build( new CacheLoader<String, EmailTemplateInfo>() {
                 @Override

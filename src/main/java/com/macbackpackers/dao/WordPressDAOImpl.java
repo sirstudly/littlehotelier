@@ -93,12 +93,14 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Value( "${processor.id}" )
     private String processorId;
 
-    // cached
-    private static String CSRF_TOKEN = null;
+    // Per-instance caches: must NOT be static. ronbot-read-api runs all property
+    // contexts in one JVM; a JVM-wide cache would mix Cloudbeds property_id / cookies
+    // across hostels (e.g. LSH options returned for HSH availability).
+    private String csrfToken = null;
 
     private static final long WP_OPTIONS_CACHE_TIMEOUT_MINUTES = 5;
 
-    private static final Cache<String, String> WP_OPTIONS_CACHE = CacheBuilder.newBuilder()
+    private final Cache<String, String> wpOptionsCache = CacheBuilder.newBuilder()
             .expireAfterAccess( WP_OPTIONS_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES )
             .build();
 
@@ -1310,13 +1312,13 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     @Transactional( readOnly = true )
     public String getOption( String property ) {
-        String cached = WP_OPTIONS_CACHE.getIfPresent( property );
+        String cached = wpOptionsCache.getIfPresent( property );
         if ( cached != null ) {
             return cached;
         }
         String fromDb = loadOptionFromDb( property );
         if ( fromDb != null ) {
-            WP_OPTIONS_CACHE.put( property, fromDb );
+            wpOptionsCache.put( property, fromDb );
         }
         return fromDb;
     }
@@ -1332,25 +1334,25 @@ public class WordPressDAOImpl implements WordPressDAO {
     public String getOptionNoCache( String property ) {
         String value = loadOptionFromDb( property );
         if ( value != null ) {
-            WP_OPTIONS_CACHE.put( property, value );
+            wpOptionsCache.put( property, value );
         } else {
-            WP_OPTIONS_CACHE.invalidate( property );
+            wpOptionsCache.invalidate( property );
         }
         return value;
     }
 
     @Override
     public String getCsrfToken() {
-        if ( CSRF_TOKEN == null ) {
+        if ( csrfToken == null ) {
             String cookies = getOption( "hbo_cloudbeds_cookies" );
             Pattern p = Pattern.compile( "csrf_accessa_cookie=([0-9a-f]+)" );
             Matcher m = p.matcher( cookies );
             if ( false == m.find() ) {
                 throw new MissingUserDataException( "Missing CSRF cookie??" );
             }
-            CSRF_TOKEN = m.group( 1 );
+            csrfToken = m.group( 1 );
         }
-        return CSRF_TOKEN;
+        return csrfToken;
     }
 
     @Override
@@ -1390,12 +1392,16 @@ public class WordPressDAOImpl implements WordPressDAO {
             .setParameter( "name", property )
             .setParameter( "value", value )
             .executeUpdate();
-        WP_OPTIONS_CACHE.put( property, value );
+        wpOptionsCache.put( property, value );
+        if ( "hbo_cloudbeds_cookies".equals( property ) ) {
+            csrfToken = null;
+        }
     }
 
     @Override
     public void invalidateOptionsCache() {
-        WP_OPTIONS_CACHE.invalidateAll();
+        wpOptionsCache.invalidateAll();
+        csrfToken = null;
         LOGGER.info( "Options cache invalidated." );
     }
 

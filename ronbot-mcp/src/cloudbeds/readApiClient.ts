@@ -65,6 +65,23 @@ export async function getBookingTimeline(property: string, query: string): Promi
   );
 }
 
+/**
+ * Live sellable availability by room type for an inclusive date range.
+ * Omit from/to to use read-api defaults (today → tomorrow, Europe/London).
+ */
+export async function getAvailability(params: {
+  property: string;
+  from?: string;
+  to?: string;
+}): Promise<unknown> {
+  const { property, from, to } = params;
+  const q = new URLSearchParams();
+  if (from?.trim()) q.set("from", from.trim());
+  if (to?.trim()) q.set("to", to.trim());
+  const qs = q.toString();
+  return request(`/ronbot/${property}/availability${qs ? `?${qs}` : ""}`);
+}
+
 export async function health(): Promise<unknown> {
   return request("/ronbot/health");
 }

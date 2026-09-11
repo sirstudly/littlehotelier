@@ -207,6 +207,61 @@ export function createServer(): McpServer {
     },
   );
 
+  const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
+
+  server.tool(
+    "get_availability",
+    "Live Cloudbeds sellable availability (beds for dorms, rooms for privates) via ronbot-read-api. Pass properties for one or more hostels, or omit both properties and property to query all (crh/hsh/rmb/lsh) in one call. Optional from/to (YYYY-MM-DD, inclusive; defaults today→tomorrow). Do not issue multiple get_availability calls for a multi-property question — use one fan-out call.",
+    {
+      properties: z.array(propertySchema).min(1).max(4).optional(),
+      property: propertySchema.optional(),
+      from: isoDate.optional(),
+      to: isoDate.optional(),
+    },
+    async ({ properties, property, from, to }) => {
+      try {
+        let targets: Array<"crh" | "hsh" | "rmb" | "lsh">;
+        if (properties && properties.length > 0) {
+          targets = [...new Set(properties)];
+        } else if (property) {
+          targets = [property];
+        } else {
+          targets = ["crh", "hsh", "rmb", "lsh"];
+        }
+
+        const settled = await Promise.allSettled(
+          targets.map((p) => readApi.getAvailability({ property: p, from, to })),
+        );
+
+        const results = settled.map((outcome, i) => {
+          const prop = targets[i];
+          if (outcome.status === "fulfilled") {
+            return { property: prop, ok: true as const, data: outcome.value };
+          }
+          const message =
+            outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+          return { property: prop, ok: false as const, error: message };
+        });
+
+        const anyOk = results.some((r) => r.ok);
+        const payload = {
+          from: from ?? null,
+          to: to ?? null,
+          results,
+        };
+        if (!anyOk) {
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+            isError: true,
+          };
+        }
+        return ok(payload);
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
   server.tool(
     "insert_job",
     "Enqueue an allowlisted job into wp_lh_jobs (status=submitted)",

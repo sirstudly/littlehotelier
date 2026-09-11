@@ -122,6 +122,8 @@ Validates `@ronbot` / follow-up / authorized DM / stranger DM ignore without WAH
 
 - `@ronbot explain the EVL charges on reservation 1234567 (crh)`
 - `@ronbot timeline for reservation 1234567 at rmb`
+- `@ronbot how many beds free tomorrow at hsh?`
+- `@ronbot availability tonight across all hostels`
 - DM (if you’re in a subscribed group): `if guest cancels last night on 1234567 crh, how much should we refund?`
 - `@ronbot how often do we attempt to charge a non-refundable hostelworld booking?`
 

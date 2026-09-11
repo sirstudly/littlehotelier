@@ -1,9 +1,14 @@
 package com.macbackpackers.ronbot;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -16,6 +21,9 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.macbackpackers.beans.cloudbeds.responses.BookingNote;
 import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
@@ -23,9 +31,11 @@ import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
+import com.macbackpackers.ronbot.dto.AvailabilityDto;
 import com.macbackpackers.ronbot.dto.BookingSummaryDto;
 import com.macbackpackers.ronbot.dto.BookingTimelineDto;
 import com.macbackpackers.ronbot.dto.JobHistoryDto;
+import com.macbackpackers.ronbot.dto.RoomTypeAvailabilityDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 
@@ -183,6 +193,190 @@ public class RonbotReadService {
         }
         timeline.setJobs( jobDtos );
         return timeline;
+    }
+
+    /**
+     * Live sellable availability by room type for an inclusive date range.
+     *
+     * @param property property code
+     * @param fromRaw optional YYYY-MM-DD (default today)
+     * @param toRaw optional YYYY-MM-DD (default today+1)
+     */
+    public AvailabilityDto getAvailability( String property, String fromRaw, String toRaw ) throws IOException {
+        LocalDate from = parseDateOrDefault( fromRaw, LocalDate.now() );
+        LocalDate to = parseDateOrDefault( toRaw, LocalDate.now().plusDays( 1 ) );
+        if ( to.isBefore( from ) ) {
+            throw new IllegalArgumentException( "to must be on or after from" );
+        }
+        long nights = ChronoUnit.DAYS.between( from, to ) + 1;
+        if ( nights > 14 ) {
+            throw new IllegalArgumentException( "Date range too long (max 14 nights inclusive); got " + nights );
+        }
+
+        ConfigurableApplicationContext ctx = propertyContexts.require( property );
+        CloudbedsScraper scraper = ctx.getBean( CloudbedsScraper.class );
+
+        try ( WebClient webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            LOGGER.info( "Fetching availability for property={} from={} to={}", property, from, to );
+            JsonObject findResp = scraper.fetchRoomTypesFind( webClient );
+            List<RoomTypeMeta> metas = parseRoomTypeMetas( findResp ).stream()
+                    .filter( m -> !isExcludedFromAvailability( property, m.name ) )
+                    .collect( Collectors.toList() );
+            List<String> roomTypeIds = metas.stream().map( m -> m.id ).collect( Collectors.toList() );
+
+            Map<String, Map<LocalDate, Integer>> availability = scraper.fetchAvailability(
+                    webClient, from, to, roomTypeIds );
+
+            AvailabilityDto dto = new AvailabilityDto();
+            dto.setProperty( property );
+            dto.setFrom( from.toString() );
+            dto.setTo( to.toString() );
+
+            Map<String, Integer> totalsByDate = new LinkedHashMap<>();
+            for ( LocalDate night = from; !night.isAfter( to ); night = night.plusDays( 1 ) ) {
+                totalsByDate.put( night.toString(), 0 );
+            }
+
+            List<RoomTypeAvailabilityDto> roomTypes = new ArrayList<>();
+            for ( RoomTypeMeta meta : metas ) {
+                RoomTypeAvailabilityDto rt = new RoomTypeAvailabilityDto();
+                rt.setRoomTypeId( meta.id );
+                rt.setName( meta.name );
+                rt.setCapacity( meta.capacity );
+                rt.setIsPrivate( meta.isPrivate );
+
+                Map<LocalDate, Integer> byDate = availability.getOrDefault( meta.id, Map.of() );
+                Map<String, Integer> availableByDate = new LinkedHashMap<>();
+                for ( LocalDate night = from; !night.isAfter( to ); night = night.plusDays( 1 ) ) {
+                    int sell = byDate.getOrDefault( night, 0 );
+                    availableByDate.put( night.toString(), sell );
+                    totalsByDate.merge( night.toString(), sell, Integer::sum );
+                }
+                rt.setAvailableByDate( availableByDate );
+                roomTypes.add( rt );
+            }
+
+            roomTypes.sort( Comparator.comparing(
+                    r -> StringUtils.defaultString( r.getName() ), String.CASE_INSENSITIVE_ORDER ) );
+            dto.setRoomTypes( roomTypes );
+            dto.setTotalsByDate( totalsByDate );
+            return dto;
+        }
+    }
+
+    private static LocalDate parseDateOrDefault( String raw, LocalDate fallback ) {
+        String trimmed = StringUtils.trimToNull( raw );
+        if ( trimmed == null ) {
+            return fallback;
+        }
+        try {
+            return LocalDate.parse( trimmed );
+        }
+        catch ( DateTimeParseException ex ) {
+            throw new IllegalArgumentException( "Invalid date '" + trimmed + "' (expected YYYY-MM-DD)" );
+        }
+    }
+
+    /**
+     * Internal Cloudbeds placeholders that must not appear in staff availability
+     * (neither room-type rows nor nightly totals).
+     */
+    static boolean isExcludedFromAvailability( String property, String roomTypeName ) {
+        if ( StringUtils.isBlank( roomTypeName ) ) {
+            return false;
+        }
+        String name = roomTypeName.trim();
+        String upper = name.toUpperCase( Locale.ROOT );
+        // "PAID BED", "PAID BEDS", "PAID BED - NOT FOR SALE", etc.
+        if ( upper.contains( "PAID BED" ) ) {
+            return true;
+        }
+        if ( upper.equals( "SPLITS" ) ) {
+            return true;
+        }
+        // Castle Rock only — offline / internal private
+        if ( "crh".equalsIgnoreCase( property ) && upper.equals( "ROOM 52" ) ) {
+            return true;
+        }
+        return false;
+    }
+
+    private static List<RoomTypeMeta> parseRoomTypeMetas( JsonObject findResp ) {
+        List<RoomTypeMeta> out = new ArrayList<>();
+        if ( findResp == null ) {
+            return out;
+        }
+        JsonElement dataEl = findResp.get( "data" );
+        if ( dataEl == null || !dataEl.isJsonArray() ) {
+            return out;
+        }
+        JsonArray data = dataEl.getAsJsonArray();
+        for ( JsonElement el : data ) {
+            if ( !el.isJsonObject() ) {
+                continue;
+            }
+            JsonObject row = el.getAsJsonObject();
+            String id = jsonString( row, "id" );
+            if ( id.isEmpty() ) {
+                continue;
+            }
+            // Skip virtual / allotment-only types if flagged
+            if ( "1".equals( jsonString( row, "is_virtual" ) ) || "Y".equalsIgnoreCase( jsonString( row, "is_virtual" ) ) ) {
+                continue;
+            }
+            String title = jsonString( row, "title" );
+            if ( title.isEmpty() ) {
+                title = jsonString( row, "short_title" );
+            }
+            if ( title.isEmpty() ) {
+                title = id;
+            }
+            int capacity = parsePositiveInt( row, "num_beds" );
+            if ( capacity <= 0 ) {
+                capacity = parsePositiveInt( row, "room_capacity" );
+            }
+            boolean isPrivate = "Y".equalsIgnoreCase( jsonString( row, "is_private" ) );
+            out.add( new RoomTypeMeta( id, title, capacity > 0 ? capacity : null, isPrivate ) );
+        }
+        return out;
+    }
+
+    private static String jsonString( JsonObject obj, String key ) {
+        JsonElement e = obj.get( key );
+        if ( e == null || e.isJsonNull() ) {
+            return "";
+        }
+        return e.getAsString().trim();
+    }
+
+    private static int parsePositiveInt( JsonObject obj, String key ) {
+        JsonElement e = obj.get( key );
+        if ( e == null || e.isJsonNull() ) {
+            return 0;
+        }
+        try {
+            if ( e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber() ) {
+                return e.getAsInt();
+            }
+            return Integer.parseInt( e.getAsString().trim() );
+        }
+        catch ( NumberFormatException ex ) {
+            return 0;
+        }
+    }
+
+    private static final class RoomTypeMeta {
+        final String id;
+        final String name;
+        final Integer capacity;
+        final boolean isPrivate;
+
+        RoomTypeMeta( String id, String name, Integer capacity, boolean isPrivate ) {
+            this.id = id;
+            this.name = name;
+            this.capacity = capacity;
+            this.isPrivate = isPrivate;
+        }
     }
 
     static boolean isExactMatch( String query, Customer c ) {
