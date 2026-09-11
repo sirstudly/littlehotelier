@@ -14,6 +14,11 @@ const transcript = new TranscriptStore();
 const recentMessageIds = new Set<string>();
 const processingChats = new Set<string>();
 
+/** Agent silence contract: exact NO_REPLY (trim + case-insensitive) means skip send. */
+export function isNoReply(answer: string): boolean {
+  return /^NO_REPLY$/i.test(answer.trim());
+}
+
 function readJson(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -131,6 +136,10 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
       `handling ${reason} chat=${chatId} from=${senderId}${images?.length ? " images=1" : ""}`,
     );
     const answer = await askRonbot(chatId, prompt, images);
+    if (isNoReply(answer)) {
+      console.log(`silence NO_REPLY chat=${chatId} from=${senderId}`);
+      return;
+    }
     const chunks = chunkWhatsAppText(answer);
     let lastId: string | undefined;
     for (const chunk of chunks) {
@@ -143,7 +152,7 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
         messageId: lastId,
       });
     }
-    transcript.markBotReply(chatId, lastId);
+    transcript.markBotReply(chatId, lastId, senderId);
   } catch (err) {
     console.error("handle failed", err);
     try {

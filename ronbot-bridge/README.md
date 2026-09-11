@@ -6,10 +6,10 @@ WhatsApp staff bridge: **WAHA** (unofficial WhatsApp Web HTTP API) → this serv
 
 | Channel | Who | When we reply |
 |---------|-----|----------------|
-| Allowlisted groups (`@g.us`) | Everyone in the group (full context) | WhatsApp @-mention of the bot (LID), text `ronbot` / `@~ronbot`, or follow-up within ~15 minutes of our last reply |
-| Private DMs (`@c.us` / `@lid`) | Sender must be a **member of an allowlisted group** | Always (treated as directed at us) |
+| Allowlisted groups (`@g.us`) | Everyone in the group (full context) | WhatsApp @-mention / text `ronbot` / `@~ronbot`; **or** WhatsApp reply-to a bot message; **or** same human continuing within ~15 minutes of our last reply (short / question / image). Agent may return `NO_REPLY` to stay silent when there is nothing useful to add. |
+| Private DMs (`@c.us` / `@lid`) | Sender must be a **member of an allowlisted group** | Always triggered (treated as directed at us); may still stay silent via `NO_REPLY` |
 
-Images (JPEG/PNG/WebP/GIF screenshots) are downloaded from WAHA and passed to the Cursor agent. In groups, attach a caption that mentions ronbot, or send the image as a follow-up; in DMs an image alone is enough.
+Images (JPEG/PNG/WebP/GIF screenshots) are downloaded from WAHA and passed to the Cursor agent. In groups, attach a caption that mentions ronbot, send the image as a same-sender follow-up, or reply-to a bot message; in DMs an image alone is enough.
 
 ## Risk
 

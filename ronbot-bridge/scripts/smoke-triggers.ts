@@ -130,15 +130,48 @@ const extractedMentions = extractMentionedIds({
 });
 assert(extractedMentions.includes("99900011122233@lid"), "extract mentionedJid from _data");
 
-transcript.markBotReply(groupId);
+transcript.markBotReply(groupId, undefined, member);
 assert(
   shouldHandle(
     msg({ chatId: groupId, senderId: member, body: "and for rmb?", isGroup: true }),
     membership,
     transcript,
   ) === "followup",
-  "short follow-up after bot reply should trigger",
+  "same-sender short follow-up after bot reply should trigger",
 );
+
+const otherMember = "447700900002@c.us";
+assert(
+  shouldHandle(
+    msg({ chatId: groupId, senderId: otherMember, body: "unrelated short chatter", isGroup: true }),
+    membership,
+    transcript,
+  ) === null,
+  "other member short chatter during follow-up window should ignore",
+);
+
+const botMsgId = "bot-msg-1";
+transcript.markBotReply(groupId, botMsgId, member);
+assert(
+  shouldHandle(
+    msg({
+      chatId: groupId,
+      senderId: otherMember,
+      body: "also check guest X",
+      isGroup: true,
+      replyToId: botMsgId,
+    }),
+    membership,
+    transcript,
+  ) === "followup",
+  "reply-to-bot from another member should trigger",
+);
+
+const { isNoReply } = await import("../src/server.js");
+assert(isNoReply("NO_REPLY"), "NO_REPLY sentinel recognized");
+assert(isNoReply("  no_reply  "), "NO_REPLY is case-insensitive and trimmed");
+assert(!isNoReply("NO_REPLY thanks"), "NO_REPLY must be exact");
+assert(!isNoReply("ok"), "ordinary text is not silence");
 
 assert(
   shouldHandle(

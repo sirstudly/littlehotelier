@@ -1,4 +1,4 @@
-import { config } from "./env.js";
+import { config, normalizeJid } from "./env.js";
 
 export interface TranscriptEntry {
   at: number;
@@ -12,6 +12,7 @@ export class TranscriptStore {
   private readonly byChat = new Map<string, TranscriptEntry[]>();
   private readonly lastBotReplyAt = new Map<string, number>();
   private readonly lastBotMessageIds = new Map<string, Set<string>>();
+  private readonly lastHumanTriggerByChat = new Map<string, string>();
 
   append(chatId: string, entry: TranscriptEntry): void {
     const list = this.byChat.get(chatId) ?? [];
@@ -49,17 +50,24 @@ export class TranscriptStore {
     return Date.now() - at;
   }
 
+  lastHumanTriggerId(chatId: string): string | null {
+    return this.lastHumanTriggerByChat.get(chatId) ?? null;
+  }
+
   isReplyToBot(chatId: string, replyToId?: string): boolean {
     if (!replyToId) return false;
     return this.lastBotMessageIds.get(chatId)?.has(replyToId) ?? false;
   }
 
-  markBotReply(chatId: string, messageId?: string): void {
+  markBotReply(chatId: string, messageId?: string, humanSenderId?: string): void {
     this.lastBotReplyAt.set(chatId, Date.now());
     if (messageId) {
       const ids = this.lastBotMessageIds.get(chatId) ?? new Set<string>();
       ids.add(messageId);
       this.lastBotMessageIds.set(chatId, ids);
+    }
+    if (humanSenderId) {
+      this.lastHumanTriggerByChat.set(chatId, normalizeJid(humanSenderId));
     }
   }
 }

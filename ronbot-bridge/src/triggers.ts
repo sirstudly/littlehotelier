@@ -69,11 +69,18 @@ function isFollowUp(
   msg: NormalizedInbound,
   transcript: TranscriptStore,
 ): boolean {
+  // WhatsApp reply-to a bot message: any member
   if (transcript.isReplyToBot(chatId, msg.replyToId)) return true;
+
   const age = transcript.lastBotReplyAgeMs(chatId);
   if (age == null) return false;
   const windowMs = config.followUpMinutes * 60 * 1000;
   if (age > windowMs) return false;
+
+  // Time-window follow-ups only from the human whose message last got a bot reply
+  const lastHuman = transcript.lastHumanTriggerId(chatId);
+  if (!lastHuman || normalizeJid(msg.senderId) !== lastHuman) return false;
+
   // Image-only follow-ups (empty caption) count as directed
   if (msg.hasMedia && !msg.body) return true;
   // Prefer short / question-like follow-ups to reduce false positives
