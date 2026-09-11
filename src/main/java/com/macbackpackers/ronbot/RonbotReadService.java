@@ -2,18 +2,22 @@ package com.macbackpackers.ronbot;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.htmlunit.WebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,8 +38,10 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.ronbot.dto.AvailabilityDto;
 import com.macbackpackers.ronbot.dto.BookingSummaryDto;
 import com.macbackpackers.ronbot.dto.BookingTimelineDto;
+import com.macbackpackers.ronbot.dto.ContinuingRoomDto;
 import com.macbackpackers.ronbot.dto.JobHistoryDto;
 import com.macbackpackers.ronbot.dto.RoomTypeAvailabilityDto;
+import com.macbackpackers.ronbot.dto.StayContinuationDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 
@@ -264,6 +270,257 @@ public class RonbotReadService {
         }
     }
 
+    /**
+     * Whether the guest is staying on past {@code asOf} — either the same reservation’s checkout
+     * moved, or a follow-on booking occupies the same beds starting on checkout night.
+     *
+     * @param asOfRaw optional YYYY-MM-DD (default today)
+     */
+    public StayContinuationDto getStayContinuation( String property, String query, String asOfRaw )
+            throws IOException {
+        LocalDate asOf = parseDateOrDefault( asOfRaw, LocalDate.now() );
+        String reservationId = requireUniqueReservationId( property, query );
+
+        ConfigurableApplicationContext ctx = propertyContexts.require( property );
+        CloudbedsScraper scraper = ctx.getBean( CloudbedsScraper.class );
+
+        try ( WebClient webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            Reservation reservation = scraper.getReservationRetry( webClient, reservationId );
+            LocalDate checkout = reservation.getCheckoutDateAsLocalDate();
+
+            StayContinuationDto dto = new StayContinuationDto();
+            dto.setAsOf( asOf.toString() );
+            dto.setCheckoutDate( reservation.getCheckoutDate() );
+            dto.setBooking( toBookingSummary( property, reservation ) );
+
+            List<ContinuingRoomDto> rooms = new ArrayList<>();
+            List<BookingSummaryDto> following = new ArrayList<>();
+
+            if ( checkout.isAfter( asOf ) ) {
+                dto.setKind( "same_reservation" );
+                dto.setStayingOn( true );
+                for ( BookingRoom room : safeRooms( reservation ) ) {
+                    LocalDate end = roomEndDate( room, checkout );
+                    ContinuingRoomDto cr = baseContinuingRoom( room );
+                    if ( end.isAfter( asOf ) ) {
+                        cr.setContinues( true );
+                        cr.setReason( "same_reservation" );
+                    }
+                    else {
+                        cr.setContinues( false );
+                        cr.setReason( "ends_on_or_before_asOf" );
+                    }
+                    rooms.add( cr );
+                }
+            }
+            else if ( checkout.equals( asOf ) ) {
+                JsonObject report = scraper.getRoomAssignmentsReport( webClient, checkout );
+                Map<String, List<RoomAssignmentHit>> byBed = indexAssignmentsByBed( report, checkout );
+                Map<String, Reservation> loadedFollowOns = new LinkedHashMap<>();
+
+                for ( BookingRoom room : safeRooms( reservation ) ) {
+                    ContinuingRoomDto cr = baseContinuingRoom( room );
+                    String bedKey = normalizeBedLabel( room.getRoomNumber() );
+                    List<RoomAssignmentHit> hits = byBed.getOrDefault( bedKey, List.of() );
+                    RoomAssignmentHit other = hits.stream()
+                            .filter( h -> !reservationId.equals( h.bookingId ) )
+                            .findFirst()
+                            .orElse( null );
+
+                    if ( other == null ) {
+                        cr.setContinues( false );
+                        cr.setReason( "vacant" );
+                        rooms.add( cr );
+                        continue;
+                    }
+
+                    Reservation followOn = loadedFollowOns.get( other.bookingId );
+                    if ( followOn == null ) {
+                        followOn = scraper.getReservationRetry( webClient, other.bookingId );
+                        loadedFollowOns.put( other.bookingId, followOn );
+                    }
+
+                    if ( followOn.isCanceledOrNoShow() ) {
+                        cr.setContinues( false );
+                        cr.setReason( "inactive_follow_on" );
+                        rooms.add( cr );
+                        continue;
+                    }
+
+                    if ( isSameGuest( reservation, followOn ) ) {
+                        cr.setContinues( true );
+                        cr.setReason( "linked_reservation" );
+                        cr.setFollowingReservationId( followOn.getReservationId() );
+                        rooms.add( cr );
+                    }
+                    else {
+                        cr.setContinues( false );
+                        cr.setReason( "different_guest" );
+                        rooms.add( cr );
+                    }
+                }
+
+                boolean anyContinue = rooms.stream().anyMatch( ContinuingRoomDto::isContinues );
+                dto.setStayingOn( anyContinue );
+                dto.setKind( anyContinue ? "linked_reservation" : "none" );
+
+                Set<String> seenFollowIds = new LinkedHashSet<>();
+                for ( ContinuingRoomDto cr : rooms ) {
+                    if ( cr.isContinues() && StringUtils.isNotBlank( cr.getFollowingReservationId() )
+                            && seenFollowIds.add( cr.getFollowingReservationId() ) ) {
+                        Reservation fo = loadedFollowOns.get( cr.getFollowingReservationId() );
+                        if ( fo != null ) {
+                            following.add( toBookingSummary( property, fo ) );
+                        }
+                    }
+                }
+            }
+            else {
+                dto.setKind( "none" );
+                dto.setStayingOn( false );
+                for ( BookingRoom room : safeRooms( reservation ) ) {
+                    ContinuingRoomDto cr = baseContinuingRoom( room );
+                    cr.setContinues( false );
+                    cr.setReason( "already_checked_out" );
+                    rooms.add( cr );
+                }
+            }
+
+            dto.setContinuingRooms( rooms );
+            dto.setFollowingBookings( following );
+            return dto;
+        }
+    }
+
+    private static List<BookingRoom> safeRooms( Reservation reservation ) {
+        return reservation.getBookingRooms() != null ? reservation.getBookingRooms() : List.of();
+    }
+
+    private static ContinuingRoomDto baseContinuingRoom( BookingRoom room ) {
+        ContinuingRoomDto cr = new ContinuingRoomDto();
+        cr.setRoomId( room.getRoomId() );
+        cr.setRoomNumber( room.getRoomNumber() );
+        cr.setRoomTypeName( room.getRoomTypeName() );
+        return cr;
+    }
+
+    private static LocalDate roomEndDate( BookingRoom room, LocalDate reservationCheckout ) {
+        String end = StringUtils.trimToNull( room.getEndDate() );
+        if ( end == null ) {
+            return reservationCheckout;
+        }
+        try {
+            return LocalDate.parse( end );
+        }
+        catch ( DateTimeParseException ex ) {
+            return reservationCheckout;
+        }
+    }
+
+    /** HTML-unescape + trim; matches LT conflict-bed matching. */
+    static String normalizeBedLabel( String roomNumber ) {
+        if ( roomNumber == null ) {
+            return "";
+        }
+        return StringEscapeUtils.unescapeHtml4( roomNumber ).trim();
+    }
+
+    /**
+     * Same guest when customerIds match, or (fallback) same normalized name and matching emails
+     * when both emails are present.
+     */
+    static boolean isSameGuest( Reservation a, Reservation b ) {
+        String aCust = StringUtils.trimToNull( a.getCustomerId() );
+        String bCust = StringUtils.trimToNull( b.getCustomerId() );
+        if ( aCust != null && bCust != null ) {
+            return aCust.equals( bCust );
+        }
+        String aName = normalizeGuestName( a.getFirstName(), a.getLastName() );
+        String bName = normalizeGuestName( b.getFirstName(), b.getLastName() );
+        if ( aName.isEmpty() || !aName.equals( bName ) ) {
+            return false;
+        }
+        String aEmail = StringUtils.trimToNull( a.getEmail() );
+        String bEmail = StringUtils.trimToNull( b.getEmail() );
+        if ( aEmail != null && bEmail != null ) {
+            return aEmail.equalsIgnoreCase( bEmail );
+        }
+        // Names match and at least one side lacks email — treat as same guest
+        return true;
+    }
+
+    static String normalizeGuestName( String firstName, String lastName ) {
+        return ( StringUtils.defaultString( firstName ) + " " + StringUtils.defaultString( lastName ) )
+                .trim()
+                .replaceAll( "\\s+", " " )
+                .toLowerCase( Locale.ROOT );
+    }
+
+    /**
+     * Index room-assignments report hits by normalized bed label for a single night.
+     */
+    static Map<String, List<RoomAssignmentHit>> indexAssignmentsByBed( JsonObject report, LocalDate night ) {
+        Map<String, List<RoomAssignmentHit>> byBed = new LinkedHashMap<>();
+        if ( report == null ) {
+            return byBed;
+        }
+        JsonElement roomsEl = report.get( "rooms" );
+        if ( roomsEl == null || !roomsEl.isJsonObject() ) {
+            return byBed;
+        }
+        JsonObject roomsByDate = roomsEl.getAsJsonObject();
+        JsonElement dayEl = roomsByDate.get( night.format( DateTimeFormatter.ISO_LOCAL_DATE ) );
+        if ( dayEl == null || !dayEl.isJsonObject() ) {
+            return byBed;
+        }
+        for ( Map.Entry<String, JsonElement> roomTypeEntry : dayEl.getAsJsonObject().entrySet() ) {
+            if ( !roomTypeEntry.getValue().isJsonObject() ) {
+                continue;
+            }
+            JsonObject roomTypeObj = roomTypeEntry.getValue().getAsJsonObject();
+            JsonElement bedsEl = roomTypeObj.get( "rooms" );
+            if ( bedsEl == null || !bedsEl.isJsonObject() ) {
+                continue;
+            }
+            for ( Map.Entry<String, JsonElement> bedEntry : bedsEl.getAsJsonObject().entrySet() ) {
+                String bedKey = normalizeBedLabel( bedEntry.getKey() );
+                if ( bedKey.isEmpty() || !bedEntry.getValue().isJsonArray() ) {
+                    continue;
+                }
+                JsonArray arr = bedEntry.getValue().getAsJsonArray();
+                for ( JsonElement hitEl : arr ) {
+                    if ( !hitEl.isJsonObject() ) {
+                        continue;
+                    }
+                    JsonObject hit = hitEl.getAsJsonObject();
+                    String bookingId = jsonString( hit, "booking_id" );
+                    if ( bookingId.isEmpty() ) {
+                        continue;
+                    }
+                    byBed.computeIfAbsent( bedKey, k -> new ArrayList<>() )
+                            .add( new RoomAssignmentHit(
+                                    bookingId,
+                                    jsonString( hit, "guest_first_name" ),
+                                    jsonString( hit, "guest_last_name" ) ) );
+                }
+            }
+        }
+        return byBed;
+    }
+
+    /** Package-visible for unit tests. */
+    static final class RoomAssignmentHit {
+        final String bookingId;
+        final String guestFirstName;
+        final String guestLastName;
+
+        RoomAssignmentHit( String bookingId, String guestFirstName, String guestLastName ) {
+            this.bookingId = bookingId;
+            this.guestFirstName = guestFirstName;
+            this.guestLastName = guestLastName;
+        }
+    }
+
     private static LocalDate parseDateOrDefault( String raw, LocalDate fallback ) {
         String trimmed = StringUtils.trimToNull( raw );
         if ( trimmed == null ) {
@@ -433,6 +690,9 @@ public class RonbotReadService {
                 rm.put( "roomId", room.getRoomId() );
                 rm.put( "roomNumber", room.getRoomNumber() );
                 rm.put( "roomTypeName", room.getRoomTypeName() );
+                rm.put( "roomTypeId", room.getRoomTypeId() );
+                rm.put( "startDate", room.getStartDate() );
+                rm.put( "endDate", room.getEndDate() );
                 rm.put( "guestCount", room.getGuestCount() );
                 rooms.add( rm );
             }

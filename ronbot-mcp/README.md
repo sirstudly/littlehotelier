@@ -21,6 +21,7 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `get_booking` | Live reservation search by visible id / OTA ref / guest name (read-api; returns a list) |
 | `list_transactions` | Live folio lines (read-api; unique match required) |
 | `get_booking_timeline` | Live booking + transactions + job history |
+| `check_stay_continuation` | Cleaning / extension: staying on past checkout? (same reservation or linked follow-on in same beds) |
 | `get_availability` | Live sellable beds/rooms by room type (read-api; single property, subset, or all hostels in one call) |
 | `insert_job` | Allowlisted enqueue only |
 
@@ -72,6 +73,7 @@ See [`.cursor/mcp.json`](../.cursor/mcp.json). Point `args` at `ronbot-mcp/dist/
 - "What's the live balance for reservation 4586958844219 at crh?" → `get_booking` with `query`
 - "Find bookings for Jane Smith at hsh" → `get_booking` with guest name as `query`
 - "Timeline of events for reservation 4586958844219 at crh" → `get_booking_timeline` (unique match)
+- "Is booking 4586958844219 at crh staying another night / extended?" → `check_stay_continuation`
 - "How many beds free tomorrow at hsh?" → `get_availability` with `property=hsh` (or omit from/to for today→tomorrow)
 - "Availability tonight across all hostels" → `get_availability` once with `properties` omitted (fans out to crh/hsh/rmb/lsh)
 - "Run housekeeping for crh for today" → `insert_job` with `HousekeepingJob` / `selected_date`

@@ -21,6 +21,7 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.ronbot.dto.AvailabilityDto;
 import com.macbackpackers.ronbot.dto.BookingSummaryDto;
 import com.macbackpackers.ronbot.dto.BookingTimelineDto;
+import com.macbackpackers.ronbot.dto.StayContinuationDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
 
 @Profile( "ronbot-parent" )
@@ -89,6 +90,18 @@ public class RonbotReadController {
             @PathVariable String property,
             @PathVariable String query ) throws IOException {
         return readService.getTimeline( property, query );
+    }
+
+    /**
+     * Whether the guest is staying on past {@code asOf} (same reservation extended, or a linked
+     * follow-on booking in the same beds). Defaults {@code asOf}=today (Europe/London).
+     */
+    @GetMapping( "/{property}/reservations/{query}/stay-continuation" )
+    public StayContinuationDto stayContinuation(
+            @PathVariable String property,
+            @PathVariable String query,
+            @RequestParam( name = "asOf", required = false ) String asOf ) throws IOException {
+        return readService.getStayContinuation( property, query, asOf );
     }
 
     /**

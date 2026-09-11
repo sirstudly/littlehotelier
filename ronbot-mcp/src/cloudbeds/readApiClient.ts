@@ -66,6 +66,28 @@ export async function getBookingTimeline(property: string, query: string): Promi
 }
 
 /**
+ * Whether the guest is staying on past asOf (same reservation extended, or a linked
+ * follow-on booking in the same beds). `query` must resolve uniquely.
+ * Omit asOf for today (Europe/London).
+ */
+export async function getStayContinuation(params: {
+  property: string;
+  query: string;
+  asOf?: string;
+}): Promise<unknown> {
+  const { property, query, asOf } = params;
+  if (!query?.trim()) {
+    throw new Error("query is required");
+  }
+  const q = new URLSearchParams();
+  if (asOf?.trim()) q.set("asOf", asOf.trim());
+  const qs = q.toString();
+  return request(
+    `/ronbot/${property}/reservations/${encodeURIComponent(query.trim())}/stay-continuation${qs ? `?${qs}` : ""}`,
+  );
+}
+
+/**
  * Live sellable availability by room type for an inclusive date range.
  * Omit from/to to use read-api defaults (today → tomorrow, Europe/London).
  */

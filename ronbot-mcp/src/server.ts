@@ -210,6 +210,23 @@ export function createServer(): McpServer {
   const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
 
   server.tool(
+    "check_stay_continuation",
+    "Cleaning / extension check: is this guest staying on past checkout (same reservation extended, or a new linked booking in the same beds)? Pass property + query (prefer reservationId from get_booking). Optional as_of (YYYY-MM-DD; defaults today). Returns stayingOn, kind (none|same_reservation|linked_reservation), per-bed continuingRooms, and followingBookings when linked. Do not guess from get_booking alone when staff ask about a follow-on booking.",
+    {
+      property: propertySchema,
+      query: z.string().min(1),
+      as_of: isoDate.optional(),
+    },
+    async ({ property, query, as_of }) => {
+      try {
+        return ok(await readApi.getStayContinuation({ property, query, asOf: as_of }));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
     "get_availability",
     "Live Cloudbeds sellable availability (beds for dorms, rooms for privates) via ronbot-read-api. Pass properties for one or more hostels, or omit both properties and property to query all (crh/hsh/rmb/lsh) in one call. Optional from/to (YYYY-MM-DD, inclusive; defaults today→tomorrow). Do not issue multiple get_availability calls for a multi-property question — use one fan-out call.",
     {
