@@ -34,7 +34,7 @@ const stranger = "447700900099@c.us";
 // Patch allowlist for this process if empty
 if (!isAllowlistedGroup(groupId)) {
   const { config } = await import("../src/env.js");
-  (config.groups as string[]).push(groupId);
+  config.groups.push({ id: groupId });
 }
 
 const membership = new FakeMembership(new Set([member, memberLid]));
@@ -250,6 +250,121 @@ assert(
 );
 
 assert(normalizeJid("447700900001@s.whatsapp.net") === "447700900001@c.us", "jid normalize");
+
+const {
+  parseGroupEntry,
+  parseGroupEntriesFromEnv,
+  parseGroupsJson,
+} = await import("../src/env.js");
+assert(
+  JSON.stringify(parseGroupEntry("120363aaa@g.us")) ===
+    JSON.stringify({ id: "120363aaa@g.us" }),
+  "parse plain group jid",
+);
+assert(
+  JSON.stringify(parseGroupEntry("120363aaa@g.us:hsh")) ===
+    JSON.stringify({ id: "120363aaa@g.us", property: "hsh" }),
+  "parse group jid with property",
+);
+assert(
+  JSON.stringify(parseGroupEntry("120363aaa@g.us:HSH")) ===
+    JSON.stringify({ id: "120363aaa@g.us", property: "hsh" }),
+  "parse property case-insensitive",
+);
+assert(
+  JSON.stringify(parseGroupEntry("120363aaa@g.us:nope")) ===
+    JSON.stringify({ id: "120363aaa@g.us" }),
+  "invalid property ignored, still allowlisted",
+);
+assert(
+  JSON.stringify(
+    parseGroupEntriesFromEnv(
+      "120363aaa@g.us:hsh, 120363bbb@g.us ,120363ccc@g.us:rmb",
+    ),
+  ) ===
+    JSON.stringify([
+      { id: "120363aaa@g.us", property: "hsh" },
+      { id: "120363bbb@g.us" },
+      { id: "120363ccc@g.us", property: "rmb" },
+    ]),
+  "parse env comma list",
+);
+assert(
+  JSON.stringify(
+    parseGroupsJson({
+      groups: [
+        { id: "120363aaa@g.us", property: "hsh" },
+        "120363ccc@g.us",
+        { id: "120363ddd@g.us", property: "bad" },
+      ],
+    }),
+  ) ===
+    JSON.stringify([
+      { id: "120363aaa@g.us", property: "hsh" },
+      { id: "120363ccc@g.us" },
+      { id: "120363ddd@g.us" },
+    ]),
+  "parse groups.json mixed shapes",
+);
+
+const { propertyContextLines } = await import("../src/server.js");
+class PropMembership extends MembershipCache {
+  constructor(private readonly props: Map<string, string[]>) {
+    super({} as never);
+  }
+  override getSenderProperties(senderId: string) {
+    return (this.props.get(normalizeJid(senderId)) ?? []) as (
+      | "crh"
+      | "hsh"
+      | "rmb"
+      | "lsh"
+    )[];
+  }
+}
+const hshGroup = "120363hsh000000000@g.us";
+{
+  const { config } = await import("../src/env.js");
+  if (!config.groups.some((g) => g.id === hshGroup)) {
+    config.groups.push({ id: hshGroup, property: "hsh" });
+  }
+}
+assert(
+  propertyContextLines(true, hshGroup, member, membership).some((l) =>
+    l.startsWith("DefaultProperty=hsh"),
+  ),
+  "group prompt gets DefaultProperty from tag",
+);
+assert(
+  propertyContextLines(true, groupId, member, membership).length === 0,
+  "untagged group has no property context",
+);
+assert(
+  propertyContextLines(
+    false,
+    member,
+    member,
+    new PropMembership(new Map([[member, ["lsh"]]])),
+  ).some((l) => l.startsWith("DefaultProperty=lsh")),
+  "DM single membership property → DefaultProperty",
+);
+assert(
+  propertyContextLines(
+    false,
+    member,
+    member,
+    new PropMembership(new Map([[member, ["hsh", "rmb"]]])),
+  ).some((l) => l.startsWith("CandidateProperties=hsh,rmb")),
+  "DM multi membership → CandidateProperties",
+);
+assert(
+  propertyContextLines(
+    false,
+    member,
+    member,
+    new PropMembership(new Map()),
+  ).length === 0,
+  "DM with no tagged groups → no property context",
+);
 
 // LID + phoneNumber extraction (WAHA NOWEB / addressingMode=lid)
 const { extractParticipantIds } = await import("../src/waha/client.js");

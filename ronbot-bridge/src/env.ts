@@ -34,19 +34,92 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function loadGroupAllowlist(): string[] {
-  const fromEnv = env("RONBOT_WHATSAPP_GROUPS")
+export const PROPERTY_IDS = ["crh", "hsh", "rmb", "lsh"] as const;
+export type PropertyId = (typeof PROPERTY_IDS)[number];
+
+export type GroupEntry = { id: string; property?: PropertyId };
+
+const PROPERTY_SET = new Set<string>(PROPERTY_IDS);
+
+export function normalizePropertyId(raw: string): PropertyId | undefined {
+  const code = raw.trim().toLowerCase();
+  return PROPERTY_SET.has(code) ? (code as PropertyId) : undefined;
+}
+
+/** Parse one allowlist token: `jid` or `jid:property` (property optional). */
+export function parseGroupEntry(token: string): GroupEntry | null {
+  const trimmed = token.trim();
+  if (!trimmed) return null;
+
+  const colon = trimmed.lastIndexOf(":");
+  if (colon > 0) {
+    const idPart = trimmed.slice(0, colon).trim();
+    const maybeProp = trimmed.slice(colon + 1).trim();
+    if (idPart && maybeProp) {
+      const property = normalizePropertyId(maybeProp);
+      if (property) {
+        return { id: normalizeJid(idPart), property };
+      }
+      console.warn(
+        `invalid property "${maybeProp}" for group ${idPart}; allowlisting without property`,
+      );
+      return { id: normalizeJid(idPart) };
+    }
+  }
+
+  return { id: normalizeJid(trimmed) };
+}
+
+/** Comma-separated `jid` / `jid:property` entries from env. */
+export function parseGroupEntriesFromEnv(raw: string): GroupEntry[] {
+  return raw
     .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+    .map((s) => parseGroupEntry(s))
+    .filter((e): e is GroupEntry => e !== null);
+}
+
+type GroupsJsonRaw = {
+  groups?: Array<string | { id?: unknown; property?: unknown }>;
+};
+
+/** Parse groups.json shape (legacy string[] or objects with optional property). */
+export function parseGroupsJson(raw: unknown): GroupEntry[] {
+  const groups = (raw as GroupsJsonRaw)?.groups;
+  if (!Array.isArray(groups)) return [];
+
+  const out: GroupEntry[] = [];
+  for (const item of groups) {
+    if (typeof item === "string") {
+      const entry = parseGroupEntry(item);
+      if (entry) out.push(entry);
+      continue;
+    }
+    if (item && typeof item === "object" && item.id != null) {
+      const id = normalizeJid(String(item.id));
+      if (!id) continue;
+      const property =
+        item.property != null ? normalizePropertyId(String(item.property)) : undefined;
+      if (item.property != null && !property) {
+        console.warn(
+          `invalid property "${String(item.property)}" for group ${id}; allowlisting without property`,
+        );
+      }
+      out.push(property ? { id, property } : { id });
+    }
+  }
+  return out;
+}
+
+function loadGroupAllowlist(): GroupEntry[] {
+  const fromEnv = parseGroupEntriesFromEnv(env("RONBOT_WHATSAPP_GROUPS"));
   if (fromEnv.length > 0) return fromEnv;
 
   const configPath =
     env("RONBOT_GROUPS_CONFIG") ||
     path.join(bridgeRoot, "config", "groups.json");
   try {
-    const raw = JSON.parse(readFileSync(configPath, "utf8")) as { groups?: string[] };
-    return (raw.groups ?? []).map((s) => String(s).trim()).filter(Boolean);
+    const raw = JSON.parse(readFileSync(configPath, "utf8")) as unknown;
+    return parseGroupsJson(raw);
   } catch {
     return [];
   }
@@ -79,7 +152,13 @@ export const config = {
 };
 
 export function isAllowlistedGroup(chatId: string): boolean {
-  return config.groups.includes(normalizeJid(chatId));
+  const jid = normalizeJid(chatId);
+  return config.groups.some((g) => g.id === jid);
+}
+
+export function getGroupProperty(chatId: string): PropertyId | undefined {
+  const jid = normalizeJid(chatId);
+  return config.groups.find((g) => g.id === jid)?.property;
 }
 
 export function normalizeJid(id: string): string {

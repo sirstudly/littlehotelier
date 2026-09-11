@@ -42,9 +42,10 @@ WAHA_ENGINE=NOWEB
 WAHA_DASHBOARD_USERNAME=admin
 WAHA_DASHBOARD_PASSWORD=change-me
 
-# Allowlisted staff groups (comma-separated WhatsApp group JIDs)
-RONBOT_WHATSAPP_GROUPS=120363...@g.us,120363...@g.us
-# Or edit config/groups.json
+# Allowlisted staff groups (comma-separated JIDs; optional :property default)
+# Property codes: crh | hsh | rmb | lsh — used when staff omit a property in the question.
+RONBOT_WHATSAPP_GROUPS=120363...@g.us:hsh,120363...@g.us:lsh,120363...@g.us
+# Or edit config/groups.json (strings or { "id", "property?" } objects)
 
 RONBOT_MENTION=@ronbot
 RONBOT_FOLLOWUP_MINUTES=15
@@ -76,8 +77,10 @@ Build context is the **repo root** (Linux MCP deps are baked into the image — 
 2. Start session `default` (or `WAHA_SESSION`)
 3. Scan QR with the burner phone’s WhatsApp
 4. Add that contact to each staff group
-5. Discover group ids (WAHA API / dashboard → groups) and set `RONBOT_WHATSAPP_GROUPS`
+5. Discover group ids (WAHA API / dashboard → groups) and set `RONBOT_WHATSAPP_GROUPS` (optionally `jid:hsh` / `jid:lsh` / etc. for a default property per group)
 6. Restart `ronbot-bridge` after updating groups
+
+Tagged groups inject `DefaultProperty` into the agent prompt. DMs infer the default from the sender’s tagged-group memberships; if they belong to multiple tagged properties, ronbot asks which one unless the message already names a property.
 
 Webhook is preconfigured in compose:
 

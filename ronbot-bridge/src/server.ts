@@ -1,12 +1,47 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { rememberBotIds } from "./botIdentity.js";
-import { config, isAllowlistedGroup, normalizeJid } from "./env.js";
+import {
+  config,
+  getGroupProperty,
+  isAllowlistedGroup,
+  normalizeJid,
+  type PropertyId,
+} from "./env.js";
 import { askRonbot, chunkWhatsAppText } from "./agent/runner.js";
 import { MembershipCache } from "./membership.js";
 import { TranscriptStore } from "./transcript.js";
 import { isDirectChat, shouldHandle } from "./triggers.js";
 import { WahaClient } from "./waha/client.js";
 import { normalizeInbound, type WahaWebhookEvent } from "./waha/types.js";
+
+/** Prompt lines for default / candidate property context (empty if none). */
+export function propertyContextLines(
+  isGroup: boolean,
+  chatId: string,
+  senderId: string,
+  membership: MembershipCache,
+): string[] {
+  if (isGroup) {
+    const property = getGroupProperty(chatId);
+    if (!property) return [];
+    return [
+      `DefaultProperty=${property} (from this group; use unless staff name another property)`,
+    ];
+  }
+
+  const properties: PropertyId[] = membership.getSenderProperties(senderId);
+  if (properties.length === 1) {
+    return [
+      `DefaultProperty=${properties[0]} (from staff group membership; use unless they name another)`,
+    ];
+  }
+  if (properties.length > 1) {
+    return [
+      `CandidateProperties=${properties.join(",")} (ask which unless the message already names a property)`,
+    ];
+  }
+  return [];
+}
 
 const waha = new WahaClient();
 const membership = new MembershipCache(waha);
@@ -120,10 +155,17 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
         ? `Attached image: ${images[0]!.mimeType} (screenshot from WhatsApp)`
         : null,
     ].filter(Boolean);
+    const propertyLines = propertyContextLines(
+      msg.isGroup,
+      chatId,
+      senderId,
+      membership,
+    );
     const prompt = [
       `WhatsApp ${msg.isGroup ? "group" : "DM"} chatId=${chatId}`,
       `Trigger=${reason}`,
       `From=${senderId}`,
+      ...propertyLines,
       "",
       "Recent chat context:",
       context || "(empty)",
