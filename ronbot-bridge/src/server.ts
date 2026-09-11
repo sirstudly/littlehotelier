@@ -51,16 +51,17 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
 
   const chatId = normalizeJid(msg.chatId);
   const senderId = normalizeJid(msg.senderId);
+  const transcriptBody = msg.body || (msg.hasMedia ? "[image]" : "");
 
-  // Always record non-empty inbound into transcript for allowlisted groups / authorized DMs
+  // Always record inbound into transcript for allowlisted groups / authorized DMs
   const trackGroup = msg.isGroup && isAllowlistedGroup(chatId);
   const trackDm =
     !msg.isGroup && isDirectChat(chatId) && membership.isAuthorizedDmSender(senderId);
-  if ((trackGroup || trackDm) && msg.body) {
+  if ((trackGroup || trackDm) && transcriptBody) {
     transcript.append(chatId, {
       at: msg.timestampMs,
       senderId,
-      body: msg.body,
+      body: transcriptBody,
       fromMe: msg.fromMe,
       messageId: msg.messageId,
     });
@@ -92,7 +93,28 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
       void waha.startTyping(chatId);
     }, 15_000);
 
+    let images: { data: string; mimeType: string }[] | undefined;
+    if (msg.media) {
+      try {
+        const downloaded = await waha.downloadMedia(msg.media.url, msg.media.mimetype);
+        images = [downloaded];
+      } catch (err) {
+        console.error("media download failed", err);
+        await waha.sendText(
+          chatId,
+          "I couldn't download that image — please resend it, or paste the reservation id / guest name as text.",
+        );
+        return;
+      }
+    }
+
     const context = transcript.formatForPrompt(chatId);
+    const latestLines = [
+      msg.body || "(no caption)",
+      images?.length
+        ? `Attached image: ${images[0]!.mimeType} (screenshot from WhatsApp)`
+        : null,
+    ].filter(Boolean);
     const prompt = [
       `WhatsApp ${msg.isGroup ? "group" : "DM"} chatId=${chatId}`,
       `Trigger=${reason}`,
@@ -102,11 +124,13 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
       context || "(empty)",
       "",
       "Latest message to answer:",
-      msg.body,
+      ...latestLines,
     ].join("\n");
 
-    console.log(`handling ${reason} chat=${chatId} from=${senderId}`);
-    const answer = await askRonbot(chatId, prompt);
+    console.log(
+      `handling ${reason} chat=${chatId} from=${senderId}${images?.length ? " images=1" : ""}`,
+    );
+    const answer = await askRonbot(chatId, prompt, images);
     const chunks = chunkWhatsAppText(answer);
     let lastId: string | undefined;
     for (const chunk of chunks) {

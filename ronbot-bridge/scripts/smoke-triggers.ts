@@ -47,6 +47,7 @@ function msg(partial: Partial<NormalizedInbound> & Pick<NormalizedInbound, "chat
     fromMe: false,
     timestampMs: Date.now(),
     mentionedIds: [],
+    hasMedia: false,
     ...partial,
   };
 }
@@ -96,6 +97,25 @@ assert(
     transcript,
   ) === null,
   "group without mention/follow-up should ignore",
+);
+
+assert(
+  shouldHandle(
+    msg({
+      chatId: groupId,
+      senderId: member,
+      body: "",
+      isGroup: true,
+      hasMedia: true,
+      media: {
+        url: "http://localhost:3000/api/files/x.jpg",
+        mimetype: "image/jpeg",
+      },
+    }),
+    membership,
+    transcript,
+  ) === null,
+  "group image-only without follow-up should ignore",
 );
 
 const extractedMentions = extractMentionedIds({
@@ -150,6 +170,50 @@ assert(
     transcript,
   ) === null,
   "unauthorized DM should ignore",
+);
+
+assert(
+  shouldHandle(
+    msg({
+      chatId: memberLid,
+      senderId: memberLid,
+      body: "",
+      isGroup: false,
+      hasMedia: true,
+      media: {
+        url: "http://localhost:3000/api/files/x.jpg",
+        mimetype: "image/jpeg",
+      },
+    }),
+    membership,
+    transcript,
+  ) === "dm",
+  "authorized LID DM image-only should handle",
+);
+
+const { extractAllowedImageMedia } = await import("../src/waha/types.js");
+assert(
+  extractAllowedImageMedia({
+    hasMedia: true,
+    media: { url: "http://waha:3000/api/files/a.jpg", mimetype: "image/jpeg" },
+  })?.mimetype === "image/jpeg",
+  "allowed jpeg media extracted",
+);
+assert(
+  extractAllowedImageMedia({
+    hasMedia: true,
+    media: { url: "http://waha:3000/api/files/a.pdf", mimetype: "application/pdf" },
+  }) === undefined,
+  "pdf media rejected",
+);
+
+const { rewriteMediaUrl } = await import("../src/waha/client.js");
+assert(
+  rewriteMediaUrl(
+    "http://localhost:3000/api/files/x.jpg",
+    "http://waha:3000",
+  ) === "http://waha:3000/api/files/x.jpg",
+  "rewrite localhost media URL for Docker",
 );
 
 assert(normalizeJid("447700900001@s.whatsapp.net") === "447700900001@c.us", "jid normalize");

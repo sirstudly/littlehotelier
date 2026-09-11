@@ -1,4 +1,10 @@
-import { Agent, Cursor, CursorAgentError, type SDKAgent } from "@cursor/sdk";
+import {
+  Agent,
+  Cursor,
+  CursorAgentError,
+  type SDKAgent,
+  type SDKImage,
+} from "@cursor/sdk";
 import { config } from "../env.js";
 import { SYSTEM_PROMPT } from "./systemPrompt.js";
 
@@ -68,7 +74,11 @@ async function getOrCreateAgent(chatId: string): Promise<SDKAgent> {
   return agent;
 }
 
-export async function askRonbot(chatId: string, userPrompt: string): Promise<string> {
+export async function askRonbot(
+  chatId: string,
+  userPrompt: string,
+  images?: SDKImage[],
+): Promise<string> {
   const slot = agents.get(chatId);
   if (slot?.busy) {
     return "Still working on your previous question — give me a moment, then ask again.";
@@ -78,10 +88,12 @@ export async function askRonbot(chatId: string, userPrompt: string): Promise<str
   const entry = agents.get(chatId)!;
   entry.busy = true;
   try {
-    const message = entry.primed
+    const messageText = entry.primed
       ? userPrompt
       : `${SYSTEM_PROMPT}\n\n---\n\n${userPrompt}`;
-    const run = await agent.send(message);
+    const run = await agent.send(
+      images?.length ? { text: messageText, images } : messageText,
+    );
     const result = await run.wait();
     if (result.status === "error") {
       const detail = result.error?.message ?? result.result ?? "(no error detail)";

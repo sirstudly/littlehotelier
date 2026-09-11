@@ -15,17 +15,18 @@ export function shouldHandle(
 
   const chatId = normalizeJid(msg.chatId);
   const senderId = normalizeJid(msg.senderId);
+  const hasContent = Boolean(msg.body) || msg.hasMedia;
 
   if (msg.isGroup) {
     if (!isAllowlistedGroup(chatId)) return null;
     if (mentionsRonbot(msg)) return "mention";
-    if (!msg.body) return null;
+    if (!hasContent) return null;
     if (isFollowUp(chatId, msg, transcript)) return "followup";
     return null;
   }
 
   // 1:1 DM — WAHA/NOWEB often uses @lid (not @c.us) for private chats
-  if (!msg.body) return null;
+  if (!hasContent) return null;
   if (!isDirectChat(chatId)) return null;
   if (!membership.isAuthorizedDmSender(senderId)) return null;
   return "dm";
@@ -73,6 +74,8 @@ function isFollowUp(
   if (age == null) return false;
   const windowMs = config.followUpMinutes * 60 * 1000;
   if (age > windowMs) return false;
+  // Image-only follow-ups (empty caption) count as directed
+  if (msg.hasMedia && !msg.body) return true;
   // Prefer short / question-like follow-ups to reduce false positives
   if (msg.body.length <= 280) return true;
   if (/[?]/.test(msg.body)) return true;

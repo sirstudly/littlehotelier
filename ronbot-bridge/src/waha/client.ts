@@ -1,5 +1,13 @@
 import { config, normalizeJid } from "../env.js";
 
+/** Max inbound image size passed to Cursor (bytes). */
+export const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
+
+export interface DownloadedImage {
+  data: string;
+  mimeType: string;
+}
+
 export class WahaClient {
   constructor(
     private readonly baseUrl = config.wahaBaseUrl,
@@ -11,6 +19,56 @@ export class WahaClient {
     const h: Record<string, string> = { "Content-Type": "application/json" };
     if (this.apiKey) h["X-Api-Key"] = this.apiKey;
     return h;
+  }
+
+  private mediaHeaders(): HeadersInit {
+    const h: Record<string, string> = {};
+    if (this.apiKey) h["X-Api-Key"] = this.apiKey;
+    return h;
+  }
+
+  /**
+   * Download image bytes from a WAHA media URL.
+   * Rewrites localhost hosts to WAHA_BASE_URL so Docker bridge → waha works.
+   */
+  async downloadMedia(
+    url: string,
+    fallbackMimeType = "image/jpeg",
+  ): Promise<DownloadedImage> {
+    const resolved = rewriteMediaUrl(url, this.baseUrl);
+    const res = await fetch(resolved, { headers: this.mediaHeaders() });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`WAHA media download ${res.status}: ${body.slice(0, 200)}`);
+    }
+
+    const lenHeader = res.headers.get("content-length");
+    if (lenHeader) {
+      const n = Number(lenHeader);
+      if (Number.isFinite(n) && n > MAX_MEDIA_BYTES) {
+        throw new Error(`Image too large (${n} bytes; max ${MAX_MEDIA_BYTES})`);
+      }
+    }
+
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.byteLength > MAX_MEDIA_BYTES) {
+      throw new Error(
+        `Image too large (${buf.byteLength} bytes; max ${MAX_MEDIA_BYTES})`,
+      );
+    }
+    if (buf.byteLength === 0) {
+      throw new Error("WAHA media download returned empty body");
+    }
+
+    const headerMime = res.headers.get("content-type")?.split(";")[0]?.trim();
+    const mimeType =
+      headerMime && headerMime.startsWith("image/")
+        ? headerMime === "image/jpg"
+          ? "image/jpeg"
+          : headerMime
+        : fallbackMimeType;
+
+    return { data: buf.toString("base64"), mimeType };
   }
 
   /** Returns WAHA message id when the API includes one (for reply-to follow-ups). */
@@ -156,6 +214,25 @@ function extractOneParticipant(item: unknown): string[] {
     if (typeof v === "string" && v.trim()) ids.push(v.trim());
   }
   return ids;
+}
+
+/** Point media URLs at the reachable WAHA base (Docker service name). */
+export function rewriteMediaUrl(mediaUrl: string, wahaBaseUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(mediaUrl);
+  } catch {
+    // Relative path — join onto base
+    return new URL(mediaUrl.replace(/^\//, ""), wahaBaseUrl.endsWith("/") ? wahaBaseUrl : `${wahaBaseUrl}/`).href;
+  }
+
+  const host = parsed.hostname;
+  if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0") {
+    const base = new URL(wahaBaseUrl);
+    parsed.protocol = base.protocol;
+    parsed.host = base.host;
+  }
+  return parsed.href;
 }
 
 function pickSessionMe(

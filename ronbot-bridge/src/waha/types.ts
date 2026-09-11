@@ -1,3 +1,18 @@
+export const ALLOWED_IMAGE_MIME = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
+export interface WahaMediaInfo {
+  url?: string;
+  mimetype?: string;
+  filename?: string | null;
+  error?: string | null;
+}
+
 export interface WahaMessagePayload {
   id?: string;
   timestamp?: number;
@@ -7,6 +22,7 @@ export interface WahaMessagePayload {
   fromMe?: boolean;
   body?: string | null;
   hasMedia?: boolean;
+  media?: WahaMediaInfo;
   replyTo?: { id?: string; participant?: string; body?: string };
   /** WAHA sometimes surfaces mentions at the top level. */
   mentionedIds?: string[];
@@ -26,6 +42,12 @@ export interface WahaWebhookEvent {
   engine?: string;
 }
 
+export interface NormalizedMedia {
+  url: string;
+  mimetype: string;
+  filename?: string;
+}
+
 export interface NormalizedInbound {
   event: string;
   messageId: string;
@@ -37,6 +59,9 @@ export interface NormalizedInbound {
   timestampMs: number;
   /** Explicit @-mentions from WhatsApp (often the bot LID, not the push name). */
   mentionedIds: string[];
+  hasMedia: boolean;
+  /** Populated only for allowed image types with a downloadable URL. */
+  media?: NormalizedMedia;
   replyToId?: string;
   replyToBody?: string;
 }
@@ -55,6 +80,7 @@ export function normalizeInbound(event: WahaWebhookEvent): NormalizedInbound | n
   const body = (p.body ?? "").toString().trim();
   const ts = p.timestamp ?? Math.floor(Date.now() / 1000);
   const timestampMs = ts > 1e12 ? ts : ts * 1000;
+  const media = extractAllowedImageMedia(p);
 
   return {
     event: event.event,
@@ -66,9 +92,36 @@ export function normalizeInbound(event: WahaWebhookEvent): NormalizedInbound | n
     isGroup,
     timestampMs,
     mentionedIds: extractMentionedIds(p),
+    hasMedia: Boolean(media),
+    media,
     replyToId: p.replyTo?.id,
     replyToBody: p.replyTo?.body,
   };
+}
+
+/** Keep only downloadable image attachments we can send to the Cursor SDK. */
+export function extractAllowedImageMedia(
+  payload: WahaMessagePayload,
+): NormalizedMedia | undefined {
+  if (!payload.hasMedia || !payload.media) return undefined;
+  const url = payload.media.url?.trim();
+  if (!url) return undefined;
+  if (payload.media.error) return undefined;
+
+  let mimetype = (payload.media.mimetype ?? "").trim().toLowerCase();
+  if (mimetype === "image/jpg") mimetype = "image/jpeg";
+  if (!mimetype) {
+    // Infer from URL extension when WAHA omits mimetype
+    const lower = url.toLowerCase();
+    if (lower.includes(".png")) mimetype = "image/png";
+    else if (lower.includes(".webp")) mimetype = "image/webp";
+    else if (lower.includes(".gif")) mimetype = "image/gif";
+    else if (lower.includes(".jpg") || lower.includes(".jpeg")) mimetype = "image/jpeg";
+  }
+  if (!ALLOWED_IMAGE_MIME.has(mimetype)) return undefined;
+
+  const filename = payload.media.filename?.trim() || undefined;
+  return { url, mimetype, filename };
 }
 
 /** Collect mentioned JIDs from WAHA / Baileys payload shapes. */

@@ -9,7 +9,7 @@ WhatsApp staff bridge: **WAHA** (unofficial WhatsApp Web HTTP API) → this serv
 | Allowlisted groups (`@g.us`) | Everyone in the group (full context) | WhatsApp @-mention of the bot (LID), text `ronbot` / `@~ronbot`, or follow-up within ~15 minutes of our last reply |
 | Private DMs (`@c.us` / `@lid`) | Sender must be a **member of an allowlisted group** | Always (treated as directed at us) |
 
-Answers use the littlehotelier repo + MCP tools (`get_booking`, `get_booking_timeline`, jobs, logs, allowlisted `insert_job`, etc.).
+Images (JPEG/PNG/WebP/GIF screenshots) are downloaded from WAHA and passed to the Cursor agent. In groups, attach a caption that mentions ronbot, or send the image as a follow-up; in DMs an image alone is enough.
 
 ## Risk
 
