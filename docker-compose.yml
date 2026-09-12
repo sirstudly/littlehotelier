@@ -3,14 +3,14 @@ services:
   mysql-tailscale:
     image: tailscale/tailscale:stable
     container_name: mysql-tailscale
-    hostname: tailscale-mysql-egress
+    hostname: ${TS_HOSTNAME:-tailscale-mysql-egress}
     restart: unless-stopped
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_AUTH_ONCE=true
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
-      - TS_HOSTNAME=tailscale-mysql-egress
+      - TS_HOSTNAME=${TS_HOSTNAME:-tailscale-mysql-egress}
       - TS_TAILNET_TARGET_FQDN=new-mac-example.tail2ccb6b.ts.net
       - TS_ENABLE_HEALTH_CHECK=true
     volumes:
