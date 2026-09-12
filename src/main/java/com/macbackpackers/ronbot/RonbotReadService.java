@@ -1,6 +1,7 @@
 package com.macbackpackers.ronbot;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -85,16 +86,19 @@ public class RonbotReadService {
             List<Customer> exact = matches.stream()
                     .filter( c -> isExactMatch( q, c ) )
                     .collect( Collectors.toList() );
-            List<Customer> toLoad = exact.isEmpty() ? matches : exact;
-            if ( toLoad.size() > MAX_SEARCH_RESULTS ) {
-                LOGGER.info( "Truncating search results from {} to {}", toLoad.size(), MAX_SEARCH_RESULTS );
-                toLoad = toLoad.subList( 0, MAX_SEARCH_RESULTS );
+            List<Customer> toSummarize = exact.isEmpty() ? matches : exact;
+            if ( toSummarize.size() > MAX_SEARCH_RESULTS ) {
+                LOGGER.info( "Truncating search results from {} to {}", toSummarize.size(), MAX_SEARCH_RESULTS );
+                toSummarize = toSummarize.subList( 0, MAX_SEARCH_RESULTS );
             }
 
-            List<BookingSummaryDto> results = new ArrayList<>();
-            for ( Customer c : toLoad ) {
-                Reservation reservation = scraper.getReservationRetry( webClient, c.getId() );
-                results.add( toBookingSummary( property, reservation ) );
+            // Map search rows only — do not call get_reservation per hit.
+            // Cursor's MCP tools/call client times out at a hard ~60s; full loads
+            // for name searches routinely exceed that. Use get_booking_timeline
+            // (or list_transactions) with reservationId for folio/notes/rooms.
+            List<BookingSummaryDto> results = new ArrayList<>( toSummarize.size() );
+            for ( Customer c : toSummarize ) {
+                results.add( toBookingSummary( property, c ) );
             }
             return results;
         }
@@ -640,6 +644,38 @@ public class RonbotReadService {
         return query.equalsIgnoreCase( StringUtils.trimToEmpty( c.getId() ) )
                 || query.equalsIgnoreCase( StringUtils.trimToEmpty( c.getIdentifier() ) )
                 || query.equalsIgnoreCase( StringUtils.trimToEmpty( c.getThirdPartyIdentifier() ) );
+    }
+
+    /**
+     * Lightweight summary from Cloudbeds search list rows (no get_reservation).
+     * Enough for staff to pick a match; folio/EVL/notes need timeline tools.
+     */
+    private BookingSummaryDto toBookingSummary( String property, Customer c ) {
+        BookingSummaryDto dto = new BookingSummaryDto();
+        dto.setProperty( property );
+        dto.setReservationId( c.getId() );
+        dto.setIdentifier( c.getIdentifier() );
+        dto.setThirdPartyIdentifier( c.getThirdPartyIdentifier() );
+        dto.setStatus( c.getStatus() );
+        dto.setFirstName( c.getFirstName() );
+        dto.setLastName( c.getLastName() );
+        dto.setEmail( c.getEmail() );
+        dto.setSourceName( c.getSourceName() );
+        dto.setCheckinDate( c.getCheckinDate() );
+        dto.setCheckoutDate( c.getCheckoutDate() );
+        dto.setNights( c.getNights() );
+        dto.setBalanceDue( c.getBalanceDue() );
+        dto.setIsHotelCollectBooking( c.getIsHotelCollectBooking() );
+        dto.setBookingDateHotelTime( c.getBookingDate() );
+        if ( StringUtils.isNotBlank( c.getGrandTotal() ) ) {
+            try {
+                dto.setGrandTotal( new BigDecimal( c.getGrandTotal().trim() ) );
+            }
+            catch ( NumberFormatException ignored ) {
+                // leave null
+            }
+        }
+        return dto;
     }
 
     private BookingSummaryDto toBookingSummary( String property, Reservation r ) {

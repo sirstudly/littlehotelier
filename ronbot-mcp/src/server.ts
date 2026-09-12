@@ -161,7 +161,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_booking",
-    "Live Cloudbeds booking search (via ronbot-read-api). query may be a visible reservation id, third-party/OTA ref, or guest name. Returns a list of matches (exact id matches preferred). For a full story+folio+jobs prefer get_booking_timeline once instead of chaining this with list_transactions.",
+    "Live Cloudbeds booking search (via ronbot-read-api). query may be a visible reservation id, third-party/OTA ref, or guest name. Returns a list of search-row matches (exact id matches preferred) — enough to pick a booking; for folio/notes/rooms call get_booking_timeline with reservationId. Prefer get_booking_timeline once when staff already have a unique ref.",
     {
       property: propertySchema,
       query: z.string().min(1),
