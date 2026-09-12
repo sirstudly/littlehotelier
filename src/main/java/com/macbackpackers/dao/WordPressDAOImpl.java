@@ -1281,6 +1281,56 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public List<String> searchReservationIdsInLatestCalendar( String query, int maxResults ) {
+        String q = StringUtils.trimToNull( query );
+        if ( q == null || maxResults <= 0 ) {
+            return Collections.emptyList();
+        }
+
+        Integer jobId = getLastCompletedAllocationScraperJobId();
+        if ( jobId == null ) {
+            LOGGER.info( "No completed allocation scrape; skipping calendar search for query={}", q );
+            return Collections.emptyList();
+        }
+
+        // Tokenize name: "Jane Smith" → "%jane%smith%"
+        String namePattern = "%" + q.toLowerCase().replaceAll( "\\s+", "%" ) + "%";
+
+        int capped = Math.min( maxResults, 100 );
+        // Prefer one representative row per reservation (lowest id) without CTEs/window funcs.
+        @SuppressWarnings( "unchecked" )
+        List<Number> reservationIds = em.createNativeQuery(
+                "SELECT a.reservation_id FROM wp_lh_calendar a "
+                        + " WHERE a.job_id = :jobId "
+                        + "   AND a.reservation_id > 0 "
+                        + "   AND a.id = ("
+                        + "         SELECT MIN(a2.id) FROM wp_lh_calendar a2 "
+                        + "          WHERE a2.job_id = a.job_id "
+                        + "            AND a2.reservation_id = a.reservation_id"
+                        + "       ) "
+                        + "   AND ("
+                        + "         LOWER(IFNULL(a.guest_name, '')) LIKE :namePattern "
+                        + "      OR LOWER(IFNULL(a.booking_reference, '')) = :exact "
+                        + "      OR CAST(a.reservation_id AS CHAR) = :exact"
+                        + "       ) "
+                        + " ORDER BY a.checkin_date DESC, a.reservation_id "
+                        + " LIMIT " + capped )
+                .setParameter( "jobId", jobId )
+                .setParameter( "namePattern", namePattern )
+                .setParameter( "exact", q.toLowerCase() )
+                .getResultList();
+
+        List<String> out = new ArrayList<>( reservationIds.size() );
+        for ( Number id : reservationIds ) {
+            if ( id != null ) {
+                out.add( String.valueOf( id.longValue() ) );
+            }
+        }
+        LOGGER.info( "Calendar search jobId={} query={} matches={}", jobId, q, out.size() );
+        return out;
+    }
+
+    @Override
     public void updateGuestCommentsForReservations( List<GuestCommentReportEntry> comments ) {
         if ( comments.size() > 0 ) {
             Query q = em.createNativeQuery( "INSERT INTO wp_lh_rpt_guest_comments ( reservation_id, comments ) "

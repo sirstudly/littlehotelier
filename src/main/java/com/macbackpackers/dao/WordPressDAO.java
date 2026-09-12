@@ -576,6 +576,17 @@ public interface WordPressDAO {
     Integer getLastCompletedAllocationScraperJobId();
 
     /**
+     * Searches the latest completed allocation scrape for distinct Cloudbeds reservation ids
+     * matching a guest name (token LIKE) or exact {@code booking_reference} /
+     * {@code reservation_id}. Used by ronbot to avoid slow Cloudbeds name search.
+     *
+     * @param query staff search string (name or ref); blank returns empty
+     * @param maxResults max distinct reservation ids to return (must be &gt; 0)
+     * @return non-null list of reservation id strings, empty if no scrape or no matches
+     */
+    List<String> searchReservationIdsInLatestCalendar( String query, int maxResults );
+
+    /**
      * Inserts/updates the table for guest comments with a block of guest comments.
      * {@code reservationId} and {@code comments} must be populated.
      * 

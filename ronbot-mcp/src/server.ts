@@ -161,7 +161,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_booking",
-    "Live Cloudbeds booking search (via ronbot-read-api). query may be a visible reservation id, third-party/OTA ref, or guest name. Returns a list of search-row matches (exact id matches preferred) — enough to pick a booking; for folio/notes/rooms call get_booking_timeline with reservationId. Prefer get_booking_timeline once when staff already have a unique ref.",
+    "Booking search (via ronbot-read-api). query may be a visible reservation id, third-party/OTA ref, or guest name. Name-like queries resolve via local calendar DB first, then Cloudbeds get_reservation by id; Cloudbeds free-text search runs only when the calendar has no matches. Identifier-like queries go straight to Cloudbeds. Returns a list of matches (exact id matches preferred) — enough to pick a booking; for folio/notes/rooms call get_booking_timeline with reservationId. Prefer get_booking_timeline once when staff already have a unique ref.",
     {
       property: propertySchema,
       query: z.string().min(1),
@@ -193,7 +193,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_booking_timeline",
-    "Preferred one-shot live booking + folio transactions + DB job history. Pass the exact staff ref (visible id / OTA ref / HW number) once; do not also call get_booking or list_transactions, and do not probe spelling variants unless this returns no match. Fails if the query is ambiguous.",
+    "Preferred one-shot live booking + folio transactions + DB job history. Pass the exact staff ref (visible id / OTA ref / HW number) once; do not also call get_booking or list_transactions, and do not probe spelling variants unless this returns no match. Name-like queries resolve via local calendar first (then Cloudbeds by id) before free-text Cloudbeds search. Fails if the query is ambiguous.",
     {
       property: propertySchema,
       reservation_id: z.string().min(1),

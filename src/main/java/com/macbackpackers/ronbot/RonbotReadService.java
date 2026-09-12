@@ -7,6 +7,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -62,8 +63,12 @@ public class RonbotReadService {
     }
 
     /**
-     * Search Cloudbeds reservations by visible identifier, third-party/OTA ref, guest name,
-     * or internal reservation id (same as the Cloudbeds search box).
+     * Search reservations by visible identifier, third-party/OTA ref, guest name,
+     * or internal reservation id.
+     * <p>
+     * Name-like queries hit the local allocation calendar first (fast), then load each
+     * match via Cloudbeds {@code get_reservation} by id. Cloudbeds free-text search is
+     * only used when the calendar has no hits (or for identifier-like queries).
      *
      * @return non-empty list of booking summaries; exact id/identifier/third-party matches preferred
      */
@@ -75,32 +80,18 @@ public class RonbotReadService {
 
         ConfigurableApplicationContext ctx = propertyContexts.require( property );
         CloudbedsScraper scraper = ctx.getBean( CloudbedsScraper.class );
+        WordPressDAO dao = ctx.getBean( WordPressDAO.class );
 
         try ( WebClient webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class ) ) {
-            LOGGER.info( "Searching Cloudbeds reservations for query={}", q );
-            List<Customer> matches = scraper.getReservations( webClient, q );
-            if ( matches.isEmpty() ) {
-                throw new MissingUserDataException( "No reservation found for query=" + q );
+            if ( !looksLikeReservationIdentifier( q ) ) {
+                List<BookingSummaryDto> fromDb = searchBookingsViaCalendar( property, q, scraper, dao, webClient );
+                if ( !fromDb.isEmpty() ) {
+                    return fromDb;
+                }
+                LOGGER.info( "Calendar miss for name-like query={}; falling back to Cloudbeds search", q );
             }
 
-            List<Customer> exact = matches.stream()
-                    .filter( c -> isExactMatch( q, c ) )
-                    .collect( Collectors.toList() );
-            List<Customer> toSummarize = exact.isEmpty() ? matches : exact;
-            if ( toSummarize.size() > MAX_SEARCH_RESULTS ) {
-                LOGGER.info( "Truncating search results from {} to {}", toSummarize.size(), MAX_SEARCH_RESULTS );
-                toSummarize = toSummarize.subList( 0, MAX_SEARCH_RESULTS );
-            }
-
-            // Map search rows only — do not call get_reservation per hit.
-            // Cursor's MCP tools/call client times out at a hard ~60s; full loads
-            // for name searches routinely exceed that. Use get_booking_timeline
-            // (or list_transactions) with reservationId for folio/notes/rooms.
-            List<BookingSummaryDto> results = new ArrayList<>( toSummarize.size() );
-            for ( Customer c : toSummarize ) {
-                results.add( toBookingSummary( property, c ) );
-            }
-            return results;
+            return searchBookingsViaCloudbeds( property, q, scraper, webClient );
         }
     }
 
@@ -108,8 +99,8 @@ public class RonbotReadService {
      * Resolve a unique reservation for timeline/transactions. Prefers exact id/identifier/third-party
      * matches; fails if search is ambiguous.
      * <p>
-     * Tries a direct {@code get_reservation} first (fast when the caller already has the internal id),
-     * then falls back to Cloudbeds search for visible ids / OTA refs / names.
+     * For name-like queries: calendar DB first, then Cloudbeds by id. Identifier-like queries
+     * try direct {@code get_reservation}, then Cloudbeds search.
      */
     public String requireUniqueReservationId( String property, String query ) throws IOException {
         String q = StringUtils.trimToNull( query );
@@ -119,17 +110,33 @@ public class RonbotReadService {
 
         ConfigurableApplicationContext ctx = propertyContexts.require( property );
         CloudbedsScraper scraper = ctx.getBean( CloudbedsScraper.class );
+        WordPressDAO dao = ctx.getBean( WordPressDAO.class );
 
         try ( WebClient webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class ) ) {
-            try {
-                Reservation direct = scraper.getReservation( webClient, q );
-                if ( direct != null && StringUtils.isNotBlank( direct.getReservationId() ) ) {
-                    LOGGER.info( "Resolved query={} via direct get_reservation id={}", q, direct.getReservationId() );
-                    return direct.getReservationId();
+            if ( !looksLikeReservationIdentifier( q ) ) {
+                List<String> calendarIds = dao.searchReservationIdsInLatestCalendar( q, MAX_SEARCH_RESULTS );
+                if ( calendarIds.size() == 1 ) {
+                    LOGGER.info( "Resolved query={} via calendar db id={}", q, calendarIds.get( 0 ) );
+                    return calendarIds.get( 0 );
                 }
+                if ( calendarIds.size() > 1 ) {
+                    throw new IllegalArgumentException(
+                            "Ambiguous query=" + q + ": " + calendarIds.size()
+                                    + " calendar matches. Use get_booking to pick one." );
+                }
+                LOGGER.info( "Calendar miss for name-like query={}; falling back to Cloudbeds", q );
             }
-            catch ( Exception ex ) {
-                LOGGER.debug( "Direct get_reservation failed for query={}; falling back to search", q, ex );
+            else {
+                try {
+                    Reservation direct = scraper.getReservation( webClient, q );
+                    if ( direct != null && StringUtils.isNotBlank( direct.getReservationId() ) ) {
+                        LOGGER.info( "Resolved query={} via direct get_reservation id={}", q, direct.getReservationId() );
+                        return direct.getReservationId();
+                    }
+                }
+                catch ( Exception ex ) {
+                    LOGGER.debug( "Direct get_reservation failed for query={}; falling back to search", q, ex );
+                }
             }
 
             LOGGER.info( "Resolving unique reservation via Cloudbeds search for query={}", q );
@@ -157,6 +164,75 @@ public class RonbotReadService {
                     "Ambiguous query=" + q + ": " + matches.size()
                             + " matches. Use get_booking to pick one." );
         }
+    }
+
+    /**
+     * True when {@code query} looks like a Cloudbeds / OTA reservation id or ref
+     * (compact token containing a digit), not a guest name.
+     */
+    static boolean looksLikeReservationIdentifier( String query ) {
+        String q = StringUtils.trimToEmpty( query );
+        if ( q.isEmpty() || q.indexOf( ' ' ) >= 0 || q.indexOf( '\t' ) >= 0 ) {
+            return false;
+        }
+        // Single-token names ("Smith") stay on the DB-first path; ids/refs almost always contain a digit.
+        for ( int i = 0; i < q.length(); i++ ) {
+            if ( Character.isDigit( q.charAt( i ) ) ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<BookingSummaryDto> searchBookingsViaCalendar( String property, String q,
+            CloudbedsScraper scraper, WordPressDAO dao, WebClient webClient ) {
+        List<String> reservationIds = dao.searchReservationIdsInLatestCalendar( q, MAX_SEARCH_RESULTS );
+        if ( reservationIds.isEmpty() ) {
+            return Collections.emptyList();
+        }
+
+        LOGGER.info( "Resolved query={} via calendar db ({} id(s))", q, reservationIds.size() );
+        List<BookingSummaryDto> results = new ArrayList<>( reservationIds.size() );
+        for ( String reservationId : reservationIds ) {
+            try {
+                Reservation r = scraper.getReservation( webClient, reservationId );
+                if ( r != null && StringUtils.isNotBlank( r.getReservationId() ) ) {
+                    results.add( toBookingSummary( property, r ) );
+                }
+            }
+            catch ( Exception ex ) {
+                LOGGER.warn( "get_reservation failed for calendar hit id={}: {}", reservationId, ex.toString() );
+            }
+        }
+        return results;
+    }
+
+    private List<BookingSummaryDto> searchBookingsViaCloudbeds( String property, String q,
+            CloudbedsScraper scraper, WebClient webClient ) throws IOException {
+        LOGGER.info( "Searching Cloudbeds reservations for query={}", q );
+        List<Customer> matches = scraper.getReservations( webClient, q );
+        if ( matches.isEmpty() ) {
+            throw new MissingUserDataException( "No reservation found for query=" + q );
+        }
+
+        List<Customer> exact = matches.stream()
+                .filter( c -> isExactMatch( q, c ) )
+                .collect( Collectors.toList() );
+        List<Customer> toSummarize = exact.isEmpty() ? matches : exact;
+        if ( toSummarize.size() > MAX_SEARCH_RESULTS ) {
+            LOGGER.info( "Truncating search results from {} to {}", toSummarize.size(), MAX_SEARCH_RESULTS );
+            toSummarize = toSummarize.subList( 0, MAX_SEARCH_RESULTS );
+        }
+
+        // Map search rows only — do not call get_reservation per hit.
+        // Cursor's MCP tools/call client times out at a hard ~60s; full loads
+        // for name searches routinely exceed that. Use get_booking_timeline
+        // (or list_transactions) with reservationId for folio/notes/rooms.
+        List<BookingSummaryDto> results = new ArrayList<>( toSummarize.size() );
+        for ( Customer c : toSummarize ) {
+            results.add( toBookingSummary( property, c ) );
+        }
+        return results;
     }
 
     public List<TransactionDto> listTransactions( String property, String query ) throws IOException {

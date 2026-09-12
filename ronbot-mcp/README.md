@@ -18,9 +18,9 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `list_scheduled_jobs` / `get_scheduled_job` | Cron templates |
 | `get_job_queue_stats` | submitted / processing / retry counts |
 | `search_logs` | Grep property log dirs |
-| `get_booking` | Live reservation search by visible id / OTA ref / guest name (read-api; returns a list) |
+| `get_booking` | Booking search by visible id / OTA ref / guest name (calendar DB first for names, then Cloudbeds; returns a list) |
 | `list_transactions` | Live folio lines (read-api; unique match required) |
-| `get_booking_timeline` | Live booking + transactions + job history |
+| `get_booking_timeline` | Live booking + transactions + job history (name queries: calendar first) |
 | `check_stay_continuation` | Cleaning / extension: staying on past checkout? (same reservation or linked follow-on in same beds) |
 | `get_availability` | Live sellable beds/rooms by room type (read-api; single property, subset, or all hostels in one call) |
 | `insert_job` | Allowlisted enqueue only |
