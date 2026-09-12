@@ -310,7 +310,7 @@ services:
     container_name: waha
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${WAHA_PORT:-3000}:3000"
     environment:
       - WHATSAPP_DEFAULT_ENGINE=${WAHA_ENGINE:-NOWEB}
       - WHATSAPP_HOOK_URL=http://ronbot-bridge:8787/webhooks/waha

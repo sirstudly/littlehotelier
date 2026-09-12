@@ -41,6 +41,7 @@ WAHA_SESSION=default
 WAHA_ENGINE=NOWEB
 WAHA_DASHBOARD_USERNAME=admin
 WAHA_DASHBOARD_PASSWORD=change-me
+WAHA_PORT=3000   # host port published by Compose; container stays on 3000
 
 # Allowlisted staff groups (comma-separated JIDs; optional :property default)
 # Property codes: crh | hsh | rmb | lsh — used when staff omit a property in the question.
@@ -73,7 +74,7 @@ Build context is the **repo root** (Linux MCP deps are baked into the image — 
 
 ### Link the burner SIM (one-time)
 
-1. Open WAHA dashboard: http://127.0.0.1:3000/dashboard (creds from env)
+1. Open WAHA dashboard: http://127.0.0.1:${WAHA_PORT:-3000}/dashboard (creds from env)
 2. Start session `default` (or `WAHA_SESSION`)
 3. Scan QR with the burner phone’s WhatsApp
 4. Add that contact to each staff group
