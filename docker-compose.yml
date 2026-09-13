@@ -269,41 +269,6 @@ services:
       - -c
       - exec java -server $$JAVA_OPTS -Dloader.main=com.macbackpackers.ronbot.RunRonbotReadApi -jar lilhotelier.jar
 
-  # MCP ops server (stdio; use docker compose run/exec or host node for Cursor)
-  ronbot-mcp:
-    build:
-      context: ./ronbot-mcp
-      dockerfile: Dockerfile
-    container_name: ronbot-mcp
-    restart: unless-stopped
-    environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
-      - GCP_PROJECT_ID=macbackpackers-backoffice
-      - RONBOT_READ_API_URL=http://ronbot-read-api:8080
-      - RONBOT_TOKEN=${RONBOT_TOKEN:-}
-      - LOG_DIR_CRH=/logs/crh
-      - LOG_DIR_HSH=/logs/hsh
-      - LOG_DIR_RMB=/logs/rmb
-      - LOG_DIR_LSH=/logs/lsh
-    volumes:
-      - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json:ro
-      - ./logs/crh:/logs/crh:ro
-      - ./logs/hsh:/logs/hsh:ro
-      - ./logs/rmb:/logs/rmb:ro
-      - ./logs/lsh:/logs/lsh:ro
-    networks:
-      - macbackpackers-network
-    depends_on:
-      - ronbot-read-api
-    stdin_open: true
-    tty: false
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 128M
-
   # Unofficial WhatsApp Web gateway (burner SIM via QR). See ronbot-bridge/README.md.
   waha:
     image: devlikeapro/waha:latest

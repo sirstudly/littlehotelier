@@ -54,14 +54,14 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials/gcp-service-account.j
 node dist/index.js
 ```
 
-Or via Docker Compose from the repo root:
+Read-api via Compose (MCP stays on the host for Cursor):
 
 ```bash
 export RONBOT_TOKEN='some-shared-secret'
-docker compose up -d --build ronbot-read-api ronbot-mcp
+docker compose up -d --build ronbot-read-api
 ```
 
-Set the same `RONBOT_TOKEN` in `.cursor/mcp.json` when calling a remote read-api.
+Set the same `RONBOT_TOKEN` in `.cursor/mcp.json` when calling that read-api. Production WhatsApp uses MCP baked into the `ronbot-bridge` image — there is no separate `ronbot-mcp` Compose service.
 
 ## Cursor wiring
 

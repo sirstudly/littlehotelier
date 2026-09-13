@@ -25,10 +25,11 @@ The bridge image is **Debian** (`node:22-bookworm-slim`), not Alpine — `@curso
 
 ## Prerequisites
 
-1. `ronbot-mcp` built (`cd ../ronbot-mcp && npm run build`)
-2. `ronbot-read-api` up for live Cloudbeds tools (optional for pure codebase/DB questions)
-3. `CURSOR_API_KEY` or SDK login (`Cursor.auth.login()`)
-4. `GOOGLE_APPLICATION_CREDENTIALS` for MCP Secret Manager / MySQL
+1. `ronbot-read-api` up for live Cloudbeds tools (optional for pure codebase/DB questions)
+2. `CURSOR_API_KEY` or SDK login (`Cursor.auth.login()`)
+3. `GOOGLE_APPLICATION_CREDENTIALS` for MCP Secret Manager / MySQL
+
+For Docker Compose, MCP is built into the `ronbot-bridge` image (no separate host/`ronbot-mcp` container). For local (non-Docker) bridge runs, build MCP first: `(cd ../ronbot-mcp && npm run build)`.
 
 ## Env (gitignored `.env`)
 
