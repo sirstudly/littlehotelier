@@ -149,9 +149,10 @@ Ensure read-api is up (`docker compose up -d ronbot-read-api`), then `npm run sm
 Staff groups / authorized DMs via WAHA + [`ronbot-bridge`](../ronbot-bridge/README.md):
 
 ```bash
-(cd ronbot-mcp && npm run build)
 docker compose up -d --build waha ronbot-bridge
 ```
+
+MCP `dist` is compiled inside the `ronbot-bridge` image; rebuilding the bridge is enough after MCP source changes.
 
 ## Security notes
 

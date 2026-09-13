@@ -10,11 +10,15 @@ COPY ronbot-bridge/tsconfig.json ./
 COPY ronbot-bridge/src ./src
 RUN npm run build && npm prune --omit=dev
 
-FROM node:22-bookworm-slim AS mcp-deps
+# Build MCP JS + Linux native deps inside the image (do not bind-mount host dist —
+# host dist is often missing/root-owned and would shadow this layer).
+FROM node:22-bookworm-slim AS mcp-build
 WORKDIR /app/ronbot-mcp
 COPY ronbot-mcp/package.json ronbot-mcp/package-lock.json* ./
-# Production deps only (mysql2 native bindings for linux)
-RUN npm install --omit=dev
+RUN npm install
+COPY ronbot-mcp/tsconfig.json ./
+COPY ronbot-mcp/src ./src
+RUN npm run build && npm prune --omit=dev
 
 FROM node:22-bookworm-slim
 WORKDIR /app
@@ -31,9 +35,11 @@ COPY --from=bridge-build /app/bridge/dist /app/bridge/dist
 COPY ronbot-bridge/config /app/bridge/config
 COPY ronbot-bridge/docker-entrypoint.sh /docker-entrypoint.sh
 
-COPY --from=mcp-deps /app/ronbot-mcp/node_modules /app/ronbot-mcp/node_modules
-COPY --from=mcp-deps /app/ronbot-mcp/package.json /app/ronbot-mcp/
-# dist/config mounted at runtime from host for faster iteration
+COPY --from=mcp-build /app/ronbot-mcp/node_modules /app/ronbot-mcp/node_modules
+COPY --from=mcp-build /app/ronbot-mcp/package.json /app/ronbot-mcp/
+COPY --from=mcp-build /app/ronbot-mcp/dist /app/ronbot-mcp/dist
+# Default config baked in; compose may still mount host config for live edits
+COPY ronbot-mcp/config /app/ronbot-mcp/config
 
 RUN chmod +x /docker-entrypoint.sh \
   && sed -i 's/\r$//' /docker-entrypoint.sh \

@@ -64,13 +64,10 @@ GCP_PROJECT_ID=macbackpackers-backoffice
 From repo root:
 
 ```bash
-# Ensure MCP dist exists for the bridge volume mount
-(cd ronbot-mcp && npm run build)
-
 docker compose up -d --build waha ronbot-bridge
 ```
 
-Build context is the **repo root** (Linux MCP deps are baked into the image — do not mount a Mac `ronbot-mcp/node_modules`).
+Build context is the **repo root**. The bridge image builds `ronbot-mcp` (`dist` + Linux `node_modules`) itself — no host `npm run build` and no `./ronbot-mcp/dist` mount (that mount used to shadow the image with an empty directory).
 
 ### Link the burner SIM (one-time)
 

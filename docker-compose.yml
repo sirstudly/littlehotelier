@@ -366,8 +366,9 @@ services:
       - HOME=/home/node
     volumes:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json:ro
-      # JS-only mounts OK from Mac; Linux native node_modules are baked into the image
-      - ./ronbot-mcp/dist:/app/ronbot-mcp/dist:ro
+      # MCP dist + node_modules are baked into the image (do not mount host dist —
+      # an empty/root-owned ./ronbot-mcp/dist would hide the baked build).
+      # Config stays bind-mounted for allowlist/properties edits without rebuild.
       - ./ronbot-mcp/config:/app/ronbot-mcp/config:ro
       # RW: Cursor local agent needs writable cwd/state (SQLite under HOME / workspace)
       - .:/app/repo
