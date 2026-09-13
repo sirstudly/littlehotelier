@@ -1,5 +1,5 @@
 services:
-  # Tailscale egress → MySQL on the tailnet (new-mac-example). Apps use Docker DNS name mysql-tailscale.
+  # Tailscale egress → MySQL on the tailnet. Apps use Docker DNS name mysql-tailscale.
   mysql-tailscale:
     image: tailscale/tailscale:stable
     container_name: mysql-tailscale
@@ -11,7 +11,7 @@ services:
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
       - TS_HOSTNAME=${TS_HOSTNAME:-tailscale-mysql-egress}
-      - TS_TAILNET_TARGET_FQDN=new-mac-example.tail2ccb6b.ts.net
+      - TS_TAILNET_TARGET_FQDN=${TS_TAILNET_TARGET_FQDN}
       - TS_ENABLE_HEALTH_CHECK=true
     volumes:
       - tailscale_state:/var/lib/tailscale
