@@ -24,6 +24,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Service;
 
+import com.macbackpackers.utils.TransientDataAccessFailures;
+
 import javax.mail.MessagingException;
 import java.io.File;
 import java.io.IOException;
@@ -329,7 +331,9 @@ public class ProcessorService {
                 if ( i == job.getRetryCount() - 1 ) {
 
                     // catch SNI errors and random connection errors and retry later
-                    if ( !( ex instanceof GoogleJsonResponseException ) && ( ex instanceof IOException || ex instanceof TimeoutException || ex instanceof IORuntimeException || ex instanceof ApiConnectionException || ex instanceof CannotAcquireLockException ) ) {
+                    if ( !( ex instanceof GoogleJsonResponseException ) && ( ex instanceof IOException || ex instanceof TimeoutException
+                            || ex instanceof IORuntimeException || ex instanceof ApiConnectionException || ex instanceof CannotAcquireLockException
+                            || TransientDataAccessFailures.isTransientDbConnectionFailure( ex ) ) ) {
                         LOGGER.info( "Maximum number of attempts reached. Transient error on job " + job.getId() + ". Setting status to RETRY" );
                         dao.updateJobStatusToRetry( job.getId() );
                     }

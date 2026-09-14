@@ -569,43 +569,20 @@ INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`)
 INSERT INTO `wp_lh_scheduled_job_param` (`job_param_id`,`job_id`,`name`,`value`) VALUES (10,10,'days_back','14');
 */
 
--- housekeeping
-
-CREATE TABLE `wp_lh_cleaner` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `first_name` varchar(255) DEFAULT NULL,
-  `last_name` varchar(255) DEFAULT NULL,
-  `active_yn` char(1) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-CREATE TABLE `wp_lh_cleaner_bed_assign` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `lh_cleaner_id` bigint(20) unsigned NOT NULL,
-  `room_id` bigint(20) unsigned NOT NULL,
-  `start_date` datetime NOT NULL,
-  `end_date` datetime NULL DEFAULT NULL,
-  PRIMARY KEY (`id`)
---  FOREIGN KEY (`lh_cleaner_id`) REFERENCES `wp_lh_cleaner`(`id`)  -- removed cause of hibernate
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-
-CREATE TABLE `wp_lh_cleaner_task` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) DEFAULT NULL,
-  `description` text DEFAULT NULL,
-  `default_hours` int(10) unsigned DEFAULT 0,
-  `active_yn` char(1) DEFAULT NULL,
-  `show_in_daily_tasks_yn` char(1) DEFAULT NULL,
-  `sort_order` int(10) unsigned DEFAULT 0,
-  `frequency` int(10) unsigned DEFAULT 0,
-  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `last_updated_date` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`)
+CREATE TABLE `wp_booking_lookup_key` (
+ `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+ `reservation_id` varchar(255) NOT NULL,
+ `lookup_key` varchar(255) NOT NULL,
+ `payment_requested` decimal(10,2) DEFAULT NULL,
+ `include_levy_yn` char(1) DEFAULT NULL, -- used only when payment_requested is null
+ `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY (`id`),
+ UNIQUE KEY `lookup_key` (`lookup_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- Production migration: folio EVL snapshot for unpaid deposit report filtering
 -- ALTER TABLE `wp_lh_calendar` ADD COLUMN `visitor_levy_total` decimal(10,2) DEFAULT 0 AFTER `payment_outstanding`;
 -- ALTER TABLE `wp_lh_calendar` ADD COLUMN `hotel_collect_yn` char(1) DEFAULT NULL AFTER `booking_source`;
+
+-- ALTER TABLE `wp_booking_lookup_key` ADD COLUMN `include_levy_yn` char(1) DEFAULT NULL AFTER `payment_requested`;
 

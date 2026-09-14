@@ -119,22 +119,35 @@ public class WordPressDAOImpl implements WordPressDAO {
         em.persist( alloc );
     }
 
+    /** Rows per multi-value INSERT for allocations (keeps statements under query timeout). */
+    public static final int ALLOCATION_INSERT_BATCH_SIZE = 50;
+
+    /** Rows per multi-value UPSERT for guest comments. */
+    public static final int GUEST_COMMENT_UPSERT_BATCH_SIZE = 20;
+
+    /** Wall-clock seconds allowed for large bulk scrapes over Tailscale. */
+    private static final int BULK_PERSIST_TX_TIMEOUT_SECONDS = 300;
+
     @Override
+    @Transactional( timeout = BULK_PERSIST_TX_TIMEOUT_SECONDS )
     public void insertAllocations( AllocationList allocations ) {
-        if ( allocations.size() > 0 ) {
-            Query q = em.createNativeQuery( allocations.getBulkInsertStatement() );
-            for ( int i = 0 ; i < allocations.size() ; i++ ) {
-                Allocation a = allocations.get( i );
-                Object params[] = a.getAsParameters();
+        if ( allocations == null || allocations.isEmpty() ) {
+            LOGGER.info( "Nothing to update." );
+            return;
+        }
+        int totalInserted = 0;
+        for ( int from = 0 ; from < allocations.size() ; from += ALLOCATION_INSERT_BATCH_SIZE ) {
+            int to = Math.min( from + ALLOCATION_INSERT_BATCH_SIZE, allocations.size() );
+            AllocationList batch = new AllocationList( allocations.subList( from, to ) );
+            Query q = em.createNativeQuery( batch.getBulkInsertStatement() );
+            for ( int i = 0 ; i < batch.size() ; i++ ) {
+                Object[] params = batch.get( i ).getAsParameters();
                 for ( int j = 0 ; j < params.length ; j++ ) {
                     q.setParameter( i * params.length + j + 1, params[j] );
                 }
             }
-            int rowsInserted = q.executeUpdate();
-            LOGGER.info( rowsInserted + " allocation rows inserted." );
-        }
-        else {
-            LOGGER.info( "Nothing to update." );
+            totalInserted += q.executeUpdate();
+            LOGGER.info( "Inserted {}/{} allocation rows.", totalInserted, allocations.size() );
         }
     }
 
@@ -1331,20 +1344,28 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    @Transactional( timeout = BULK_PERSIST_TX_TIMEOUT_SECONDS )
     public void updateGuestCommentsForReservations( List<GuestCommentReportEntry> comments ) {
-        if ( comments.size() > 0 ) {
+        if ( comments == null || comments.isEmpty() ) {
+            return;
+        }
+        int totalUpdated = 0;
+        for ( int from = 0 ; from < comments.size() ; from += GUEST_COMMENT_UPSERT_BATCH_SIZE ) {
+            int to = Math.min( from + GUEST_COMMENT_UPSERT_BATCH_SIZE, comments.size() );
+            List<GuestCommentReportEntry> batch = comments.subList( from, to );
             Query q = em.createNativeQuery( "INSERT INTO wp_lh_rpt_guest_comments ( reservation_id, comments ) "
-                    + " VALUES " + StringUtils.repeat( "( ?, ? )", ",", comments.size() )
+                    + " VALUES " + StringUtils.repeat( "( ?, ? )", ",", batch.size() )
                     + " ON DUPLICATE KEY UPDATE "
                     + " reservation_id = VALUES( reservation_id ), "
                     + " comments = VALUES( comments )" );
-            for ( int i = 0 ; i < comments.size() ; i++ ) {
-                GuestCommentReportEntry entry = comments.get( i );
+            for ( int i = 0 ; i < batch.size() ; i++ ) {
+                GuestCommentReportEntry entry = batch.get( i );
                 q.setParameter( 2 * i + 1, entry.getReservationId() );
                 q.setParameter( 2 * i + 2, entry.getComments() );
             }
             q.executeUpdate();
-            LOGGER.info( "Updated " + comments.size() + " guest comments." );
+            totalUpdated += batch.size();
+            LOGGER.info( "Updated {}/{} guest comments.", totalUpdated, comments.size() );
         }
     }
 

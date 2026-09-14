@@ -44,6 +44,7 @@ import com.macbackpackers.scrapers.CloudbedsRoomBedSyncMapper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
+import com.macbackpackers.utils.TransientDataAccessFailures;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -118,6 +119,9 @@ import static com.macbackpackers.utils.MDCUtils.wrapWithMDC;
 public class CloudbedsService {
 
     private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+
+    private static final int LOCAL_DAO_RETRY_ATTEMPTS = 3;
+    private static final long LOCAL_DAO_RETRY_BACKOFF_MS = 3000L;
 
     @Autowired
     @Qualifier( "gsonForCloudbeds" )
@@ -230,8 +234,10 @@ public class CloudbedsService {
                 throw new IOException( "Error retrieving reservation - operation rolled back" );
             }
 
-            dao.insertAllocations( new AllocationList( allocations ) );
-            dao.updateGuestCommentsForReservations( guestComments );
+            retryTransientDb( "insertAllocations", () ->
+                    dao.insertAllocations( new AllocationList( allocations ) ) );
+            retryTransientDb( "updateGuestCommentsForReservations", () ->
+                    dao.updateGuestCommentsForReservations( guestComments ) );
         }
         finally {
             // MDC lost as side-effect of calling MDCUtils.wrapWithMDC
@@ -242,7 +248,35 @@ public class CloudbedsService {
         AllocationList staffAllocations = new AllocationList( getAllStaffAllocations( webClient, startDate ) );
         staffAllocations.forEach( a -> a.setJobId( jobId ) );
         LOGGER.info( "Inserting {} staff allocations.", staffAllocations.size() );
-        dao.insertAllocations( staffAllocations );
+        retryTransientDb( "insertAllocations(staff)", () -> dao.insertAllocations( staffAllocations ) );
+    }
+
+    /**
+     * Retries a DB write a few times on transient connection failures so a Tailscale blip
+     * does not force a full Cloudbeds re-scrape.
+     */
+    private void retryTransientDb( String operation, Runnable action ) {
+        for ( int attempt = 1 ; attempt <= LOCAL_DAO_RETRY_ATTEMPTS ; attempt++ ) {
+            try {
+                action.run();
+                return;
+            }
+            catch ( RuntimeException ex ) {
+                if ( !TransientDataAccessFailures.isTransientDbConnectionFailure( ex )
+                        || attempt == LOCAL_DAO_RETRY_ATTEMPTS ) {
+                    throw ex;
+                }
+                LOGGER.warn( "Transient DB failure during {} (attempt {}/{}): {}",
+                        operation, attempt, LOCAL_DAO_RETRY_ATTEMPTS, ex.toString() );
+                try {
+                    Thread.sleep( LOCAL_DAO_RETRY_BACKOFF_MS );
+                }
+                catch ( InterruptedException ie ) {
+                    Thread.currentThread().interrupt();
+                    throw ex;
+                }
+            }
+        }
     }
 
     /**

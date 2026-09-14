@@ -68,14 +68,32 @@ public class DatabaseConfig {
             long connectionTimeoutMs ) throws PropertyVetoException {
         HikariConfig config = new HikariConfig();
         config.setDriverClassName( driverClass );
-        config.setJdbcUrl( dbUrl );
+        config.setJdbcUrl( withTcpKeepAlive( dbUrl ) );
         config.setUsername( user );
         config.setPassword( pass );
         config.setMaximumPoolSize( maxPoolSize );
         config.setMinimumIdle( minPoolSize );
         config.setConnectionTimeout( connectionTimeoutMs );
+        // Recycle connections before remote MySQL wait_timeout (or Tailscale) kills them.
+        // db.maxidletime=0 historically meant "never expire" under c3p0; use 10 minutes instead.
+        long maxLifetimeMs = maxIdleTime > 0 ? maxIdleTime * 1000L : 600_000L;
+        config.setMaxLifetime( maxLifetimeMs );
+        // Hikari keepalive minimum is 30s; map unused c3p0 idleConnectionTestPeriod intent.
+        long keepaliveMs = Math.max( 30_000L, idleConnectionTestPeriod * 1000L );
+        config.setKeepaliveTime( keepaliveMs );
+        if ( maxIdleTimeExcessConnections > 0 ) {
+            config.setIdleTimeout( maxIdleTimeExcessConnections * 1000L );
+        }
         config.setConnectionTestQuery( "SELECT 1" );
         return new HikariDataSource( config );
+    }
+
+    /** Ensures MySQL JDBC URLs request TCP keepalive. */
+    private static String withTcpKeepAlive( String dbUrl ) {
+        if ( dbUrl == null || dbUrl.contains( "tcpKeepAlive=" ) ) {
+            return dbUrl;
+        }
+        return dbUrl + ( dbUrl.contains( "?" ) ? "&" : "?" ) + "tcpKeepAlive=true";
     }
 
     @Bean( name = "sharedJdbcTemplate" )
