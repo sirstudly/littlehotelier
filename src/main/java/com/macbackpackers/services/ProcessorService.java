@@ -482,7 +482,7 @@ public class ProcessorService {
                 throw new IOException( "gzip failed with exit code(" + exitVal + ") for job " + jobId );
             }
 
-            final int MAX_ATTEMPTS = 3;
+            final int MAX_ATTEMPTS = 10;
             for ( int attempt = 1 ; attempt <= MAX_ATTEMPTS ; attempt++ ) {
                 pb = new ProcessBuilder( "scp", localLogDirectory + "/job-" + jobId + ".gz", destinationLogLocation );
                 pb.redirectOutput( new File( localLogDirectory + "/job-" + jobId + ".scp.out" ) );
