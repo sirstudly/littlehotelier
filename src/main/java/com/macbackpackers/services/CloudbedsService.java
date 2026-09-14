@@ -995,22 +995,26 @@ public class CloudbedsService {
     }
 
     /**
-     * Creates send email jobs for all bookings on the given booking date that fall within the given
-     * guest count range.
+     * Creates send email jobs for bookings within the given optional booking-date and/or
+     * checkin-date ranges. At least one pair must be non-null; when both are set, only bookings
+     * matching both ranges are included.
      *
      * @param webClient
-     * @param bookingDate booking date to search on (inclusive)
-     * @param minGuests minimum number of guests (inclusive)
-     * @param maxGuests maximum number of guests (inclusive)
+     * @param bookingDateStart booking date start (inclusive; optional)
+     * @param bookingDateEnd booking date end (inclusive; optional)
+     * @param checkinDateStart checkin date start (inclusive; optional)
+     * @param checkinDateEnd checkin date end (inclusive; optional)
      * @throws IOException
      */
-    public void createSendGuestRegistrationJobs( WebClient webClient, LocalDate bookingDate, int minGuests, int maxGuests ) throws IOException {
+    public void createSendGuestRegistrationJobs( WebClient webClient,
+            LocalDate bookingDateStart, LocalDate bookingDateEnd,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
 
-        scraper.getReservationsByBookingDate( webClient, bookingDate, bookingDate, "confirmed,not_confirmed" ).stream()
+        scraper.getReservations( webClient, null, null, checkinDateStart, checkinDateEnd, null, null,
+                bookingDateStart, bookingDateEnd, "confirmed,not_confirmed" ).stream()
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GUEST_REGISTRATION_REQUEST ) )
                 .filter( r -> r.getEmail().contains( "@" ) )
-                .filter( r -> r.getNumberOfGuests() >= minGuests && r.getNumberOfGuests() <= maxGuests )
                 .forEach( r -> {
                     LOGGER.info( "Creating SendGuestRegistrationJob for Res #" + r.getReservationId()
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()

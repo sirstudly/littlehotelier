@@ -6,6 +6,7 @@ import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Transient;
 
+import org.apache.commons.lang3.StringUtils;
 import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -15,6 +16,7 @@ import com.macbackpackers.services.CloudbedsService;
 
 /**
  * Job that creates individual jobs for sending out guest registration request emails.
+ * Searches by optional booking-date and/or checkin-date range; at least one pair must be set.
  *
  */
 @Entity
@@ -36,63 +38,68 @@ public class CreateSendGuestRegistrationJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
+        LocalDate bookingDateStart = getBookingDateStart();
+        LocalDate bookingDateEnd = getBookingDateEnd();
+        LocalDate checkinDateStart = getCheckinDateStart();
+        LocalDate checkinDateEnd = getCheckinDateEnd();
+        validateDateRanges( bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd );
+
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
-            cloudbedsService.createSendGuestRegistrationJobs( webClient, getBookingDate(), getMinGuests(), getMaxGuests() );
+            cloudbedsService.createSendGuestRegistrationJobs( webClient,
+                    bookingDateStart, bookingDateEnd, checkinDateStart, checkinDateEnd );
         }
     }
 
-    /**
-     * Gets the booking date.
-     *
-     * @return non-null date parameter
-     */
-    public LocalDate getBookingDate() {
-        return LocalDate.parse( getParameter( "booking_date" ) );
+    private static void validateDateRanges( LocalDate bookingDateStart, LocalDate bookingDateEnd,
+            LocalDate checkinDateStart, LocalDate checkinDateEnd ) {
+        requireCompletePair( "booking_date", bookingDateStart, bookingDateEnd );
+        requireCompletePair( "checkin_date", checkinDateStart, checkinDateEnd );
+        if ( bookingDateStart == null && checkinDateStart == null ) {
+            throw new IllegalArgumentException(
+                    "Either booking_date_start/end or checkin_date_start/end must be non-blank" );
+        }
     }
 
-    /**
-     * Sets the booking date.
-     *
-     * @param bookingDate non-null date
-     */
-    public void setBookingDate( LocalDate bookingDate ) {
-        setParameter( "booking_date", bookingDate.toString() );
+    private static void requireCompletePair( String prefix, LocalDate start, LocalDate end ) {
+        if ( ( start == null ) != ( end == null ) ) {
+            throw new IllegalArgumentException(
+                    prefix + "_start and " + prefix + "_end must both be set or both blank" );
+        }
     }
 
-    /**
-     * Gets the minimum number of guests in the booking (inclusive).
-     *
-     * @return minimum guest count
-     */
-    public int getMinGuests() {
-        return Integer.parseInt( getParameter( "min_guests" ) );
+    public LocalDate getBookingDateStart() {
+        String bookingDateStart = getParameter( "booking_date_start" );
+        return StringUtils.isBlank( bookingDateStart ) ? null : LocalDate.parse( bookingDateStart );
     }
 
-    /**
-     * Sets the minimum number of guests in the booking (inclusive).
-     *
-     * @param minGuests minimum guest count
-     */
-    public void setMinGuests( int minGuests ) {
-        setParameter( "min_guests", String.valueOf( minGuests ) );
+    public void setBookingDateStart( LocalDate bookingDateStart ) {
+        setParameter( "booking_date_start", bookingDateStart.toString() );
     }
 
-    /**
-     * Gets the maximum number of guests in the booking (inclusive).
-     *
-     * @return maximum guest count
-     */
-    public int getMaxGuests() {
-        return Integer.parseInt( getParameter( "max_guests" ) );
+    public LocalDate getBookingDateEnd() {
+        String bookingDateEnd = getParameter( "booking_date_end" );
+        return StringUtils.isBlank( bookingDateEnd ) ? null : LocalDate.parse( bookingDateEnd );
     }
 
-    /**
-     * Sets the maximum number of guests in the booking (inclusive).
-     *
-     * @param maxGuests maximum guest count
-     */
-    public void setMaxGuests( int maxGuests ) {
-        setParameter( "max_guests", String.valueOf( maxGuests ) );
+    public void setBookingDateEnd( LocalDate bookingDateEnd ) {
+        setParameter( "booking_date_end", bookingDateEnd.toString() );
+    }
+
+    public LocalDate getCheckinDateStart() {
+        String checkinDateStart = getParameter( "checkin_date_start" );
+        return StringUtils.isBlank( checkinDateStart ) ? null : LocalDate.parse( checkinDateStart );
+    }
+
+    public void setCheckinDateStart( LocalDate checkinDateStart ) {
+        setParameter( "checkin_date_start", checkinDateStart.toString() );
+    }
+
+    public LocalDate getCheckinDateEnd() {
+        String checkinDateEnd = getParameter( "checkin_date_end" );
+        return StringUtils.isBlank( checkinDateEnd ) ? null : LocalDate.parse( checkinDateEnd );
+    }
+
+    public void setCheckinDateEnd( LocalDate checkinDateEnd ) {
+        setParameter( "checkin_date_end", checkinDateEnd.toString() );
     }
 }
-
