@@ -18,5 +18,10 @@
     "classname": "com.macbackpackers.jobs.ChargeNonRefundableBookingJob",
     "requiredParams": ["reservation_id"],
     "description": "Charge non-refundable booking in Cloudbeds"
+  },
+  "RunQuarterlyEvl6PlusNightsReportJob": {
+    "classname": "com.macbackpackers.jobs.RunQuarterlyEvl6PlusNightsReportJob",
+    "requiredParams": ["email"],
+    "description": "Build EVL nights-6+ room revenue xlsx and email it (Edinburgh properties)"
   }
 }

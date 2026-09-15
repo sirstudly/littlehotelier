@@ -31,7 +31,11 @@ import org.springframework.stereotype.Service;
 import javax.mail.MessagingException;
 import javax.mail.Session;
 import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeMultipart;
+import javax.activation.DataHandler;
+import javax.activation.FileDataSource;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -409,6 +413,32 @@ public class GmailService {
     }
 
     /**
+     * Sends an HTML email with a single file attachment.
+     *
+     * @param toAddress email address of the receiver
+     * @param toName (optional) name for destination address
+     * @param subject subject of the email
+     * @param bodyHtml HTML body
+     * @param attachment file to attach (must exist)
+     * @param attachmentFilename filename shown to the recipient
+     */
+    public synchronized void sendEmail( String toAddress, String toName, String subject, String bodyHtml,
+            File attachment, String attachmentFilename ) throws MessagingException, IOException {
+        if ( StringUtils.isBlank( toAddress ) || toAddress.contains( "@" ) == false ) {
+            throw new MessagingException( "Invalid email address: " + toAddress );
+        }
+        if ( attachment == null || false == attachment.isFile() ) {
+            throw new MessagingException( "Attachment file missing: " + attachment );
+        }
+        String filename = StringUtils.defaultIfBlank( attachmentFilename, attachment.getName() );
+        Message message = createMessageWithEmail(
+                createEmailWithAttachment( toAddress, toName, null, subject, bodyHtml, attachment, filename ) );
+        message = connectAsClient().users().messages().send( GMAIL_USER, message ).execute();
+        LOGGER.info( "Sent message with attachment {} — {} : {}", filename, message.getId(),
+                message.toPrettyString() );
+    }
+
+    /**
      * Sends an email from the current email address.
      *
      * @param toAddress email address of the receiver
@@ -484,6 +514,37 @@ public class GmailService {
         }
         email.setSubject( subject );
         email.setContent( bodyText, "text/html; charset=utf-8" );
+        return email;
+    }
+
+    private MimeMessage createEmailWithAttachment( String toAddress, String toName, String ccAddress,
+            String subject, String bodyHtml, File attachment, String attachmentFilename )
+            throws MessagingException, UnsupportedEncodingException {
+        Properties props = new Properties();
+        Session session = Session.getDefaultInstance( props, null );
+        MimeMessage email = new MimeMessage( session );
+
+        email.setFrom( new InternetAddress( gmailSendAddress, gmailSendName ) );
+        InternetAddress emailDest = StringUtils.isBlank( toName )
+                ? new InternetAddress( toAddress )
+                : new InternetAddress( toAddress, toName );
+        email.addRecipient( javax.mail.Message.RecipientType.TO, emailDest );
+        if ( StringUtils.isNotBlank( ccAddress ) ) {
+            email.addRecipient( javax.mail.Message.RecipientType.CC, new InternetAddress( ccAddress ) );
+        }
+        email.setSubject( subject );
+
+        MimeBodyPart htmlPart = new MimeBodyPart();
+        htmlPart.setContent( bodyHtml, "text/html; charset=utf-8" );
+
+        MimeBodyPart filePart = new MimeBodyPart();
+        filePart.setDataHandler( new DataHandler( new FileDataSource( attachment ) ) );
+        filePart.setFileName( attachmentFilename );
+
+        MimeMultipart multipart = new MimeMultipart( "mixed" );
+        multipart.addBodyPart( htmlPart );
+        multipart.addBodyPart( filePart );
+        email.setContent( multipart );
         return email;
     }
 

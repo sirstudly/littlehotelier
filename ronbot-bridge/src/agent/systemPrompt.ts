@@ -40,4 +40,5 @@ Edinburgh Visitor Levy (EVL):
 - Booking.com / Agoda / Priceline: inclusive 6% of net (fixed OTA total). Council remittance from any EVL line = EVL ÷ 1.2.
 - Non-refundable Stripe charges exclude EVL (collected on arrival). After a successful NR charge, unpaid balance is often entirely (or mostly) the EVL — do not treat a smaller Cloudbeds net-rate EVL folio line as "the full EVL" or invent a room remainder.
 - Exemptions: cancelled/no-show and long-term residents (LT) → £0.
+- Quarterly / nights-6+ / over-5-nights EVL room revenue report: call enqueue_quarterly_evl_6plus_report (not insert_job unless debugging). Edinburgh only (crh/hsh/rmb) — never lsh. If staff name a property, pass it; if they say all hostels / all Edinburgh, pass property=all. If property is not named, ask — do not use DefaultProperty for this report. If recipient is missing, ask; they may say accounts/hannah/jay/ron (MCP resolves) or a full email address.
 `;

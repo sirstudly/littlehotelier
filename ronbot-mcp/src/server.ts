@@ -2,6 +2,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import * as readApi from "./cloudbeds/readApiClient.js";
+import {
+  resolveEmailParamInParameters,
+  resolveEmailRecipient,
+} from "./config/emailAliases.js";
 import { assertProperty, loadJobAllowlist, loadProperties } from "./config/properties.js";
 import * as jobsDb from "./db/jobs.js";
 import { searchLogs } from "./db/logs.js";
@@ -24,6 +28,8 @@ function fail(err: unknown) {
 }
 
 const propertySchema = z.enum(["crh", "hsh", "rmb", "lsh"]);
+const edinburghPropertySchema = z.enum(["crh", "hsh", "rmb"]);
+const EDINBURGH_PROPERTIES = ["crh", "hsh", "rmb"] as const;
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -281,7 +287,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "insert_job",
-    "Enqueue an allowlisted job into wp_lh_jobs (status=submitted)",
+    "Enqueue an allowlisted job into wp_lh_jobs (status=submitted). If parameters include email, shorthand aliases (accounts/hannah/jay/ron) are resolved to full addresses.",
     {
       property: propertySchema,
       job_type: z.string().min(1),
@@ -308,13 +314,14 @@ export function createServer(): McpServer {
           throw new Error("job_type must be a short allowlisted name, not a classname");
         }
 
-        const jobId = await jobsDb.insertJob(property, entry.classname, parameters);
+        const resolvedParameters = resolveEmailParamInParameters(parameters);
+        const jobId = await jobsDb.insertJob(property, entry.classname, resolvedParameters);
         audit("insert_job", {
           property,
           job_type: job_type,
           classname: entry.classname,
           job_id: jobId,
-          parameters,
+          parameters: resolvedParameters,
           requested_by: requested_by ?? null,
         });
         return ok({
@@ -323,7 +330,64 @@ export function createServer(): McpServer {
           jobType: job_type,
           classname: entry.classname,
           status: "submitted",
-          parameters,
+          parameters: resolvedParameters,
+        });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "enqueue_quarterly_evl_6plus_report",
+    "Enqueue RunQuarterlyEvl6PlusNightsReportJob: builds EVL nights-6+ / over-5-nights room revenue xlsx and emails it. Edinburgh hostels only (crh/hsh/rmb). Pass property (or properties), or property=all for all three. Ask the user if property is missing — do not assume. email may be a full address or shorthand accounts|hannah|jay|ron. Synonyms: quarterly EVL report, EVL over 5 nights, nights 6+ room revenue.",
+    {
+      email: z.string().min(1),
+      property: z.union([edinburghPropertySchema, z.literal("all")]).optional(),
+      properties: z.array(edinburghPropertySchema).min(1).max(3).optional(),
+      requested_by: z.string().optional(),
+    },
+    async ({ email, property, properties, requested_by }) => {
+      try {
+        const resolvedEmail = resolveEmailRecipient(email);
+        let targets: Array<"crh" | "hsh" | "rmb">;
+        if (properties && properties.length > 0) {
+          targets = [...new Set(properties)];
+        } else if (property === "all") {
+          targets = [...EDINBURGH_PROPERTIES];
+        } else if (property) {
+          targets = [property];
+        } else {
+          throw new Error(
+            "Specify which Edinburgh hostel: crh, hsh, or rmb (or property=all / properties list). EVL does not apply to lsh.",
+          );
+        }
+
+        const allowlist = loadJobAllowlist();
+        const entry = allowlist.RunQuarterlyEvl6PlusNightsReportJob;
+        if (!entry) {
+          throw new Error("RunQuarterlyEvl6PlusNightsReportJob is not allowlisted");
+        }
+
+        const parameters = { email: resolvedEmail };
+        const enqueued: Array<{ property: string; jobId: number }> = [];
+        for (const target of targets) {
+          const jobId = await jobsDb.insertJob(target, entry.classname, parameters);
+          audit("enqueue_quarterly_evl_6plus_report", {
+            property: target,
+            job_type: "RunQuarterlyEvl6PlusNightsReportJob",
+            classname: entry.classname,
+            job_id: jobId,
+            parameters,
+            requested_by: requested_by ?? null,
+          });
+          enqueued.push({ property: target, jobId });
+        }
+
+        return ok({
+          email: resolvedEmail,
+          enqueued,
+          status: "submitted",
         });
       } catch (err) {
         return fail(err);

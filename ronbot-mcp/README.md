@@ -23,7 +23,8 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `get_booking_timeline` | Live booking + transactions + job history (name queries: calendar first) |
 | `check_stay_continuation` | Cleaning / extension: staying on past checkout? (same reservation or linked follow-on in same beds) |
 | `get_availability` | Live sellable beds/rooms by room type (read-api; single property, subset, or all hostels in one call) |
-| `insert_job` | Allowlisted enqueue only |
+| `insert_job` | Allowlisted enqueue only (`email` params accept aliases accounts/hannah/jay/ron) |
+| `enqueue_quarterly_evl_6plus_report` | Enqueue EVL nights-6+ room revenue xlsx email job (Edinburgh crh/hsh/rmb or all) |
 
 ### `insert_job` allowlist
 
@@ -33,6 +34,23 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `AllocationScraperJob` | `start_date`, `days_ahead` |
 | `CalculateEdinburghVisitorLevyForBookingJob` | `reservation_id` |
 | `ChargeNonRefundableBookingJob` | `reservation_id` |
+| `RunQuarterlyEvl6PlusNightsReportJob` | `email` (or alias accounts/hannah/jay/ron) |
+
+### Email aliases
+
+Shorthand for job `email` parameters (config/`email-aliases.json`):
+
+| Alias | Address |
+|-------|---------|
+| `accounts` / `hannah` | accounts@macbackpackers.com |
+| `jay` | jay@macbackpackers.com |
+| `ron` | ron@macbackpackers.com |
+
+### `enqueue_quarterly_evl_6plus_report`
+
+- Required: `email` (address or alias above)
+- Property: `property` = `crh`\|`hsh`\|`rmb`\|`all`, or `properties` array; omit neither — tool errors so the agent asks
+- Edinburgh only (not `lsh`)
 
 ## Local development
 
@@ -77,6 +95,8 @@ See [`.cursor/mcp.json`](../.cursor/mcp.json). Point `args` at `ronbot-mcp/dist/
 - "How many beds free tomorrow at hsh?" → `get_availability` with `property=hsh` (or omit from/to for today→tomorrow)
 - "Availability tonight across all hostels" → `get_availability` once with `properties` omitted (fans out to crh/hsh/rmb/lsh)
 - "Run housekeeping for crh for today" → `insert_job` with `HousekeepingJob` / `selected_date`
+- "Run the quarterly EVL nights 6+ report for hsh to accounts" → `enqueue_quarterly_evl_6plus_report` with `property=hsh`, `email=accounts`
+- "EVL over 5 nights report for all Edinburgh hostels, email jay" → `enqueue_quarterly_evl_6plus_report` with `property=all`, `email=jay`
 
 ## Phase 2: Local SDK `Agent.prompt` smoke
 
