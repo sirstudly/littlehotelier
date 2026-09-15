@@ -50,6 +50,34 @@ export async function execute(
   return result;
 }
 
+/**
+ * Runs {@code fn} on a dedicated connection inside BEGIN…COMMIT.
+ * Rolls back on error. Use for multi-statement inserts that must appear atomically
+ * to other clients (e.g. job row + job params).
+ */
+export async function withTransaction<T>(
+  property: string,
+  fn: (conn: mysql.PoolConnection) => Promise<T>,
+): Promise<T> {
+  const pool = await getPool(property);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const result = await fn(conn);
+    await conn.commit();
+    return result;
+  } catch (err) {
+    try {
+      await conn.rollback();
+    } catch {
+      // ignore rollback errors
+    }
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 export async function closePools(): Promise<void> {
   for (const pool of pools.values()) {
     await pool.end();

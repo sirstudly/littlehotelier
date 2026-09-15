@@ -1,5 +1,5 @@
-import type { RowDataPacket } from "mysql2";
-import { execute, query } from "./pools.js";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
+import { query, withTransaction } from "./pools.js";
 
 export interface JobRow {
   jobId: number;
@@ -141,18 +141,19 @@ export async function insertJob(
   classname: string,
   parameters: Record<string, string>,
 ): Promise<number> {
-  const result = await execute(
-    property,
-    `INSERT INTO wp_lh_jobs (classname, status, created_date) VALUES (?, 'submitted', NOW())`,
-    [classname],
-  );
-  const jobId = result.insertId;
-  for (const [name, value] of Object.entries(parameters)) {
-    await execute(
-      property,
-      `INSERT INTO wp_lh_job_param (job_id, name, value) VALUES (?, ?, ?)`,
-      [jobId, name, value],
+  // Single transaction so processors cannot claim the job before params exist.
+  return withTransaction(property, async (conn) => {
+    const [result] = await conn.query<ResultSetHeader>(
+      `INSERT INTO wp_lh_jobs (classname, status, created_date) VALUES (?, 'submitted', NOW())`,
+      [classname],
     );
-  }
-  return jobId;
+    const jobId = result.insertId;
+    for (const [name, value] of Object.entries(parameters)) {
+      await conn.query(
+        `INSERT INTO wp_lh_job_param (job_id, name, value) VALUES (?, ?, ?)`,
+        [jobId, name, value],
+      );
+    }
+    return jobId;
+  });
 }
