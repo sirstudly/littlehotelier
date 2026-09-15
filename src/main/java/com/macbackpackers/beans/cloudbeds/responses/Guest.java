@@ -1,6 +1,8 @@
 
 package com.macbackpackers.beans.cloudbeds.responses;
 
+import org.apache.commons.lang3.StringUtils;
+
 public class Guest {
 
     private String id;
@@ -22,8 +24,9 @@ public class Guest {
     private String documentNumber;
     private String documentIssueDate;
     private String documentIssuingCountry;
-
+    private String documentIssuingCountryName;
     private String documentExpirationDate;
+    private String deleted;
 
     public String getId() {
         return id;
@@ -177,12 +180,62 @@ public class Guest {
         this.documentIssuingCountry = documentIssuingCountry;
     }
 
+    public String getDocumentIssuingCountryName() {
+        return documentIssuingCountryName;
+    }
+
+    public void setDocumentIssuingCountryName( String documentIssuingCountryName ) {
+        this.documentIssuingCountryName = documentIssuingCountryName;
+    }
+
     public String getDocumentExpirationDate() {
         return documentExpirationDate;
     }
 
     public void setDocumentExpirationDate( String documentExpirationDate ) {
         this.documentExpirationDate = documentExpirationDate;
+    }
+
+    public String getDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted( String deleted ) {
+        this.deleted = deleted;
+    }
+
+    public boolean isDeleted() {
+        return "1".equals( StringUtils.trimToEmpty( deleted ) );
+    }
+
+    /**
+     * Same rules as Tampermonkey CloudbedsDisplayGuestRegistrationComplete:
+     * document type and issuing country required; document number optional for UK/Ireland.
+     */
+    public boolean isIdentityDocumentComplete() {
+        String type = StringUtils.trimToEmpty( documentType );
+        if ( type.isEmpty() || "na".equalsIgnoreCase( type ) || "-".equals( type ) ) {
+            return false;
+        }
+        String country = StringUtils.trimToEmpty( documentIssuingCountry );
+        if ( country.isEmpty() || "na".equalsIgnoreCase( country ) ) {
+            return false;
+        }
+        if ( false == isDocumentNumberOptional() && StringUtils.isBlank( documentNumber ) ) {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean isDocumentNumberOptional() {
+        String code = StringUtils.trimToEmpty( documentIssuingCountry ).toUpperCase();
+        if ( "GB".equals( code ) || "IE".equals( code ) ) {
+            return true;
+        }
+        String name = StringUtils.trimToEmpty( documentIssuingCountryName ).toLowerCase();
+        return "ireland".equals( name )
+                || "united kingdom".equals( name )
+                || "united kingdom of great britain and northern ireland".equals( name );
     }
 
 }

@@ -9,10 +9,12 @@ import java.time.Month;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import org.apache.commons.lang3.StringUtils;
@@ -65,6 +67,7 @@ public class Reservation extends CloudbedsJsonResponse {
     private BookingSource selectedSource;
     private String documentNumber;
     private BalanceDetails balanceDetails;
+    private List<Guest> additionalGuests;
 
     public String getReservationId() {
         return reservationId;
@@ -507,6 +510,39 @@ public class Reservation extends CloudbedsJsonResponse {
 
     public void setBalanceDetails( BalanceDetails balanceDetails ) {
         this.balanceDetails = balanceDetails;
+    }
+
+    public List<Guest> getAdditionalGuests() {
+        return additionalGuests;
+    }
+
+    public void setAdditionalGuests( List<Guest> additionalGuests ) {
+        this.additionalGuests = additionalGuests;
+    }
+
+    /**
+     * Non-deleted guests listed under Guest Details ({@code additional_guests}).
+     */
+    public List<Guest> getNamedGuests() {
+        if ( additionalGuests == null ) {
+            return Collections.emptyList();
+        }
+        return additionalGuests.stream()
+                .filter( g -> false == g.isDeleted() )
+                .collect( Collectors.toList() );
+    }
+
+    /**
+     * True when guest headcount matches named guests and every named guest has identity docs
+     * (same criteria as Tampermonkey CloudbedsDisplayGuestRegistrationComplete).
+     * Document number is optional for UK/Ireland issuing country.
+     */
+    public boolean isGuestRegistrationComplete() {
+        List<Guest> guests = getNamedGuests();
+        if ( getNumberOfGuests() > guests.size() ) {
+            return false;
+        }
+        return guests.stream().allMatch( Guest::isIdentityDocumentComplete );
     }
 
     /**

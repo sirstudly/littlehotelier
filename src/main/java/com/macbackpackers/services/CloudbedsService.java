@@ -1015,6 +1015,7 @@ public class CloudbedsService {
                 .map( c -> scraper.getReservationRetry( webClient, c.getId() ) )
                 .filter( r -> false == r.containsNote( CloudbedsScraper.TEMPLATE_GUEST_REGISTRATION_REQUEST ) )
                 .filter( r -> r.getEmail().contains( "@" ) )
+                .filter( r -> false == r.isGuestRegistrationComplete() )
                 .forEach( r -> {
                     LOGGER.info( "Creating SendGuestRegistrationJob for Res #" + r.getReservationId()
                             + " (" + r.getThirdPartyIdentifier() + ") " + r.getFirstName() + " " + r.getLastName()
