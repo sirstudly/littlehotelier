@@ -25,6 +25,13 @@ public class BookingRoom {
     private String detailedRates;
     private String rateId;
     private String guestId;
+    /** Cloudbeds per-room flag: {@code "1"} = in-house, {@code "-1"} = not. */
+    @SerializedName( "in_house" )
+    private String inHouse;
+    @SerializedName( "guest_first_name" )
+    private String guestFirstName;
+    @SerializedName( "guest_last_name" )
+    private String guestLastName;
     @SerializedName( "adults" )
     private Integer adults;
     @SerializedName( "kids" )
@@ -132,6 +139,35 @@ public class BookingRoom {
 
     public void setGuestId( String guestId ) {
         this.guestId = guestId;
+    }
+
+    public String getInHouse() {
+        return inHouse;
+    }
+
+    public void setInHouse( String inHouse ) {
+        this.inHouse = inHouse;
+    }
+
+    /** {@code true} when Cloudbeds marks this room/bed as in-house ({@code in_house=1}). */
+    public boolean isInHouse() {
+        return "1".equals( inHouse );
+    }
+
+    public String getGuestFirstName() {
+        return guestFirstName;
+    }
+
+    public void setGuestFirstName( String guestFirstName ) {
+        this.guestFirstName = guestFirstName;
+    }
+
+    public String getGuestLastName() {
+        return guestLastName;
+    }
+
+    public void setGuestLastName( String guestLastName ) {
+        this.guestLastName = guestLastName;
     }
 
     public Integer getAdults() {

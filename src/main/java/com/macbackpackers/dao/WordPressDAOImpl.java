@@ -9,7 +9,9 @@ import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
+import com.macbackpackers.beans.HousekeepingBed;
 import com.macbackpackers.beans.Job;
+import com.macbackpackers.beans.OccupancyVersion;
 import com.macbackpackers.beans.JobScheduler;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.RoomBed;
@@ -1637,6 +1639,165 @@ public class WordPressDAOImpl implements WordPressDAO {
      */
     private String getUniqueProcessorId() {
         return processorId + "-" + Thread.currentThread().getName();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public List<OccupancyVersion> fetchCurrentOccupancy() {
+        return em.createQuery(
+                "FROM OccupancyVersion o WHERE o.validTo IS NULL", OccupancyVersion.class )
+                .getResultList();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public OccupancyVersion fetchCurrentOccupancyByAssignmentKey( String assignmentKey ) {
+        try {
+            return em.createQuery(
+                    "FROM OccupancyVersion o WHERE o.assignmentKey = :key AND o.validTo IS NULL",
+                    OccupancyVersion.class )
+                    .setParameter( "key", assignmentKey )
+                    .getSingleResult();
+        }
+        catch ( NoResultException e ) {
+            return null;
+        }
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public OccupancyVersion fetchCurrentOccupancyByCalendarEventId( String calendarEventId ) {
+        try {
+            return em.createQuery(
+                    "FROM OccupancyVersion o WHERE o.calendarEventId = :eid AND o.validTo IS NULL",
+                    OccupancyVersion.class )
+                    .setParameter( "eid", calendarEventId )
+                    .getSingleResult();
+        }
+        catch ( NoResultException e ) {
+            return null;
+        }
+    }
+
+    @Override
+    @Transactional
+    public boolean upsertOccupancyVersion( OccupancyVersion next ) {
+        if ( next == null || StringUtils.isBlank( next.getAssignmentKey() ) ) {
+            return false;
+        }
+        OccupancyVersion current = fetchCurrentOccupancyByAssignmentKey( next.getAssignmentKey() );
+        if ( current != null && false == current.differsForVersioning( next ) ) {
+            return false;
+        }
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        if ( current != null ) {
+            current.setValidTo( now );
+            em.merge( current );
+        }
+        next.setId( 0 );
+        next.setValidFrom( now );
+        next.setValidTo( null );
+        em.persist( next );
+        return true;
+    }
+
+    @Override
+    @Transactional
+    public void closeOccupancyVersion( String assignmentKey ) {
+        if ( StringUtils.isBlank( assignmentKey ) ) {
+            return;
+        }
+        OccupancyVersion current = fetchCurrentOccupancyByAssignmentKey( assignmentKey );
+        if ( current != null ) {
+            current.setValidTo( new Timestamp( System.currentTimeMillis() ) );
+            em.merge( current );
+        }
+    }
+
+    @Override
+    @Transactional
+    public void closeOccupancyVersionByCalendarEventId( String calendarEventId ) {
+        if ( StringUtils.isBlank( calendarEventId ) ) {
+            return;
+        }
+        OccupancyVersion current = fetchCurrentOccupancyByCalendarEventId( calendarEventId );
+        if ( current != null ) {
+            current.setValidTo( new Timestamp( System.currentTimeMillis() ) );
+            em.merge( current );
+        }
+    }
+
+    @Override
+    @Transactional( timeout = BULK_PERSIST_TX_TIMEOUT_SECONDS )
+    public void reconcileOccupancyCurrents( List<OccupancyVersion> desiredCurrents ) {
+        Map<String, OccupancyVersion> desiredByKey = new HashMap<>();
+        if ( desiredCurrents != null ) {
+            for ( OccupancyVersion d : desiredCurrents ) {
+                if ( d != null && StringUtils.isNotBlank( d.getAssignmentKey() ) ) {
+                    desiredByKey.put( d.getAssignmentKey(), d );
+                }
+            }
+        }
+        List<OccupancyVersion> existing = fetchCurrentOccupancy();
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        for ( OccupancyVersion cur : existing ) {
+            OccupancyVersion desired = desiredByKey.get( cur.getAssignmentKey() );
+            if ( desired == null ) {
+                cur.setValidTo( now );
+                em.merge( cur );
+            }
+            else if ( cur.differsForVersioning( desired ) ) {
+                cur.setValidTo( now );
+                em.merge( cur );
+                desired.setId( 0 );
+                desired.setValidFrom( now );
+                desired.setValidTo( null );
+                em.persist( desired );
+                desiredByKey.remove( cur.getAssignmentKey() );
+            }
+            else {
+                desiredByKey.remove( cur.getAssignmentKey() );
+            }
+        }
+        for ( OccupancyVersion remaining : desiredByKey.values() ) {
+            remaining.setId( 0 );
+            remaining.setValidFrom( now );
+            remaining.setValidTo( null );
+            em.persist( remaining );
+        }
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public List<RoomBed> fetchActiveHousekeepingRooms() {
+        return em.createQuery(
+                "FROM RoomBed r WHERE r.active = 'Y' AND r.room <> 'Unallocated' ORDER BY r.room, r.bedName",
+                RoomBed.class )
+                .getResultList();
+    }
+
+    @Override
+    @Transactional( timeout = BULK_PERSIST_TX_TIMEOUT_SECONDS )
+    public void replaceHousekeepingBeds( List<HousekeepingBed> beds ) {
+        em.createQuery( "DELETE FROM HousekeepingBed" ).executeUpdate();
+        if ( beds == null || beds.isEmpty() ) {
+            return;
+        }
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        for ( HousekeepingBed bed : beds ) {
+            if ( bed.getUpdatedAt() == null ) {
+                bed.setUpdatedAt( now );
+            }
+            em.persist( bed );
+        }
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public List<HousekeepingBed> fetchHousekeepingBeds() {
+        return em.createQuery(
+                "FROM HousekeepingBed b ORDER BY b.room, b.bedName", HousekeepingBed.class )
+                .getResultList();
     }
 
 }

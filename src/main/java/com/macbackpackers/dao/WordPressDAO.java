@@ -18,7 +18,9 @@ import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
+import com.macbackpackers.beans.HousekeepingBed;
 import com.macbackpackers.beans.Job;
+import com.macbackpackers.beans.OccupancyVersion;
 import com.macbackpackers.beans.JobScheduler;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.MostlyFullDormReportEntry;
@@ -786,4 +788,44 @@ public interface WordPressDAO {
      * @return non-null URL
      */
     String getBookingsURL();
+
+    // --- Realtime housekeeping occupancy (SCD2) ---
+
+    /** Current occupancy versions ({@code valid_to IS NULL}). */
+    List<OccupancyVersion> fetchCurrentOccupancy();
+
+    /** Current occupancy for a single assignment key, or null. */
+    OccupancyVersion fetchCurrentOccupancyByAssignmentKey( String assignmentKey );
+
+    /** Current occupancy keyed by calendar event id, or null. */
+    OccupancyVersion fetchCurrentOccupancyByCalendarEventId( String calendarEventId );
+
+    /**
+     * Closes the open version for {@code assignmentKey} (if any) and opens {@code next} as current.
+     * No-op if {@code next} does not differ from the current version.
+     *
+     * @return true if a new version was written
+     */
+    boolean upsertOccupancyVersion( OccupancyVersion next );
+
+    /** Closes the current version for the assignment (cancel / room_free). */
+    void closeOccupancyVersion( String assignmentKey );
+
+    /** Closes current version matched by calendar event id. */
+    void closeOccupancyVersionByCalendarEventId( String calendarEventId );
+
+    /**
+     * Reconcile: desired currents replace existing currents. Closes assignments not in desired;
+     * upserts each desired row.
+     */
+    void reconcileOccupancyCurrents( List<OccupancyVersion> desiredCurrents );
+
+    /** Active rooms eligible for the housekeeping report (excludes Unallocated). */
+    List<RoomBed> fetchActiveHousekeepingRooms();
+
+    /** Replaces all rows in {@code wp_lh_housekeeping_bed}. */
+    void replaceHousekeepingBeds( List<HousekeepingBed> beds );
+
+    /** All current housekeeping bed projections. */
+    List<HousekeepingBed> fetchHousekeepingBeds();
 }

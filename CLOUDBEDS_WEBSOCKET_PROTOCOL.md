@@ -437,6 +437,58 @@ This avoids calling `get_reservation` hundreds of times: take the bulk state fro
 
 ---
 
+## Realtime housekeeping occupancy
+
+Housekeeping no longer depends on job-scoped `wp_lh_calendar` snapshots. It uses:
+
+| Store | Role |
+|-------|------|
+| `wp_lh_occupancy` | SCD2 versions of bed/room **assignments** (`valid_from` / `valid_to`; current = `valid_to IS NULL`) |
+| `wp_lh_housekeeping_bed` | Denormalised bedsheet badges for `/housekeeping` + Mercure |
+
+### Per-bed `in_house`
+
+REST `get_reservation` → `booking_rooms[].in_house`:
+
+| Value | Meaning |
+|-------|---------|
+| `"1"` | That room/bed is in-house (even if other rooms on the same booking are not) |
+| `"-1"` | Not in-house |
+
+Calendar WS events expose the same signal via `type` / `status` (`checked_in` vs `booked` / `checked_out`). Closures use `type` `out_of_service` or `blocked_dates` (`booking_id` often `"0"`).
+
+### Listener
+
+`HousekeepingCloudbedsEventListener`:
+
+1. **`onSnapshot`** — rebuild desired currents overlapping today±window from Events; `reconcileOccupancyCurrents`; recompute badges; publish Mercure.
+2. **`onUpdate`** — upsert versions for guest/closure Events; close on `room_free` / `delete` (via calendar event id → assignment key); debounce ~400ms then recompute + publish.
+
+Assignment key: `booking_rooms_id` when present, else `res:{booking_id}:{room_id}`; closures use `closure:{event_id}`.
+
+### Bedsheet badges
+
+| Badge | Rule (selected date = today) |
+|-------|------------------------------|
+| `EMPTY` | No overnight guest, or booked/confirmed and not in-house |
+| `CHANGE (CHECKED OUT)` | Effective checkout = today and not in-house |
+| `CHANGE (IN-HOUSE)` | Effective checkout = today and still in-house, or vacated by in-house room move |
+| `CHANGE (ROOM CLOSURE)` | OOS / blocked covering the overnight window |
+| `NO CHANGE` | Still staying (after stay-continuation) |
+| `N DAY CHANGE` | `hbo_bedsheets_change_after_days` linen day |
+
+Stay-continuation: same guest + same `room_id` with `checkin = prior checkout` extends effective checkout (same as legacy SQL `c2` join).
+
+### Mercure
+
+- Topic: `housekeeping/{propertyId}`
+- Options: `hbo_mercure_hub_url`, `hbo_mercure_publisher_jwt`, `hbo_mercure_subscriber_jwt`
+- Payload: `{ action: "housekeeping_snapshot", beds: [...], totals: {...} }`
+
+`HousekeepingJob` remains the REST reconcile / heal path (Refresh Now).
+
+---
+
 ## Complementary REST calls (calendar page)
 
 The WebSocket carries the bookings; the calendar page also fires REST calls for the availability bar and occupancy strip. These are **counts/percentages only — no guest data**:

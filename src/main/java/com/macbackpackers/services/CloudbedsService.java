@@ -1323,7 +1323,7 @@ public class CloudbedsService {
                 a.setRoom( bed.getRoom() );
                 a.setRoomId( br.getRoomId() );
                 a.setRoomTypeId( Integer.parseInt( br.getRoomTypeId() ) );
-                a.setStatus( r.getStatus() );
+                a.setStatus( derivePerBedStatus( r.getStatus(), br ) );
                 a.setViewed( StringUtils.isNotBlank( r.getDocumentNumber() ) ); // hijacking this field to flag whether PII is visible
                 a.setNotes( r.getNotesAsString() );
                 a.setComments( r.getSpecialRequests() );
@@ -1331,6 +1331,26 @@ public class CloudbedsService {
                 return a;
             } )
             .collect( Collectors.toList() );
+    }
+
+    /**
+     * Derives per-bed status from Cloudbeds {@code booking_rooms.in_house} when available.
+     * In-house rooms are {@code checked_in}; otherwise falls back to the reservation status.
+     */
+    public static String derivePerBedStatus( String reservationStatus, BookingRoom br ) {
+        if ( br != null && br.isInHouse() ) {
+            return "checked_in";
+        }
+        if ( br != null && "1".equals( br.getInHouse() ) == false
+                && "checked_out".equalsIgnoreCase( reservationStatus ) ) {
+            return "checked_out";
+        }
+        // Not in-house: keep reservation status (confirmed / checked_out / canceled / …)
+        if ( br != null && false == br.isInHouse() && "checked_in".equalsIgnoreCase( reservationStatus ) ) {
+            // Multi-room booking: this bed not flagged in-house while reservation is checked_in
+            return "confirmed";
+        }
+        return reservationStatus;
     }
 
     /**

@@ -586,3 +586,53 @@ CREATE TABLE `wp_booking_lookup_key` (
 
 -- ALTER TABLE `wp_booking_lookup_key` ADD COLUMN `include_levy_yn` char(1) DEFAULT NULL AFTER `payment_requested`;
 
+-- Realtime housekeeping: SCD2 occupancy versions (HK sole consumer; wp_lh_calendar unchanged)
+CREATE TABLE `wp_lh_occupancy` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `assignment_key` varchar(64) NOT NULL,
+  `calendar_event_id` varchar(64) DEFAULT NULL,
+  `booking_rooms_id` varchar(64) DEFAULT NULL,
+  `reservation_id` bigint(20) unsigned DEFAULT NULL,
+  `room_id` varchar(255) DEFAULT NULL,
+  `room` varchar(50) DEFAULT NULL,
+  `bed_name` varchar(50) DEFAULT NULL,
+  `room_type_id` int(10) unsigned DEFAULT NULL,
+  `guest_name` varchar(255) DEFAULT NULL,
+  `checkin_date` date NOT NULL,
+  `checkout_date` date NOT NULL,
+  `bed_status` varchar(50) DEFAULT NULL,
+  `in_house_yn` char(1) DEFAULT NULL,
+  `source` varchar(20) NOT NULL,
+  `valid_from` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `valid_to` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `lh_occ_current_room` (`valid_to`, `room_id`),
+  KEY `lh_occ_booking_rooms` (`booking_rooms_id`, `valid_to`),
+  KEY `lh_occ_assignment` (`assignment_key`, `valid_to`),
+  KEY `lh_occ_reservation` (`reservation_id`, `valid_to`),
+  KEY `lh_occ_event` (`calendar_event_id`, `valid_to`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- Current projected bedsheet badges for /housekeeping + Mercure
+CREATE TABLE `wp_lh_housekeeping_bed` (
+  `room_id` varchar(255) NOT NULL,
+  `room` varchar(50) NOT NULL,
+  `bed_name` varchar(50) DEFAULT NULL,
+  `room_type` varchar(50) DEFAULT NULL,
+  `capacity` int(10) unsigned DEFAULT 1,
+  `guest_name` varchar(255) DEFAULT NULL,
+  `checkin_date` date DEFAULT NULL,
+  `checkout_date` date DEFAULT NULL,
+  `data_href` varchar(255) DEFAULT NULL,
+  `bedsheet` varchar(50) NOT NULL,
+  `selected_date` date NOT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`room_id`),
+  KEY `lh_hk_bed_selected` (`selected_date`),
+  KEY `lh_hk_bed_room` (`room`, `bed_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- Production migrations:
+-- CREATE TABLE `wp_lh_occupancy` (...);
+-- CREATE TABLE `wp_lh_housekeeping_bed` (...);
+

@@ -1,4 +1,3 @@
-
 package com.macbackpackers.jobs;
 
 import java.text.ParseException;
@@ -14,11 +13,11 @@ import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
-import com.macbackpackers.services.CloudbedsService;
+import com.macbackpackers.services.OccupancyReconcileService;
 
 /**
- * Job that updates the housekeeping tables for the given date
- *
+ * Reconciles {@code wp_lh_occupancy} from Cloudbeds REST for the selected date and recomputes
+ * the realtime housekeeping bedsheet projection. Does not write {@code wp_lh_calendar}.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.HousekeepingJob" )
@@ -26,7 +25,7 @@ public class HousekeepingJob extends AbstractJob {
 
     @Autowired
     @Transient
-    private CloudbedsService cloudbedsService;
+    private OccupancyReconcileService occupancyReconcileService;
 
     @Autowired
     @Transient
@@ -37,15 +36,14 @@ public class HousekeepingJob extends AbstractJob {
 
     @Override
     public void resetJob() throws Exception {
-        dao.deleteAllocations( getId() );
+        // Occupancy is SCD2; reconcile upserts/closes versions. No calendar wipe.
     }
 
     @Override
     public void processJob() throws Exception {
         if ( dao.isCloudbeds() ) {
             LocalDate selectedDate = getSelectedLocalDate();
-            cloudbedsService.dumpAllocationsFrom( getWebClient(),
-                    getId(), selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
+            occupancyReconcileService.reconcileFromCloudbeds( getWebClient(), selectedDate );
         }
     }
 
@@ -76,8 +74,7 @@ public class HousekeepingJob extends AbstractJob {
 
     private WebClient getWebClient() {
         if ( webClient == null ) {
-            webClient = ctx.getBean( dao.isCloudbeds() ? "webClientForCloudbeds" : "webClientForCloudbeds",
-                    WebClient.class );
+            webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class );
         }
         return webClient;
     }
