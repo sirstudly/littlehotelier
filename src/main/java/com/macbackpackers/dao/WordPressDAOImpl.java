@@ -121,14 +121,17 @@ public class WordPressDAOImpl implements WordPressDAO {
         em.persist( alloc );
     }
 
-    /** Rows per multi-value INSERT for allocations (keeps statements under query timeout). */
-    public static final int ALLOCATION_INSERT_BATCH_SIZE = 50;
+    /** Rows per multi-value INSERT for allocations (keeps each Tailscale round-trip short). */
+    public static final int ALLOCATION_INSERT_BATCH_SIZE = 25;
 
     /** Rows per multi-value UPSERT for guest comments. */
-    public static final int GUEST_COMMENT_UPSERT_BATCH_SIZE = 20;
+    public static final int GUEST_COMMENT_UPSERT_BATCH_SIZE = 10;
 
-    /** Per-chunk transaction timeout (seconds); avoid one long TX that trips MySQL wait_timeout. */
-    private static final int CHUNK_TX_TIMEOUT_SECONDS = 60;
+    /**
+     * Per-chunk transaction timeout (seconds). Must stay above slow Tailscale batch times
+     * (observed ~60s for 50-row batches) and align with the query hint below.
+     */
+    private static final int CHUNK_TX_TIMEOUT_SECONDS = 180;
 
     /** Timeout for other large bulk writes (occupancy / housekeeping). */
     private static final int BULK_PERSIST_TX_TIMEOUT_SECONDS = 300;
@@ -147,18 +150,29 @@ public class WordPressDAOImpl implements WordPressDAO {
         for ( int from = 0 ; from < allocations.size() ; from += ALLOCATION_INSERT_BATCH_SIZE ) {
             int to = Math.min( from + ALLOCATION_INSERT_BATCH_SIZE, allocations.size() );
             AllocationList batch = new AllocationList( allocations.subList( from, to ) );
-            Integer inserted = tt.execute( status -> {
-                Query q = em.createNativeQuery( batch.getBulkInsertStatement() );
-                for ( int i = 0 ; i < batch.size() ; i++ ) {
-                    Object[] params = batch.get( i ).getAsParameters();
-                    for ( int j = 0 ; j < params.length ; j++ ) {
-                        q.setParameter( i * params.length + j + 1, params[j] );
+            long started = System.currentTimeMillis();
+            try {
+                Integer inserted = tt.execute( status -> {
+                    Query q = em.createNativeQuery( batch.getBulkInsertStatement() );
+                    // Override global jakarta.persistence.query.timeout=60000 for slow Tailscale links
+                    q.setHint( "jakarta.persistence.query.timeout", CHUNK_TX_TIMEOUT_SECONDS * 1000 );
+                    for ( int i = 0 ; i < batch.size() ; i++ ) {
+                        Object[] params = batch.get( i ).getAsParameters();
+                        for ( int j = 0 ; j < params.length ; j++ ) {
+                            q.setParameter( i * params.length + j + 1, params[j] );
+                        }
                     }
-                }
-                return q.executeUpdate();
-            } );
-            totalInserted += inserted == null ? 0 : inserted;
-            LOGGER.info( "Inserted {}/{} allocation rows.", totalInserted, allocations.size() );
+                    return q.executeUpdate();
+                } );
+                totalInserted += inserted == null ? 0 : inserted;
+                LOGGER.info( "Inserted {}/{} allocation rows ({} ms for batch of {}).",
+                        totalInserted, allocations.size(), System.currentTimeMillis() - started, batch.size() );
+            }
+            catch ( RuntimeException ex ) {
+                LOGGER.error( "Allocation insert failed after {}/{} rows (batch {}-{}, {} ms): {}",
+                        totalInserted, allocations.size(), from, to, System.currentTimeMillis() - started, ex.toString() );
+                throw ex;
+            }
         }
     }
 
@@ -1373,6 +1387,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + " ON DUPLICATE KEY UPDATE "
                         + " reservation_id = VALUES( reservation_id ), "
                         + " comments = VALUES( comments )" );
+                q.setHint( "jakarta.persistence.query.timeout", CHUNK_TX_TIMEOUT_SECONDS * 1000 );
                 for ( int i = 0 ; i < batch.size() ; i++ ) {
                     GuestCommentReportEntry entry = batch.get( i );
                     q.setParameter( 2 * i + 1, entry.getReservationId() );
