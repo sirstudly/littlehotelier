@@ -7,6 +7,7 @@ import com.macbackpackers.beans.JobParameter;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.IORuntimeException;
+import com.macbackpackers.exceptions.WebResponseException;
 import com.macbackpackers.jobs.AbstractJob;
 import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -331,11 +332,18 @@ public class ProcessorService {
                 if ( i == job.getRetryCount() - 1 ) {
 
                     // catch SNI errors and random connection errors and retry later
-                    if ( !( ex instanceof GoogleJsonResponseException ) && ( ex instanceof IOException || ex instanceof TimeoutException
-                            || ex instanceof IORuntimeException || ex instanceof ApiConnectionException || ex instanceof CannotAcquireLockException
+                    // WebResponseException extends IOException but is usually a business/HTTP failure — do not requeue forever
+                    if ( !( ex instanceof GoogleJsonResponseException ) && !( ex instanceof WebResponseException )
+                            && ( ex instanceof IOException || ex instanceof TimeoutException || ex instanceof IORuntimeException
+                            || ex instanceof ApiConnectionException || ex instanceof CannotAcquireLockException
                             || TransientDataAccessFailures.isTransientDbConnectionFailure( ex ) ) ) {
-                        LOGGER.info( "Maximum number of attempts reached. Transient error on job " + job.getId() + ". Setting status to RETRY" );
-                        dao.updateJobStatusToRetry( job.getId() );
+                        if ( dao.updateJobStatusToRetry( job.getId() ) ) {
+                            LOGGER.info( "Maximum number of attempts reached. Transient error on job " + job.getId() + ". Setting status to RETRY" );
+                        }
+                        else {
+                            LOGGER.error( "Maximum number of attempts reached. Job " + job.getId() + " failed after exhausting retries" );
+                            emailJobFailureToSupport( job, ex );
+                        }
                     }
                     else {
                         LOGGER.error( "Maximum number of attempts reached. Job " + job.getId() + " failed" );

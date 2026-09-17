@@ -127,28 +127,37 @@ public class WordPressDAOImpl implements WordPressDAO {
     /** Rows per multi-value UPSERT for guest comments. */
     public static final int GUEST_COMMENT_UPSERT_BATCH_SIZE = 20;
 
-    /** Wall-clock seconds allowed for large bulk scrapes over Tailscale. */
+    /** Per-chunk transaction timeout (seconds); avoid one long TX that trips MySQL wait_timeout. */
+    private static final int CHUNK_TX_TIMEOUT_SECONDS = 60;
+
+    /** Timeout for other large bulk writes (occupancy / housekeeping). */
     private static final int BULK_PERSIST_TX_TIMEOUT_SECONDS = 300;
 
     @Override
-    @Transactional( timeout = BULK_PERSIST_TX_TIMEOUT_SECONDS )
+    @Transactional( propagation = Propagation.NOT_SUPPORTED )
     public void insertAllocations( AllocationList allocations ) {
         if ( allocations == null || allocations.isEmpty() ) {
             LOGGER.info( "Nothing to update." );
             return;
         }
+        TransactionTemplate tt = new TransactionTemplate( transactionManager );
+        tt.setPropagationBehavior( TransactionDefinition.PROPAGATION_REQUIRES_NEW );
+        tt.setTimeout( CHUNK_TX_TIMEOUT_SECONDS );
         int totalInserted = 0;
         for ( int from = 0 ; from < allocations.size() ; from += ALLOCATION_INSERT_BATCH_SIZE ) {
             int to = Math.min( from + ALLOCATION_INSERT_BATCH_SIZE, allocations.size() );
             AllocationList batch = new AllocationList( allocations.subList( from, to ) );
-            Query q = em.createNativeQuery( batch.getBulkInsertStatement() );
-            for ( int i = 0 ; i < batch.size() ; i++ ) {
-                Object[] params = batch.get( i ).getAsParameters();
-                for ( int j = 0 ; j < params.length ; j++ ) {
-                    q.setParameter( i * params.length + j + 1, params[j] );
+            Integer inserted = tt.execute( status -> {
+                Query q = em.createNativeQuery( batch.getBulkInsertStatement() );
+                for ( int i = 0 ; i < batch.size() ; i++ ) {
+                    Object[] params = batch.get( i ).getAsParameters();
+                    for ( int j = 0 ; j < params.length ; j++ ) {
+                        q.setParameter( i * params.length + j + 1, params[j] );
+                    }
                 }
-            }
-            totalInserted += q.executeUpdate();
+                return q.executeUpdate();
+            } );
+            totalInserted += inserted == null ? 0 : inserted;
             LOGGER.info( "Inserted {}/{} allocation rows.", totalInserted, allocations.size() );
         }
     }
@@ -495,7 +504,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    public void updateJobStatusToRetry( int jobId ) {
+    public boolean updateJobStatusToRetry( int jobId ) {
         AbstractJob job = fetchJobById( jobId );
         if ( JobStatus.processing != job.getStatus() ) {
             throw new IncorrectNumberOfRecordsUpdatedException(
@@ -507,17 +516,17 @@ public class WordPressDAOImpl implements WordPressDAO {
             // set default number of retries to 5
             job.setParameter( "retry_count_remaining", "5" );
             updateJobStatus( job, JobStatus.retry );
+            return true;
         }
-        else {
-            int retries = Integer.parseInt( retryCount ) - 1;
-            if ( retries < 0 ) {
-                updateJobStatus( job, JobStatus.failed );
-            }
-            else {
-                job.setParameter( "retry_count_remaining", Integer.toString( retries ) );
-                updateJobStatus( job, JobStatus.retry );
-            }
+        int retries = Integer.parseInt( retryCount ) - 1;
+        if ( retries <= 0 ) {
+            LOGGER.error( "Job {} exhausted retry_count_remaining; marking failed", jobId );
+            updateJobStatus( job, JobStatus.failed );
+            return false;
         }
+        job.setParameter( "retry_count_remaining", Integer.toString( retries ) );
+        updateJobStatus( job, JobStatus.retry );
+        return true;
     }
 
     @Override
@@ -1346,26 +1355,31 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    @Transactional( timeout = BULK_PERSIST_TX_TIMEOUT_SECONDS )
+    @Transactional( propagation = Propagation.NOT_SUPPORTED )
     public void updateGuestCommentsForReservations( List<GuestCommentReportEntry> comments ) {
         if ( comments == null || comments.isEmpty() ) {
             return;
         }
+        TransactionTemplate tt = new TransactionTemplate( transactionManager );
+        tt.setPropagationBehavior( TransactionDefinition.PROPAGATION_REQUIRES_NEW );
+        tt.setTimeout( CHUNK_TX_TIMEOUT_SECONDS );
         int totalUpdated = 0;
         for ( int from = 0 ; from < comments.size() ; from += GUEST_COMMENT_UPSERT_BATCH_SIZE ) {
             int to = Math.min( from + GUEST_COMMENT_UPSERT_BATCH_SIZE, comments.size() );
             List<GuestCommentReportEntry> batch = comments.subList( from, to );
-            Query q = em.createNativeQuery( "INSERT INTO wp_lh_rpt_guest_comments ( reservation_id, comments ) "
-                    + " VALUES " + StringUtils.repeat( "( ?, ? )", ",", batch.size() )
-                    + " ON DUPLICATE KEY UPDATE "
-                    + " reservation_id = VALUES( reservation_id ), "
-                    + " comments = VALUES( comments )" );
-            for ( int i = 0 ; i < batch.size() ; i++ ) {
-                GuestCommentReportEntry entry = batch.get( i );
-                q.setParameter( 2 * i + 1, entry.getReservationId() );
-                q.setParameter( 2 * i + 2, entry.getComments() );
-            }
-            q.executeUpdate();
+            tt.executeWithoutResult( status -> {
+                Query q = em.createNativeQuery( "INSERT INTO wp_lh_rpt_guest_comments ( reservation_id, comments ) "
+                        + " VALUES " + StringUtils.repeat( "( ?, ? )", ",", batch.size() )
+                        + " ON DUPLICATE KEY UPDATE "
+                        + " reservation_id = VALUES( reservation_id ), "
+                        + " comments = VALUES( comments )" );
+                for ( int i = 0 ; i < batch.size() ; i++ ) {
+                    GuestCommentReportEntry entry = batch.get( i );
+                    q.setParameter( 2 * i + 1, entry.getReservationId() );
+                    q.setParameter( 2 * i + 2, entry.getComments() );
+                }
+                q.executeUpdate();
+            } );
             totalUpdated += batch.size();
             LOGGER.info( "Updated {}/{} guest comments.", totalUpdated, comments.size() );
         }

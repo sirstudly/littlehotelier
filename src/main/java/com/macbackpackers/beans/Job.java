@@ -101,6 +101,12 @@ public class Job {
     }
 
     public void setParameter( String name, String value ) {
+        for ( JobParameter param : getParameters() ) {
+            if ( param.getName().equals( name ) ) {
+                param.setValue( value );
+                return;
+            }
+        }
         getParameters().add( new JobParameter( this, name, value ) );
     }
 

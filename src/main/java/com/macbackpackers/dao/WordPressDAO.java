@@ -258,11 +258,13 @@ public interface WordPressDAO {
     void updateJobStatus( int jobId, JobStatus status ) throws EmptyResultDataAccessException;
 
     /**
-     * Updates the status of the given job to 'retry' or 'failed' if the number of retries is exceeded.
-     * 
+     * Updates the status of the given job to {@code retry}, or {@code failed} when
+     * {@code retry_count_remaining} is exhausted (defaults to 5 requeues).
+     *
      * @param jobId PK of job
+     * @return true if status set to retry, false if marked failed
      */
-    void updateJobStatusToRetry( int jobId );
+    boolean updateJobStatusToRetry( int jobId );
 
     /**
      * Updates the given job from 'submitted' to 'processing' and sets the jobStartDate and
