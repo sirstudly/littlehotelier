@@ -482,7 +482,8 @@ Stay-continuation: same guest + same `room_id` with `checkin = prior checkout` e
 ### Mercure
 
 - Topic: `housekeeping/{propertyId}`
-- Options: `hbo_mercure_hub_url`, `hbo_mercure_publisher_jwt`, `hbo_mercure_subscriber_jwt`
+- Options: `hbo_mercure_hub_url`, `hbo_mercure_jwt_secret` (shared HMAC secret with the hub)
+- Java mints a short-lived **publisher** JWT at publish time; PHP mints a short-lived **subscriber** JWT when rendering `/housekeeping`
 - Payload: `{ action: "housekeeping_snapshot", beds: [...], totals: {...} }`
 
 `HousekeepingJob` remains the REST reconcile / heal path (Refresh Now).

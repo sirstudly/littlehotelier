@@ -25,13 +25,16 @@ import com.macbackpackers.scrapers.CloudbedsScraper;
 /**
  * Publishes housekeeping snapshots to a Mercure hub so browser EventSource clients update in place.
  * <p>
- * Config (WordPress options): {@code hbo_mercure_hub_url}, {@code hbo_mercure_publisher_jwt}.
- * Topic: {@code housekeeping/{propertyId}}.
+ * Config (WordPress options): {@code hbo_mercure_hub_url}, {@code hbo_mercure_jwt_secret}.
+ * Publisher JWT is minted at runtime from the shared secret. Topic: {@code housekeeping/{propertyId}}.
  */
 @Service
 public class MercurePublisher {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( MercurePublisher.class );
+
+    /** Short-lived publisher tokens; re-minted on each publish. */
+    private static final long PUBLISHER_JWT_TTL_SECONDS = 300;
 
     @Autowired
     private WordPressDAO dao;
@@ -43,20 +46,21 @@ public class MercurePublisher {
 
     public void publishHousekeepingSnapshot( List<HousekeepingBed> beds, LocalDate selectedDate ) {
         String hubUrl = dao.getOption( "hbo_mercure_hub_url" );
-        String jwt = dao.getOption( "hbo_mercure_publisher_jwt" );
-        if ( StringUtils.isBlank( hubUrl ) || StringUtils.isBlank( jwt ) ) {
-            LOGGER.debug( "Mercure not configured (hbo_mercure_hub_url / hbo_mercure_publisher_jwt); skip publish." );
+        String secret = dao.getOption( "hbo_mercure_jwt_secret" );
+        if ( StringUtils.isBlank( hubUrl ) || StringUtils.isBlank( secret ) ) {
+            LOGGER.debug( "Mercure not configured (hbo_mercure_hub_url / hbo_mercure_jwt_secret); skip publish." );
             return;
         }
         String propertyId = scraper.getPropertyId();
         String topic = "housekeeping/" + propertyId;
         JsonObject payload = buildPayload( beds, selectedDate, propertyId );
         try {
+            String jwt = MercureJwt.mintPublisher( secret, topic, PUBLISHER_JWT_TTL_SECONDS );
             postToHub( hubUrl, jwt, topic, gson.toJson( payload ) );
             LOGGER.info( "Published housekeeping Mercure update topic={} beds={}", topic,
                     beds == null ? 0 : beds.size() );
         }
-        catch ( IOException e ) {
+        catch ( Exception e ) {
             LOGGER.warn( "Failed to publish housekeeping Mercure update: {}", e.toString() );
         }
     }
