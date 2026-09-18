@@ -32,7 +32,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.sql.Timestamp;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -156,7 +155,14 @@ public class ProcessorService {
                 .filter( s -> s.isOverdue() && s.isActive() )
                 .forEach( s -> {
                     try {
-                        s.setLastRunDate( new Timestamp( System.currentTimeMillis() ) );
+                        // Defense in depth: a long-running prior instance (or daily-boundary race)
+                        // should not enqueue a second copy while one is still submitted/processing.
+                        if ( dao.isJobCurrentlyPending( s.getClassname() ) ) {
+                            LOGGER.info( "Skipping overdue schedule for {}; job already pending",
+                                    s.getClassname() );
+                            return;
+                        }
+                        s.setLastRunDate( s.newLastRunDate() );
                         dao.updateJobScheduler( s );
                         LOGGER.info( "Creating new job " + s.getClassname() );
                         dao.insertJob( s.createNewJob() );

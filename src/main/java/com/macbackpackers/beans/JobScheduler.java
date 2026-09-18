@@ -199,6 +199,31 @@ public class JobScheduler {
     }
 
     /**
+     * Timestamp to record when enqueueing a run from this schedule.
+     * <p>
+     * For daily schedules, advances to at least today's {@code repeat_daily_at} so a catch-up
+     * enqueue before that time does not look overdue again once the clock crosses it (which would
+     * create a duplicate job on the next coordinator cycle).
+     *
+     * @return non-null timestamp to store as {@link #lastRunDate}
+     */
+    public Timestamp newLastRunDate() {
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        if ( getRepeatDailyAt() == null ) {
+            return now;
+        }
+        LocalDateTime todaysSlot = LocalDateTime.now()
+                .withHour( getRepeatDailyHour() )
+                .withMinute( getRepeatDailyMinute() )
+                .withSecond( 0 )
+                .withNano( 0 );
+        if ( now.toLocalDateTime().isBefore( todaysSlot ) ) {
+            return Timestamp.valueOf( todaysSlot );
+        }
+        return now;
+    }
+
+    /**
      * Returns whether this scheduled job is due to be run.
      * 
      * @return true if job needs to be run, false otherwise.
@@ -217,7 +242,8 @@ public class JobScheduler {
             LocalDateTime repeatAt = LocalDateTime.now()
                     .withHour( getRepeatDailyHour() )
                     .withMinute( getRepeatDailyMinute() )
-                    .withSecond( 0 );
+                    .withSecond( 0 )
+                    .withNano( 0 );
 
             // if the repeat time is in the future, dial it back a day to get the last time it should've run
             if ( LocalDateTime.now().isBefore( repeatAt ) ) {
