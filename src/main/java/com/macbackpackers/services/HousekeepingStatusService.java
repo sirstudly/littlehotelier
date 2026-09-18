@@ -23,7 +23,7 @@ import com.macbackpackers.dao.WordPressDAO;
 @Service
 public class HousekeepingStatusService {
 
-    private static final List<String> EXCLUDED_ROOM_TYPES = List.of( "LT_MALE", "LT_FEMALE", "LT_MIXED", "OVERFLOW" );
+    private static final List<String> EXCLUDED_ROOM_TYPES = List.of( "LT_MALE", "LT_FEMALE", "LT_MIXED", "OVERFLOW", "PAID BEDS" );
 
     @Autowired
     private WordPressDAO dao;
