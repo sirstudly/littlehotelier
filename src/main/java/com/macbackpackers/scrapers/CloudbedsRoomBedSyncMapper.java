@@ -1,4 +1,3 @@
-
 package com.macbackpackers.scrapers;
 
 import java.util.ArrayList;
@@ -29,16 +28,24 @@ public final class CloudbedsRoomBedSyncMapper {
      *
      * @param isPrivate {@code is_private} ({@code Y}/{@code N})
      * @param gender    {@code gender} (e.g. {@code FE}, {@code MI})
-     * @param capacity  numeric {@code room_capacity}
+     * @param capacity  guests per private room, or beds per dorm room
+     * @param title     Cloudbeds room type {@code title} (used to distinguish double vs twin, etc.)
      */
-    public static String deriveRoomTypeCode( String isPrivate, String gender, int capacity ) {
+    public static String deriveRoomTypeCode( String isPrivate, String gender, int capacity, String title ) {
         boolean priv = "Y".equals( isPrivate );
         if ( priv ) {
+            String fromTitle = derivePrivateRoomTypeFromTitle( title );
+            if ( fromTitle != null ) {
+                return fromTitle;
+            }
             if ( capacity == 1 ) {
                 return "SGL";
             }
             if ( capacity == 2 ) {
                 return "TWN";
+            }
+            if ( capacity == 3 ) {
+                return "TRIPLE";
             }
             if ( capacity == 4 ) {
                 return "QUAD";
@@ -51,16 +58,64 @@ public final class CloudbedsRoomBedSyncMapper {
         return "MX";
     }
 
+    /** Capacity-only overload when title is unavailable. */
+    public static String deriveRoomTypeCode( String isPrivate, String gender, int capacity ) {
+        return deriveRoomTypeCode( isPrivate, gender, capacity, null );
+    }
+
+    static String derivePrivateRoomTypeFromTitle( String title ) {
+        if ( title == null || title.isEmpty() ) {
+            return null;
+        }
+        String lower = title.toLowerCase();
+        if ( lower.contains( "double" ) ) {
+            return "DBL";
+        }
+        if ( lower.contains( "twin" ) ) {
+            return "TWN";
+        }
+        if ( lower.contains( "triple" ) ) {
+            return "TRIPLE";
+        }
+        if ( lower.contains( "quad" ) ) {
+            return "QUAD";
+        }
+        if ( lower.contains( "single" ) ) {
+            return "SGL";
+        }
+        return null;
+    }
+
+    /**
+     * Guests-per-room for private rooms ({@code max_guests}); beds-per-room for dorms ({@code num_beds}).
+     * Private rooms are sold as a single unit so Cloudbeds sets {@code num_beds=1} even when the room
+     * sleeps 2–4 guests.
+     */
     static int parseRoomCapacity( JsonObject roomTypeFindRow ) {
-        JsonElement cap = roomTypeFindRow.get( "num_beds" );
-        if ( cap == null || cap.isJsonNull() ) {
+        boolean isPrivate = "Y".equals( getStringMember( roomTypeFindRow, "is_private" ) );
+        String field = isPrivate ? "max_guests" : "num_beds";
+        int capacity = parsePositiveIntMember( roomTypeFindRow, field );
+        if ( capacity > 0 ) {
+            return capacity;
+        }
+        // fallback if preferred field missing
+        capacity = parsePositiveIntMember( roomTypeFindRow, isPrivate ? "num_beds" : "max_guests" );
+        return Math.max( capacity, 0 );
+    }
+
+    private static int parsePositiveIntMember( JsonObject obj, String name ) {
+        JsonElement el = obj.get( name );
+        if ( el == null || el.isJsonNull() ) {
             return 0;
         }
         try {
-            return Integer.parseInt( cap.getAsString().trim() );
+            int value = el.isJsonPrimitive() && el.getAsJsonPrimitive().isNumber()
+                    ? el.getAsInt()
+                    : Integer.parseInt( el.getAsString().trim() );
+            return value > 0 ? value : 0;
         }
-        catch ( NumberFormatException ex ) {
-            LOGGER.warn( "Unable to parse room capacity: " + cap.getAsString() );
+        catch ( NumberFormatException | UnsupportedOperationException ex ) {
+            LOGGER.warn( "Unable to parse {}: {}", name, el );
             return 0;
         }
     }
@@ -85,13 +140,27 @@ public final class CloudbedsRoomBedSyncMapper {
             return Collections.emptyList();
         }
 
-        JsonArray names = namesEl.getAsJsonArray();
-        String isPrivate = getStringMember( roomTypeFindRow, "is_private" );
-        String gender = getStringMember( roomTypeFindRow, "gender" );
-        int capacity = parseRoomCapacity( roomTypeFindRow );
-        String roomTypeCode = deriveRoomTypeCode( isPrivate, gender, capacity );
+        // Prefer find_one fields when present (same schema); fall back to find summary.
+        JsonObject capacitySource = findOneData.has( "max_guests" ) || findOneData.has( "num_beds" )
+                ? findOneData
+                : roomTypeFindRow;
 
-        String roomTypeIdStr = getStringMember( roomTypeFindRow, "id" );
+        JsonArray names = namesEl.getAsJsonArray();
+        String isPrivate = firstNonEmpty(
+                getStringMember( capacitySource, "is_private" ),
+                getStringMember( roomTypeFindRow, "is_private" ) );
+        String gender = firstNonEmpty(
+                getStringMember( capacitySource, "gender" ),
+                getStringMember( roomTypeFindRow, "gender" ) );
+        String title = firstNonEmpty(
+                getStringMember( capacitySource, "title" ),
+                getStringMember( roomTypeFindRow, "title" ) );
+        int capacity = parseRoomCapacity( capacitySource );
+        String roomTypeCode = deriveRoomTypeCode( isPrivate, gender, capacity, title );
+
+        String roomTypeIdStr = firstNonEmpty(
+                getStringMember( roomTypeFindRow, "id" ),
+                getStringMember( capacitySource, "id" ) );
         final int roomTypeId;
         try {
             roomTypeId = Integer.parseInt( roomTypeIdStr );
@@ -124,6 +193,10 @@ public final class CloudbedsRoomBedSyncMapper {
             out.add( rb );
         }
         return out;
+    }
+
+    private static String firstNonEmpty( String a, String b ) {
+        return a != null && !a.isEmpty() ? a : ( b == null ? "" : b );
     }
 
     private static String getStringMember( JsonObject obj, String name ) {
