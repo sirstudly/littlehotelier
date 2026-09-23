@@ -1,4 +1,3 @@
-
 package com.macbackpackers.jobs;
 
 import jakarta.persistence.DiscriminatorValue;
@@ -6,30 +5,20 @@ import jakarta.persistence.Entity;
 
 import org.springframework.transaction.annotation.Transactional;
 
-import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
 
 /**
- * Job that creates all dependent report instances for all allocation
- * records from a previous {@link AllocationScraperJob}.
- *
+ * Creates report jobs from current {@code wp_lh_booking_assignment} / dual-written calendar
+ * for a completed {@link AllocationScraperJob} heal.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.CreateAllocationScraperReportsJob" )
 public class CreateAllocationScraperReportsJob extends AbstractJob {
 
     @Override
-    @Transactional // no re-run on this job; all must go thru or nothing
+    @Transactional
     public void processJob() throws Exception {
-        // first we consolidate results from all AllocationScraperWorkerJobs
-        for ( Job dependentJob : getDependentJobs() ) {
-            // remap the worker id to the parent AllocationScraperJob id (for consolidating results)
-            if ( dependentJob instanceof CloudbedsAllocationScraperWorkerJob ) {
-                dao.updateAllocationJobId( dependentJob.getId(), getAllocationScraperJobId() );
-            }
-        }
-
-        // insert jobs to create any reports
+        // Worker remapping retired — AllocationScraperJob dual-writes calendar under its own job id.
         insertSplitRoomReportJob();
         insertUnpaidDepositReportJob();
         insertGroupBookingsReportJob();
@@ -37,9 +26,6 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         insertBlacklistEmailJob();
     }
 
-    /**
-     * Creates an additional job to run the split room report.
-     */
     private void insertSplitRoomReportJob() {
         SplitRoomReservationReportJob splitRoomReportJob = new SplitRoomReservationReportJob();
         splitRoomReportJob.setStatus( JobStatus.submitted );
@@ -47,9 +33,6 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         dao.insertJob( splitRoomReportJob );
     }
 
-    /**
-     * Creates an additional job to run the unpaid deposit report.
-     */
     private void insertUnpaidDepositReportJob() {
         UnpaidDepositReportJob unpaidDepositRptJob = new UnpaidDepositReportJob();
         unpaidDepositRptJob.setStatus( JobStatus.submitted );
@@ -57,9 +40,6 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         dao.insertJob( unpaidDepositRptJob );
     }
 
-    /**
-     * Creates an additional job to run the group bookings report.
-     */
     private void insertGroupBookingsReportJob() {
         GroupBookingsReportJob groupBookingRptJob = new GroupBookingsReportJob();
         groupBookingRptJob.setStatus( JobStatus.submitted );
@@ -67,9 +47,6 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         dao.insertJob( groupBookingRptJob );
     }
 
-    /**
-     * Creates an additional job to run the mostly-full dorm report.
-     */
     private void insertMostlyFullDormReportJob() {
         MostlyFullDormReportJob mostlyFullDormRptJob = new MostlyFullDormReportJob();
         mostlyFullDormRptJob.setStatus( JobStatus.submitted );
@@ -77,9 +54,6 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         dao.insertJob( mostlyFullDormRptJob );
     }
 
-    /**
-     * Creates an additional job identifying any bookings in the blacklist.
-     */
     private void insertBlacklistEmailJob() {
         CheckNewBookingsOnBlacklistJob blacklistJob = new CheckNewBookingsOnBlacklistJob();
         blacklistJob.setStatus( JobStatus.submitted );

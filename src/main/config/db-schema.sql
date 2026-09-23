@@ -636,3 +636,48 @@ CREATE TABLE `wp_lh_housekeeping_bed` (
 -- CREATE TABLE `wp_lh_occupancy` (...);
 -- CREATE TABLE `wp_lh_housekeeping_bed` (...);
 
+-- Report-grade current booking assignments (WS + selective REST; SCD2)
+CREATE TABLE `wp_lh_booking_assignment` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `assignment_key` varchar(64) NOT NULL,
+  `calendar_event_id` varchar(64) DEFAULT NULL,
+  `booking_rooms_id` varchar(64) DEFAULT NULL,
+  `reservation_id` bigint(20) unsigned DEFAULT NULL,
+  `room_id` varchar(255) DEFAULT NULL,
+  `room` varchar(50) DEFAULT NULL,
+  `bed_name` varchar(50) DEFAULT NULL,
+  `room_type_id` int(10) unsigned DEFAULT NULL,
+  `guest_name` varchar(255) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `checkin_date` date NOT NULL,
+  `checkout_date` date NOT NULL,
+  `bed_status` varchar(50) DEFAULT NULL,
+  `in_house_yn` char(1) DEFAULT NULL,
+  `source` varchar(20) NOT NULL,
+  `payment_total` decimal(10,2) DEFAULT NULL,
+  `payment_outstanding` decimal(10,2) DEFAULT NULL,
+  `visitor_levy_total` decimal(10,2) DEFAULT NULL,
+  `rate_plan_name` varchar(512) DEFAULT NULL,
+  `num_guests` int(10) unsigned DEFAULT NULL,
+  `booking_reference` varchar(100) DEFAULT NULL,
+  `booking_source` varchar(100) DEFAULT NULL,
+  `hotel_collect_yn` char(1) DEFAULT NULL,
+  `booked_date` datetime DEFAULT NULL,
+  `notes` text,
+  `comments` text,
+  `data_href` varchar(255) DEFAULT NULL,
+  `viewed_yn` char(1) DEFAULT NULL,
+  `last_rest_fetched_at` timestamp NULL DEFAULT NULL,
+  `valid_from` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `valid_to` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `lh_ba_current_room` (`valid_to`, `room_id`),
+  KEY `lh_ba_booking_rooms` (`booking_rooms_id`, `valid_to`),
+  KEY `lh_ba_assignment` (`assignment_key`, `valid_to`),
+  KEY `lh_ba_reservation` (`reservation_id`, `valid_to`),
+  KEY `lh_ba_event` (`calendar_event_id`, `valid_to`),
+  KEY `lh_ba_rest_stale` (`valid_to`, `last_rest_fetched_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- Production migration: src/main/config/migrations/2026-09-22-booking-assignment-scd2.sql
+

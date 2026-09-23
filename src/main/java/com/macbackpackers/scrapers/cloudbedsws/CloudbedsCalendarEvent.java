@@ -76,6 +76,22 @@ public class CloudbedsCalendarEvent {
         return get( "booking_date" );
     }
 
+    public String getEmail() {
+        return get( "email" );
+    }
+
+    public String getAdults() {
+        return get( "adults" );
+    }
+
+    public String getKids() {
+        return get( "kids" );
+    }
+
+    public String getNotes() {
+        return get( "notes" );
+    }
+
     /** Room/bed id in the form {@code roomTypeId-bedId} (bed/unit {@code 0} when whole-room). */
     public String getRoomId() {
         return get( "room_id" );

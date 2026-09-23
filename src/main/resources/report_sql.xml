@@ -3,26 +3,24 @@
 <properties>
     <comment>Reporting SQL queries</comment>
     <entry key="reservations.split.rooms">
--- Query all unallocated reservations that span more than 1 room for the same room type
+-- Current SCD2 booking assignments (valid_to IS NULL); :jobId stamps the report run
 INSERT INTO wp_lh_rpt_split_rooms (job_id, reservation_id, guest_name, checkin_date, checkout_date, data_href, 
        notes, lh_status, booking_reference, booking_source, booked_date, eta, viewed_yn, created_date)
-SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' ) guest_name, 
-       checkin_date, checkout_date, data_href, notes, lh_status, booking_reference, 
-       booking_source, booked_date, eta, viewed_yn, MAX(created_date) `created_date` 
-  FROM wp_lh_calendar rep
- WHERE rep.job_id = :jobId -- the job_id of the AllocationScraperJob to use data for
+SELECT :jobId, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' ) guest_name, 
+       checkin_date, checkout_date, data_href, notes, bed_status, booking_reference, 
+       booking_source, booked_date, NULL, viewed_yn, MAX(valid_from) `created_date` 
+  FROM wp_lh_booking_assignment rep
+ WHERE rep.valid_to IS NULL
    AND (
        EXISTS (
-           -- all reservations where for the same room type, they are split into different rooms
-           -- does not take into account group bookings
-           SELECT t.job_id, t.reservation_id, t.room_type_id, MAX(t.capacity) AS capacity, SUM(t.num_beds) AS total_beds, COUNT(1) AS num_rooms
+           SELECT t.reservation_id, t.room_type_id, MAX(t.capacity) AS capacity, SUM(t.num_beds) AS total_beds, COUNT(1) AS num_rooms
              FROM ( -- for each reservation, determine which rooms are they assigned to
-                  SELECT c.job_id, c.reservation_id, rm.room, rm.room_type_id, rm.capacity, count(1) AS num_beds
-                    FROM (SELECT DISTINCT job_id, reservation_id, room_id FROM wp_lh_calendar WHERE job_id = :jobId) c -- remove duplicates (bug when inserting data?)
+                  SELECT c.reservation_id, rm.room, rm.room_type_id, rm.capacity, count(1) AS num_beds
+                    FROM (SELECT DISTINCT reservation_id, room_id FROM wp_lh_booking_assignment WHERE valid_to IS NULL) c
                     JOIN wp_lh_rooms rm ON c.room_id = rm.id 
                    WHERE rm.room_type NOT IN ('LT_MALE', 'LT_FEMALE', 'DBL', 'TRIPLE', 'QUAD', 'TWIN')
                      AND c.reservation_id > 0 -- do not include room closures
-                   GROUP BY c.job_id, c.reservation_id, rm.room, rm.room_type_id, rm.capacity
+                   GROUP BY c.reservation_id, rm.room, rm.room_type_id, rm.capacity
               ) t
             WHERE t.reservation_id = rep.reservation_id
             GROUP BY t.reservation_id, t.room_type_id
@@ -30,41 +28,41 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
               AND COUNT(1) > 1 -- assigned to more than one room (for the same room type)
        ) -- end exists
        OR EXISTS (
-           -- include all reservations which have unallocated rooms
-           SELECT c.job_id, c.reservation_id, c.room_type_id
-             FROM wp_lh_calendar c
+        -- include all reservations which have unallocated rooms
+           SELECT c.reservation_id, c.room_type_id
+             FROM wp_lh_booking_assignment c
             WHERE c.room_id IS NULL -- unallocated reservations don't have this set
+              AND c.valid_to IS NULL
               AND c.reservation_id = rep.reservation_id
-              AND c.job_id = rep.job_id
        ) -- end exists
     )
- GROUP BY job_id, reservation_id, checkin_date, checkout_date, data_href, notes, lh_status, booking_reference, booking_source, booked_date, eta, viewed_yn
+ GROUP BY reservation_id, checkin_date, checkout_date, data_href, notes, bed_status, booking_reference, booking_source, booked_date, viewed_yn
     </entry>
     <entry key="unpaid.deposit.report">
         INSERT INTO wp_lh_rpt_unpaid_deposit( job_id, guest_name, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn, created_date )
-        SELECT f.job_id, GROUP_CONCAT( DISTINCT f.guest_name ) `guest_name`, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn, MAX(f.created_date) `created_date`
-          FROM wp_lh_calendar f
-         WHERE f.job_id = :jobId
-           AND f.payment_total = f.payment_outstanding -- nothing's been charged
-           AND f.hotel_collect_yn = '1'
+        SELECT :jobId, GROUP_CONCAT( DISTINCT f.guest_name ) `guest_name`, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn, MAX(f.valid_from) `created_date`
+          FROM wp_lh_booking_assignment f
+         WHERE f.valid_to IS NULL
+           AND f.payment_total = f.payment_outstanding
+           AND (f.hotel_collect_yn = '1' OR f.hotel_collect_yn = 'Y')
            AND f.payment_total &gt; 0
            AND f.booked_date &lt; DATE_SUB(NOW(), INTERVAL 2 DAY) -- leave a window until we process it
            AND ( f.booking_source IN ('Booking.com', 'Expedia')
                OR ( -- include non-refundable bookings
                         f.booking_source IN ('Hostelworld &amp; Hostelbookers', 'Booking.com', 'Hostelworld')
-                    AND (f.rate_plan_name LIKE '%Non-refundable%' OR f.rate_plan_name = 'nonref')
+                    AND (f.rate_plan_name LIKE '%Non-refundable%' OR f.rate_plan_name = 'nonref' OR f.rate_plan_name LIKE '%non-refundable%' OR f.rate_plan_name LIKE '%\"nonref\"%')
                    ))
          GROUP BY f.reservation_id, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn;
     </entry>
     <entry key="group.bookings">
         INSERT INTO `wp_lh_group_bookings` (job_id, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn)
-        SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, CASE WHEN :propertyManager = 'cloudbeds' THEN num_guests ELSE SUM(num_guests) END `num_guests`, notes, viewed_yn
+        SELECT :jobId, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, CASE WHEN :propertyManager = 'cloudbeds' THEN num_guests ELSE SUM(num_guests) END `num_guests`, notes, viewed_yn
           FROM ( -- some duplicates may occur; remove them first
-                SELECT job_id, room, bed_name, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn 
-                  FROM wp_lh_calendar
-                 WHERE job_id = :jobId
+                SELECT room, bed_name, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn 
+                  FROM wp_lh_booking_assignment
+                 WHERE valid_to IS NULL
                    AND reservation_id > 0 -- ignore room closures
-                 GROUP BY job_id, room, bed_name, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn
+                 GROUP BY room, bed_name, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn
                 ) t
          WHERE reservation_id > 0 -- ignore room closures
       GROUP BY reservation_id, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, notes, viewed_yn
@@ -72,16 +70,16 @@ SELECT job_id, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
     </entry>
     <entry key="mostly.full.dorms">
         INSERT INTO `wp_lh_rpt_mostly_full_dorms` (job_id, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, room_capacity, notes, viewed_yn)
-        SELECT job_id, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, CASE WHEN :propertyManager = 'cloudbeds' THEN num_guests ELSE SUM(num_guests) END `num_guests`, MAX(capacity) `room_capacity`, notes, viewed_yn
+        SELECT :jobId, reservation_id, GROUP_CONCAT(DISTINCT guest_name) `guest_name`, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, CASE WHEN :propertyManager = 'cloudbeds' THEN num_guests ELSE SUM(num_guests) END `num_guests`, MAX(capacity) `room_capacity`, notes, viewed_yn
           FROM ( -- some duplicates may occur; remove them first
-                SELECT c.job_id, c.room, c.bed_name, c.reservation_id, c.guest_name, c.booking_reference, c.booking_source, c.checkin_date, c.checkout_date, c.booked_date, c.payment_outstanding, c.data_href, c.num_guests, c.notes, c.viewed_yn, c.room_id, rm.capacity
-                  FROM wp_lh_calendar c
+                SELECT c.room, c.bed_name, c.reservation_id, c.guest_name, c.booking_reference, c.booking_source, c.checkin_date, c.checkout_date, c.booked_date, c.payment_outstanding, c.data_href, c.num_guests, c.notes, c.viewed_yn, c.room_id, rm.capacity
+                  FROM wp_lh_booking_assignment c
                   JOIN wp_lh_rooms rm ON c.room_id = rm.id
-                 WHERE c.job_id = :jobId
+                 WHERE c.valid_to IS NULL
                    AND c.reservation_id > 0 -- ignore room closures
                    AND rm.room_type IN ('MX', 'M', 'F') -- guest dorms only (excludes staff LT_MALE/LT_FEMALE)
                    AND rm.active_yn = 'Y'
-                 GROUP BY c.job_id, c.room, c.bed_name, c.reservation_id, c.guest_name, c.booking_reference, c.booking_source, c.checkin_date, c.checkout_date, c.booked_date, c.payment_outstanding, c.data_href, c.num_guests, c.notes, c.viewed_yn, c.room_id, rm.capacity
+                 GROUP BY c.room, c.bed_name, c.reservation_id, c.guest_name, c.booking_reference, c.booking_source, c.checkin_date, c.checkout_date, c.booked_date, c.payment_outstanding, c.data_href, c.num_guests, c.notes, c.viewed_yn, c.room_id, rm.capacity
                 ) t
          WHERE reservation_id > 0 -- ignore room closures
       GROUP BY reservation_id, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, notes, viewed_yn

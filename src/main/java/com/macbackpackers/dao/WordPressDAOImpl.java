@@ -4,6 +4,7 @@ package com.macbackpackers.dao;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BlacklistEntry;
+import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
@@ -400,6 +401,23 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     public boolean hasCalculateEdinburghVisitorLevyJobForReservation( String reservationId ) {
         return findPendingCalculateEdinburghVisitorLevyJobForReservation( reservationId ) != null;
+    }
+
+    @Override
+    public boolean hasBookingAssignmentEnrichJobForReservation( String reservationId ) {
+        if ( StringUtils.isBlank( reservationId ) ) {
+            return false;
+        }
+        String sql = "SELECT COUNT(1) FROM wp_lh_jobs j "
+                + "  JOIN wp_lh_job_param p ON j.job_id = p.job_id "
+                + " WHERE j.classname = 'com.macbackpackers.jobs.BookingAssignmentEnrichJob' "
+                + "   AND p.name = 'reservation_id' "
+                + "   AND p.value = :reservationId "
+                + "   AND j.status IN ('submitted', 'processing', 'retry')";
+        Number count = (Number) em.createNativeQuery( sql )
+                .setParameter( "reservationId", reservationId )
+                .getSingleResult();
+        return count.longValue() > 0;
     }
 
     @Override
@@ -1826,6 +1844,183 @@ public class WordPressDAOImpl implements WordPressDAO {
     public List<HousekeepingBed> fetchHousekeepingBeds() {
         return em.createQuery(
                 "FROM HousekeepingBed b ORDER BY b.room, b.bedName", HousekeepingBed.class )
+                .getResultList();
+    }
+
+    // --- Booking assignment SCD2 ---
+
+    @Override
+    @Transactional( readOnly = true )
+    public List<BookingAssignment> fetchCurrentBookingAssignments() {
+        return em.createQuery(
+                "FROM BookingAssignment a WHERE a.validTo IS NULL", BookingAssignment.class )
+                .getResultList();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public BookingAssignment fetchCurrentBookingAssignmentByKey( String assignmentKey ) {
+        try {
+            return em.createQuery(
+                    "FROM BookingAssignment a WHERE a.assignmentKey = :key AND a.validTo IS NULL",
+                    BookingAssignment.class )
+                    .setParameter( "key", assignmentKey )
+                    .getSingleResult();
+        }
+        catch ( NoResultException e ) {
+            return null;
+        }
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public BookingAssignment fetchCurrentBookingAssignmentByCalendarEventId( String calendarEventId ) {
+        try {
+            return em.createQuery(
+                    "FROM BookingAssignment a WHERE a.calendarEventId = :eid AND a.validTo IS NULL",
+                    BookingAssignment.class )
+                    .setParameter( "eid", calendarEventId )
+                    .getSingleResult();
+        }
+        catch ( NoResultException e ) {
+            return null;
+        }
+    }
+
+    @Override
+    @Transactional
+    public boolean upsertBookingAssignment( BookingAssignment next ) {
+        if ( next == null || StringUtils.isBlank( next.getAssignmentKey() ) ) {
+            return false;
+        }
+        BookingAssignment current = fetchCurrentBookingAssignmentByKey( next.getAssignmentKey() );
+        if ( current != null && false == current.differsForVersioning( next ) ) {
+            return false;
+        }
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        if ( current != null ) {
+            next.copyEnrichFrom( current );
+            current.setValidTo( now );
+            em.merge( current );
+        }
+        next.setId( 0 );
+        next.setValidFrom( now );
+        next.setValidTo( null );
+        em.persist( next );
+        return true;
+    }
+
+    @Override
+    @Transactional
+    public void closeBookingAssignment( String assignmentKey ) {
+        if ( StringUtils.isBlank( assignmentKey ) ) {
+            return;
+        }
+        BookingAssignment current = fetchCurrentBookingAssignmentByKey( assignmentKey );
+        if ( current != null ) {
+            current.setValidTo( new Timestamp( System.currentTimeMillis() ) );
+            em.merge( current );
+        }
+    }
+
+    @Override
+    @Transactional
+    public void closeBookingAssignmentByCalendarEventId( String calendarEventId ) {
+        if ( StringUtils.isBlank( calendarEventId ) ) {
+            return;
+        }
+        BookingAssignment current = fetchCurrentBookingAssignmentByCalendarEventId( calendarEventId );
+        if ( current != null ) {
+            current.setValidTo( new Timestamp( System.currentTimeMillis() ) );
+            em.merge( current );
+        }
+    }
+
+    @Override
+    @Transactional( timeout = BULK_PERSIST_TX_TIMEOUT_SECONDS )
+    public void reconcileBookingAssignmentCurrents( List<BookingAssignment> desiredCurrents ) {
+        Map<String, BookingAssignment> desiredByKey = new HashMap<>();
+        if ( desiredCurrents != null ) {
+            for ( BookingAssignment d : desiredCurrents ) {
+                if ( d != null && StringUtils.isNotBlank( d.getAssignmentKey() ) ) {
+                    desiredByKey.put( d.getAssignmentKey(), d );
+                }
+            }
+        }
+        List<BookingAssignment> existing = fetchCurrentBookingAssignments();
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        for ( BookingAssignment cur : existing ) {
+            BookingAssignment desired = desiredByKey.get( cur.getAssignmentKey() );
+            if ( desired == null ) {
+                cur.setValidTo( now );
+                em.merge( cur );
+            }
+            else if ( cur.differsForVersioning( desired ) ) {
+                desired.copyEnrichFrom( cur );
+                cur.setValidTo( now );
+                em.merge( cur );
+                desired.setId( 0 );
+                desired.setValidFrom( now );
+                desired.setValidTo( null );
+                em.persist( desired );
+                desiredByKey.remove( cur.getAssignmentKey() );
+            }
+            else {
+                desiredByKey.remove( cur.getAssignmentKey() );
+            }
+        }
+        for ( BookingAssignment remaining : desiredByKey.values() ) {
+            remaining.setId( 0 );
+            remaining.setValidFrom( now );
+            remaining.setValidTo( null );
+            em.persist( remaining );
+        }
+    }
+
+    @Override
+    @Transactional
+    public boolean patchBookingAssignmentEnrich( String assignmentKey, BigDecimal visitorLevyTotal,
+            String comments, String ratePlanName, Boolean viewed ) {
+        if ( StringUtils.isBlank( assignmentKey ) ) {
+            return false;
+        }
+        BookingAssignment current = fetchCurrentBookingAssignmentByKey( assignmentKey );
+        if ( current == null ) {
+            return false;
+        }
+        current.setVisitorLevyTotal( visitorLevyTotal );
+        current.setComments( comments );
+        if ( StringUtils.isNotBlank( ratePlanName ) ) {
+            current.setRatePlanName( ratePlanName );
+        }
+        if ( viewed != null ) {
+            current.setViewed( viewed );
+        }
+        current.setLastRestFetchedAt( new Timestamp( System.currentTimeMillis() ) );
+        em.merge( current );
+        return true;
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public List<BookingAssignment> fetchBookingAssignmentsNeedingRestEnrich() {
+        return em.createQuery(
+                "FROM BookingAssignment a WHERE a.validTo IS NULL AND a.lastRestFetchedAt IS NULL "
+                        + "AND a.source = :guest AND a.reservationId IS NOT NULL AND a.reservationId > 0",
+                BookingAssignment.class )
+                .setParameter( "guest", BookingAssignment.SOURCE_GUEST )
+                .getResultList();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public List<Long> fetchReservationIdsNeedingRestEnrich() {
+        return em.createQuery(
+                "SELECT DISTINCT a.reservationId FROM BookingAssignment a "
+                        + "WHERE a.validTo IS NULL AND a.lastRestFetchedAt IS NULL "
+                        + "AND a.source = :guest AND a.reservationId IS NOT NULL AND a.reservationId > 0",
+                Long.class )
+                .setParameter( "guest", BookingAssignment.SOURCE_GUEST )
                 .getResultList();
     }
 

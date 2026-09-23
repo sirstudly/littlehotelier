@@ -16,7 +16,11 @@ import com.macbackpackers.services.CloudbedsService;
 
 /**
  * Worker job that scrapes the allocation data for a particular date range.
- *
+ * <p>
+ * <strong>Retired</strong> as the primary AllocationScraper path — use WS-backed
+ * {@code wp_lh_booking_assignment} + {@link AllocationScraperJob} heal instead.
+ * Kept for ad-hoc/manual full dumps if needed; {@link com.macbackpackers.jobs.BedCountJob}
+ * still calls {@code dumpAllocationsFrom} directly.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.CloudbedsAllocationScraperWorkerJob" )

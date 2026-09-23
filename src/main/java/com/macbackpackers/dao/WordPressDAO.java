@@ -13,6 +13,7 @@ import jakarta.persistence.NoResultException;
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BlacklistEntry;
+import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
@@ -194,6 +195,14 @@ public interface WordPressDAO {
      * @param reservationId Cloudbeds reservation id
      */
     boolean hasCalculateEdinburghVisitorLevyJobForReservation( String reservationId );
+
+    /**
+     * True if a pending {@code BookingAssignmentEnrichJob} exists for the reservation
+     * (status {@code submitted}, {@code processing}, or {@code retry}).
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    boolean hasBookingAssignmentEnrichJobForReservation( String reservationId );
 
     /**
      * Returns a pending {@code CalculateEdinburghVisitorLevyForBookingJob} for the reservation
@@ -830,4 +839,53 @@ public interface WordPressDAO {
 
     /** All current housekeeping bed projections. */
     List<HousekeepingBed> fetchHousekeepingBeds();
+
+    // --- Booking assignment SCD2 (allocation reports) ---
+
+    /** Current booking assignment versions ({@code valid_to IS NULL}). */
+    List<BookingAssignment> fetchCurrentBookingAssignments();
+
+    /** Current assignment for a single key, or null. */
+    BookingAssignment fetchCurrentBookingAssignmentByKey( String assignmentKey );
+
+    /** Current assignment keyed by calendar event id, or null. */
+    BookingAssignment fetchCurrentBookingAssignmentByCalendarEventId( String calendarEventId );
+
+    /**
+     * Closes the open version for {@code assignmentKey} (if any) and opens {@code next} as current.
+     * Copies REST enrich columns from the previous current onto {@code next}.
+     *
+     * @return true if a new version was written
+     */
+    boolean upsertBookingAssignment( BookingAssignment next );
+
+    /** Closes the current version for the assignment (cancel / room_free). */
+    void closeBookingAssignment( String assignmentKey );
+
+    /** Closes current version matched by calendar event id. */
+    void closeBookingAssignmentByCalendarEventId( String calendarEventId );
+
+    /**
+     * Reconcile: desired currents replace existing currents. Closes assignments not in desired;
+     * upserts each desired row (preserving REST enrich via upsert).
+     */
+    void reconcileBookingAssignmentCurrents( List<BookingAssignment> desiredCurrents );
+
+    /**
+     * Patches REST-only enrich columns on the current row in place (no new SCD2 version).
+     *
+     * @return true if a current row was updated
+     */
+    boolean patchBookingAssignmentEnrich( String assignmentKey, BigDecimal visitorLevyTotal,
+            String comments, String ratePlanName, Boolean viewed );
+
+    /**
+     * Current guest assignments that have never been REST-enriched ({@code last_rest_fetched_at IS NULL}).
+     */
+    List<BookingAssignment> fetchBookingAssignmentsNeedingRestEnrich();
+
+    /**
+     * Distinct reservation ids among current guest assignments with null {@code last_rest_fetched_at}.
+     */
+    List<Long> fetchReservationIdsNeedingRestEnrich();
 }
