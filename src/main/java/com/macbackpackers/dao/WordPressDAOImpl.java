@@ -1699,31 +1699,37 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     @Transactional( readOnly = true )
     public OccupancyVersion fetchCurrentOccupancyByAssignmentKey( String assignmentKey ) {
-        try {
-            return em.createQuery(
-                    "FROM OccupancyVersion o WHERE o.assignmentKey = :key AND o.validTo IS NULL",
-                    OccupancyVersion.class )
-                    .setParameter( "key", assignmentKey )
-                    .getSingleResult();
+        List<OccupancyVersion> currents = listCurrentOccupancyByAssignmentKey( assignmentKey );
+        return currents.isEmpty() ? null : currents.get( 0 );
+    }
+
+    private List<OccupancyVersion> listCurrentOccupancyByAssignmentKey( String assignmentKey ) {
+        if ( StringUtils.isBlank( assignmentKey ) ) {
+            return Collections.emptyList();
         }
-        catch ( NoResultException e ) {
-            return null;
-        }
+        return em.createQuery(
+                "FROM OccupancyVersion o WHERE o.assignmentKey = :key AND o.validTo IS NULL",
+                OccupancyVersion.class )
+                .setParameter( "key", assignmentKey )
+                .getResultList();
     }
 
     @Override
     @Transactional( readOnly = true )
     public OccupancyVersion fetchCurrentOccupancyByCalendarEventId( String calendarEventId ) {
-        try {
-            return em.createQuery(
-                    "FROM OccupancyVersion o WHERE o.calendarEventId = :eid AND o.validTo IS NULL",
-                    OccupancyVersion.class )
-                    .setParameter( "eid", calendarEventId )
-                    .getSingleResult();
+        List<OccupancyVersion> currents = listCurrentOccupancyByCalendarEventId( calendarEventId );
+        return currents.isEmpty() ? null : currents.get( 0 );
+    }
+
+    private List<OccupancyVersion> listCurrentOccupancyByCalendarEventId( String calendarEventId ) {
+        if ( StringUtils.isBlank( calendarEventId ) ) {
+            return Collections.emptyList();
         }
-        catch ( NoResultException e ) {
-            return null;
-        }
+        return em.createQuery(
+                "FROM OccupancyVersion o WHERE o.calendarEventId = :eid AND o.validTo IS NULL",
+                OccupancyVersion.class )
+                .setParameter( "eid", calendarEventId )
+                .getResultList();
     }
 
     @Override
@@ -1732,14 +1738,17 @@ public class WordPressDAOImpl implements WordPressDAO {
         if ( next == null || StringUtils.isBlank( next.getAssignmentKey() ) ) {
             return false;
         }
-        OccupancyVersion current = fetchCurrentOccupancyByAssignmentKey( next.getAssignmentKey() );
-        if ( current != null && false == current.differsForVersioning( next ) ) {
+        List<OccupancyVersion> currents = listCurrentOccupancyByAssignmentKey( next.getAssignmentKey() );
+        OccupancyVersion current = currents.isEmpty() ? null : currents.get( 0 );
+        next.preserveCalendarEventIdFrom( current );
+        // Single matching current: no version. Multiple currents: heal by closing all and rewriting.
+        if ( currents.size() == 1 && false == currents.get( 0 ).differsForVersioning( next ) ) {
             return false;
         }
         Timestamp now = new Timestamp( System.currentTimeMillis() );
-        if ( current != null ) {
-            current.setValidTo( now );
-            em.merge( current );
+        for ( OccupancyVersion cur : currents ) {
+            cur.setValidTo( now );
+            em.merge( cur );
         }
         next.setId( 0 );
         next.setValidFrom( now );
@@ -1754,9 +1763,9 @@ public class WordPressDAOImpl implements WordPressDAO {
         if ( StringUtils.isBlank( assignmentKey ) ) {
             return;
         }
-        OccupancyVersion current = fetchCurrentOccupancyByAssignmentKey( assignmentKey );
-        if ( current != null ) {
-            current.setValidTo( new Timestamp( System.currentTimeMillis() ) );
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        for ( OccupancyVersion current : listCurrentOccupancyByAssignmentKey( assignmentKey ) ) {
+            current.setValidTo( now );
             em.merge( current );
         }
     }
@@ -1767,9 +1776,9 @@ public class WordPressDAOImpl implements WordPressDAO {
         if ( StringUtils.isBlank( calendarEventId ) ) {
             return;
         }
-        OccupancyVersion current = fetchCurrentOccupancyByCalendarEventId( calendarEventId );
-        if ( current != null ) {
-            current.setValidTo( new Timestamp( System.currentTimeMillis() ) );
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        for ( OccupancyVersion current : listCurrentOccupancyByCalendarEventId( calendarEventId ) ) {
+            current.setValidTo( now );
             em.merge( current );
         }
     }
@@ -1793,17 +1802,20 @@ public class WordPressDAOImpl implements WordPressDAO {
                 cur.setValidTo( now );
                 em.merge( cur );
             }
-            else if ( cur.differsForVersioning( desired ) ) {
-                cur.setValidTo( now );
-                em.merge( cur );
-                desired.setId( 0 );
-                desired.setValidFrom( now );
-                desired.setValidTo( null );
-                em.persist( desired );
-                desiredByKey.remove( cur.getAssignmentKey() );
-            }
             else {
-                desiredByKey.remove( cur.getAssignmentKey() );
+                desired.preserveCalendarEventIdFrom( cur );
+                if ( cur.differsForVersioning( desired ) ) {
+                    cur.setValidTo( now );
+                    em.merge( cur );
+                    desired.setId( 0 );
+                    desired.setValidFrom( now );
+                    desired.setValidTo( null );
+                    em.persist( desired );
+                    desiredByKey.remove( cur.getAssignmentKey() );
+                }
+                else {
+                    desiredByKey.remove( cur.getAssignmentKey() );
+                }
             }
         }
         for ( OccupancyVersion remaining : desiredByKey.values() ) {
@@ -1860,31 +1872,37 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     @Transactional( readOnly = true )
     public BookingAssignment fetchCurrentBookingAssignmentByKey( String assignmentKey ) {
-        try {
-            return em.createQuery(
-                    "FROM BookingAssignment a WHERE a.assignmentKey = :key AND a.validTo IS NULL",
-                    BookingAssignment.class )
-                    .setParameter( "key", assignmentKey )
-                    .getSingleResult();
+        List<BookingAssignment> currents = listCurrentBookingAssignmentByKey( assignmentKey );
+        return currents.isEmpty() ? null : currents.get( 0 );
+    }
+
+    private List<BookingAssignment> listCurrentBookingAssignmentByKey( String assignmentKey ) {
+        if ( StringUtils.isBlank( assignmentKey ) ) {
+            return Collections.emptyList();
         }
-        catch ( NoResultException e ) {
-            return null;
-        }
+        return em.createQuery(
+                "FROM BookingAssignment a WHERE a.assignmentKey = :key AND a.validTo IS NULL",
+                BookingAssignment.class )
+                .setParameter( "key", assignmentKey )
+                .getResultList();
     }
 
     @Override
     @Transactional( readOnly = true )
     public BookingAssignment fetchCurrentBookingAssignmentByCalendarEventId( String calendarEventId ) {
-        try {
-            return em.createQuery(
-                    "FROM BookingAssignment a WHERE a.calendarEventId = :eid AND a.validTo IS NULL",
-                    BookingAssignment.class )
-                    .setParameter( "eid", calendarEventId )
-                    .getSingleResult();
+        List<BookingAssignment> currents = listCurrentBookingAssignmentByCalendarEventId( calendarEventId );
+        return currents.isEmpty() ? null : currents.get( 0 );
+    }
+
+    private List<BookingAssignment> listCurrentBookingAssignmentByCalendarEventId( String calendarEventId ) {
+        if ( StringUtils.isBlank( calendarEventId ) ) {
+            return Collections.emptyList();
         }
-        catch ( NoResultException e ) {
-            return null;
-        }
+        return em.createQuery(
+                "FROM BookingAssignment a WHERE a.calendarEventId = :eid AND a.validTo IS NULL",
+                BookingAssignment.class )
+                .setParameter( "eid", calendarEventId )
+                .getResultList();
     }
 
     @Override
@@ -1893,15 +1911,19 @@ public class WordPressDAOImpl implements WordPressDAO {
         if ( next == null || StringUtils.isBlank( next.getAssignmentKey() ) ) {
             return false;
         }
-        BookingAssignment current = fetchCurrentBookingAssignmentByKey( next.getAssignmentKey() );
-        if ( current != null && false == current.differsForVersioning( next ) ) {
+        List<BookingAssignment> currents = listCurrentBookingAssignmentByKey( next.getAssignmentKey() );
+        BookingAssignment current = currents.isEmpty() ? null : currents.get( 0 );
+        next.preserveCalendarEventIdFrom( current );
+        if ( currents.size() == 1 && false == currents.get( 0 ).differsForVersioning( next ) ) {
             return false;
         }
         Timestamp now = new Timestamp( System.currentTimeMillis() );
         if ( current != null ) {
             next.copyEnrichFrom( current );
-            current.setValidTo( now );
-            em.merge( current );
+        }
+        for ( BookingAssignment cur : currents ) {
+            cur.setValidTo( now );
+            em.merge( cur );
         }
         next.setId( 0 );
         next.setValidFrom( now );
@@ -1916,9 +1938,9 @@ public class WordPressDAOImpl implements WordPressDAO {
         if ( StringUtils.isBlank( assignmentKey ) ) {
             return;
         }
-        BookingAssignment current = fetchCurrentBookingAssignmentByKey( assignmentKey );
-        if ( current != null ) {
-            current.setValidTo( new Timestamp( System.currentTimeMillis() ) );
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        for ( BookingAssignment current : listCurrentBookingAssignmentByKey( assignmentKey ) ) {
+            current.setValidTo( now );
             em.merge( current );
         }
     }
@@ -1929,9 +1951,9 @@ public class WordPressDAOImpl implements WordPressDAO {
         if ( StringUtils.isBlank( calendarEventId ) ) {
             return;
         }
-        BookingAssignment current = fetchCurrentBookingAssignmentByCalendarEventId( calendarEventId );
-        if ( current != null ) {
-            current.setValidTo( new Timestamp( System.currentTimeMillis() ) );
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        for ( BookingAssignment current : listCurrentBookingAssignmentByCalendarEventId( calendarEventId ) ) {
+            current.setValidTo( now );
             em.merge( current );
         }
     }
@@ -1955,18 +1977,21 @@ public class WordPressDAOImpl implements WordPressDAO {
                 cur.setValidTo( now );
                 em.merge( cur );
             }
-            else if ( cur.differsForVersioning( desired ) ) {
-                desired.copyEnrichFrom( cur );
-                cur.setValidTo( now );
-                em.merge( cur );
-                desired.setId( 0 );
-                desired.setValidFrom( now );
-                desired.setValidTo( null );
-                em.persist( desired );
-                desiredByKey.remove( cur.getAssignmentKey() );
-            }
             else {
-                desiredByKey.remove( cur.getAssignmentKey() );
+                desired.preserveCalendarEventIdFrom( cur );
+                if ( cur.differsForVersioning( desired ) ) {
+                    desired.copyEnrichFrom( cur );
+                    cur.setValidTo( now );
+                    em.merge( cur );
+                    desired.setId( 0 );
+                    desired.setValidFrom( now );
+                    desired.setValidTo( null );
+                    em.persist( desired );
+                    desiredByKey.remove( cur.getAssignmentKey() );
+                }
+                else {
+                    desiredByKey.remove( cur.getAssignmentKey() );
+                }
             }
         }
         for ( BookingAssignment remaining : desiredByKey.values() ) {

@@ -137,6 +137,53 @@ public class BookingAssignmentMapperTest {
         assertThat( a.differsForVersioning( b ), is( true ) );
     }
 
+    @Test
+    public void preserveCalendarEventIdFromStopsRestNullChurn() {
+        BookingAssignment current = new BookingAssignment();
+        current.setAssignmentKey( "k" );
+        current.setRoomId( "1" );
+        current.setCheckinDate( java.time.LocalDate.of( 2026, 9, 22 ) );
+        current.setCheckoutDate( java.time.LocalDate.of( 2026, 9, 23 ) );
+        current.setSource( BookingAssignment.SOURCE_GUEST );
+        current.setCalendarEventId( "ev-ws" );
+
+        BookingAssignment fromRest = new BookingAssignment();
+        fromRest.setAssignmentKey( "k" );
+        fromRest.setRoomId( "1" );
+        fromRest.setCheckinDate( java.time.LocalDate.of( 2026, 9, 22 ) );
+        fromRest.setCheckoutDate( java.time.LocalDate.of( 2026, 9, 23 ) );
+        fromRest.setSource( BookingAssignment.SOURCE_GUEST );
+        // REST omit calendarEventId
+
+        assertThat( current.differsForVersioning( fromRest ), is( true ) );
+        fromRest.preserveCalendarEventIdFrom( current );
+        assertThat( fromRest.getCalendarEventId(), is( "ev-ws" ) );
+        assertThat( current.differsForVersioning( fromRest ), is( false ) );
+    }
+
+    @Test
+    public void preserveCalendarEventIdFromAllowsRealEventIdChange() {
+        BookingAssignment current = new BookingAssignment();
+        current.setAssignmentKey( "k" );
+        current.setRoomId( "1" );
+        current.setCheckinDate( java.time.LocalDate.of( 2026, 9, 22 ) );
+        current.setCheckoutDate( java.time.LocalDate.of( 2026, 9, 23 ) );
+        current.setSource( BookingAssignment.SOURCE_GUEST );
+        current.setCalendarEventId( "ev-old" );
+
+        BookingAssignment next = new BookingAssignment();
+        next.setAssignmentKey( "k" );
+        next.setRoomId( "1" );
+        next.setCheckinDate( java.time.LocalDate.of( 2026, 9, 22 ) );
+        next.setCheckoutDate( java.time.LocalDate.of( 2026, 9, 23 ) );
+        next.setSource( BookingAssignment.SOURCE_GUEST );
+        next.setCalendarEventId( "ev-new" );
+
+        next.preserveCalendarEventIdFrom( current );
+        assertThat( next.getCalendarEventId(), is( "ev-new" ) );
+        assertThat( current.differsForVersioning( next ), is( true ) );
+    }
+
     private static Map<String, String> baseGuest() {
         Map<String, String> raw = new HashMap<>();
         raw.put( "id", "ev-1" );

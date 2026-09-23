@@ -251,6 +251,19 @@ public class OccupancyVersion {
     }
 
     /**
+     * When REST omit {@code calendarEventId}, keep the WS id from the previous current so
+     * null↔event-id flip-flops do not create spurious SCD2 versions.
+     */
+    public void preserveCalendarEventIdFrom( OccupancyVersion previous ) {
+        if ( previous == null ) {
+            return;
+        }
+        if ( isBlank( calendarEventId ) && false == isBlank( previous.calendarEventId ) ) {
+            calendarEventId = previous.calendarEventId;
+        }
+    }
+
+    /**
      * Returns true when HK-relevant fields differ from {@code other} (triggers a new version).
      */
     public boolean differsForVersioning( OccupancyVersion other ) {
@@ -265,6 +278,10 @@ public class OccupancyVersion {
                 || false == eq( guestName, other.guestName )
                 || false == eq( source, other.source )
                 || false == eq( calendarEventId, other.calendarEventId );
+    }
+
+    private static boolean isBlank( String s ) {
+        return s == null || s.trim().isEmpty();
     }
 
     private static boolean eq( Object a, Object b ) {

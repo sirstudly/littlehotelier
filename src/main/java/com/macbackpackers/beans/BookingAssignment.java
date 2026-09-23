@@ -462,6 +462,19 @@ public class BookingAssignment {
     }
 
     /**
+     * When REST omit {@code calendarEventId}, keep the WS id from the previous current so
+     * null↔event-id flip-flops do not create spurious SCD2 versions.
+     */
+    public void preserveCalendarEventIdFrom( BookingAssignment previous ) {
+        if ( previous == null ) {
+            return;
+        }
+        if ( StringUtilsBlank( calendarEventId ) && false == StringUtilsBlank( previous.calendarEventId ) ) {
+            calendarEventId = previous.calendarEventId;
+        }
+    }
+
+    /**
      * Returns true when WS/report-relevant fields differ from {@code other} (triggers a new version).
      * REST-only enrich columns are intentionally excluded.
      */
