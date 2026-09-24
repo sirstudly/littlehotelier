@@ -8,6 +8,7 @@ import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
+import com.macbackpackers.beans.ChannelStayNight;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.HousekeepingBed;
@@ -2046,6 +2047,47 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "AND a.source = :guest AND a.reservationId IS NOT NULL AND a.reservationId > 0",
                 Long.class )
                 .setParameter( "guest", BookingAssignment.SOURCE_GUEST )
+                .getResultList();
+    }
+
+    @Override
+    @Transactional
+    public void replaceChannelStayNights( LocalDate startDate, LocalDate endDate, String dataOrigin,
+            List<ChannelStayNight> rows ) {
+        em.createQuery(
+                "DELETE FROM ChannelStayNight n WHERE n.stayDate >= :start AND n.stayDate <= :end "
+                        + "AND n.dataOrigin = :origin" )
+                .setParameter( "start", java.sql.Date.valueOf( startDate ) )
+                .setParameter( "end", java.sql.Date.valueOf( endDate ) )
+                .setParameter( "origin", dataOrigin )
+                .executeUpdate();
+        if ( rows == null || rows.isEmpty() ) {
+            return;
+        }
+        int i = 0;
+        for ( ChannelStayNight row : rows ) {
+            em.persist( row );
+            if ( ++i % 50 == 0 ) {
+                em.flush();
+                em.clear();
+            }
+        }
+        em.flush();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    @SuppressWarnings( "unchecked" )
+    public List<Object[]> sumChannelStayNightsBySource( LocalDate startDate, LocalDate endDate ) {
+        return em.createQuery(
+                "SELECT n.bookingSource, SUM(n.roomRevenue), SUM(n.roomsSold) "
+                        + "FROM ChannelStayNight n "
+                        + "WHERE n.stayDate >= :start AND n.stayDate <= :end "
+                        + "AND n.bookingSource IS NOT NULL "
+                        + "GROUP BY n.bookingSource "
+                        + "ORDER BY n.bookingSource" )
+                .setParameter( "start", java.sql.Date.valueOf( startDate ) )
+                .setParameter( "end", java.sql.Date.valueOf( endDate ) )
                 .getResultList();
     }
 
