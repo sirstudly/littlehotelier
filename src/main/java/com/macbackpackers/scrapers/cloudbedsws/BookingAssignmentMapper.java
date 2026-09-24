@@ -28,6 +28,9 @@ public class BookingAssignmentMapper {
     @Autowired
     private CloudbedsScraper scraper;
 
+    /** Resolving this per event costs a DB transaction; ~900 events per snapshot stalls the WS thread. */
+    private volatile String propertyId;
+
     /**
      * Converts a calendar event into a booking assignment, or null if not applicable
      * (unknown type / canceled guest / incomplete dates).
@@ -102,7 +105,7 @@ public class BookingAssignmentMapper {
             a.setNumberGuests( parseGuestCount( event.getAdults(), event.getKids() ) );
             a.setBookedDate( parseBookingDate( event.getBookingDate() ) );
             if ( a.getReservationId() != null && a.getReservationId() > 0 ) {
-                a.setDataHref( "/connect/" + scraper.getPropertyId() + "#/reservations/" + a.getReservationId() );
+                a.setDataHref( "/connect/" + getPropertyId() + "#/reservations/" + a.getReservationId() );
             }
         }
 
@@ -133,6 +136,15 @@ public class BookingAssignmentMapper {
 
         a.setValidFrom( new Timestamp( System.currentTimeMillis() ) );
         return a;
+    }
+
+    private String getPropertyId() {
+        String id = propertyId;
+        if ( id == null ) {
+            id = scraper.getPropertyId();
+            propertyId = id;
+        }
+        return id;
     }
 
     private static BigDecimal parseMoney( String value ) {

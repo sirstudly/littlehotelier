@@ -29,6 +29,9 @@ public class BookingAssignment {
     public static final String SOURCE_GUEST = "guest";
     public static final String SOURCE_CLOSURE = "closure";
 
+    /** Some property DBs have {@code rate_plan_name varchar(255)}; WS {@code detailed_rates} can exceed it. */
+    public static final int RATE_PLAN_NAME_MAX_LENGTH = 255;
+
     @Id
     @GeneratedValue( strategy = GenerationType.IDENTITY )
     @Column( name = "id", nullable = false )
@@ -306,7 +309,9 @@ public class BookingAssignment {
     }
 
     public void setRatePlanName( String ratePlanName ) {
-        this.ratePlanName = ratePlanName;
+        this.ratePlanName = ratePlanName != null && ratePlanName.length() > RATE_PLAN_NAME_MAX_LENGTH
+                ? ratePlanName.substring( 0, RATE_PLAN_NAME_MAX_LENGTH )
+                : ratePlanName;
     }
 
     public Integer getNumberGuests() {

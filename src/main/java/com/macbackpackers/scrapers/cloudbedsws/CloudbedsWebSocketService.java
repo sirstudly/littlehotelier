@@ -8,8 +8,11 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -81,6 +84,14 @@ public class CloudbedsWebSocketService {
     private volatile boolean running;
     private volatile Thread monitorThread;
     private volatile CloudbedsWebSocketClient currentClient;
+
+    /** Single thread so snapshot/update ordering is preserved across listeners. */
+    private final ExecutorService dispatchExecutor = Executors.newSingleThreadExecutor( r -> {
+        Thread t = new Thread( r, "cloudbeds-ws-dispatch" );
+        t.setDaemon( true );
+        return t;
+    } );
+    private final AtomicLong latestSnapshotSeq = new AtomicLong();
 
     /**
      * Starts the WebSocket monitor on a background daemon thread. Safe to call once; subsequent calls
@@ -211,40 +222,58 @@ public class CloudbedsWebSocketService {
 
     /**
      * Returns a listener that forwards each event to every registered {@link CloudbedsEventListener}.
+     * Listeners run on {@link #dispatchExecutor} (in arrival order) rather than the WebSocket read
+     * thread, which must stay free to answer pings or the server drops the connection.
      */
     private CloudbedsEventListener multiplexEventListeners() {
         return new CloudbedsEventListener() {
             @Override
             public void onSnapshot( String propertyId, List<CloudbedsCalendarEvent> events ) {
-                eventRegistry.onSnapshot( propertyId, events );
-                for ( CloudbedsEventListener listener : eventListeners ) {
-                    try {
-                        listener.onSnapshot( propertyId, events );
+                long seq = latestSnapshotSeq.incrementAndGet();
+                dispatchExecutor.execute( () -> {
+                    if ( seq != latestSnapshotSeq.get() ) {
+                        LOGGER.info( "Skipping superseded Cloudbeds WebSocket snapshot #{} (latest #{})",
+                                seq, latestSnapshotSeq.get() );
+                        return;
                     }
-                    catch ( Exception e ) {
-                        LOGGER.error( "Cloudbeds WebSocket snapshot listener failed: {}", listener.getClass().getSimpleName(), e );
-                    }
-                }
+                    dispatchSnapshot( propertyId, events );
+                } );
             }
 
             @Override
             public void onUpdate( String propertyId, CloudbedsCalendarUpdate update ) {
-                eventRegistry.beginUpdate( propertyId, update );
-                try {
-                    for ( CloudbedsEventListener listener : eventListeners ) {
-                        try {
-                            listener.onUpdate( propertyId, update );
-                        }
-                        catch ( Exception e ) {
-                            LOGGER.error( "Cloudbeds WebSocket update listener failed: {}", listener.getClass().getSimpleName(), e );
-                        }
-                    }
-                }
-                finally {
-                    eventRegistry.commitUpdate( propertyId, update );
-                }
+                dispatchExecutor.execute( () -> dispatchUpdate( propertyId, update ) );
             }
         };
+    }
+
+    private void dispatchSnapshot( String propertyId, List<CloudbedsCalendarEvent> events ) {
+        eventRegistry.onSnapshot( propertyId, events );
+        for ( CloudbedsEventListener listener : eventListeners ) {
+            try {
+                listener.onSnapshot( propertyId, events );
+            }
+            catch ( Exception e ) {
+                LOGGER.error( "Cloudbeds WebSocket snapshot listener failed: {}", listener.getClass().getSimpleName(), e );
+            }
+        }
+    }
+
+    private void dispatchUpdate( String propertyId, CloudbedsCalendarUpdate update ) {
+        eventRegistry.beginUpdate( propertyId, update );
+        try {
+            for ( CloudbedsEventListener listener : eventListeners ) {
+                try {
+                    listener.onUpdate( propertyId, update );
+                }
+                catch ( Exception e ) {
+                    LOGGER.error( "Cloudbeds WebSocket update listener failed: {}", listener.getClass().getSimpleName(), e );
+                }
+            }
+        }
+        finally {
+            eventRegistry.commitUpdate( propertyId, update );
+        }
     }
 
     /**

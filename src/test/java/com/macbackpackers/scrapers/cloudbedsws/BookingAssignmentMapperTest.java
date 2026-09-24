@@ -3,10 +3,14 @@ package com.macbackpackers.scrapers.cloudbedsws;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,6 +77,26 @@ public class BookingAssignmentMapperTest {
         assertThat( a.getNotes(), is( "late arrival" ) );
         assertThat( a.getRatePlanName(), is( "Non-refundable" ) );
         assertThat( a.getDataHref(), containsString( "reservations/555" ) );
+    }
+
+    @Test
+    public void resolvesPropertyIdOnceAcrossEvents() {
+        for ( int i = 0 ; i < 5 ; i++ ) {
+            Map<String, String> raw = baseGuest();
+            raw.put( "booking_rooms_id", "br-" + i );
+            assertThat( mapper.toAssignment( new CloudbedsCalendarEvent( raw ), roomsById ).getDataHref(),
+                    is( "/connect/prop1#/reservations/555" ) );
+        }
+        verify( scraper, times( 1 ) ).getPropertyId();
+    }
+
+    @Test
+    public void truncatesLongDetailedRatesToColumnLength() {
+        Map<String, String> raw = baseGuest();
+        raw.put( "booking_rooms_id", "br-long" );
+        raw.put( "detailed_rates", StringUtils.repeat( "x", 2000 ) );
+        BookingAssignment a = mapper.toAssignment( new CloudbedsCalendarEvent( raw ), roomsById );
+        assertThat( a.getRatePlanName().length(), is( BookingAssignment.RATE_PLAN_NAME_MAX_LENGTH ) );
     }
 
     @Test

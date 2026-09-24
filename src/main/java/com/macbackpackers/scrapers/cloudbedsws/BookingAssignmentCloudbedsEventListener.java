@@ -38,9 +38,12 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
     /** calendar event id → assignment_key for delete / room_free resolution. */
     private final Map<String, String> eventIdToAssignmentKey = new ConcurrentHashMap<>();
 
+    /** DB option to switch this listener off at runtime (any value other than "false" leaves it on). */
+    static final String OPTION_ENABLED = "hbo_booking_assignment_ws_enabled";
+
     @Override
     public void onSnapshot( String propertyId, List<CloudbedsCalendarEvent> events ) {
-        if ( false == dao.isCloudbeds() || events == null ) {
+        if ( false == isEnabled() || events == null ) {
             return;
         }
         Map<String, RoomBed> roomsById = indexRoomsById();
@@ -49,10 +52,7 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
         for ( CloudbedsCalendarEvent event : events ) {
             BookingAssignment a = mapper.toAssignment( event, roomsById );
             if ( a == null ) {
-                // Canceled (or incomplete): ensure any previous current is closed
-                if ( StringUtils.isNotBlank( event.getId() ) ) {
-                    dao.closeBookingAssignmentByCalendarEventId( event.getId() );
-                }
+                // canceled / incomplete: reconcile below closes any current not in the desired set
                 continue;
             }
             desired.add( a );
@@ -67,7 +67,7 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
 
     @Override
     public void onUpdate( String propertyId, CloudbedsCalendarUpdate update ) {
-        if ( false == dao.isCloudbeds() || update == null ) {
+        if ( false == isEnabled() || update == null ) {
             return;
         }
         Map<String, RoomBed> roomsById = indexRoomsById();
@@ -156,6 +156,11 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
             LOGGER.info( "BookingAssignment enrich: queued {} jobs ({} pending enrich)",
                     queued, reservationIds.size() );
         }
+    }
+
+    private boolean isEnabled() {
+        return dao.isCloudbeds()
+                && false == "false".equalsIgnoreCase( dao.getOptionNoCache( OPTION_ENABLED ) );
     }
 
     private Map<String, RoomBed> indexRoomsById() {
