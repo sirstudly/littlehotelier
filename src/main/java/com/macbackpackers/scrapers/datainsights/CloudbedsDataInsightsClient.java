@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,8 @@ import org.springframework.stereotype.Component;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.macbackpackers.scrapers.CloudbedsAccessTokenService;
 import com.macbackpackers.scrapers.CloudbedsJsonRequestFactory;
 
 /**
@@ -45,8 +48,16 @@ public class CloudbedsDataInsightsClient {
     private CloudbedsJsonRequestFactory jsonRequestFactory;
 
     @Autowired
+    private CloudbedsAccessTokenService accessTokenService;
+
+    @Autowired
     @Qualifier( "gsonForCloudbedsIdentity" )
     private Gson gson;
+
+    private static final long TOKEN_EXPIRY_MARGIN_SEC = 300;
+
+    private String cachedAccessToken;
+    private long cachedAccessTokenExp;
 
     /**
      * Group columns for stay-night facts rolled up to Channel Production.
@@ -197,17 +208,39 @@ public class CloudbedsDataInsightsClient {
         return c;
     }
 
+    /**
+     * Returns a cached access token, refreshing it (which rotates the one-time {@code rt} cookie)
+     * only when missing or within {@link #TOKEN_EXPIRY_MARGIN_SEC} of expiry.
+     */
+    private synchronized String getAccessToken() throws IOException {
+        long now = System.currentTimeMillis() / 1000;
+        if ( cachedAccessToken == null || cachedAccessTokenExp < now + TOKEN_EXPIRY_MARGIN_SEC ) {
+            CloudbedsAccessTokenService.AccessToken at = accessTokenService.refresh(
+                    jsonRequestFactory.getCookies(), jsonRequestFactory.getUserAgent() );
+            cachedAccessToken = at.getToken();
+            cachedAccessTokenExp = parseJwtExp( cachedAccessToken );
+        }
+        return cachedAccessToken;
+    }
+
+    /** Reads the {@code exp} claim (epoch seconds) from a JWT, or 0 if it cannot be parsed. */
+    static long parseJwtExp( String jwt ) {
+        try {
+            String[] parts = jwt.split( "\\." );
+            String payload = new String( Base64.getUrlDecoder().decode( parts[1] ), StandardCharsets.UTF_8 );
+            return JsonParser.parseString( payload ).getAsJsonObject().get( "exp" ).getAsLong();
+        }
+        catch ( RuntimeException e ) {
+            LOGGER.warn( "Could not parse access token expiry: {}", e.getMessage() );
+            return 0;
+        }
+    }
+
     private JsonObject postJson( WebClient webClient, String url, String propertyId, JsonObject body )
             throws IOException {
-        // Data Insights (api.cloudbeds.com) authenticates with Bearer access token + X-Property-Id.
-        // Chrome HARs omit Authorization/Cookie; CORS preflight requests Authorization explicitly.
-        // Cookie alone → 401. Same JWT as the 'at' session cookie (see CloudbedsWebSocketService refresh).
-        String cookies = jsonRequestFactory.getCookies();
-        String accessToken = extractCookieValue( cookies, "at" );
-        if ( StringUtils.isBlank( accessToken ) ) {
-            throw new IOException(
-                    "Missing Cloudbeds 'at' (access token) cookie required for Data Insights Authorization: Bearer …" );
-        }
+        // Data Insights (api.cloudbeds.com) authenticates with Bearer access token + X-Property-Id;
+        // cookies alone → 401. The token is not a cookie (browser keeps it in localStorage).
+        String accessToken = getAccessToken();
 
         WebRequest req = new WebRequest( new URL( url ), HttpMethod.POST );
         req.setAdditionalHeader( "Accept", "application/json" );
@@ -222,24 +255,15 @@ public class CloudbedsDataInsightsClient {
         Page page = webClient.getPage( req );
         String text = page.getWebResponse().getContentAsString( StandardCharsets.UTF_8 );
         int status = page.getWebResponse().getStatusCode();
+        if ( status == 401 ) {
+            synchronized ( this ) {
+                cachedAccessToken = null;
+            }
+        }
         if ( status < 200 || status >= 300 ) {
             throw new IOException( "Data Insights HTTP " + status + ": " + StringUtils.left( text, 500 ) );
         }
         return gson.fromJson( text, JsonObject.class );
-    }
-
-    /** Extracts the value of the named cookie from a Cookie header string, or null if absent. */
-    static String extractCookieValue( String cookies, String name ) {
-        if ( cookies == null ) {
-            return null;
-        }
-        for ( String pair : cookies.split( ";" ) ) {
-            int eq = pair.indexOf( '=' );
-            if ( eq > 0 && name.equals( pair.substring( 0, eq ).trim() ) ) {
-                return pair.substring( eq + 1 ).trim();
-            }
-        }
-        return null;
     }
 
     /**

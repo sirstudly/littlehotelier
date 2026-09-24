@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -120,12 +121,13 @@ public class DataInsightsStockReportParserTest {
     }
 
     @Test
-    public void extractCookieValueReadsAtToken() {
-        String cookies = "foo=1; at=eyJhbGciOiJSUzI1NiJ9.abc; rt=refresh";
-        assertThat( CloudbedsDataInsightsClient.extractCookieValue( cookies, "at" ),
-                is( "eyJhbGciOiJSUzI1NiJ9.abc" ) );
-        assertThat( CloudbedsDataInsightsClient.extractCookieValue( cookies, "rt" ), is( "refresh" ) );
-        assertThat( CloudbedsDataInsightsClient.extractCookieValue( cookies, "missing" ), nullValue() );
+    public void parseJwtExpReadsExpiryClaim() {
+        String jwt = "eyJhbGciOiJSUzI1NiJ9."
+                + Base64.getUrlEncoder().withoutPadding().encodeToString(
+                        "{\"sub\":\"x\",\"exp\":1790302959}".getBytes( StandardCharsets.UTF_8 ) )
+                + ".sig";
+        assertThat( CloudbedsDataInsightsClient.parseJwtExp( jwt ), is( 1790302959L ) );
+        assertThat( CloudbedsDataInsightsClient.parseJwtExp( "garbage" ), is( 0L ) );
     }
 
     private static JsonObject loadJson( String classpath ) throws Exception {
