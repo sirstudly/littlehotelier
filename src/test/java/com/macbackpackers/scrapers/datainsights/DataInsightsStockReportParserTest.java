@@ -64,8 +64,14 @@ public class DataInsightsStockReportParserTest {
 
     @Test
     public void parsesDayBookingRoomGrainWalkInsMatchingCpr() throws Exception {
+        // Finer than stock report 191 allows (max 3 group_rows); fixture proves parser can flatten it.
         JsonObject root = loadJson( "/datainsights_channel_production_walkin_day_grain_rmb_2026-08.json" );
-        List<String> groups = CloudbedsDataInsightsClient.stayNightGroupColumns();
+        List<String> groups = Arrays.asList(
+                "stay_date",
+                "reservation_source_category",
+                "reservation_source",
+                "booking_id",
+                "room_id" );
         List<ChannelStayNight> rows = parser.parseQueryData(
                 root, groups, ChannelStayNight.ORIGIN_DI_OCCUPANCY );
 
@@ -101,9 +107,25 @@ public class DataInsightsStockReportParserTest {
         assertThat( filters, containsString( "2026-08-01" ) );
         assertThat( filters, containsString( "2026-09-01" ) );
 
-        // no month modifier on stay_date group
+        // stock report 191: max 3 group_rows; no month modifier (day grain)
         assertThat( body.getAsJsonArray( "group_rows" ).toString(), not( containsString( "month" ) ) );
-        assertThat( body.getAsJsonArray( "group_rows" ).size(), is( 5 ) );
+        assertThat( body.getAsJsonArray( "group_rows" ).size(), is( 3 ) );
+
+        // stock report 191 locked columns (not room_rate)
+        String cols = body.getAsJsonArray( "columns" ).toString();
+        assertThat( cols, containsString( "room_revenue" ) );
+        assertThat( cols, containsString( "rooms_sold" ) );
+        assertThat( cols, containsString( "\"adr\"" ) );
+        assertThat( cols, not( containsString( "room_rate" ) ) );
+    }
+
+    @Test
+    public void extractCookieValueReadsAtToken() {
+        String cookies = "foo=1; at=eyJhbGciOiJSUzI1NiJ9.abc; rt=refresh";
+        assertThat( CloudbedsDataInsightsClient.extractCookieValue( cookies, "at" ),
+                is( "eyJhbGciOiJSUzI1NiJ9.abc" ) );
+        assertThat( CloudbedsDataInsightsClient.extractCookieValue( cookies, "rt" ), is( "refresh" ) );
+        assertThat( CloudbedsDataInsightsClient.extractCookieValue( cookies, "missing" ), nullValue() );
     }
 
     private static JsonObject loadJson( String classpath ) throws Exception {

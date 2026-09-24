@@ -48,16 +48,8 @@ public class ChannelStayNightSyncService {
         }
 
         List<String> groups = CloudbedsDataInsightsClient.stayNightGroupColumns();
-        JsonObject response;
-        try {
-            response = dataInsightsClient.queryChannelProduction( webClient, startDate, endDate, groups );
-        }
-        catch ( IOException ex ) {
-            LOGGER.warn( "Stay-night group query failed ({}), falling back to day×source grain",
-                    ex.getMessage() );
-            groups = List.of( "stay_date", "reservation_source_category", "reservation_source" );
-            response = dataInsightsClient.queryChannelProduction( webClient, startDate, endDate, groups );
-        }
+        JsonObject response = dataInsightsClient.queryChannelProduction(
+                webClient, startDate, endDate, groups );
 
         List<String> groupColumns = CloudbedsDataInsightsClient.groupColumnsFromResponse( response );
         if ( groupColumns.isEmpty() ) {

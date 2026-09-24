@@ -49,25 +49,24 @@ public class CloudbedsDataInsightsClient {
     private Gson gson;
 
     /**
-     * Group columns for stay-night raw facts (day × category × source × booking × room).
+     * Group columns for stay-night facts rolled up to Channel Production.
+     * Stock report 191 allows at most 3 {@code group_rows} ("Length must be between 1 and 3").
+     * Day × category × source is the finest CPR-compatible grain.
      */
     public static List<String> stayNightGroupColumns() {
         return Arrays.asList(
                 "stay_date",
                 "reservation_source_category",
-                "reservation_source",
-                "booking_id",
-                "room_id" );
+                "reservation_source" );
     }
 
     /**
      * Group columns matching the default Channel Production UI (month × category × source).
+     * Same three dimensions as {@link #stayNightGroupColumns()}; callers add {@code modifier:month}
+     * on stay_date when needed.
      */
     public static List<String> monthlySourceGroupColumns() {
-        return Arrays.asList(
-                "stay_date",
-                "reservation_source_category",
-                "reservation_source" );
+        return stayNightGroupColumns();
     }
 
     /**
@@ -109,10 +108,12 @@ public class CloudbedsDataInsightsClient {
         filters.add( "and", and );
         body.add( "filters", filters );
 
+        // Must match stock report 191 definition exactly ("Columns are not the same on stock report id 191").
+        // Channel Production: room_revenue(sum), rooms_sold(sum), adr (no metrics — aggregated).
         JsonArray columns = new JsonArray();
         columns.add( metricColumn( "room_revenue", "sum" ) );
         columns.add( metricColumn( "rooms_sold", "sum" ) );
-        columns.add( metricColumn( "room_rate", "sum" ) );
+        columns.add( adrColumn() );
         body.add( "columns", columns );
 
         JsonObject settings = new JsonObject();
@@ -186,19 +187,36 @@ public class CloudbedsDataInsightsClient {
         return c;
     }
 
+    /** ADR on stock report 191 has no {@code metrics} array (server aggregates). */
+    private static JsonObject adrColumn() {
+        JsonObject c = new JsonObject();
+        JsonObject cdf = new JsonObject();
+        cdf.addProperty( "type", "default" );
+        cdf.addProperty( "column", "adr" );
+        c.add( "cdf", cdf );
+        return c;
+    }
+
     private JsonObject postJson( WebClient webClient, String url, String propertyId, JsonObject body )
             throws IOException {
+        // Data Insights (api.cloudbeds.com) authenticates with Bearer access token + X-Property-Id.
+        // Chrome HARs omit Authorization/Cookie; CORS preflight requests Authorization explicitly.
+        // Cookie alone → 401. Same JWT as the 'at' session cookie (see CloudbedsWebSocketService refresh).
+        String cookies = jsonRequestFactory.getCookies();
+        String accessToken = extractCookieValue( cookies, "at" );
+        if ( StringUtils.isBlank( accessToken ) ) {
+            throw new IOException(
+                    "Missing Cloudbeds 'at' (access token) cookie required for Data Insights Authorization: Bearer …" );
+        }
+
         WebRequest req = new WebRequest( new URL( url ), HttpMethod.POST );
         req.setAdditionalHeader( "Accept", "application/json" );
         req.setAdditionalHeader( "Content-Type", "application/json" );
         req.setAdditionalHeader( "Origin", "https://hotels.cloudbeds.com" );
         req.setAdditionalHeader( "Referer", "https://hotels.cloudbeds.com/" );
         req.setAdditionalHeader( "X-Property-Id", propertyId );
+        req.setAdditionalHeader( "Authorization", "Bearer " + accessToken );
         req.setAdditionalHeader( "User-Agent", jsonRequestFactory.getUserAgent() );
-        String cookies = jsonRequestFactory.getCookies();
-        if ( StringUtils.isNotBlank( cookies ) ) {
-            req.setAdditionalHeader( "Cookie", cookies );
-        }
         req.setRequestBody( gson.toJson( body ) );
 
         Page page = webClient.getPage( req );
@@ -208,6 +226,20 @@ public class CloudbedsDataInsightsClient {
             throw new IOException( "Data Insights HTTP " + status + ": " + StringUtils.left( text, 500 ) );
         }
         return gson.fromJson( text, JsonObject.class );
+    }
+
+    /** Extracts the value of the named cookie from a Cookie header string, or null if absent. */
+    static String extractCookieValue( String cookies, String name ) {
+        if ( cookies == null ) {
+            return null;
+        }
+        for ( String pair : cookies.split( ";" ) ) {
+            int eq = pair.indexOf( '=' );
+            if ( eq > 0 && name.equals( pair.substring( 0, eq ).trim() ) ) {
+                return pair.substring( eq + 1 ).trim();
+            }
+        }
+        return null;
     }
 
     /**

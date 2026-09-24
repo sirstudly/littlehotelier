@@ -70,7 +70,8 @@ public class DataInsightsStockReportParser {
     }
 
     private static boolean isMetricsObject( JsonObject node ) {
-        return node.has( "room_revenue" ) || node.has( "rooms_sold" ) || node.has( "room_rate" );
+        return node.has( "room_revenue" ) || node.has( "rooms_sold" )
+                || node.has( "room_rate" ) || node.has( "adr" );
     }
 
     private void emit( PathState path, JsonObject metrics, String dataOrigin, List<ChannelStayNight> out ) {
@@ -81,7 +82,11 @@ public class DataInsightsStockReportParser {
             return;
         }
         BigDecimal revenue = metricAmount( metrics, "room_revenue" );
-        BigDecimal rate = metricAmount( metrics, "room_rate" );
+        // Stock report 191 exposes adr (aggregated), not room_rate; keep room_rate if present.
+        BigDecimal rate = metricAmountOptional( metrics, "room_rate" );
+        if ( rate == null ) {
+            rate = metricAmountOptional( metrics, "adr" );
+        }
         int sold = metricInt( metrics, "rooms_sold" );
         if ( sold <= 0 && revenue.compareTo( BigDecimal.ZERO ) == 0
                 && ( rate == null || rate.compareTo( BigDecimal.ZERO ) == 0 ) ) {
@@ -108,12 +113,24 @@ public class DataInsightsStockReportParser {
     }
 
     static BigDecimal metricAmount( JsonObject metrics, String name ) {
+        BigDecimal v = metricAmountOptional( metrics, name );
+        return v == null ? BigDecimal.ZERO : v;
+    }
+
+    /** {@code sum} or {@code aggregated} (ADR) metric value, or null if absent. */
+    static BigDecimal metricAmountOptional( JsonObject metrics, String name ) {
         if ( !metrics.has( name ) ) {
-            return name.equals( "room_rate" ) ? null : BigDecimal.ZERO;
+            return null;
         }
         JsonElement el = metrics.get( name );
-        if ( el.isJsonObject() && el.getAsJsonObject().has( "sum" ) ) {
-            return parseDecimal( el.getAsJsonObject().get( "sum" ).getAsString() );
+        if ( el.isJsonObject() ) {
+            JsonObject o = el.getAsJsonObject();
+            if ( o.has( "sum" ) ) {
+                return parseDecimal( o.get( "sum" ).getAsString() );
+            }
+            if ( o.has( "aggregated" ) ) {
+                return parseDecimal( o.get( "aggregated" ).getAsString() );
+            }
         }
         if ( el.isJsonPrimitive() ) {
             return parseDecimal( el.getAsString() );
