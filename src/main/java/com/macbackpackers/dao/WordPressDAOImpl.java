@@ -135,6 +135,8 @@ public class WordPressDAOImpl implements WordPressDAO {
      */
     private static final int CHUNK_TX_TIMEOUT_SECONDS = 180;
 
+    private static final int BOOKING_ASSIGNMENT_RECONCILE_CHUNK_SIZE = 100;
+
     /** Timeout for other large bulk writes (occupancy / housekeeping). */
     private static final int BULK_PERSIST_TX_TIMEOUT_SECONDS = 300;
 
@@ -1960,7 +1962,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    @Transactional( timeout = BULK_PERSIST_TX_TIMEOUT_SECONDS )
+    @Transactional( propagation = Propagation.NOT_SUPPORTED )
     public void reconcileBookingAssignmentCurrents( List<BookingAssignment> desiredCurrents ) {
         Map<String, BookingAssignment> desiredByKey = new HashMap<>();
         if ( desiredCurrents != null ) {
@@ -1970,37 +1972,84 @@ public class WordPressDAOImpl implements WordPressDAO {
                 }
             }
         }
-        List<BookingAssignment> existing = fetchCurrentBookingAssignments();
+        List<BookingAssignment> existing = em.createQuery(
+                "FROM BookingAssignment a WHERE a.validTo IS NULL", BookingAssignment.class )
+                .getResultList();
         Timestamp now = new Timestamp( System.currentTimeMillis() );
+
+        // each change is (current row id to close, new row to insert); either side may be absent
+        List<Long> closeIds = new ArrayList<>();
+        List<BookingAssignment> inserts = new ArrayList<>();
         for ( BookingAssignment cur : existing ) {
-            BookingAssignment desired = desiredByKey.get( cur.getAssignmentKey() );
+            BookingAssignment desired = desiredByKey.remove( cur.getAssignmentKey() );
             if ( desired == null ) {
-                cur.setValidTo( now );
-                em.merge( cur );
+                closeIds.add( cur.getId() );
+                inserts.add( null );
+                continue;
             }
-            else {
-                desired.preserveCalendarEventIdFrom( cur );
-                if ( cur.differsForVersioning( desired ) ) {
-                    desired.copyEnrichFrom( cur );
-                    cur.setValidTo( now );
-                    em.merge( cur );
-                    desired.setId( 0 );
-                    desired.setValidFrom( now );
-                    desired.setValidTo( null );
-                    em.persist( desired );
-                    desiredByKey.remove( cur.getAssignmentKey() );
-                }
-                else {
-                    desiredByKey.remove( cur.getAssignmentKey() );
-                }
+            desired.preserveCalendarEventIdFrom( cur );
+            if ( cur.differsForVersioning( desired ) ) {
+                desired.copyEnrichFrom( cur );
+                closeIds.add( cur.getId() );
+                inserts.add( desired );
             }
         }
         for ( BookingAssignment remaining : desiredByKey.values() ) {
-            remaining.setId( 0 );
-            remaining.setValidFrom( now );
-            remaining.setValidTo( null );
-            em.persist( remaining );
+            closeIds.add( null );
+            inserts.add( remaining );
         }
+        if ( inserts.isEmpty() ) {
+            LOGGER.info( "BookingAssignment reconcile: no changes ({} currents)", existing.size() );
+            return;
+        }
+
+        // one short transaction per chunk: a single long one exceeds the tx timeout on slow DB links;
+        // a close and its replacement insert stay in the same chunk so an assignment is never missing
+        TransactionTemplate tt = new TransactionTemplate( transactionManager );
+        tt.setPropagationBehavior( TransactionDefinition.PROPAGATION_REQUIRES_NEW );
+        tt.setTimeout( CHUNK_TX_TIMEOUT_SECONDS );
+        int applied = 0;
+        int failedChunks = 0;
+        long started = System.currentTimeMillis();
+        for ( int from = 0 ; from < inserts.size() ; from += BOOKING_ASSIGNMENT_RECONCILE_CHUNK_SIZE ) {
+            int to = Math.min( from + BOOKING_ASSIGNMENT_RECONCILE_CHUNK_SIZE, inserts.size() );
+            List<Long> chunkCloseIds = new ArrayList<>();
+            List<BookingAssignment> chunkInserts = new ArrayList<>();
+            for ( int i = from ; i < to ; i++ ) {
+                if ( closeIds.get( i ) != null ) {
+                    chunkCloseIds.add( closeIds.get( i ) );
+                }
+                if ( inserts.get( i ) != null ) {
+                    chunkInserts.add( inserts.get( i ) );
+                }
+            }
+            try {
+                tt.executeWithoutResult( status -> {
+                    if ( false == chunkCloseIds.isEmpty() ) {
+                        em.createQuery( "UPDATE BookingAssignment a SET a.validTo = :now "
+                                + "WHERE a.id IN (:ids) AND a.validTo IS NULL" )
+                                .setParameter( "now", now )
+                                .setParameter( "ids", chunkCloseIds )
+                                .executeUpdate();
+                    }
+                    for ( BookingAssignment a : chunkInserts ) {
+                        a.setId( 0 );
+                        a.setValidFrom( now );
+                        a.setValidTo( null );
+                        em.persist( a );
+                    }
+                } );
+                applied += to - from;
+            }
+            catch ( RuntimeException ex ) {
+                failedChunks++;
+                LOGGER.error( "BookingAssignment reconcile chunk {}-{} failed; next snapshot will retry: {}",
+                        from, to, ex.toString() );
+            }
+        }
+        LOGGER.info( "BookingAssignment reconcile: applied {}/{} changes ({} closes, {} inserts) in {} ms; {} failed chunks",
+                applied, inserts.size(), closeIds.stream().filter( id -> id != null ).count(),
+                inserts.stream().filter( a -> a != null ).count(), System.currentTimeMillis() - started, failedChunks );
     }
 
     @Override
