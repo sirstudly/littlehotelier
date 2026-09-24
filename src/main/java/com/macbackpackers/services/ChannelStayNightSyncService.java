@@ -35,6 +35,8 @@ public class ChannelStayNightSyncService {
     @Autowired
     private WordPressDAO dao;
 
+    private final Object writeLock = new Object();
+
     /**
      * Fetches stay-night facts for {@code [startDate, endDate]} and replaces existing
      * {@code di_occupancy} rows in that stay-date window (does not truncate older history).
@@ -63,9 +65,14 @@ public class ChannelStayNightSyncService {
             row.setFetchedAt( fetchedAt );
         }
 
-        LOGGER.info( "Replacing {} di_occupancy channel stay-night row(s) for stay_date [{} .. {}]",
-                rows.size(), startDate, endDate );
-        dao.replaceChannelStayNights( startDate, endDate, ChannelStayNight.ORIGIN_DI_OCCUPANCY, rows );
+        // Concurrent range DELETE + INSERT on this table deadlocks under REPEATABLE READ: next-key/gap
+        // locks from one month's DELETE extend into the adjacent month's key range. Serialize writes
+        // (the Data Insights fetch above still runs in parallel).
+        synchronized ( writeLock ) {
+            LOGGER.info( "Replacing {} di_occupancy channel stay-night row(s) for stay_date [{} .. {}]",
+                    rows.size(), startDate, endDate );
+            dao.replaceChannelStayNights( startDate, endDate, ChannelStayNight.ORIGIN_DI_OCCUPANCY, rows );
+        }
         return rows.size();
     }
 }
