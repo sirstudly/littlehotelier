@@ -8,9 +8,17 @@ import {
   resolveEmailRecipientList,
 } from "./config/emailAliases.js";
 import { assertProperty, loadJobAllowlist, loadProperties } from "./config/properties.js";
+import {
+  DEFUNCT_TABLES,
+  HARD_MAX_ROWS,
+  KEY_TABLES,
+  describeTables,
+  runAdhocSelect,
+} from "./db/adhocSql.js";
 import * as jobsDb from "./db/jobs.js";
 import { searchLogs } from "./db/logs.js";
 import { getJobQueueStats } from "./db/queue.js";
+import { isReadOnlySqlConfigured } from "./db/readOnlyPool.js";
 import * as scheduledDb from "./db/scheduled.js";
 import { audit } from "./lib/audit.js";
 
@@ -550,6 +558,56 @@ export function createServer(): McpServer {
       }
     },
   );
+
+  if (isReadOnlySqlConfigured()) {
+    server.tool(
+      "describe_sql_tables",
+      "List tables in a property's backoffice DB (each tagged key / other / defunct), or pass table to get its columns (name, type, nullable, key, default). Use before run_sql when unsure of table or column names.",
+      {
+        property: propertySchema,
+        table: z.string().min(1).max(64).optional(),
+      },
+      async ({ property, table }) => {
+        try {
+          return ok(await describeTables(property, table));
+        } catch (err) {
+          return fail(err);
+        }
+      },
+    );
+
+    server.tool(
+      "run_sql",
+      `Run one read-only ad-hoc SELECT against a property's backoffice DB (dedicated read-only MySQL user). MySQL 5.5 syntax: no CTEs/WITH, window functions or JSON_*. Any table may be queried (UNIONs, subqueries and cross-database joins like wp_hsh_backoffice.wp_lh_calendar are fine). Key tables: ${KEY_TABLES.join(", ")}. Defunct tables, not for current data: ${DEFUNCT_TABLES.join(", ")}. Rows are capped by max_rows (default 200, max ${HARD_MAX_ROWS}); truncated=true means more rows exist. Queries are cancelled after 15s. SLEEP/BENCHMARK/GET_LOCK/LOAD_FILE, FOR UPDATE, LOCK IN SHARE MODE and SELECT ... INTO are rejected. Call describe_sql_tables first if unsure of tables or columns. Prefer the specific tools (get_job, list_jobs, get_booking, get_occupancy, ...) when they answer the question.`,
+      {
+        property: propertySchema,
+        sql: z.string().min(1).max(10000),
+        max_rows: z.number().int().positive().max(HARD_MAX_ROWS).optional(),
+        requested_by: z.string().optional(),
+      },
+      async ({ property, sql, max_rows, requested_by }) => {
+        try {
+          const result = await runAdhocSelect(property, sql, { maxRows: max_rows });
+          audit("run_sql", {
+            property,
+            sql: result.sql,
+            row_count: result.rowCount,
+            truncated: result.truncated,
+            requested_by: requested_by ?? null,
+          });
+          return ok(result);
+        } catch (err) {
+          audit("run_sql_failed", {
+            property,
+            sql,
+            error: err instanceof Error ? err.message : String(err),
+            requested_by: requested_by ?? null,
+          });
+          return fail(err);
+        }
+      },
+    );
+  }
 
   return server;
 }

@@ -1,10 +1,12 @@
 import { closePools } from "./db/pools.js";
+import { closeReadOnlyPools } from "./db/readOnlyPool.js";
 import { startStdio } from "./server.js";
 
 async function main(): Promise<void> {
   const shutdown = async () => {
     try {
       await closePools();
+      await closeReadOnlyPools();
     } finally {
       process.exit(0);
     }

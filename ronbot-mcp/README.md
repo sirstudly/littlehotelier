@@ -28,6 +28,8 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `insert_job` | Allowlisted enqueue only (`email` / `to_emails` params accept aliases accounts/hannah/jay/ron) |
 | `enqueue_quarterly_evl_6plus_report` | Enqueue EVL nights-6+ room revenue xlsx email job (Edinburgh crh/hsh/rmb or all) |
 | `enqueue_channel_production_report` | Enqueue Channel Production xlsx email job (month vs same month in previous 2 years) |
+| `describe_sql_tables` | List backoffice DB tables (tagged key / other / defunct) or one table's columns. Only when `RONBOT_SQL_RO_*` is set |
+| `run_sql` | One read-only ad-hoc SELECT on any table (row cap, 15s timeout). Only when `RONBOT_SQL_RO_*` is set |
 
 ### `insert_job` allowlist
 
@@ -85,6 +87,29 @@ Each value is either an address string or an object with the user's WhatsApp ide
 - Proxies `GET /ronbot/{property}/occupancy?from=&to=` on read-api (Data Insights classic Occupancy report; one request per calendar year)
 - Returns overall `occupancyPct` (weighted by nights of each month inside the range), `bedsBooked`, `revenue`, and `months[]` with the same fields per month
 
+### `run_sql` / `describe_sql_tables`
+
+Ad-hoc read-only queries against `wp_<prop>_backoffice`, over a separate pool that logs in as a dedicated MySQL user with only `SELECT` and `SHOW VIEW`. The tools are registered only when these are set (repo-root `.env`, loaded by Cursor via `envFile` in `.cursor/mcp.json`):
+
+```bash
+RONBOT_SQL_RO_USER=...
+RONBOT_SQL_RO_PASSWORD=...
+# Optional; default to host/port from each property's db_url_<prop> secret
+# RONBOT_SQL_RO_HOST=...
+# RONBOT_SQL_RO_PORT=3306
+```
+
+- `run_sql`: `property`, `sql`, optional `max_rows` (default 200, max 1000), optional `requested_by`
+  - Exactly one `SELECT` (UNIONs, subqueries, cross-database joins OK); no table restrictions
+  - Rejected: `SLEEP` / `BENCHMARK` / `GET_LOCK` / `LOAD_FILE` (and other lock functions), `FOR UPDATE`, `LOCK IN SHARE MODE`, `SELECT ... INTO`
+  - A `LIMIT` is appended when absent and clamped when larger than `max_rows`; `truncated: true` means more rows exist
+  - Cancelled with `KILL QUERY` after 15s (MySQL 5.5 has no `max_execution_time`)
+  - MySQL 5.5 syntax only: no CTEs/`WITH`, window functions or `JSON_*`
+  - Dates are returned as stored (strings), not converted to UTC
+- `describe_sql_tables`: `property`, optional `table`. Without `table` lists tables; with `table` lists its columns
+- Key tables (hinted to the agent): `wp_lh_calendar`, `wp_lh_booking_assignment`, `wp_lh_jobs`, `wp_lh_job_param`, `job_scheduler`, `job_scheduler_param`, `wp_booking_lookup_key`, `wp_invoice`, `wp_invoice_notes`, `wp_lh_bedcounts`, `wp_lh_group_bookings`, `wp_lh_housekeeping_bed`, `wp_lh_occupancy`, `wp_lh_rpt_guest_comments`, `wp_lh_rpt_mostly_full_dorms`, `wp_lh_rpt_split_rooms`, `wp_lh_rpt_unpaid_deposit`, `wp_stripe_transaction`, `wp_stripe_tx_refund`, `wp_tx_refund`, `wp_hwl_cancel_booking_exempt`, `wp_options`
+- Defunct tables (not for current data): `wp_hw_booking`, `wp_hw_booking_dates`, `wp_pxpost_transaction`, `wp_sagepay_transaction`, `wp_sagepay_tx_auth`, `wp_sagepay_tx_refund`
+
 ## Local development
 
 ```bash
@@ -134,6 +159,8 @@ See [`.cursor/mcp.json`](../.cursor/mcp.json). Point `args` at `ronbot-mcp/dist/
 - WhatsApp: "send me the latest channel report" (from a tagged hsh group, sender listed in `email-aliases.json`) → `enqueue_channel_production_report` with `property=hsh`, previous month, `to_emails=[<Requester alias>]`
 - "Revenue by channel at hsh for July 2026" → `get_channel_production` with `property=hsh`, `month=2026-07`
 - "Occupancy at rmb from 2026-06-01 to 2026-08-31" → `get_occupancy` with `property=rmb`, `from=2026-06-01`, `to=2026-08-31`
+- "How many HousekeepingJob runs failed at hsh this week?" → `run_sql` on `wp_lh_jobs`
+- "Which beds in wp_lh_calendar at crh have checkin 2026-09-25?" → `describe_sql_tables` (`table=wp_lh_calendar`), then `run_sql`
 
 ## Phase 2: Local SDK `Agent.prompt` smoke
 
@@ -215,6 +242,8 @@ MCP `dist` is compiled inside the `ronbot-bridge` image; rebuilding the bridge i
 
 - MCP never calls Cloudbeds directly
 - `insert_job` classname comes only from `config/job-allowlist.json`
+- `run_sql` / `describe_sql_tables` use a dedicated read-only DB user (`SELECT` + `SHOW VIEW` only), never the read/write pool
+- Those tools are not registered unless `RONBOT_SQL_RO_USER` / `RONBOT_SQL_RO_PASSWORD` are set; `ronbot-bridge` does not forward them, so WhatsApp never sees them
 - Booking/transaction responses redact full card numbers
 - Optional shared secret: `X-Ronbot-Token` / `RONBOT_TOKEN`
 - Keep secrets in gitignored `.env` files (repo root and/or `ronbot-mcp/.env`); do not commit them
