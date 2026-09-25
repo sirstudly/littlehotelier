@@ -151,7 +151,7 @@ public class ChannelProductionReportService {
         for ( int i = 0; i < reportsNewestFirst.size(); i++ ) {
             MonthReport report = reportsNewestFirst.get( i );
             MonthReport previous = i + 1 < reportsNewestFirst.size() ? reportsNewestFirst.get( i + 1 ) : null;
-            writeSheet( workbook.createSheet( sheetName( report ) ), report, previous, styles );
+            writeSheet( workbook.createSheet( sheetName( report ) ), report, previous, i == 0, styles );
         }
         workbook.setForceFormulaRecalculation( true );
         return workbook;
@@ -161,7 +161,7 @@ public class ChannelProductionReportService {
         return String.valueOf( report.getMonth().getYear() );
     }
 
-    private static void writeSheet( Sheet sheet, MonthReport report, MonthReport previous, Styles styles ) {
+    private static void writeSheet( Sheet sheet, MonthReport report, MonthReport previous, boolean newest, Styles styles ) {
         List<SourceLine> lines = report.getLines();
         int n = lines.size();
         BigDecimal totalRevenue = lines.stream().map( SourceLine::getRevenue ).reduce( BigDecimal.ZERO, BigDecimal::add );
@@ -176,7 +176,8 @@ public class ChannelProductionReportService {
         int adrTitleRow = roomNightsLastRow + 2;
         int adrFirstRow = adrTitleRow + 2;
 
-        setString( sheet, 1, 0, "Revenue " + report.getMonth().getYear(), null );
+        int year = report.getMonth().getYear();
+        setString( sheet, 1, 0, "Revenue " + year, styles.bold );
         setString( sheet, 2, 0, "Source", null );
         setString( sheet, 2, 1, "Revenue", null );
         setString( sheet, 2, 2, "% of Revenue", null );
@@ -212,7 +213,7 @@ public class ChannelProductionReportService {
             setNumber( sheet, r, 1, line.getAdr() );
         }
 
-        SummaryLayout layout = SummaryLayout.of( report );
+        SummaryLayout layout = SummaryLayout.of( report, newest && previous != null );
         int commissionRow = SummaryLayout.FIRST_COMMISSION_ROW;
         for ( int i = 0; i < n; i++ ) {
             SourceLine line = lines.get( i );
@@ -230,16 +231,24 @@ public class ChannelProductionReportService {
         setFormula( sheet, totalCommissionRow, 5, totalCommissionRow == SummaryLayout.FIRST_COMMISSION_ROW
                 ? "0"
                 : "SUM(F" + SummaryLayout.FIRST_COMMISSION_ROW + ":F" + ( totalCommissionRow - 1 ) + ")", styles.currency );
-        setString( sheet, layout.grossRow, 4, "GROSS REVENUE", null );
+        setString( sheet, layout.grossRow, 4, "GROSS REVENUE " + year, null );
         setFormula( sheet, layout.grossRow, 5, "B" + revenueTotalRow, styles.currency );
-        setString( sheet, layout.netRow, 4, "NET REVENUE (AFTER COMMISSION)", styles.bold );
+        setString( sheet, layout.netRow, 4, "NET REVENUE " + year + " (AFTER COMMISSION)", styles.bold );
         setFormula( sheet, layout.netRow, 5, "F" + layout.grossRow + "-F" + totalCommissionRow, styles.boldCurrency );
         if ( previous != null ) {
             String previousSheet = sheetName( previous );
-            SummaryLayout previousLayout = SummaryLayout.of( previous );
+            SummaryLayout previousLayout = SummaryLayout.of( previous, false );
+            String previousNetRef = "'" + previousSheet + "'!F" + previousLayout.netRow;
+            if ( layout.previousGrossRow > 0 ) {
+                setString( sheet, layout.previousGrossRow, 4, "GROSS REVENUE " + previousSheet, null );
+                setFormula( sheet, layout.previousGrossRow, 5,
+                        "'" + previousSheet + "'!F" + previousLayout.grossRow, styles.currency );
+                setString( sheet, layout.previousNetRow, 4, "NET REVENUE " + previousSheet, null );
+                setFormula( sheet, layout.previousNetRow, 5, previousNetRef, styles.currency );
+                previousNetRef = "F" + layout.previousNetRow;
+            }
             setString( sheet, layout.moreMadeRow, 4, "HOW MUCH MORE WE MADE", styles.bold );
-            setFormula( sheet, layout.moreMadeRow, 5,
-                    "F" + layout.netRow + "-'" + previousSheet + "'!F" + previousLayout.netRow, styles.boldCurrency );
+            setFormula( sheet, layout.moreMadeRow, 5, "F" + layout.netRow + "-" + previousNetRef, styles.boldCurrency );
             setString( sheet, layout.moreCommissionRow, 4, "HOW MUCH MORE COMMISSION WE PAID", null );
             setFormula( sheet, layout.moreCommissionRow, 5,
                     "F" + totalCommissionRow + "-'" + previousSheet + "'!F" + previousLayout.totalCommissionRow, styles.currency );
@@ -348,29 +357,34 @@ public class ChannelProductionReportService {
         final int totalCommissionRow;
         final int grossRow;
         final int netRow;
+        /** Previous year's gross/net revenue rows; only on the newest sheet (else 0). */
+        final int previousGrossRow;
+        final int previousNetRow;
         final int moreMadeRow;
         final int moreCommissionRow;
         final int bedsSoldRow;
         final int occupiedRow;
         final int avgPriceRow;
 
-        private SummaryLayout( int commissionRows ) {
+        private SummaryLayout( int commissionRows, boolean withPreviousRevenue ) {
             int shift = Math.max( 0, commissionRows - MAX_UNSHIFTED_COMMISSION_ROWS );
             totalCommissionRow = FIRST_COMMISSION_ROW + commissionRows;
             grossRow = 9 + shift;
             netRow = 10 + shift;
-            moreMadeRow = 13 + shift;
-            moreCommissionRow = 14 + shift;
+            previousGrossRow = withPreviousRevenue ? 11 + shift : 0;
+            previousNetRow = withPreviousRevenue ? 12 + shift : 0;
+            moreMadeRow = ( withPreviousRevenue ? 14 : 13 ) + shift;
+            moreCommissionRow = moreMadeRow + 1;
             bedsSoldRow = 17 + shift;
             occupiedRow = 18 + shift;
             avgPriceRow = 19 + shift;
         }
 
-        static SummaryLayout of( MonthReport report ) {
+        static SummaryLayout of( MonthReport report, boolean withPreviousRevenue ) {
             int commissionRows = (int) report.getLines().stream()
                     .filter( line -> report.findCommissionRate( line.getSource() ) != null )
                     .count();
-            return new SummaryLayout( commissionRows );
+            return new SummaryLayout( commissionRows, withPreviousRevenue );
         }
     }
 

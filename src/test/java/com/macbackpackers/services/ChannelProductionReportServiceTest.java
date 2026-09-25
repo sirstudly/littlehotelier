@@ -2,6 +2,7 @@ package com.macbackpackers.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
@@ -88,10 +89,19 @@ public class ChannelProductionReportServiceTest {
             assertEquals( "B3/6.67", formula( s2026, "F3" ) );
             assertEquals( "TOTAL COMMISSION", string( s2026, "E4" ) );
             assertEquals( "SUM(F3:F3)", formula( s2026, "F4" ) );
+            assertTrue( wb.getFontAt( cellAt( s2026, "A1" ).getCellStyle().getFontIndex() ).getBold() );
+            assertEquals( "GROSS REVENUE 2026", string( s2026, "E9" ) );
             assertEquals( "B7", formula( s2026, "F9" ) );
+            assertEquals( "NET REVENUE 2026 (AFTER COMMISSION)", string( s2026, "E10" ) );
             assertEquals( "F9-F4", formula( s2026, "F10" ) );
-            assertEquals( "F10-'2025'!F10", formula( s2026, "F13" ) );
-            assertEquals( "F4-'2025'!F4", formula( s2026, "F14" ) );
+            assertEquals( "GROSS REVENUE 2025", string( s2026, "E11" ) );
+            assertEquals( "'2025'!F9", formula( s2026, "F11" ) );
+            assertEquals( "NET REVENUE 2025", string( s2026, "E12" ) );
+            assertEquals( "'2025'!F10", formula( s2026, "F12" ) );
+            assertNull( cellAt( s2026, "E13" ) );
+            assertEquals( "HOW MUCH MORE WE MADE", string( s2026, "E14" ) );
+            assertEquals( "F10-F12", formula( s2026, "F14" ) );
+            assertEquals( "F4-'2025'!F4", formula( s2026, "F15" ) );
             assertEquals( "SUM(B10:B13)", formula( s2026, "F17" ) );
             assertEquals( "% OF BEDS OCCUPIED", string( s2026, "E18" ) );
             assertEquals( 0.8184, number( s2026, "F18" ), 0.00001 );
@@ -99,9 +109,16 @@ public class ChannelProductionReportServiceTest {
             assertNull( cellAt( wb.getSheet( "2025" ), "F18" ) );
             assertEquals( "F10/F17", formula( s2026, "F19" ) );
 
-            assertEquals( "F10-'2024'!F10", formula( wb.getSheet( "2025" ), "F13" ) );
+            Sheet s2025 = wb.getSheet( "2025" );
+            assertTrue( wb.getFontAt( cellAt( s2025, "A1" ).getCellStyle().getFontIndex() ).getBold() );
+            assertEquals( "GROSS REVENUE 2025", string( s2025, "E9" ) );
+            assertEquals( "NET REVENUE 2025 (AFTER COMMISSION)", string( s2025, "E10" ) );
+            assertNull( cellAt( s2025, "F11" ) );
+            assertEquals( "F10-'2024'!F10", formula( s2025, "F13" ) );
+            assertEquals( "F4-'2024'!F4", formula( s2025, "F14" ) );
 
             Sheet s2024 = wb.getSheet( "2024" );
+            assertEquals( "GROSS REVENUE 2024", string( s2024, "E9" ) );
             assertEquals( "SUM(B3:B7)", formula( s2024, "B8" ) );
             assertEquals( "B8", formula( s2024, "F9" ) );
             assertEquals( "SUM(B11:B15)", formula( s2024, "F17" ) );
@@ -138,8 +155,9 @@ public class ChannelProductionReportServiceTest {
             assertEquals( "SUM(F3:F5)", formula( s2026, "F6" ) );
             assertEquals( "B7", formula( s2026, "F9" ) );
             assertEquals( "F9-F6", formula( s2026, "F10" ) );
-            assertEquals( "F10-'2025'!F10", formula( s2026, "F13" ) );
-            assertEquals( "F6-'2025'!F5", formula( s2026, "F14" ) );
+            assertEquals( "'2025'!F10", formula( s2026, "F12" ) );
+            assertEquals( "F10-F12", formula( s2026, "F14" ) );
+            assertEquals( "F6-'2025'!F5", formula( s2026, "F15" ) );
 
             Sheet s2025 = wb.getSheet( "2025" );
             assertEquals( "AIRBNB COMMISSION", string( s2025, "E3" ) );
@@ -170,10 +188,12 @@ public class ChannelProductionReportServiceTest {
         try ( Workbook wb = ChannelProductionReportService.buildWorkbook( Arrays.asList( current, previous ) ) ) {
             Sheet s2026 = wb.getSheet( "2026" );
             assertEquals( "SUM(F3:F8)", formula( s2026, "F9" ) );
-            assertEquals( "GROSS REVENUE", string( s2026, "E10" ) );
+            assertEquals( "GROSS REVENUE 2026", string( s2026, "E10" ) );
             assertEquals( "F10-F9", formula( s2026, "F11" ) );
-            assertEquals( "F11-'2025'!F10", formula( s2026, "F14" ) );
-            assertEquals( "F9-'2025'!F4", formula( s2026, "F15" ) );
+            assertEquals( "'2025'!F9", formula( s2026, "F12" ) );
+            assertEquals( "'2025'!F10", formula( s2026, "F13" ) );
+            assertEquals( "F11-F13", formula( s2026, "F15" ) );
+            assertEquals( "F9-'2025'!F4", formula( s2026, "F16" ) );
             assertEquals( "F11/F18", formula( s2026, "F20" ) );
         }
     }
