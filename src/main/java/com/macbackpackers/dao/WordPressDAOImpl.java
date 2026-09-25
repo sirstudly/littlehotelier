@@ -126,7 +126,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     /** Rows per multi-value INSERT for allocations (keeps each Tailscale round-trip short). */
-    public static final int ALLOCATION_INSERT_BATCH_SIZE = 25;
+    public static final int ALLOCATION_INSERT_BATCH_SIZE = 100;
 
     /** Rows per multi-value UPSERT for guest comments. */
     public static final int GUEST_COMMENT_UPSERT_BATCH_SIZE = 10;
