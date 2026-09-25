@@ -28,6 +28,10 @@ public final class JobPriorities {
         map.put( CreateAllocationScraperReportsJob.class.getName(), 99 );
         map.put( HousekeepingJob.class.getName(), 99 );
         map.put( VoidAndResubmitLegacyEVLFolioJob.class.getName(), 999 );
+
+        // One-off historical backfill; only run when nothing else is queued
+        map.put( CreateBackfillBookingAssignmentJob.class.getName(), 9999 );
+        map.put( BackfillBookingAssignmentJob.class.getName(), 9999 );
         BY_CLASSNAME = Collections.unmodifiableMap( map );
     }
 

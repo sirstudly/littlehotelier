@@ -4,7 +4,10 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -553,6 +556,62 @@ public class BookingAssignment {
                 || false == eq( room, other.room )
                 || false == eq( bedName, other.bedName )
                 || false == eq( roomTypeId, other.roomTypeId );
+    }
+
+    /** Column order for native multi-row inserts; matches {@link #getInsertParameters()}. */
+    public static final String[] INSERT_COLUMNS = { "assignment_key", "calendar_event_id", "booking_rooms_id",
+            "reservation_id", "room_id", "room", "bed_name", "room_type_id", "guest_name", "email",
+            "checkin_date", "checkout_date", "bed_status", "in_house_yn", "source", "payment_total",
+            "payment_outstanding", "visitor_levy_total", "rate_plan_name", "num_guests", "booking_reference",
+            "booking_source", "hotel_collect_yn", "booked_date", "notes", "comments", "data_href", "viewed_yn",
+            "last_rest_fetched_at", "valid_from", "valid_to" };
+
+    /**
+     * Native insert statement for {@code rowCount} rows in {@link #INSERT_COLUMNS} order.
+     */
+    public static String getBulkInsertStatement( int rowCount ) {
+        String placeholders = "(" + String.join( ",", Collections.nCopies( INSERT_COLUMNS.length, "?" ) ) + ")";
+        return "INSERT INTO wp_lh_booking_assignment (" + String.join( ",", INSERT_COLUMNS ) + ") VALUES "
+                + String.join( ",", Collections.nCopies( rowCount, placeholders ) );
+    }
+
+    /**
+     * Values in {@link #INSERT_COLUMNS} order (Y/N columns as {@code 'Y'} / {@code 'N'}).
+     */
+    public Object[] getInsertParameters() {
+        return new Object[] { assignmentKey, calendarEventId, bookingRoomsId, reservationId, roomId, room, bedName,
+                roomTypeId, guestName, email, checkinDate, checkoutDate, bedStatus, inHouseYn, source, paymentTotal,
+                paymentOutstanding, visitorLevyTotal, ratePlanName, numberGuests, bookingReference, bookingSource,
+                toYesNo( hotelCollect ), bookedDate, notes, comments, dataHref, toYesNo( viewed ), lastRestFetchedAt,
+                validFrom, validTo };
+    }
+
+    private static String toYesNo( Boolean b ) {
+        return b == null ? null : b ? "Y" : "N";
+    }
+
+    /**
+     * Splits rows into chunks of roughly {@code targetSize}, never splitting one reservation's rows
+     * across chunks (a chunk may exceed {@code targetSize} for a single large reservation).
+     * Rows for the same reservation are expected to be adjacent.
+     */
+    public static List<List<BookingAssignment>> chunkByReservation( List<BookingAssignment> rows, int targetSize ) {
+        List<List<BookingAssignment>> chunks = new ArrayList<>();
+        List<BookingAssignment> current = new ArrayList<>();
+        Long currentRes = null;
+        for ( BookingAssignment a : rows ) {
+            boolean newReservation = current.isEmpty() || false == eq( currentRes, a.getReservationId() );
+            if ( newReservation && current.size() >= targetSize ) {
+                chunks.add( current );
+                current = new ArrayList<>();
+            }
+            current.add( a );
+            currentRes = a.getReservationId();
+        }
+        if ( false == current.isEmpty() ) {
+            chunks.add( current );
+        }
+        return chunks;
     }
 
     private static boolean StringUtilsBlank( String s ) {

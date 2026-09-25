@@ -2,6 +2,7 @@ package com.macbackpackers.services;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -48,6 +49,8 @@ public class BookingAssignmentEnrichService {
     private static final Logger LOGGER = LoggerFactory.getLogger( BookingAssignmentEnrichService.class );
 
     private static final String STATUS_CANCELED = "canceled";
+
+    private static final String STATUS_NO_SHOW = "no_show";
 
     /** Stays starting within this many days are REST-refreshed every heal (catches room moves). */
     static final String OPTION_HEAL_REFRESH_DAYS = "hbo_booking_assignment_heal_refresh_days";
@@ -116,7 +119,7 @@ public class BookingAssignmentEnrichService {
         }
 
         Map<Long, List<BookingAssignment>> currentsByRes = new HashMap<>();
-        for ( BookingAssignment a : dao.fetchCurrentBookingAssignments() ) {
+        for ( BookingAssignment a : dao.fetchCurrentBookingAssignmentsCheckingOutAfter( startDate.minusDays( 1 ) ) ) {
             if ( a.getReservationId() == null || a.getReservationId() <= 0 || a.isClosure() ) {
                 continue;
             }
@@ -306,10 +309,7 @@ public class BookingAssignmentEnrichService {
         LocalDate today = LocalDate.now();
         List<Allocation> rows = new ArrayList<>();
         List<GuestCommentReportEntry> comments = new ArrayList<>();
-        for ( BookingAssignment a : dao.fetchCurrentBookingAssignments() ) {
-            if ( a.getCheckoutDate() != null && a.getCheckoutDate().toLocalDate().isBefore( today ) ) {
-                continue;
-            }
+        for ( BookingAssignment a : dao.fetchCurrentBookingAssignmentsCheckingOutAfter( today.minusDays( 1 ) ) ) {
             Allocation alloc = toAllocation( jobId, a );
             if ( alloc != null ) {
                 rows.add( alloc );
@@ -340,26 +340,15 @@ public class BookingAssignmentEnrichService {
         catch ( NumberFormatException e ) {
             return;
         }
-        BigDecimal levy = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( r );
-        String comments = r.getSpecialRequests();
-        Boolean viewed = StringUtils.isNotBlank( r.getDocumentNumber() );
-        Map<String, RoomBed> roomsById = getRoomsById();
 
         Set<String> liveKeys = new HashSet<>();
-        for ( BookingRoom br : r.getBookingRooms() ) {
-            BookingAssignment fromRest = reservationRoomToAssignment( r, br, roomsById );
-            if ( fromRest == null ) {
-                continue;
-            }
+        for ( BookingAssignment fromRest : buildAssignments( r ) ) {
             // WS drops canceled tiles; do the same so canceled rows never linger as currents
             if ( STATUS_CANCELED.equalsIgnoreCase( fromRest.getBedStatus() ) ) {
                 dao.closeBookingAssignment( fromRest.getAssignmentKey() );
                 continue;
             }
             liveKeys.add( fromRest.getAssignmentKey() );
-            fromRest.setVisitorLevyTotal( levy );
-            fromRest.setComments( comments );
-            fromRest.setViewed( viewed );
             dao.upsertBookingAssignment( fromRest );
             dao.patchBookingAssignmentFolio( fromRest.getAssignmentKey(), fromRest );
         }
@@ -370,6 +359,76 @@ public class BookingAssignmentEnrichService {
                 dao.closeBookingAssignment( cur.getAssignmentKey() );
             }
         }
+    }
+
+    /**
+     * One assignment per booking room of a REST reservation, including REST-only folio fields
+     * (EVL total, special requests, viewed). Canceled booking rooms are included.
+     */
+    List<BookingAssignment> buildAssignments( Reservation r ) {
+        List<BookingAssignment> rows = new ArrayList<>();
+        if ( r == null || r.getBookingRooms() == null ) {
+            return rows;
+        }
+        BigDecimal levy = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( r );
+        String comments = r.getSpecialRequests();
+        Boolean viewed = StringUtils.isNotBlank( r.getDocumentNumber() );
+        Map<String, RoomBed> roomsById = getRoomsById();
+        for ( BookingRoom br : r.getBookingRooms() ) {
+            BookingAssignment a = reservationRoomToAssignment( r, br, roomsById );
+            if ( a == null ) {
+                continue;
+            }
+            a.setVisitorLevyTotal( levy );
+            a.setComments( comments );
+            a.setViewed( viewed );
+            rows.add( a );
+        }
+        return rows;
+    }
+
+    /**
+     * Historical rows for a past stay: see {@link #applyBackfillRules}.
+     */
+    public List<BookingAssignment> buildBackfillAssignments( Reservation r ) {
+        List<BookingAssignment> rows = buildAssignments( r );
+        applyBackfillRules( r, rows, new Timestamp( System.currentTimeMillis() ) );
+        return rows;
+    }
+
+    /**
+     * Turns REST-built rows into historical SCD2 rows: personal data nulled, {@code valid_from} at the
+     * booking date, closed at check-in when the reservation (or booking room) was canceled or a no-show,
+     * and stamped as REST-fetched so enrich/heal leave them alone.
+     */
+    static void applyBackfillRules( Reservation r, List<BookingAssignment> rows, Timestamp fetchedAt ) {
+        boolean closedReservation = STATUS_CANCELED.equalsIgnoreCase( r.getStatus() )
+                || STATUS_NO_SHOW.equalsIgnoreCase( r.getStatus() );
+        for ( BookingAssignment a : rows ) {
+            a.setGuestName( null );
+            a.setEmail( null );
+            a.setNotes( null );
+            a.setComments( null );
+            a.setLastRestFetchedAt( fetchedAt );
+
+            Timestamp checkin = Timestamp.valueOf( a.getCheckinLocalDate().atStartOfDay() );
+            Timestamp validFrom = a.getBookedDate() == null ? checkin
+                    : Timestamp.valueOf( toLocalDate( a.getBookedDate() ).atStartOfDay() );
+            a.setValidFrom( validFrom );
+            if ( closedReservation || STATUS_CANCELED.equalsIgnoreCase( a.getBedStatus() ) ) {
+                a.setValidTo( checkin.before( validFrom ) ? validFrom : checkin );
+            }
+            else {
+                a.setValidTo( null );
+            }
+        }
+    }
+
+    private static LocalDate toLocalDate( java.util.Date d ) {
+        if ( d instanceof java.sql.Date ) {
+            return ( (java.sql.Date) d ).toLocalDate();
+        }
+        return d.toInstant().atZone( java.time.ZoneId.of( "GMT" ) ).toLocalDate();
     }
 
     private BookingAssignment reservationRoomToAssignment( Reservation r, BookingRoom br,

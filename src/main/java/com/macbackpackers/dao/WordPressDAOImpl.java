@@ -63,10 +63,12 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -1874,6 +1876,80 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Override
     @Transactional( readOnly = true )
+    public List<BookingAssignment> fetchCurrentBookingAssignmentsCheckingOutAfter( LocalDate date ) {
+        return em.createQuery(
+                "FROM BookingAssignment a WHERE a.validTo IS NULL AND a.checkoutDate > :date",
+                BookingAssignment.class )
+                .setParameter( "date", java.sql.Date.valueOf( date ) )
+                .getResultList();
+    }
+
+    private List<BookingAssignment> fetchCurrentBookingAssignmentsForReconcile( LocalDate windowStart,
+            Set<String> desiredKeys ) {
+        if ( desiredKeys.isEmpty() ) {
+            return fetchCurrentBookingAssignmentsCheckingOutAfter( windowStart );
+        }
+        return em.createQuery(
+                "FROM BookingAssignment a WHERE a.validTo IS NULL "
+                        + "AND ( a.checkoutDate > :date OR a.assignmentKey IN (:keys) )",
+                BookingAssignment.class )
+                .setParameter( "date", java.sql.Date.valueOf( windowStart ) )
+                .setParameter( "keys", desiredKeys )
+                .getResultList();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public Set<Long> fetchBookingAssignmentReservationIds() {
+        return new HashSet<>( em.createQuery(
+                "SELECT DISTINCT a.reservationId FROM BookingAssignment a WHERE a.reservationId IS NOT NULL",
+                Long.class ).getResultList() );
+    }
+
+    @Override
+    @Transactional( propagation = Propagation.NOT_SUPPORTED )
+    public int insertBookingAssignments( List<BookingAssignment> rows ) {
+        if ( rows == null || rows.isEmpty() ) {
+            return 0;
+        }
+        TransactionTemplate tt = new TransactionTemplate( transactionManager );
+        tt.setPropagationBehavior( TransactionDefinition.PROPAGATION_REQUIRES_NEW );
+        tt.setTimeout( CHUNK_TX_TIMEOUT_SECONDS );
+        int totalInserted = 0;
+        for ( List<BookingAssignment> chunk : BookingAssignment.chunkByReservation( rows, ALLOCATION_INSERT_BATCH_SIZE ) ) {
+            long started = System.currentTimeMillis();
+            Integer inserted = tt.execute( status -> {
+                // a live writer may have created the reservation since the caller's skip check
+                Set<Long> ids = chunk.stream().map( BookingAssignment::getReservationId )
+                        .filter( id -> id != null ).collect( Collectors.toSet() );
+                Set<Long> existing = ids.isEmpty() ? Collections.emptySet() : new HashSet<>( em.createQuery(
+                        "SELECT DISTINCT a.reservationId FROM BookingAssignment a WHERE a.reservationId IN (:ids)",
+                        Long.class ).setParameter( "ids", ids ).getResultList() );
+                List<BookingAssignment> toInsert = chunk.stream()
+                        .filter( a -> false == existing.contains( a.getReservationId() ) )
+                        .collect( Collectors.toList() );
+                if ( toInsert.isEmpty() ) {
+                    return 0;
+                }
+                Query q = em.createNativeQuery( BookingAssignment.getBulkInsertStatement( toInsert.size() ) );
+                q.setHint( "jakarta.persistence.query.timeout", CHUNK_TX_TIMEOUT_SECONDS * 1000 );
+                for ( int i = 0 ; i < toInsert.size() ; i++ ) {
+                    Object[] params = toInsert.get( i ).getInsertParameters();
+                    for ( int j = 0 ; j < params.length ; j++ ) {
+                        q.setParameter( i * params.length + j + 1, params[j] );
+                    }
+                }
+                return q.executeUpdate();
+            } );
+            totalInserted += inserted == null ? 0 : inserted;
+            LOGGER.info( "Inserted {}/{} booking assignment rows ({} ms for chunk of {}).",
+                    totalInserted, rows.size(), System.currentTimeMillis() - started, chunk.size() );
+        }
+        return totalInserted;
+    }
+
+    @Override
+    @Transactional( readOnly = true )
     public BookingAssignment fetchCurrentBookingAssignmentByKey( String assignmentKey ) {
         List<BookingAssignment> currents = listCurrentBookingAssignmentByKey( assignmentKey );
         return currents.isEmpty() ? null : currents.get( 0 );
@@ -2008,9 +2084,10 @@ public class WordPressDAOImpl implements WordPressDAO {
                 }
             }
         }
-        List<BookingAssignment> existing = em.createQuery(
-                "FROM BookingAssignment a WHERE a.validTo IS NULL", BookingAssignment.class )
-                .getResultList();
+        // currents checking out on/before windowStart are kept anyway unless the snapshot has their key
+        List<BookingAssignment> existing = windowStart == null
+                ? fetchCurrentBookingAssignments()
+                : fetchCurrentBookingAssignmentsForReconcile( windowStart, desiredByKey.keySet() );
         Timestamp now = new Timestamp( System.currentTimeMillis() );
 
         // each change is (current row id to close, new row to insert); either side may be absent

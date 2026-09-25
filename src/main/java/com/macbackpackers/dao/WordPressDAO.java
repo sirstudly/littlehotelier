@@ -7,6 +7,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import jakarta.persistence.NoResultException;
 
@@ -845,6 +846,21 @@ public interface WordPressDAO {
 
     /** Current booking assignment versions ({@code valid_to IS NULL}). */
     List<BookingAssignment> fetchCurrentBookingAssignments();
+
+    /** Current booking assignment versions with {@code checkout_date > date} (skips past stays). */
+    List<BookingAssignment> fetchCurrentBookingAssignmentsCheckingOutAfter( LocalDate date );
+
+    /** Distinct reservation ids present in any version (current or closed). */
+    Set<Long> fetchBookingAssignmentReservationIds();
+
+    /**
+     * Inserts historical rows as-is (keeps {@code valid_from} / {@code valid_to}) using chunked
+     * multi-row inserts, one transaction per chunk. Chunks never split a reservation; rows whose
+     * reservation already exists at insert time are dropped.
+     *
+     * @return number of rows inserted
+     */
+    int insertBookingAssignments( List<BookingAssignment> rows );
 
     /** Current assignment for a single key, or null. */
     BookingAssignment fetchCurrentBookingAssignmentByKey( String assignmentKey );
