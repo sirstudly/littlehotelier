@@ -11,12 +11,13 @@ SELECT :jobId, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
        booking_source, booked_date, NULL, viewed_yn, MAX(valid_from) `created_date` 
   FROM wp_lh_booking_assignment rep
  WHERE rep.valid_to IS NULL
+   AND rep.checkout_date >= CURDATE()
    AND (
        EXISTS (
            SELECT t.reservation_id, t.room_type_id, MAX(t.capacity) AS capacity, SUM(t.num_beds) AS total_beds, COUNT(1) AS num_rooms
              FROM ( -- for each reservation, determine which rooms are they assigned to
                   SELECT c.reservation_id, rm.room, rm.room_type_id, rm.capacity, count(1) AS num_beds
-                    FROM (SELECT DISTINCT reservation_id, room_id FROM wp_lh_booking_assignment WHERE valid_to IS NULL) c
+                    FROM (SELECT DISTINCT reservation_id, room_id FROM wp_lh_booking_assignment WHERE valid_to IS NULL AND checkout_date >= CURDATE()) c
                     JOIN wp_lh_rooms rm ON c.room_id = rm.id 
                    WHERE rm.room_type NOT IN ('LT_MALE', 'LT_FEMALE', 'DBL', 'TRIPLE', 'QUAD', 'TWIN')
                      AND c.reservation_id > 0 -- do not include room closures
@@ -33,6 +34,7 @@ SELECT :jobId, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
              FROM wp_lh_booking_assignment c
             WHERE c.room_id IS NULL -- unallocated reservations don't have this set
               AND c.valid_to IS NULL
+              AND c.checkout_date >= CURDATE()
               AND c.reservation_id = rep.reservation_id
        ) -- end exists
     )
@@ -43,6 +45,7 @@ SELECT :jobId, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
         SELECT :jobId, GROUP_CONCAT( DISTINCT f.guest_name ) `guest_name`, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn, MAX(f.valid_from) `created_date`
           FROM wp_lh_booking_assignment f
          WHERE f.valid_to IS NULL
+           AND f.checkout_date >= CURDATE()
            AND f.payment_total = f.payment_outstanding
            AND (f.hotel_collect_yn = '1' OR f.hotel_collect_yn = 'Y')
            AND f.payment_total &gt; 0
@@ -61,6 +64,7 @@ SELECT :jobId, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
                 SELECT room, bed_name, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn 
                   FROM wp_lh_booking_assignment
                  WHERE valid_to IS NULL
+                   AND checkout_date >= CURDATE()
                    AND reservation_id > 0 -- ignore room closures
                  GROUP BY room, bed_name, reservation_id, guest_name, booking_reference, booking_source, checkin_date, checkout_date, booked_date, payment_outstanding, data_href, num_guests, notes, viewed_yn
                 ) t
@@ -76,6 +80,7 @@ SELECT :jobId, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
                   FROM wp_lh_booking_assignment c
                   JOIN wp_lh_rooms rm ON c.room_id = rm.id
                  WHERE c.valid_to IS NULL
+                   AND c.checkout_date >= CURDATE()
                    AND c.reservation_id > 0 -- ignore room closures
                    AND rm.room_type IN ('MX', 'M', 'F') -- guest dorms only (excludes staff LT_MALE/LT_FEMALE)
                    AND rm.active_yn = 'Y'

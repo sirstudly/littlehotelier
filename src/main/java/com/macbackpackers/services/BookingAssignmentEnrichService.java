@@ -299,12 +299,17 @@ public class BookingAssignmentEnrichService {
     /**
      * Projects current booking assignments into {@code wp_lh_calendar} for the given job id
      * (bridge for blacklist / prepaid queries during migration).
+     * Departed stays are excluded to match the old scraper window (checkout on or after today).
      */
     public void dualWriteCalendar( int jobId ) {
         dao.deleteAllocations( jobId );
+        LocalDate today = LocalDate.now();
         List<Allocation> rows = new ArrayList<>();
         List<GuestCommentReportEntry> comments = new ArrayList<>();
         for ( BookingAssignment a : dao.fetchCurrentBookingAssignments() ) {
+            if ( a.getCheckoutDate() != null && a.getCheckoutDate().toLocalDate().isBefore( today ) ) {
+                continue;
+            }
             Allocation alloc = toAllocation( jobId, a );
             if ( alloc != null ) {
                 rows.add( alloc );
