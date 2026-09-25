@@ -16,6 +16,7 @@ import com.macbackpackers.beans.BlacklistEntry;
 import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
+import com.macbackpackers.beans.BookingSourceLookup;
 import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
@@ -888,4 +889,9 @@ public interface WordPressDAO {
      * Distinct reservation ids among current guest assignments with null {@code last_rest_fetched_at}.
      */
     List<Long> fetchReservationIdsNeedingRestEnrich();
+
+    /**
+     * Booking sources with a commission divisor valid on {@code asOf}.
+     */
+    List<BookingSourceLookup> fetchCommissionRates( LocalDate asOf );
 }

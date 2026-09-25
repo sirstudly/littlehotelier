@@ -51,6 +51,7 @@ import com.macbackpackers.ronbot.dto.StayContinuationDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.services.ChannelProductionReportService;
+import com.macbackpackers.services.ChannelProductionReportService.CommissionRate;
 import com.macbackpackers.services.ChannelProductionReportService.MonthReport;
 import com.macbackpackers.services.ChannelProductionReportService.SourceLine;
 import com.macbackpackers.services.OccupancyReportService;
@@ -387,19 +388,16 @@ public class RonbotReadService {
     static ChannelProductionDto toChannelProductionDto( String property, MonthReport report ) {
         BigDecimal totalRevenue = BigDecimal.ZERO;
         int totalRooms = 0;
-        BigDecimal bdcRevenue = BigDecimal.ZERO;
         for ( SourceLine line : report.getLines() ) {
             totalRevenue = totalRevenue.add( line.getRevenue() );
             totalRooms += line.getRoomsSold();
-            if ( ChannelProductionReportService.BOOKING_COM.equalsIgnoreCase( line.getSource() ) ) {
-                bdcRevenue = bdcRevenue.add( line.getRevenue() );
-            }
         }
 
         ChannelProductionDto dto = new ChannelProductionDto();
         dto.setProperty( property );
         dto.setMonth( report.getMonth().toString() );
         List<ChannelProductionDto.Source> sources = new ArrayList<>();
+        BigDecimal totalCommission = BigDecimal.ZERO;
         for ( SourceLine line : report.getLines() ) {
             ChannelProductionDto.Source s = new ChannelProductionDto.Source();
             s.setSource( line.getSource() );
@@ -409,17 +407,21 @@ public class RonbotReadService {
             s.setRoomsSoldPct( ChannelProductionReportService.percentOf(
                     BigDecimal.valueOf( line.getRoomsSold() ), BigDecimal.valueOf( totalRooms ) ) );
             s.setAdr( line.getAdr() );
+            CommissionRate rate = report.findCommissionRate( line.getSource() );
+            if ( rate != null ) {
+                BigDecimal commission = rate.commissionOn( line.getRevenue() );
+                s.setCommission( commission );
+                totalCommission = totalCommission.add( commission );
+            }
             sources.add( s );
         }
         dto.setSources( sources );
 
-        BigDecimal bdcCommission = bdcRevenue.divide(
-                new BigDecimal( ChannelProductionReportService.BDC_COMMISSION_DIVISOR ), 2, RoundingMode.HALF_UP );
-        BigDecimal netRevenue = totalRevenue.subtract( bdcCommission );
+        BigDecimal netRevenue = totalRevenue.subtract( totalCommission );
         ChannelProductionDto.Totals totals = dto.getTotals();
         totals.setRevenue( totalRevenue );
         totals.setRoomsSold( totalRooms );
-        totals.setBdcCommission( bdcCommission );
+        totals.setCommission( totalCommission );
         totals.setNetRevenue( netRevenue );
         totals.setAvgPricePerBed( totalRooms == 0 ? null
                 : netRevenue.divide( BigDecimal.valueOf( totalRooms ), 2, RoundingMode.HALF_UP ) );

@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.Cell;
@@ -29,6 +30,8 @@ import org.springframework.stereotype.Service;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.macbackpackers.beans.BookingSourceLookup;
+import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.datainsights.CloudbedsDataInsightsClient;
 
 /**
@@ -40,10 +43,6 @@ public class ChannelProductionReportService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( ChannelProductionReportService.class );
 
-    public static final String BOOKING_COM = "Booking.com";
-
-    public static final String BDC_COMMISSION_DIVISOR = "6.67";
-
     private static final String GBP_ACCOUNTING_FORMAT =
             "_-[$£-809]* #,##0.00_-;\\-[$£-809]* #,##0.00_-;_-[$£-809]* \"-\"??_-;_-@_-";
 
@@ -54,10 +53,14 @@ public class ChannelProductionReportService {
     private OccupancyReportService occupancyReportService;
 
     @Autowired
+    private WordPressDAO dao;
+
+    @Autowired
     private Environment environment;
 
     /**
-     * Fetches Channel Production totals by source, plus occupancy, for the given stay-date month.
+     * Fetches Channel Production totals by source, plus occupancy and the commission rates
+     * valid at the start of the given stay-date month.
      */
     public MonthReport fetchMonth( WebClient webClient, YearMonth month ) throws IOException {
         JsonObject response = dataInsightsClient.queryChannelProductionByMonth( webClient, month );
@@ -65,8 +68,12 @@ public class ChannelProductionReportService {
         BigDecimal occupancyPct = occupancyReportService
                 .fetchOccupancy( webClient, month.atDay( 1 ), month.atEndOfMonth() )
                 .getOccupancyPct();
-        LOGGER.info( "Channel Production {}: {} source(s), occupancy {}%", month, parsed.getLines().size(), occupancyPct );
-        return new MonthReport( month, parsed.getLines(), occupancyPct );
+        List<CommissionRate> rates = dao.fetchCommissionRates( month.atDay( 1 ) ).stream()
+                .map( CommissionRate::from )
+                .collect( Collectors.toList() );
+        LOGGER.info( "Channel Production {}: {} source(s), occupancy {}%, {} commission rate(s)",
+                month, parsed.getLines().size(), occupancyPct, rates.size() );
+        return new MonthReport( month, parsed.getLines(), occupancyPct, rates );
     }
 
     /**
@@ -143,10 +150,8 @@ public class ChannelProductionReportService {
         Styles styles = new Styles( workbook );
         for ( int i = 0; i < reportsNewestFirst.size(); i++ ) {
             MonthReport report = reportsNewestFirst.get( i );
-            String previousSheet = i + 1 < reportsNewestFirst.size()
-                    ? sheetName( reportsNewestFirst.get( i + 1 ) )
-                    : null;
-            writeSheet( workbook.createSheet( sheetName( report ) ), report, previousSheet, styles );
+            MonthReport previous = i + 1 < reportsNewestFirst.size() ? reportsNewestFirst.get( i + 1 ) : null;
+            writeSheet( workbook.createSheet( sheetName( report ) ), report, previous, styles );
         }
         workbook.setForceFormulaRecalculation( true );
         return workbook;
@@ -156,7 +161,7 @@ public class ChannelProductionReportService {
         return String.valueOf( report.getMonth().getYear() );
     }
 
-    private static void writeSheet( Sheet sheet, MonthReport report, String previousSheet, Styles styles ) {
+    private static void writeSheet( Sheet sheet, MonthReport report, MonthReport previous, Styles styles ) {
         List<SourceLine> lines = report.getLines();
         int n = lines.size();
         BigDecimal totalRevenue = lines.stream().map( SourceLine::getRevenue ).reduce( BigDecimal.ZERO, BigDecimal::add );
@@ -175,16 +180,12 @@ public class ChannelProductionReportService {
         setString( sheet, 2, 0, "Source", null );
         setString( sheet, 2, 1, "Revenue", null );
         setString( sheet, 2, 2, "% of Revenue", null );
-        Integer bookingComRow = null;
         for ( int i = 0; i < n; i++ ) {
             SourceLine line = lines.get( i );
             int r = revenueFirstRow + i;
             setString( sheet, r, 0, line.getSource(), null );
             setNumber( sheet, r, 1, line.getRevenue() );
             setNumber( sheet, r, 2, percentOf( line.getRevenue(), totalRevenue ) );
-            if ( BOOKING_COM.equalsIgnoreCase( line.getSource() ) ) {
-                bookingComRow = r;
-            }
         }
         setString( sheet, revenueTotalRow, 0, "TOTAL", null );
         setFormula( sheet, revenueTotalRow, 1, n == 0 ? "0" : "SUM(B" + revenueFirstRow + ":B" + ( revenueTotalRow - 1 ) + ")", null );
@@ -211,30 +212,48 @@ public class ChannelProductionReportService {
             setNumber( sheet, r, 1, line.getAdr() );
         }
 
-        setString( sheet, 3, 4, "BDC COMMISSION", null );
-        setFormula( sheet, 3, 5, bookingComRow == null ? "0" : "B" + bookingComRow + "/" + BDC_COMMISSION_DIVISOR, styles.currency );
-        setString( sheet, 4, 4, "TOTAL COMMISSION", null );
-        setFormula( sheet, 4, 5, "SUM(F1:F3)", styles.currency );
-        setString( sheet, 9, 4, "GROSS REVENUE", null );
-        setFormula( sheet, 9, 5, "B" + revenueTotalRow, styles.currency );
-        setString( sheet, 10, 4, "NET REVENUE (AFTER COMMISSION)", styles.bold );
-        setFormula( sheet, 10, 5, "F9-F4", styles.boldCurrency );
-        if ( previousSheet != null ) {
-            setString( sheet, 13, 4, "HOW MUCH MORE WE MADE", styles.bold );
-            setFormula( sheet, 13, 5, "F10-'" + previousSheet + "'!F10", styles.boldCurrency );
-            setString( sheet, 14, 4, "HOW MUCH MORE COMMISSION WE PAID", null );
-            setFormula( sheet, 14, 5, "F4-'" + previousSheet + "'!F4", styles.currency );
+        SummaryLayout layout = SummaryLayout.of( report );
+        int commissionRow = SummaryLayout.FIRST_COMMISSION_ROW;
+        for ( int i = 0; i < n; i++ ) {
+            SourceLine line = lines.get( i );
+            CommissionRate rate = report.findCommissionRate( line.getSource() );
+            if ( rate != null ) {
+                setString( sheet, commissionRow, 4, rate.getLabel() + " COMMISSION", null );
+                setFormula( sheet, commissionRow, 5,
+                        "B" + ( revenueFirstRow + i ) + "/" + rate.getDivisor().stripTrailingZeros().toPlainString(),
+                        styles.currency );
+                commissionRow++;
+            }
         }
-        setString( sheet, 17, 4, "BEDS SOLD", null );
-        setFormula( sheet, 17, 5, n == 0 ? "0" : "SUM(B" + roomNightsFirstRow + ":B" + roomNightsLastRow + ")", null );
-        setString( sheet, 18, 4, "% OF BEDS OCCUPIED", styles.bold );
+        int totalCommissionRow = layout.totalCommissionRow;
+        setString( sheet, totalCommissionRow, 4, "TOTAL COMMISSION", null );
+        setFormula( sheet, totalCommissionRow, 5, totalCommissionRow == SummaryLayout.FIRST_COMMISSION_ROW
+                ? "0"
+                : "SUM(F" + SummaryLayout.FIRST_COMMISSION_ROW + ":F" + ( totalCommissionRow - 1 ) + ")", styles.currency );
+        setString( sheet, layout.grossRow, 4, "GROSS REVENUE", null );
+        setFormula( sheet, layout.grossRow, 5, "B" + revenueTotalRow, styles.currency );
+        setString( sheet, layout.netRow, 4, "NET REVENUE (AFTER COMMISSION)", styles.bold );
+        setFormula( sheet, layout.netRow, 5, "F" + layout.grossRow + "-F" + totalCommissionRow, styles.boldCurrency );
+        if ( previous != null ) {
+            String previousSheet = sheetName( previous );
+            SummaryLayout previousLayout = SummaryLayout.of( previous );
+            setString( sheet, layout.moreMadeRow, 4, "HOW MUCH MORE WE MADE", styles.bold );
+            setFormula( sheet, layout.moreMadeRow, 5,
+                    "F" + layout.netRow + "-'" + previousSheet + "'!F" + previousLayout.netRow, styles.boldCurrency );
+            setString( sheet, layout.moreCommissionRow, 4, "HOW MUCH MORE COMMISSION WE PAID", null );
+            setFormula( sheet, layout.moreCommissionRow, 5,
+                    "F" + totalCommissionRow + "-'" + previousSheet + "'!F" + previousLayout.totalCommissionRow, styles.currency );
+        }
+        setString( sheet, layout.bedsSoldRow, 4, "BEDS SOLD", null );
+        setFormula( sheet, layout.bedsSoldRow, 5, n == 0 ? "0" : "SUM(B" + roomNightsFirstRow + ":B" + roomNightsLastRow + ")", null );
+        setString( sheet, layout.occupiedRow, 4, "% OF BEDS OCCUPIED", styles.bold );
         if ( report.getOccupancyPct() != null ) {
-            Cell occupied = cell( sheet, 18, 5 );
+            Cell occupied = cell( sheet, layout.occupiedRow, 5 );
             occupied.setCellValue( report.getOccupancyPct().movePointLeft( 2 ).doubleValue() );
             occupied.setCellStyle( styles.percent );
         }
-        setString( sheet, 19, 4, "AVG PRICE PER BED", null );
-        setFormula( sheet, 19, 5, "F10/F17", styles.currency );
+        setString( sheet, layout.avgPriceRow, 4, "AVG PRICE PER BED", null );
+        setFormula( sheet, layout.avgPriceRow, 5, "F" + layout.netRow + "/F" + layout.bedsSoldRow, styles.currency );
 
         sheet.setColumnWidth( 4, (int) ( 36.5 * 256 ) );
         sheet.setColumnWidth( 5, (int) ( 11.5 * 256 ) );
@@ -320,19 +339,75 @@ public class ChannelProductionReportService {
         }
     }
 
+    /** 1-based rows of the E:F summary block; rows below the commission block shift down only if it overflows. */
+    static final class SummaryLayout {
+        static final int FIRST_COMMISSION_ROW = 3;
+        /** Commission rows that fit above the fixed gross-revenue row. */
+        private static final int MAX_UNSHIFTED_COMMISSION_ROWS = 5;
+
+        final int totalCommissionRow;
+        final int grossRow;
+        final int netRow;
+        final int moreMadeRow;
+        final int moreCommissionRow;
+        final int bedsSoldRow;
+        final int occupiedRow;
+        final int avgPriceRow;
+
+        private SummaryLayout( int commissionRows ) {
+            int shift = Math.max( 0, commissionRows - MAX_UNSHIFTED_COMMISSION_ROWS );
+            totalCommissionRow = FIRST_COMMISSION_ROW + commissionRows;
+            grossRow = 9 + shift;
+            netRow = 10 + shift;
+            moreMadeRow = 13 + shift;
+            moreCommissionRow = 14 + shift;
+            bedsSoldRow = 17 + shift;
+            occupiedRow = 18 + shift;
+            avgPriceRow = 19 + shift;
+        }
+
+        static SummaryLayout of( MonthReport report ) {
+            int commissionRows = (int) report.getLines().stream()
+                    .filter( line -> report.findCommissionRate( line.getSource() ) != null )
+                    .count();
+            return new SummaryLayout( commissionRows );
+        }
+    }
+
     public static final class MonthReport {
         private final YearMonth month;
         private final List<SourceLine> lines;
         private final BigDecimal occupancyPct;
+        private final List<CommissionRate> commissionRates;
 
         public MonthReport( YearMonth month, List<SourceLine> lines ) {
             this( month, lines, null );
         }
 
         public MonthReport( YearMonth month, List<SourceLine> lines, BigDecimal occupancyPct ) {
+            this( month, lines, occupancyPct, Collections.emptyList() );
+        }
+
+        public MonthReport( YearMonth month, List<SourceLine> lines, BigDecimal occupancyPct,
+                List<CommissionRate> commissionRates ) {
             this.month = month;
             this.lines = Collections.unmodifiableList( new ArrayList<>( lines ) );
             this.occupancyPct = occupancyPct;
+            this.commissionRates = Collections.unmodifiableList( new ArrayList<>( commissionRates ) );
+        }
+
+        public List<CommissionRate> getCommissionRates() {
+            return commissionRates;
+        }
+
+        /** Commission rate for the source (case-insensitive), or null if none applies. */
+        public CommissionRate findCommissionRate( String source ) {
+            for ( CommissionRate rate : commissionRates ) {
+                if ( rate.getSource().equalsIgnoreCase( source ) ) {
+                    return rate;
+                }
+            }
+            return null;
         }
 
         public YearMonth getMonth() {
@@ -376,6 +451,40 @@ public class ChannelProductionReportService {
 
         public BigDecimal getAdr() {
             return adr;
+        }
+    }
+
+    /** Commission = revenue / divisor for the given booking source. */
+    public static final class CommissionRate {
+        private final String source;
+        private final String label;
+        private final BigDecimal divisor;
+
+        public CommissionRate( String source, String label, BigDecimal divisor ) {
+            this.source = source;
+            this.label = label;
+            this.divisor = divisor;
+        }
+
+        static CommissionRate from( BookingSourceLookup lookup ) {
+            return new CommissionRate( lookup.getSource(), lookup.getReportLabel(), lookup.getCommissionDivisor() );
+        }
+
+        /** Commission on {@code revenue}, rounded to 2 dp. */
+        public BigDecimal commissionOn( BigDecimal revenue ) {
+            return revenue.divide( divisor, 2, RoundingMode.HALF_UP );
+        }
+
+        public String getSource() {
+            return source;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public BigDecimal getDivisor() {
+            return divisor;
         }
     }
 }

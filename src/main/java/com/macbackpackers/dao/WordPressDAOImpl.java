@@ -5,6 +5,7 @@ import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BlacklistEntry;
 import com.macbackpackers.beans.BookingAssignment;
+import com.macbackpackers.beans.BookingSourceLookup;
 import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
@@ -2095,6 +2096,17 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "AND a.source = :guest AND a.reservationId IS NOT NULL AND a.reservationId > 0",
                 Long.class )
                 .setParameter( "guest", BookingAssignment.SOURCE_GUEST )
+                .getResultList();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public List<BookingSourceLookup> fetchCommissionRates( LocalDate asOf ) {
+        return em.createQuery(
+                "FROM BookingSourceLookup b WHERE b.validFrom <= :asOf "
+                        + "AND (b.validTo IS NULL OR b.validTo >= :asOf) ORDER BY b.source",
+                BookingSourceLookup.class )
+                .setParameter( "asOf", asOf )
                 .getResultList();
     }
 

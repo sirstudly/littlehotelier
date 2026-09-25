@@ -66,7 +66,7 @@ Shorthand for job `email` parameters (config/`email-aliases.json`):
 
 - Required: `month` (YYYY-MM); optional `property` / `properties` (omit both for all hostels)
 - Proxies `GET /ronbot/{property}/channel-production?month=YYYY-MM` on read-api
-- Returns per-source revenue, room nights, ADR and % shares, plus totals: `revenue`, `roomsSold`, `bdcCommission` (Booking.com revenue / 6.67), `netRevenue`, `avgPricePerBed`, `occupancyPct`
+- Returns per-source revenue, room nights, ADR, % shares and `commission` (revenue / divisor from `wp_lh_booking_source_lookup`, e.g. Booking.com, Agoda, Airbnb; null when none applies), plus totals: `revenue`, `roomsSold`, `commission` (sum of per-source commission), `netRevenue`, `avgPricePerBed`, `occupancyPct`
 
 ### `get_occupancy`
 

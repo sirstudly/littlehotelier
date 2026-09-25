@@ -291,7 +291,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_channel_production",
-    "Live Channel Production numbers (Cloudbeds Data Insights) for one stay-date month via ronbot-read-api: revenue, room nights and ADR by source (Booking.com, Hostelworld, Website, Walk-In, ...) with % shares, plus totals (revenue, roomsSold, bdcCommission = Booking.com revenue / 6.67, netRevenue, avgPricePerBed, occupancyPct = % of beds occupied for the month). month is YYYY-MM. Pass properties for one or more hostels, or omit both properties and property to query all (crh/hsh/rmb/lsh) in one call. For year-on-year comparisons call once per month needed. To email the spreadsheet instead, use enqueue_channel_production_report.",
+    "Live Channel Production numbers (Cloudbeds Data Insights) for one stay-date month via ronbot-read-api: revenue, room nights and ADR by source (Booking.com, Hostelworld, Website, Walk-In, ...) with % shares and per-source commission where applicable, plus totals (revenue, roomsSold, commission = sum of per-source commission per the booking-source lookup (Booking.com, Agoda, Airbnb), netRevenue, avgPricePerBed, occupancyPct = % of beds occupied for the month). month is YYYY-MM. Pass properties for one or more hostels, or omit both properties and property to query all (crh/hsh/rmb/lsh) in one call. For year-on-year comparisons call once per month needed. To email the spreadsheet instead, use enqueue_channel_production_report.",
     {
       month: yearMonth,
       properties: z.array(propertySchema).min(1).max(4).optional(),
@@ -494,7 +494,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "enqueue_channel_production_report",
-    "Enqueue RunChannelProductionReportJob: builds the Channel Production xlsx (revenue / room nights / ADR by source for year_month, compared with the same month in the previous 2 years, plus BDC commission and net revenue) and emails it. Pass property (or properties), or property=all for every hostel. Ask the user if property or month is missing — do not assume. to_emails entries may be full addresses or shorthand accounts|hannah|jay|ron. Synonyms: channel report, channel production report, revenue by source/channel, monthly channel report. For numbers in chat instead of an email, use get_channel_production.",
+    "Enqueue RunChannelProductionReportJob: builds the Channel Production xlsx (revenue / room nights / ADR by source for year_month, compared with the same month in the previous 2 years, plus commission per the booking-source lookup (Booking.com, Agoda, Airbnb) and net revenue) and emails it. Pass property (or properties), or property=all for every hostel. Ask the user if property or month is missing — do not assume. to_emails entries may be full addresses or shorthand accounts|hannah|jay|ron. Synonyms: channel report, channel production report, revenue by source/channel, monthly channel report. For numbers in chat instead of an email, use get_channel_production.",
     {
       year_month: yearMonth,
       to_emails: z.array(z.string().min(1)).min(1),

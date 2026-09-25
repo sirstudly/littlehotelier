@@ -56,6 +56,16 @@ public class ChannelProductionDto {
         /** Share of total rooms sold, 0–100. */
         private BigDecimal roomsSoldPct;
         private BigDecimal adr;
+        /** Revenue / the source's commission divisor; null when no commission applies. */
+        private BigDecimal commission;
+
+        public BigDecimal getCommission() {
+            return commission;
+        }
+
+        public void setCommission( BigDecimal commission ) {
+            this.commission = commission;
+        }
 
         public String getSource() {
             return source;
@@ -109,9 +119,9 @@ public class ChannelProductionDto {
     public static class Totals {
         private BigDecimal revenue = BigDecimal.ZERO;
         private int roomsSold;
-        /** Booking.com revenue / 6.67. */
-        private BigDecimal bdcCommission = BigDecimal.ZERO;
-        /** Revenue less BDC commission. */
+        /** Sum of per-source commission (wp_lh_booking_source_lookup divisors). */
+        private BigDecimal commission = BigDecimal.ZERO;
+        /** Revenue less commission. */
         private BigDecimal netRevenue = BigDecimal.ZERO;
         /** Net revenue / rooms sold; null when nothing was sold. */
         private BigDecimal avgPricePerBed;
@@ -142,12 +152,12 @@ public class ChannelProductionDto {
             this.roomsSold = roomsSold;
         }
 
-        public BigDecimal getBdcCommission() {
-            return bdcCommission;
+        public BigDecimal getCommission() {
+            return commission;
         }
 
-        public void setBdcCommission( BigDecimal bdcCommission ) {
-            this.bdcCommission = bdcCommission;
+        public void setCommission( BigDecimal commission ) {
+            this.commission = commission;
         }
 
         public BigDecimal getNetRevenue() {

@@ -681,3 +681,23 @@ CREATE TABLE `wp_lh_booking_assignment` (
 
 -- Production migration: src/main/config/migrations/2026-09-22-booking-assignment-scd2.sql
 
+-- Per-booking-source settings (commission = revenue / commission_divisor) for the Channel Production report.
+-- source matches the Cloudbeds reservation_source name (case-insensitive); valid_to is inclusive, null = open-ended.
+CREATE TABLE `wp_lh_booking_source_lookup` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `source` varchar(100) NOT NULL,
+  `commission_label` varchar(50) DEFAULT NULL,
+  `commission_divisor` decimal(10,4) NOT NULL,
+  `valid_from` date NOT NULL,
+  `valid_to` date DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `lh_bsl_source_from` (`source`, `valid_from`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+INSERT INTO `wp_lh_booking_source_lookup` (`source`, `commission_label`, `commission_divisor`, `valid_from`, `valid_to`) VALUES
+  ('Booking.com', 'BDC', 6.67, '2020-01-01', NULL),
+  ('Agoda / Priceline', 'AGODA', 6.67, '2020-01-01', NULL),
+  ('Airbnb (API)', 'AIRBNB', 6.06, '2020-01-01', NULL);
+
+-- Production migration: src/main/config/migrations/2026-09-25-booking-source-lookup.sql
+
