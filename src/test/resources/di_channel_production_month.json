@@ -1,0 +1,120 @@
+{
+  "headers": [
+    [
+      "room_revenue",
+      "sum"
+    ],
+    [
+      "rooms_sold",
+      "sum"
+    ],
+    [
+      "adr",
+      "aggregated"
+    ]
+  ],
+  "index": [
+    [
+      "2024-09",
+      "Direct",
+      "Walk-In"
+    ],
+    [
+      "2024-09",
+      "Direct",
+      "Website"
+    ],
+    [
+      "2024-09",
+      "OTA",
+      "Booking.com"
+    ],
+    [
+      "2024-09",
+      "OTA",
+      "Hostelworld"
+    ],
+    [
+      "2024-09",
+      "-",
+      "-"
+    ]
+  ],
+  "group_rows": [
+    "stay_date",
+    "reservation_source_category",
+    "reservation_source"
+  ],
+  "group_columns": [],
+  "periods": null,
+  "records": {
+    "2024-09": {
+      "Direct": {
+        "Walk-In": {
+          "room_revenue": {
+            "sum": "41.66"
+          },
+          "rooms_sold": {
+            "sum": "2"
+          },
+          "adr": {
+            "aggregated": "20.83"
+          }
+        },
+        "Website": {
+          "room_revenue": {
+            "sum": "3,607.37"
+          },
+          "rooms_sold": {
+            "sum": "163"
+          },
+          "adr": {
+            "aggregated": "22.13"
+          }
+        }
+      },
+      "OTA": {
+        "Booking.com": {
+          "room_revenue": {
+            "sum": "19,405.83"
+          },
+          "rooms_sold": {
+            "sum": "835"
+          },
+          "adr": {
+            "aggregated": "23.24"
+          }
+        },
+        "Hostelworld": {
+          "room_revenue": {
+            "sum": "2,604.22"
+          },
+          "rooms_sold": {
+            "sum": "111"
+          },
+          "adr": {
+            "aggregated": "23.46"
+          }
+        }
+      },
+      "-": {
+        "-": {
+          "room_revenue": {
+            "sum": "0.00"
+          },
+          "rooms_sold": {
+            "sum": "0"
+          },
+          "adr": {
+            "aggregated": "-"
+          }
+        }
+      }
+    }
+  },
+  "subtotals": {},
+  "totals": {},
+  "type": "Summary",
+  "comparisons": null,
+  "aggregated_count": 2741
+}

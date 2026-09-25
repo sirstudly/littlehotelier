@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -101,8 +102,31 @@ public class CloudbedsDataInsightsClient {
         return postJson( webClient, url, propertyId, body );
     }
 
+    /**
+     * Queries Channel Production totals for a single calendar month of stay dates, grouped by
+     * month × category × source (same as the default Channel Production UI).
+     *
+     * @param webClient Cloudbeds session client (cookies)
+     * @param month stay-date month
+     * @return parsed JSON root of {@code /query/data}
+     */
+    public JsonObject queryChannelProductionByMonth( WebClient webClient, YearMonth month ) throws IOException {
+        String propertyId = jsonRequestFactory.getPropertyId();
+        JsonObject body = buildChannelProductionBody( propertyId, month.atDay( 1 ), month.atEndOfMonth(),
+                monthlySourceGroupColumns(), true );
+        String url = DI_BASE + "/stock_reports/" + CHANNEL_PRODUCTION_STOCK_REPORT_ID
+                + "/query/data?mode=Run&format=formatted";
+        LOGGER.info( "Data Insights Channel Production monthly query property={} month={}", propertyId, month );
+        return postJson( webClient, url, propertyId, body );
+    }
+
     JsonObject buildChannelProductionBody( String propertyId, LocalDate startDate, LocalDate endDate,
             List<String> groupColumns ) {
+        return buildChannelProductionBody( propertyId, startDate, endDate, groupColumns, false );
+    }
+
+    JsonObject buildChannelProductionBody( String propertyId, LocalDate startDate, LocalDate endDate,
+            List<String> groupColumns, boolean groupStayDateByMonth ) {
         JsonObject body = new JsonObject();
         JsonArray propertyIds = new JsonArray();
         propertyIds.add( propertyId );
@@ -144,7 +168,9 @@ public class CloudbedsDataInsightsClient {
                 cdf.addProperty( "multi_level_id", Integer.parseInt( MULTI_LEVEL_SOURCE ) );
             }
             gr.add( "cdf", cdf );
-            // no "modifier":"month" — keep calendar-day grain when stay_date is grouped
+            if ( groupStayDateByMonth && "stay_date".equals( col ) ) {
+                gr.addProperty( "modifier", "month" );
+            }
             groupRows.add( gr );
         }
         body.add( "group_rows", groupRows );
