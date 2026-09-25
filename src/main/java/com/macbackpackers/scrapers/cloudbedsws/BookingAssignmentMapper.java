@@ -1,10 +1,7 @@
 package com.macbackpackers.scrapers.cloudbedsws;
 
-import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
@@ -21,9 +18,6 @@ import com.macbackpackers.scrapers.CloudbedsScraper;
  */
 @Component
 public class BookingAssignmentMapper {
-
-    private static final DateTimeFormatter BOOKING_DATE_TIME =
-            DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss" );
 
     @Autowired
     private CloudbedsScraper scraper;
@@ -88,22 +82,15 @@ public class BookingAssignmentMapper {
             String name = StringUtils.trimToEmpty( event.getFirstName() ) + " "
                     + StringUtils.trimToEmpty( event.getLastName() );
             a.setGuestName( name.trim() );
-            a.setEmail( StringUtils.trimToNull( event.getEmail() ) );
             String status = StringUtils.defaultIfBlank( event.getStatus(), type );
             // no_show kept (same as historic AllocationScraper statuses)
             a.setBedStatus( status );
             boolean inHouse = "checked_in".equalsIgnoreCase( type ) || "checked_in".equalsIgnoreCase( status );
             a.setInHouse( inHouse );
-            a.setPaymentTotal( parseMoney( event.getTotal() ) );
             a.setPaymentOutstanding( event.getBalanceDueAmount() );
-            a.setBookingSource( StringUtils.trimToNull( event.getBookingSource() ) );
-            a.setBookingReference( StringUtils.defaultIfBlank(
-                    event.getThirdPartyIdentifier(), null ) );
             a.setHotelCollect( event.isHotelCollectBooking() );
-            a.setNotes( StringUtils.trimToNull( event.getNotes() ) );
-            a.setRatePlanName( StringUtils.trimToNull( event.getDetailedRates() ) );
-            a.setNumberGuests( parseGuestCount( event.getAdults(), event.getKids() ) );
-            a.setBookedDate( parseBookingDate( event.getBookingDate() ) );
+            // Folio columns (total, guests, email, notes, source, booked date, rate plan, reference)
+            // are REST-owned: WS values are per-room, ids or flags and would flip-flop with REST.
             if ( a.getReservationId() != null && a.getReservationId() > 0 ) {
                 a.setDataHref( "/connect/" + getPropertyId() + "#/reservations/" + a.getReservationId() );
             }
@@ -145,57 +132,5 @@ public class BookingAssignmentMapper {
             propertyId = id;
         }
         return id;
-    }
-
-    private static BigDecimal parseMoney( String value ) {
-        if ( StringUtils.isBlank( value ) ) {
-            return null;
-        }
-        try {
-            return new BigDecimal( value.trim() );
-        }
-        catch ( NumberFormatException e ) {
-            return null;
-        }
-    }
-
-    private static Integer parseGuestCount( String adults, String kids ) {
-        int total = 0;
-        boolean any = false;
-        try {
-            if ( StringUtils.isNotBlank( adults ) ) {
-                total += Integer.parseInt( adults.trim() );
-                any = true;
-            }
-            if ( StringUtils.isNotBlank( kids ) ) {
-                total += Integer.parseInt( kids.trim() );
-                any = true;
-            }
-        }
-        catch ( NumberFormatException e ) {
-            return any ? total : null;
-        }
-        return any ? total : null;
-    }
-
-    private static java.util.Date parseBookingDate( String bookingDate ) {
-        if ( StringUtils.isBlank( bookingDate ) ) {
-            return null;
-        }
-        String trimmed = bookingDate.trim();
-        try {
-            if ( trimmed.length() >= 19 ) {
-                return java.sql.Timestamp.valueOf( LocalDateTime.parse( trimmed.substring( 0, 19 ), BOOKING_DATE_TIME ) );
-            }
-            return java.sql.Date.valueOf( LocalDate.parse( trimmed.substring( 0, 10 ) ) );
-        }
-        catch ( Exception e ) {
-            try {
-                return java.sql.Date.valueOf( LocalDate.parse( trimmed.substring( 0, 10 ) ) );
-            }
-            catch ( Exception e2 ) {
-                return null;
-            }
-        }
     }
 }

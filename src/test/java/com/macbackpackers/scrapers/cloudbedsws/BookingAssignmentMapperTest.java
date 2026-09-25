@@ -47,7 +47,7 @@ public class BookingAssignmentMapperTest {
     }
 
     @Test
-    public void mapsAssignedGuestWithReportFields() {
+    public void mapsAssignedGuestPlacementAndLeavesFolioToRest() {
         Map<String, String> raw = baseGuest();
         raw.put( "room_id", "10-3" );
         raw.put( "booking_rooms_id", "br-99" );
@@ -57,26 +57,30 @@ public class BookingAssignmentMapperTest {
         raw.put( "adults", "2" );
         raw.put( "kids", "1" );
         raw.put( "is_hotel_collect_payment", "1" );
-        raw.put( "booking_source", "Booking.com" );
+        raw.put( "booking_source", "458851" );
         raw.put( "third_party_identifier", "BDC-1" );
-        raw.put( "notes", "late arrival" );
-        raw.put( "detailed_rates", "Non-refundable" );
+        raw.put( "notes", "1" );
+        raw.put( "detailed_rates", "[{\"date\":\"2026-10-01\",\"rate\":30}]" );
+        raw.put( "booking_date", "2026-09-20 10:11:12" );
 
         BookingAssignment a = mapper.toAssignment( new CloudbedsCalendarEvent( raw ), roomsById );
         assertThat( a, notNullValue() );
         assertThat( a.getAssignmentKey(), is( "br-99" ) );
         assertThat( a.getRoom(), is( "10" ) );
         assertThat( a.getBedName(), is( "3" ) );
-        assertThat( a.getPaymentTotal(), comparesEqualTo( new BigDecimal( "120.50" ) ) );
         assertThat( a.getPaymentOutstanding(), comparesEqualTo( new BigDecimal( "40.00" ) ) );
-        assertThat( a.getEmail(), is( "a@b.com" ) );
-        assertThat( a.getNumberGuests(), is( 3 ) );
         assertThat( a.isHotelCollect(), is( true ) );
-        assertThat( a.getBookingSource(), is( "Booking.com" ) );
-        assertThat( a.getBookingReference(), is( "BDC-1" ) );
-        assertThat( a.getNotes(), is( "late arrival" ) );
-        assertThat( a.getRatePlanName(), is( "Non-refundable" ) );
         assertThat( a.getDataHref(), containsString( "reservations/555" ) );
+
+        // folio columns are REST-owned
+        assertThat( a.getPaymentTotal(), nullValue() );
+        assertThat( a.getEmail(), nullValue() );
+        assertThat( a.getNumberGuests(), nullValue() );
+        assertThat( a.getBookingSource(), nullValue() );
+        assertThat( a.getBookingReference(), nullValue() );
+        assertThat( a.getNotes(), nullValue() );
+        assertThat( a.getRatePlanName(), nullValue() );
+        assertThat( a.getBookedDate(), nullValue() );
     }
 
     @Test
@@ -91,11 +95,9 @@ public class BookingAssignmentMapperTest {
     }
 
     @Test
-    public void truncatesLongDetailedRatesToColumnLength() {
-        Map<String, String> raw = baseGuest();
-        raw.put( "booking_rooms_id", "br-long" );
-        raw.put( "detailed_rates", StringUtils.repeat( "x", 2000 ) );
-        BookingAssignment a = mapper.toAssignment( new CloudbedsCalendarEvent( raw ), roomsById );
+    public void truncatesLongRatePlanToColumnLength() {
+        BookingAssignment a = new BookingAssignment();
+        a.setRatePlanName( StringUtils.repeat( "x", 2000 ) );
         assertThat( a.getRatePlanName().length(), is( BookingAssignment.RATE_PLAN_NAME_MAX_LENGTH ) );
     }
 
@@ -159,6 +161,98 @@ public class BookingAssignmentMapperTest {
         assertThat( a.differsForVersioning( b ), is( false ) );
         b.setPaymentOutstanding( BigDecimal.ONE );
         assertThat( a.differsForVersioning( b ), is( true ) );
+    }
+
+    @Test
+    public void wsRowVersusEnrichedRowWithSamePlacementIsNotANewVersion() {
+        Map<String, String> raw = baseGuest();
+        raw.put( "room_id", "10-3" );
+        raw.put( "booking_rooms_id", "br-1" );
+        raw.put( "balance_due", "40.00" );
+        raw.put( "booking_source", "458851" );
+        raw.put( "notes", "1" );
+        raw.put( "total", "30.00" );
+        BookingAssignment ws = mapper.toAssignment( new CloudbedsCalendarEvent( raw ), roomsById );
+
+        BookingAssignment enriched = mapper.toAssignment( new CloudbedsCalendarEvent( raw ), roomsById );
+        enriched.setBookingSource( "Hostelworld" );
+        enriched.setNotes( "2026-09-20: late arrival" );
+        enriched.setPaymentTotal( new BigDecimal( "38.10" ) );
+        enriched.setNumberGuests( 2 );
+        enriched.setEmail( "a@b.com" );
+        enriched.setBookedDate( java.time.LocalDate.of( 2026, 9, 20 ) );
+        enriched.setRatePlanName( "Standard Rate" );
+        enriched.setBookingReference( "HW-1" );
+
+        assertThat( enriched.differsForVersioning( ws ), is( false ) );
+        assertThat( ws.differsForVersioning( enriched ), is( false ) );
+    }
+
+    @Test
+    public void carryFolioFromKeepsRestValuesOnWsReplacementVersion() {
+        BookingAssignment previous = new BookingAssignment();
+        previous.setBookingSource( "Hostelworld" );
+        previous.setNotes( "note" );
+        previous.setPaymentTotal( new BigDecimal( "38.10" ) );
+        previous.setNumberGuests( 2 );
+        previous.setEmail( "a@b.com" );
+        previous.setBookedDate( java.time.LocalDate.of( 2026, 9, 20 ) );
+        previous.setRatePlanName( "Standard Rate" );
+        previous.setBookingReference( "HW-1" );
+        previous.setVisitorLevyTotal( new BigDecimal( "5" ) );
+        previous.setComments( "special" );
+        previous.setViewed( true );
+        previous.setLastRestFetchedAt( new java.sql.Timestamp( 1000L ) );
+
+        BookingAssignment ws = new BookingAssignment();
+        ws.setRoomId( "10-4" );
+        ws.carryFolioFrom( previous );
+
+        assertThat( ws.getBookingSource(), is( "Hostelworld" ) );
+        assertThat( ws.getNotes(), is( "note" ) );
+        assertThat( ws.getPaymentTotal(), comparesEqualTo( new BigDecimal( "38.10" ) ) );
+        assertThat( ws.getNumberGuests(), is( 2 ) );
+        assertThat( ws.getEmail(), is( "a@b.com" ) );
+        assertThat( ws.getBookedDate(), is( previous.getBookedDate() ) );
+        assertThat( ws.getRatePlanName(), is( "Standard Rate" ) );
+        assertThat( ws.getBookingReference(), is( "HW-1" ) );
+        assertThat( ws.getVisitorLevyTotal(), comparesEqualTo( new BigDecimal( "5" ) ) );
+        assertThat( ws.getComments(), is( "special" ) );
+        assertThat( ws.isViewed(), is( true ) );
+        assertThat( ws.getLastRestFetchedAt(), is( previous.getLastRestFetchedAt() ) );
+    }
+
+    @Test
+    public void carryFolioFromDoesNotOverwriteFreshRestValues() {
+        BookingAssignment previous = new BookingAssignment();
+        previous.setPaymentTotal( new BigDecimal( "10" ) );
+        previous.setBookingSource( "Old" );
+
+        BookingAssignment rest = new BookingAssignment();
+        rest.setPaymentTotal( new BigDecimal( "20" ) );
+        rest.setBookingSource( "New" );
+        rest.carryFolioFrom( previous );
+
+        assertThat( rest.getPaymentTotal(), comparesEqualTo( new BigDecimal( "20" ) ) );
+        assertThat( rest.getBookingSource(), is( "New" ) );
+    }
+
+    @Test
+    public void applyFolioFromOverwritesFolioButNotPlacement() {
+        BookingAssignment current = new BookingAssignment();
+        current.setRoomId( "10-3" );
+        current.setBookingSource( "458851" );
+        current.setNotes( "1" );
+
+        BookingAssignment rest = new BookingAssignment();
+        rest.setRoomId( "99-9" );
+        rest.setBookingSource( "Hostelworld" );
+        rest.setNotes( null );
+        current.applyFolioFrom( rest );
+
+        assertThat( current.getRoomId(), is( "10-3" ) );
+        assertThat( current.getBookingSource(), is( "Hostelworld" ) );
+        assertThat( current.getNotes(), nullValue() );
     }
 
     @Test

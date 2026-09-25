@@ -1,5 +1,7 @@
 package com.macbackpackers.scrapers.cloudbedsws;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,8 +20,10 @@ import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.jobs.BookingAssignmentEnrichJob;
 
 /**
- * Maintains {@code wp_lh_booking_assignment} from the full Cloudbeds calendar WebSocket horizon
+ * Maintains {@code wp_lh_booking_assignment} from the Cloudbeds calendar WebSocket
  * (assigned + {@code NonAssignedReservations}). Does not apply the housekeeping ±2 day window.
+ * The {@code on_migrate} snapshot only spans roughly -4/+6 weeks; rows beyond it come from live
+ * updates and {@code AllocationScraperJob} heal, so snapshot reconcile only closes rows inside it.
  */
 @Component
 public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventListener {
@@ -49,7 +53,14 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
         Map<String, RoomBed> roomsById = indexRoomsById();
         List<BookingAssignment> desired = new ArrayList<>();
         eventIdToAssignmentKey.clear();
+        LocalDate windowStart = null;
+        LocalDate windowEnd = null;
         for ( CloudbedsCalendarEvent event : events ) {
+            LocalDate start = parseDate( event.getStartDate() );
+            if ( start != null ) {
+                windowStart = windowStart == null || start.isBefore( windowStart ) ? start : windowStart;
+                windowEnd = windowEnd == null || start.isAfter( windowEnd ) ? start : windowEnd;
+            }
             BookingAssignment a = mapper.toAssignment( event, roomsById );
             if ( a == null ) {
                 // canceled / incomplete: reconcile below closes any current not in the desired set
@@ -60,8 +71,13 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
                 eventIdToAssignmentKey.put( event.getId(), a.getAssignmentKey() );
             }
         }
-        LOGGER.info( "BookingAssignment WS snapshot: {} rows for property {}", desired.size(), propertyId );
-        dao.reconcileBookingAssignmentCurrents( desired );
+        LOGGER.info( "BookingAssignment WS snapshot: {} rows for property {} (window {} - {})",
+                desired.size(), propertyId, windowStart, windowEnd );
+        // an empty snapshot says nothing about the calendar; don't close everything
+        if ( windowStart == null ) {
+            return;
+        }
+        dao.reconcileBookingAssignmentCurrents( desired, windowStart, windowEnd );
         // REST enrich deferred to AllocationScraperJob heal / incremental updates (avoid reconnect storm)
     }
 
@@ -155,6 +171,18 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
         if ( queued > 0 ) {
             LOGGER.info( "BookingAssignment enrich: queued {} jobs ({} pending enrich)",
                     queued, reservationIds.size() );
+        }
+    }
+
+    private static LocalDate parseDate( String value ) {
+        if ( StringUtils.isBlank( value ) ) {
+            return null;
+        }
+        try {
+            return LocalDate.parse( value.trim() );
+        }
+        catch ( DateTimeParseException e ) {
+            return null;
         }
     }
 

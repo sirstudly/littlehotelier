@@ -19,8 +19,8 @@ import org.hibernate.type.YesNoConverter;
 
 /**
  * SCD2 version row for a Cloudbeds calendar assignment used by allocation reports.
- * Current rows have {@code valid_to = null}. Populated primarily from the calendar WebSocket;
- * REST-only columns ({@code visitor_levy_total}, {@code comments}, …) are patched in place.
+ * Current rows have {@code valid_to = null}. Placement columns come from the calendar WebSocket or
+ * REST and are versioned; REST-owned folio columns (see {@link #differsForVersioning}) are patched in place.
  */
 @Entity
 @Table( name = "wp_lh_booking_assignment" )
@@ -442,11 +442,36 @@ public class BookingAssignment {
     }
 
     /**
-     * Copies REST-only enrich columns from a previous current version onto this WS-derived row.
+     * Carries REST-owned folio columns from the previous current onto this replacement version
+     * wherever this row does not supply its own value (WS rows never do).
      */
-    public void copyEnrichFrom( BookingAssignment previous ) {
+    public void carryFolioFrom( BookingAssignment previous ) {
         if ( previous == null ) {
             return;
+        }
+        if ( paymentTotal == null ) {
+            paymentTotal = previous.paymentTotal;
+        }
+        if ( numberGuests == null ) {
+            numberGuests = previous.numberGuests;
+        }
+        if ( email == null ) {
+            email = previous.email;
+        }
+        if ( notes == null ) {
+            notes = previous.notes;
+        }
+        if ( bookingSource == null ) {
+            bookingSource = previous.bookingSource;
+        }
+        if ( bookedDate == null ) {
+            bookedDate = previous.bookedDate;
+        }
+        if ( StringUtilsBlank( ratePlanName ) ) {
+            ratePlanName = previous.ratePlanName;
+        }
+        if ( bookingReference == null ) {
+            bookingReference = previous.bookingReference;
         }
         if ( visitorLevyTotal == null ) {
             visitorLevyTotal = previous.visitorLevyTotal;
@@ -454,15 +479,40 @@ public class BookingAssignment {
         if ( comments == null ) {
             comments = previous.comments;
         }
+        if ( viewed == null ) {
+            viewed = previous.viewed;
+        }
+        if ( dataHref == null ) {
+            dataHref = previous.dataHref;
+        }
         if ( lastRestFetchedAt == null ) {
             lastRestFetchedAt = previous.lastRestFetchedAt;
         }
-        // Prefer REST rate plan when WS only has detailed_rates stub
-        if ( StringUtilsBlank( ratePlanName ) && false == StringUtilsBlank( previous.ratePlanName ) ) {
-            ratePlanName = previous.ratePlanName;
+    }
+
+    /**
+     * Overwrites all REST-owned folio columns on this (current) row from a REST-derived row.
+     * Does not touch placement columns, so it never requires a new version.
+     */
+    public void applyFolioFrom( BookingAssignment rest ) {
+        if ( rest == null ) {
+            return;
         }
-        if ( viewed == null ) {
-            viewed = previous.viewed;
+        paymentTotal = rest.paymentTotal;
+        numberGuests = rest.numberGuests;
+        email = rest.email;
+        notes = rest.notes;
+        bookingSource = rest.bookingSource;
+        bookedDate = rest.bookedDate;
+        setRatePlanName( rest.ratePlanName );
+        bookingReference = rest.bookingReference;
+        visitorLevyTotal = rest.visitorLevyTotal;
+        comments = rest.comments;
+        if ( rest.viewed != null ) {
+            viewed = rest.viewed;
+        }
+        if ( rest.dataHref != null ) {
+            dataHref = rest.dataHref;
         }
     }
 
@@ -480,8 +530,11 @@ public class BookingAssignment {
     }
 
     /**
-     * Returns true when WS/report-relevant fields differ from {@code other} (triggers a new version).
-     * REST-only enrich columns are intentionally excluded.
+     * Returns true when placement fields (the ones both WS and REST supply with the same meaning)
+     * differ from {@code other}; this is what triggers a new version. REST-owned folio columns
+     * ({@code payment_total}, {@code num_guests}, {@code email}, {@code notes}, {@code booking_source},
+     * {@code booked_date}, {@code rate_plan_name}, {@code booking_reference}, levy/comments/viewed)
+     * are patched in place and must stay out of this comparison, otherwise WS and REST flip-flop them.
      */
     public boolean differsForVersioning( BookingAssignment other ) {
         if ( other == null ) {
@@ -493,18 +546,10 @@ public class BookingAssignment {
                 || false == eq( bedStatus, other.bedStatus )
                 || false == eq( inHouseYn, other.inHouseYn )
                 || false == eq( guestName, other.guestName )
-                || false == eq( email, other.email )
                 || false == eq( source, other.source )
                 || false == eq( calendarEventId, other.calendarEventId )
-                || false == eq( paymentTotal, other.paymentTotal )
                 || false == eq( paymentOutstanding, other.paymentOutstanding )
-                || false == eq( numberGuests, other.numberGuests )
-                || false == eq( bookingReference, other.bookingReference )
-                || false == eq( bookingSource, other.bookingSource )
                 || false == eq( hotelCollect, other.hotelCollect )
-                || false == eq( bookedDate, other.bookedDate )
-                || false == eq( notes, other.notes )
-                || false == eq( ratePlanName, other.ratePlanName )
                 || false == eq( room, other.room )
                 || false == eq( bedName, other.bedName )
                 || false == eq( roomTypeId, other.roomTypeId );

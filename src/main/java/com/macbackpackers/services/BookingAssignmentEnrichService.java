@@ -2,9 +2,14 @@ package com.macbackpackers.services;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -24,7 +29,9 @@ import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.GuestCommentReportEntry;
+import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
+import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -39,6 +46,17 @@ import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 public class BookingAssignmentEnrichService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( BookingAssignmentEnrichService.class );
+
+    private static final String STATUS_CANCELED = "canceled";
+
+    /** Stays starting within this many days are REST-refreshed every heal (catches room moves). */
+    static final String OPTION_HEAL_REFRESH_DAYS = "hbo_booking_assignment_heal_refresh_days";
+
+    private static final long ROOMS_CACHE_MILLIS = TimeUnit.MINUTES.toMillis( 10 );
+
+    private volatile Map<String, RoomBed> roomsByIdCache;
+
+    private volatile long roomsByIdLoadedAt;
 
     @Autowired
     private CloudbedsScraper scraper;
@@ -78,53 +96,204 @@ public class BookingAssignmentEnrichService {
     }
 
     /**
-     * Heal: light reservation list for [start, end], REST-fetch ids missing from currents or never enriched;
-     * then project all currents into {@code wp_lh_calendar} under {@code jobId}.
+     * Heal: one light reservation list for [start, end], compared against current assignments.
+     * REST-fetches only reservations that are missing, never enriched, changed in the list
+     * (status / dates / balance / total), starting within the near-term refresh window, or that
+     * have in-window currents but are absent from the list (REST decides whether they are gone).
+     * Reservations the list reports as canceled are closed directly. Finally projects all
+     * currents into {@code wp_lh_calendar} under {@code jobId}.
      */
-    public void healAndDualWrite( WebClient webClient, int jobId, java.time.LocalDate startDate,
-            java.time.LocalDate endDate ) throws IOException {
-        Set<Long> listIds = new HashSet<>();
-        scraper.getReservations( webClient, startDate, endDate ).forEach( c -> {
+    public void healAndDualWrite( WebClient webClient, int jobId, LocalDate startDate,
+            LocalDate endDate ) throws IOException {
+        Map<Long, Customer> listById = new HashMap<>();
+        for ( Customer c : scraper.getReservations( webClient, startDate, endDate ) ) {
             try {
-                listIds.add( Long.parseLong( c.getId() ) );
+                listById.put( Long.parseLong( c.getId() ), c );
             }
             catch ( NumberFormatException ignored ) {
                 // skip
             }
-        } );
+        }
 
-        Set<Long> currentIds = new HashSet<>();
-        List<Long> needEnrich = new ArrayList<>();
+        Map<Long, List<BookingAssignment>> currentsByRes = new HashMap<>();
         for ( BookingAssignment a : dao.fetchCurrentBookingAssignments() ) {
-            if ( a.getReservationId() == null || a.getReservationId() <= 0 ) {
+            if ( a.getReservationId() == null || a.getReservationId() <= 0 || a.isClosure() ) {
                 continue;
             }
-            currentIds.add( a.getReservationId() );
-            if ( a.getLastRestFetchedAt() == null ) {
-                needEnrich.add( a.getReservationId() );
-            }
+            currentsByRes.computeIfAbsent( a.getReservationId(), k -> new ArrayList<>() ).add( a );
         }
 
-        List<Long> toFetch = new ArrayList<>();
-        Set<Long> seen = new HashSet<>();
-        for ( Long id : needEnrich ) {
-            if ( seen.add( id ) ) {
-                toFetch.add( id );
-            }
-        }
-        for ( Long id : listIds ) {
-            if ( false == currentIds.contains( id ) && seen.add( id ) ) {
-                toFetch.add( id );
-            }
-        }
+        LocalDate refreshEnd = startDate.plusDays(
+                Integer.parseInt( dao.getDefaultOption( OPTION_HEAL_REFRESH_DAYS, "14" ) ) );
+        HealPlan plan = planHeal( listById, currentsByRes, startDate, endDate, refreshEnd );
 
-        LOGGER.info( "BookingAssignment heal: list={}, currents={}, restFetch={}",
-                listIds.size(), currentIds.size(), toFetch.size() );
-        if ( false == toFetch.isEmpty() ) {
-            fetchAndApply( webClient, toFetch );
+        for ( Long id : plan.toClose ) {
+            dao.closeBookingAssignmentsForReservation( id );
+        }
+        LOGGER.info( "BookingAssignment heal: list={}, currentReservations={}, missing={}, notEnriched={}, "
+                + "changed={}, nearTerm={}, absentFromList={}, closedCanceled={}, restFetch={}",
+                listById.size(), currentsByRes.size(), plan.missing, plan.notEnriched, plan.changed,
+                plan.nearTerm, plan.absentFromList, plan.toClose.size(), plan.toFetch.size() );
+        if ( false == plan.toFetch.isEmpty() ) {
+            fetchAndApply( webClient, new ArrayList<>( plan.toFetch ) );
         }
 
         dualWriteCalendar( jobId );
+    }
+
+    /** Decides which reservations heal must REST-fetch or close. */
+    static HealPlan planHeal( Map<Long, Customer> listById, Map<Long, List<BookingAssignment>> currentsByRes,
+            LocalDate startDate, LocalDate endDate, LocalDate refreshEnd ) {
+        HealPlan plan = new HealPlan();
+
+        for ( Map.Entry<Long, List<BookingAssignment>> e : currentsByRes.entrySet() ) {
+            if ( e.getValue().stream().anyMatch( a -> a.getLastRestFetchedAt() == null ) ) {
+                plan.toFetch.add( e.getKey() );
+                plan.notEnriched++;
+            }
+        }
+
+        for ( Map.Entry<Long, Customer> e : listById.entrySet() ) {
+            Long id = e.getKey();
+            Customer c = e.getValue();
+            List<BookingAssignment> rows = currentsByRes.get( id );
+            if ( STATUS_CANCELED.equalsIgnoreCase( c.getStatus() ) ) {
+                if ( rows != null ) {
+                    plan.toClose.add( id );
+                    plan.toFetch.remove( id );
+                }
+                continue;
+            }
+            if ( plan.toFetch.contains( id ) ) {
+                continue;
+            }
+            if ( rows == null ) {
+                plan.toFetch.add( id );
+                plan.missing++;
+            }
+            else if ( listDiffers( c, rows ) ) {
+                plan.toFetch.add( id );
+                plan.changed++;
+            }
+            else {
+                LocalDate checkin = parseDate( c.getCheckinDate() );
+                if ( checkin != null && false == checkin.isAfter( refreshEnd ) ) {
+                    plan.toFetch.add( id );
+                    plan.nearTerm++;
+                }
+            }
+        }
+
+        // an empty list is more likely a failed call than an empty hostel; don't treat everything as gone
+        if ( false == listById.isEmpty() ) {
+            for ( Map.Entry<Long, List<BookingAssignment>> e : currentsByRes.entrySet() ) {
+                Long id = e.getKey();
+                if ( listById.containsKey( id ) || plan.toFetch.contains( id ) ) {
+                    continue;
+                }
+                boolean inWindow = e.getValue().stream().anyMatch( a -> a.getCheckoutLocalDate() != null
+                        && a.getCheckoutLocalDate().isAfter( startDate )
+                        && a.getCheckinLocalDate() != null
+                        && false == a.getCheckinLocalDate().isAfter( endDate ) );
+                if ( inWindow ) {
+                    plan.toFetch.add( id );
+                    plan.absentFromList++;
+                }
+            }
+        }
+        return plan;
+    }
+
+    /** True when list status, stay span, balance or grand total disagree with the current rows. */
+    static boolean listDiffers( Customer c, List<BookingAssignment> rows ) {
+        LocalDate minCheckin = null;
+        LocalDate maxCheckout = null;
+        Set<String> statuses = new HashSet<>();
+        for ( BookingAssignment a : rows ) {
+            LocalDate in = a.getCheckinLocalDate();
+            LocalDate out = a.getCheckoutLocalDate();
+            if ( in != null && ( minCheckin == null || in.isBefore( minCheckin ) ) ) {
+                minCheckin = in;
+            }
+            if ( out != null && ( maxCheckout == null || out.isAfter( maxCheckout ) ) ) {
+                maxCheckout = out;
+            }
+            if ( a.getBedStatus() != null ) {
+                statuses.add( a.getBedStatus().toLowerCase() );
+            }
+        }
+        LocalDate listIn = parseDate( c.getCheckinDate() );
+        LocalDate listOut = parseDate( c.getCheckoutDate() );
+        if ( listIn != null && false == listIn.equals( minCheckin ) ) {
+            return true;
+        }
+        if ( listOut != null && false == listOut.equals( maxCheckout ) ) {
+            return true;
+        }
+        if ( StringUtils.isNotBlank( c.getStatus() ) && false == statuses.contains( c.getStatus().toLowerCase() ) ) {
+            return true;
+        }
+        BookingAssignment first = rows.get( 0 );
+        if ( moneyDiffers( c.getBalanceDue(), first.getPaymentOutstanding() ) ) {
+            return true;
+        }
+        return moneyDiffers( parseMoney( c.getGrandTotal() ), first.getPaymentTotal() );
+    }
+
+    private static boolean moneyDiffers( BigDecimal listValue, BigDecimal current ) {
+        if ( listValue == null ) {
+            return false;
+        }
+        return current == null || listValue.compareTo( current ) != 0;
+    }
+
+    private static BigDecimal parseMoney( String value ) {
+        if ( StringUtils.isBlank( value ) ) {
+            return null;
+        }
+        try {
+            return new BigDecimal( value.trim() );
+        }
+        catch ( NumberFormatException e ) {
+            return null;
+        }
+    }
+
+    private static LocalDate parseDate( String value ) {
+        if ( StringUtils.isBlank( value ) || value.trim().length() < 10 ) {
+            return null;
+        }
+        try {
+            return LocalDate.parse( value.trim().substring( 0, 10 ) );
+        }
+        catch ( DateTimeParseException e ) {
+            return null;
+        }
+    }
+
+    /** Outcome of {@link #planHeal}. */
+    static class HealPlan {
+        final Set<Long> toFetch = new LinkedHashSet<>();
+        final Set<Long> toClose = new LinkedHashSet<>();
+        int missing;
+        int notEnriched;
+        int changed;
+        int nearTerm;
+        int absentFromList;
+    }
+
+    private Map<String, RoomBed> getRoomsById() {
+        Map<String, RoomBed> cached = roomsByIdCache;
+        if ( cached == null || System.currentTimeMillis() - roomsByIdLoadedAt > ROOMS_CACHE_MILLIS ) {
+            Map<String, RoomBed> map = new HashMap<>();
+            for ( RoomBed rb : dao.fetchAllRoomBeds().values() ) {
+                map.put( rb.getId(), rb );
+            }
+            roomsByIdCache = map;
+            roomsByIdLoadedAt = System.currentTimeMillis();
+            cached = map;
+        }
+        return cached;
     }
 
     /**
@@ -159,22 +328,47 @@ public class BookingAssignmentEnrichService {
         if ( r == null || r.getBookingRooms() == null ) {
             return;
         }
+        long reservationId;
+        try {
+            reservationId = Long.parseLong( r.getReservationId() );
+        }
+        catch ( NumberFormatException e ) {
+            return;
+        }
         BigDecimal levy = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( r );
         String comments = r.getSpecialRequests();
-        String ratePlan = r.getUsedRoomTypes();
         Boolean viewed = StringUtils.isNotBlank( r.getDocumentNumber() );
+        Map<String, RoomBed> roomsById = getRoomsById();
 
+        Set<String> liveKeys = new HashSet<>();
         for ( BookingRoom br : r.getBookingRooms() ) {
-            BookingAssignment fromRest = reservationRoomToAssignment( r, br );
+            BookingAssignment fromRest = reservationRoomToAssignment( r, br, roomsById );
             if ( fromRest == null ) {
                 continue;
             }
+            // WS drops canceled tiles; do the same so canceled rows never linger as currents
+            if ( STATUS_CANCELED.equalsIgnoreCase( fromRest.getBedStatus() ) ) {
+                dao.closeBookingAssignment( fromRest.getAssignmentKey() );
+                continue;
+            }
+            liveKeys.add( fromRest.getAssignmentKey() );
+            fromRest.setVisitorLevyTotal( levy );
+            fromRest.setComments( comments );
+            fromRest.setViewed( viewed );
             dao.upsertBookingAssignment( fromRest );
-            dao.patchBookingAssignmentEnrich( fromRest.getAssignmentKey(), levy, comments, ratePlan, viewed );
+            dao.patchBookingAssignmentFolio( fromRest.getAssignmentKey(), fromRest );
+        }
+
+        // booking rooms removed from the reservation (or superseded res:… fallback keys)
+        for ( BookingAssignment cur : dao.fetchCurrentBookingAssignmentsForReservation( reservationId ) ) {
+            if ( false == liveKeys.contains( cur.getAssignmentKey() ) ) {
+                dao.closeBookingAssignment( cur.getAssignmentKey() );
+            }
         }
     }
 
-    private BookingAssignment reservationRoomToAssignment( Reservation r, BookingRoom br ) {
+    private BookingAssignment reservationRoomToAssignment( Reservation r, BookingRoom br,
+            Map<String, RoomBed> roomsById ) {
         if ( br == null || StringUtils.isBlank( br.getStartDate() ) || StringUtils.isBlank( br.getEndDate() ) ) {
             return null;
         }
@@ -195,7 +389,8 @@ public class BookingAssignmentEnrichService {
         a.setBookingSource( r.getSourceName() );
         a.setHotelCollect( r.isHotelCollectBooking() );
         a.setEmail( r.getEmail() );
-        a.setGuestName( r.getFirstName() + " " + r.getLastName() );
+        a.setGuestName( ( StringUtils.trimToEmpty( r.getFirstName() ) + " "
+                + StringUtils.trimToEmpty( r.getLastName() ) ).trim() );
         a.setNumberGuests( ( r.getAdultsNumber() == null ? 0 : r.getAdultsNumber() )
                 + ( r.getKidsNumber() == null ? 0 : r.getKidsNumber() ) );
         a.setNotes( r.getNotesAsString() );
@@ -205,15 +400,26 @@ public class BookingAssignmentEnrichService {
         a.setCheckinDate( java.time.LocalDate.parse( br.getStartDate() ) );
         a.setCheckoutDate( java.time.LocalDate.parse( br.getEndDate() ) );
         a.setRoomId( StringUtils.trimToNull( br.getRoomId() ) );
-        BedAssignment bed = roomBedMatcher.parse( br.getRoomNumber() );
-        a.setRoom( StringUtils.defaultIfBlank( bed.getRoom(),
-                StringUtils.isBlank( br.getRoomId() ) ? "Unallocated" : null ) );
-        a.setBedName( bed.getBedName() );
         try {
             a.setRoomTypeId( Integer.parseInt( br.getRoomTypeId() ) );
         }
         catch ( Exception ignored ) {
             // leave null
+        }
+        // same room/bed resolution as the WS mapper so the two writers agree on placement
+        RoomBed rb = a.getRoomId() == null ? null : roomsById.get( a.getRoomId() );
+        if ( a.getRoomId() == null ) {
+            a.setRoom( "Unallocated" );
+        }
+        else if ( rb != null ) {
+            a.setRoom( rb.getRoom() );
+            a.setBedName( rb.getBedName() );
+            a.setRoomTypeId( rb.getRoomTypeId() );
+        }
+        else {
+            BedAssignment bed = roomBedMatcher.parse( br.getRoomNumber() );
+            a.setRoom( bed.getRoom() );
+            a.setBedName( bed.getBedName() );
         }
         if ( StringUtils.isNotBlank( r.getBookingDateHotelTime() ) && r.getBookingDateHotelTime().length() >= 10 ) {
             a.setBookedDate( java.time.LocalDate.parse( r.getBookingDateHotelTime().substring( 0, 10 ) ) );

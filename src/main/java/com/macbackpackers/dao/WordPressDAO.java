@@ -853,8 +853,8 @@ public interface WordPressDAO {
     BookingAssignment fetchCurrentBookingAssignmentByCalendarEventId( String calendarEventId );
 
     /**
-     * Closes the open version for {@code assignmentKey} (if any) and opens {@code next} as current.
-     * Copies REST enrich columns from the previous current onto {@code next}.
+     * Closes the open version for {@code assignmentKey} (if any) and opens {@code next} as current
+     * when placement fields differ. Carries REST folio columns from the previous current onto {@code next}.
      *
      * @return true if a new version was written
      */
@@ -866,19 +866,32 @@ public interface WordPressDAO {
     /** Closes current version matched by calendar event id. */
     void closeBookingAssignmentByCalendarEventId( String calendarEventId );
 
-    /**
-     * Reconcile: desired currents replace existing currents. Closes assignments not in desired;
-     * upserts each desired row (preserving REST enrich via upsert).
-     */
-    void reconcileBookingAssignmentCurrents( List<BookingAssignment> desiredCurrents );
+    /** Current guest versions for a reservation. */
+    List<BookingAssignment> fetchCurrentBookingAssignmentsForReservation( long reservationId );
 
     /**
-     * Patches REST-only enrich columns on the current row in place (no new SCD2 version).
+     * Closes all current guest versions for a reservation.
+     *
+     * @return number of rows closed
+     */
+    int closeBookingAssignmentsForReservation( long reservationId );
+
+    /**
+     * Reconcile: desired currents replace existing currents within the snapshot window.
+     * Currents missing from {@code desiredCurrents} are only closed when their stay overlaps
+     * {@code [windowStart, windowEnd]} (rows outside the WS snapshot horizon are maintained by
+     * live updates and heal). Null window bounds mean unbounded.
+     */
+    void reconcileBookingAssignmentCurrents( List<BookingAssignment> desiredCurrents,
+            LocalDate windowStart, LocalDate windowEnd );
+
+    /**
+     * Overwrites the REST-owned folio columns on the current row in place from {@code folio}
+     * (no new SCD2 version) and stamps {@code last_rest_fetched_at}.
      *
      * @return true if a current row was updated
      */
-    boolean patchBookingAssignmentEnrich( String assignmentKey, BigDecimal visitorLevyTotal,
-            String comments, String ratePlanName, Boolean viewed );
+    boolean patchBookingAssignmentFolio( String assignmentKey, BookingAssignment folio );
 
     /**
      * Current guest assignments that have never been REST-enriched ({@code last_rest_fetched_at IS NULL}).

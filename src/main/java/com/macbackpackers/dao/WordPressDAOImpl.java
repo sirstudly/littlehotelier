@@ -1922,7 +1922,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         }
         Timestamp now = new Timestamp( System.currentTimeMillis() );
         if ( current != null ) {
-            next.copyEnrichFrom( current );
+            next.carryFolioFrom( current );
         }
         for ( BookingAssignment cur : currents ) {
             cur.setValidTo( now );
@@ -1962,8 +1962,44 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    @Transactional( readOnly = true )
+    public List<BookingAssignment> fetchCurrentBookingAssignmentsForReservation( long reservationId ) {
+        return em.createQuery(
+                "FROM BookingAssignment a WHERE a.reservationId = :rid AND a.source = :guest AND a.validTo IS NULL",
+                BookingAssignment.class )
+                .setParameter( "rid", reservationId )
+                .setParameter( "guest", BookingAssignment.SOURCE_GUEST )
+                .getResultList();
+    }
+
+    @Override
+    @Transactional
+    public int closeBookingAssignmentsForReservation( long reservationId ) {
+        return em.createQuery( "UPDATE BookingAssignment a SET a.validTo = :now "
+                + "WHERE a.reservationId = :rid AND a.source = :guest AND a.validTo IS NULL" )
+                .setParameter( "now", new Timestamp( System.currentTimeMillis() ) )
+                .setParameter( "rid", reservationId )
+                .setParameter( "guest", BookingAssignment.SOURCE_GUEST )
+                .executeUpdate();
+    }
+
+    /** True when the assignment stay overlaps {@code [windowStart, windowEnd]} (null bounds = open). */
+    private static boolean overlapsWindow( BookingAssignment a, LocalDate windowStart, LocalDate windowEnd ) {
+        LocalDate checkin = a.getCheckinLocalDate();
+        LocalDate checkout = a.getCheckoutLocalDate();
+        if ( windowEnd != null && checkin != null && checkin.isAfter( windowEnd ) ) {
+            return false;
+        }
+        if ( windowStart != null && checkout != null && false == checkout.isAfter( windowStart ) ) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
     @Transactional( propagation = Propagation.NOT_SUPPORTED )
-    public void reconcileBookingAssignmentCurrents( List<BookingAssignment> desiredCurrents ) {
+    public void reconcileBookingAssignmentCurrents( List<BookingAssignment> desiredCurrents,
+            LocalDate windowStart, LocalDate windowEnd ) {
         Map<String, BookingAssignment> desiredByKey = new HashMap<>();
         if ( desiredCurrents != null ) {
             for ( BookingAssignment d : desiredCurrents ) {
@@ -1980,16 +2016,21 @@ public class WordPressDAOImpl implements WordPressDAO {
         // each change is (current row id to close, new row to insert); either side may be absent
         List<Long> closeIds = new ArrayList<>();
         List<BookingAssignment> inserts = new ArrayList<>();
+        int keptOutsideWindow = 0;
         for ( BookingAssignment cur : existing ) {
             BookingAssignment desired = desiredByKey.remove( cur.getAssignmentKey() );
             if ( desired == null ) {
+                if ( false == overlapsWindow( cur, windowStart, windowEnd ) ) {
+                    keptOutsideWindow++;
+                    continue;
+                }
                 closeIds.add( cur.getId() );
                 inserts.add( null );
                 continue;
             }
             desired.preserveCalendarEventIdFrom( cur );
             if ( cur.differsForVersioning( desired ) ) {
-                desired.copyEnrichFrom( cur );
+                desired.carryFolioFrom( cur );
                 closeIds.add( cur.getId() );
                 inserts.add( desired );
             }
@@ -1997,6 +2038,10 @@ public class WordPressDAOImpl implements WordPressDAO {
         for ( BookingAssignment remaining : desiredByKey.values() ) {
             closeIds.add( null );
             inserts.add( remaining );
+        }
+        if ( keptOutsideWindow > 0 ) {
+            LOGGER.info( "BookingAssignment reconcile: kept {} currents outside snapshot window {} - {}",
+                    keptOutsideWindow, windowStart, windowEnd );
         }
         if ( inserts.isEmpty() ) {
             LOGGER.info( "BookingAssignment reconcile: no changes ({} currents)", existing.size() );
@@ -2054,23 +2099,15 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Override
     @Transactional
-    public boolean patchBookingAssignmentEnrich( String assignmentKey, BigDecimal visitorLevyTotal,
-            String comments, String ratePlanName, Boolean viewed ) {
-        if ( StringUtils.isBlank( assignmentKey ) ) {
+    public boolean patchBookingAssignmentFolio( String assignmentKey, BookingAssignment folio ) {
+        if ( StringUtils.isBlank( assignmentKey ) || folio == null ) {
             return false;
         }
         BookingAssignment current = fetchCurrentBookingAssignmentByKey( assignmentKey );
         if ( current == null ) {
             return false;
         }
-        current.setVisitorLevyTotal( visitorLevyTotal );
-        current.setComments( comments );
-        if ( StringUtils.isNotBlank( ratePlanName ) ) {
-            current.setRatePlanName( ratePlanName );
-        }
-        if ( viewed != null ) {
-            current.setViewed( viewed );
-        }
+        current.applyFolioFrom( folio );
         current.setLastRestFetchedAt( new Timestamp( System.currentTimeMillis() ) );
         em.merge( current );
         return true;
