@@ -24,9 +24,12 @@ public final class JobPriorities {
         map.put( SendStripePaymentConfirmationEmailJob.class.getName(), -1 );
 
         // Demote; allocation scrapes can wait behind transactional work
+        map.put( AllocationScraperJob.class.getName(), 99 );
         map.put( CloudbedsAllocationScraperWorkerJob.class.getName(), 99 );
         map.put( CreateAllocationScraperReportsJob.class.getName(), 99 );
         map.put( HousekeepingJob.class.getName(), 99 );
+        map.put( BookingAssignmentEnrichJob.class.getName(), 99 );
+        map.put( ArchiveAllTransactionNotesJob.class.getName(), 99 );
         map.put( VoidAndResubmitLegacyEVLFolioJob.class.getName(), 999 );
 
         // One-off historical backfill; only run when nothing else is queued
