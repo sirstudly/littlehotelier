@@ -104,6 +104,18 @@ export async function getAvailability(params: {
   return request(`/ronbot/${property}/availability${qs ? `?${qs}` : ""}`);
 }
 
+/**
+ * Live Channel Production totals by source for one stay-date month (YYYY-MM).
+ */
+export async function getChannelProduction(params: {
+  property: string;
+  month: string;
+}): Promise<unknown> {
+  const { property, month } = params;
+  const q = new URLSearchParams({ month: month.trim() });
+  return request(`/ronbot/${property}/channel-production?${q}`);
+}
+
 export async function health(): Promise<unknown> {
   return request("/ronbot/health");
 }

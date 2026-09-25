@@ -40,9 +40,9 @@ public class ChannelProductionReportService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger( ChannelProductionReportService.class );
 
-    static final String BOOKING_COM = "Booking.com";
+    public static final String BOOKING_COM = "Booking.com";
 
-    private static final String BDC_COMMISSION_DIVISOR = "6.67";
+    public static final String BDC_COMMISSION_DIVISOR = "6.67";
 
     private static final String GBP_ACCOUNTING_FORMAT =
             "_-[$£-809]* #,##0.00_-;\\-[$£-809]* #,##0.00_-;_-[$£-809]* \"-\"??_-;_-@_-";
@@ -230,7 +230,7 @@ public class ChannelProductionReportService {
     }
 
     /** Percentage (0–100) rounded to 2 dp, e.g. {@code 31.75}. */
-    static BigDecimal percentOf( BigDecimal value, BigDecimal total ) {
+    public static BigDecimal percentOf( BigDecimal value, BigDecimal total ) {
         if ( total == null || total.signum() == 0 ) {
             return BigDecimal.ZERO;
         }

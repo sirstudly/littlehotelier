@@ -21,6 +21,7 @@ import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.ronbot.dto.AvailabilityDto;
 import com.macbackpackers.ronbot.dto.BookingSummaryDto;
 import com.macbackpackers.ronbot.dto.BookingTimelineDto;
+import com.macbackpackers.ronbot.dto.ChannelProductionDto;
 import com.macbackpackers.ronbot.dto.StayContinuationDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
 
@@ -114,6 +115,16 @@ public class RonbotReadController {
             @RequestParam( name = "from", required = false ) String from,
             @RequestParam( name = "to", required = false ) String to ) throws IOException {
         return readService.getAvailability( property, from, to );
+    }
+
+    /**
+     * Live Channel Production totals by source for one stay-date month ({@code month}=YYYY-MM).
+     */
+    @GetMapping( "/{property}/channel-production" )
+    public ChannelProductionDto channelProduction(
+            @PathVariable String property,
+            @RequestParam( name = "month" ) String month ) throws IOException {
+        return readService.getChannelProduction( property, month );
     }
 
     @ExceptionHandler( IllegalArgumentException.class )

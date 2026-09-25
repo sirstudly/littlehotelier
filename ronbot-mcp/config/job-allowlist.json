@@ -23,5 +23,10 @@
     "classname": "com.macbackpackers.jobs.RunQuarterlyEvl6PlusNightsReportJob",
     "requiredParams": ["email"],
     "description": "Build EVL nights-6+ room revenue xlsx and email it (Edinburgh properties)"
+  },
+  "RunChannelProductionReportJob": {
+    "classname": "com.macbackpackers.jobs.RunChannelProductionReportJob",
+    "requiredParams": ["year_month", "to_emails"],
+    "description": "Build Channel Production xlsx (month vs same month in previous 2 years) and email it"
   }
 }

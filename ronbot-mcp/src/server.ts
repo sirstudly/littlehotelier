@@ -5,6 +5,7 @@ import * as readApi from "./cloudbeds/readApiClient.js";
 import {
   resolveEmailParamInParameters,
   resolveEmailRecipient,
+  resolveEmailRecipientList,
 } from "./config/emailAliases.js";
 import { assertProperty, loadJobAllowlist, loadProperties } from "./config/properties.js";
 import * as jobsDb from "./db/jobs.js";
@@ -30,6 +31,9 @@ function fail(err: unknown) {
 const propertySchema = z.enum(["crh", "hsh", "rmb", "lsh"]);
 const edinburghPropertySchema = z.enum(["crh", "hsh", "rmb"]);
 const EDINBURGH_PROPERTIES = ["crh", "hsh", "rmb"] as const;
+const ALL_PROPERTIES = ["crh", "hsh", "rmb", "lsh"] as const;
+type PropertyId = (typeof ALL_PROPERTIES)[number];
+const yearMonth = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Expected YYYY-MM");
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -286,8 +290,54 @@ export function createServer(): McpServer {
   );
 
   server.tool(
+    "get_channel_production",
+    "Live Channel Production numbers (Cloudbeds Data Insights) for one stay-date month via ronbot-read-api: revenue, room nights and ADR by source (Booking.com, Hostelworld, Website, Walk-In, ...) with % shares, plus totals (revenue, roomsSold, bdcCommission = Booking.com revenue / 6.67, netRevenue, avgPricePerBed). month is YYYY-MM. Pass properties for one or more hostels, or omit both properties and property to query all (crh/hsh/rmb/lsh) in one call. For year-on-year comparisons call once per month needed. To email the spreadsheet instead, use enqueue_channel_production_report.",
+    {
+      month: yearMonth,
+      properties: z.array(propertySchema).min(1).max(4).optional(),
+      property: propertySchema.optional(),
+    },
+    async ({ month, properties, property }) => {
+      try {
+        let targets: PropertyId[];
+        if (properties && properties.length > 0) {
+          targets = [...new Set(properties)];
+        } else if (property) {
+          targets = [property];
+        } else {
+          targets = [...ALL_PROPERTIES];
+        }
+
+        const settled = await Promise.allSettled(
+          targets.map((p) => readApi.getChannelProduction({ property: p, month })),
+        );
+        const results = settled.map((outcome, i) => {
+          const prop = targets[i];
+          if (outcome.status === "fulfilled") {
+            return { property: prop, ok: true as const, data: outcome.value };
+          }
+          const message =
+            outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+          return { property: prop, ok: false as const, error: message };
+        });
+
+        const payload = { month, results };
+        if (!results.some((r) => r.ok)) {
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+            isError: true,
+          };
+        }
+        return ok(payload);
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
     "insert_job",
-    "Enqueue an allowlisted job into wp_lh_jobs (status=submitted). If parameters include email, shorthand aliases (accounts/hannah/jay/ron) are resolved to full addresses.",
+    "Enqueue an allowlisted job into wp_lh_jobs (status=submitted). If parameters include email or to_emails (comma-delimited), shorthand aliases (accounts/hannah/jay/ron) are resolved to full addresses.",
     {
       property: propertySchema,
       job_type: z.string().min(1),
@@ -386,6 +436,65 @@ export function createServer(): McpServer {
 
         return ok({
           email: resolvedEmail,
+          enqueued,
+          status: "submitted",
+        });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "enqueue_channel_production_report",
+    "Enqueue RunChannelProductionReportJob: builds the Channel Production xlsx (revenue / room nights / ADR by source for year_month, compared with the same month in the previous 2 years, plus BDC commission and net revenue) and emails it. Pass property (or properties), or property=all for every hostel. Ask the user if property or month is missing — do not assume. to_emails entries may be full addresses or shorthand accounts|hannah|jay|ron. Synonyms: channel report, channel production report, revenue by source/channel, monthly channel report. For numbers in chat instead of an email, use get_channel_production.",
+    {
+      year_month: yearMonth,
+      to_emails: z.array(z.string().min(1)).min(1),
+      property: z.union([propertySchema, z.literal("all")]).optional(),
+      properties: z.array(propertySchema).min(1).max(4).optional(),
+      requested_by: z.string().optional(),
+    },
+    async ({ year_month, to_emails, property, properties, requested_by }) => {
+      try {
+        const resolvedEmails = resolveEmailRecipientList(to_emails);
+        let targets: PropertyId[];
+        if (properties && properties.length > 0) {
+          targets = [...new Set(properties)];
+        } else if (property === "all") {
+          targets = [...ALL_PROPERTIES];
+        } else if (property) {
+          targets = [property];
+        } else {
+          throw new Error(
+            "Specify which hostel: crh, hsh, rmb or lsh (or property=all / properties list).",
+          );
+        }
+
+        const allowlist = loadJobAllowlist();
+        const entry = allowlist.RunChannelProductionReportJob;
+        if (!entry) {
+          throw new Error("RunChannelProductionReportJob is not allowlisted");
+        }
+
+        const parameters = { year_month, to_emails: resolvedEmails.join(",") };
+        const enqueued: Array<{ property: string; jobId: number }> = [];
+        for (const target of targets) {
+          const jobId = await jobsDb.insertJob(target, entry.classname, parameters);
+          audit("enqueue_channel_production_report", {
+            property: target,
+            job_type: "RunChannelProductionReportJob",
+            classname: entry.classname,
+            job_id: jobId,
+            parameters,
+            requested_by: requested_by ?? null,
+          });
+          enqueued.push({ property: target, jobId });
+        }
+
+        return ok({
+          yearMonth: year_month,
+          toEmails: resolvedEmails,
           enqueued,
           status: "submitted",
         });

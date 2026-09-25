@@ -60,10 +60,30 @@ export function resolveEmailRecipient(input: string): string {
   return resolved;
 }
 
-/** If parameters include `email`, replace it with the resolved address. */
+/** Resolves each comma-delimited entry (address or alias); blanks are dropped. */
+export function resolveEmailRecipientList(input: string | string[]): string[] {
+  const entries = (Array.isArray(input) ? input : input.split(","))
+    .map((e) => e.trim())
+    .filter((e) => e !== "");
+  if (entries.length === 0) {
+    throw new Error("No email recipients given");
+  }
+  return [...new Set(entries.map(resolveEmailRecipient))];
+}
+
+/**
+ * If parameters include `email`, replace it with the resolved address.
+ * If they include `to_emails` (comma-delimited), resolve each entry.
+ */
 export function resolveEmailParamInParameters(
   parameters: Record<string, string>,
 ): Record<string, string> {
-  if (parameters.email == null) return parameters;
-  return { ...parameters, email: resolveEmailRecipient(parameters.email) };
+  const resolved = { ...parameters };
+  if (parameters.email != null) {
+    resolved.email = resolveEmailRecipient(parameters.email);
+  }
+  if (parameters.to_emails != null) {
+    resolved.to_emails = resolveEmailRecipientList(parameters.to_emails).join(",");
+  }
+  return resolved;
 }
