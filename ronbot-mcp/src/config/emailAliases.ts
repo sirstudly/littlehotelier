@@ -22,24 +22,72 @@ function resolveConfigPath(filename: string): string {
   throw new Error(`Cannot find config/${filename}. Searched: ${candidates.join(", ")}`);
 }
 
+export interface DirectoryUser {
+  alias: string;
+  email: string;
+  /** Normalized WhatsApp JIDs (`<digits>@c.us` or `<id>@lid`). */
+  whatsapp: string[];
+}
+
+type RawAliasValue = string | { email?: unknown; whatsapp?: unknown };
+
+/**
+ * Bare phone numbers (optionally `+`, spaces, dashes) become `<digits>@c.us`;
+ * full JIDs are kept, with `@s.whatsapp.net` mapped to `@c.us`.
+ */
+export function normalizeWhatsAppId(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.includes("@")) {
+    return trimmed.replace(/@s\.whatsapp\.net$/, "@c.us");
+  }
+  const digits = trimmed.replace(/[\s\-+()]/g, "");
+  return digits ? `${digits}@c.us` : "";
+}
+
+let cachedUsers: DirectoryUser[] | null = null;
 let cachedAliases: Record<string, string> | null = null;
+
+export function loadUserDirectory(): DirectoryUser[] {
+  if (cachedUsers) return cachedUsers;
+  const raw = JSON.parse(readFileSync(resolveConfigPath("email-aliases.json"), "utf8")) as Record<
+    string,
+    RawAliasValue
+  >;
+  const users: DirectoryUser[] = [];
+  for (const [key, value] of Object.entries(raw)) {
+    const alias = key.trim().toLowerCase();
+    if (typeof value === "string") {
+      users.push({ alias, email: value.trim(), whatsapp: [] });
+      continue;
+    }
+    const email = typeof value?.email === "string" ? value.email.trim() : "";
+    if (!email) {
+      throw new Error(`email-aliases.json: alias '${key}' is missing an email`);
+    }
+    const whatsapp = Array.isArray(value.whatsapp)
+      ? value.whatsapp
+          .filter((v): v is string => typeof v === "string")
+          .map(normalizeWhatsAppId)
+          .filter((v) => v !== "")
+      : [];
+    users.push({ alias, email, whatsapp });
+  }
+  cachedUsers = users;
+  return cachedUsers;
+}
 
 export function loadEmailAliases(): Record<string, string> {
   if (cachedAliases) return cachedAliases;
-  const raw = JSON.parse(readFileSync(resolveConfigPath("email-aliases.json"), "utf8")) as Record<
-    string,
-    string
-  >;
   const normalized: Record<string, string> = {};
-  for (const [key, value] of Object.entries(raw)) {
-    normalized[key.trim().toLowerCase()] = String(value).trim();
+  for (const user of loadUserDirectory()) {
+    normalized[user.alias] = user.email;
   }
   cachedAliases = normalized;
   return cachedAliases;
 }
 
 /**
- * Resolves shorthand aliases (accounts/hannah/jay/ron) or returns a literal email address.
+ * Resolves shorthand aliases or returns a literal email address.
  * Case-insensitive for aliases. Inputs containing `@` are treated as literal addresses.
  */
 export function resolveEmailRecipient(input: string): string {

@@ -11,6 +11,7 @@ import { askRonbot, chunkWhatsAppText } from "./agent/runner.js";
 import { MembershipCache } from "./membership.js";
 import { TranscriptStore } from "./transcript.js";
 import { isDirectChat, shouldHandle } from "./triggers.js";
+import { resolveRequester, type Requester } from "./users.js";
 import { WahaClient } from "./waha/client.js";
 import { normalizeInbound, type WahaWebhookEvent } from "./waha/types.js";
 
@@ -41,6 +42,14 @@ export function propertyContextLines(
     ];
   }
   return [];
+}
+
+/** Prompt line identifying who asked, so "email me" maps to their alias. */
+export function requesterContextLine(requester: Requester | undefined): string {
+  if (!requester) {
+    return `Requester=unknown (ask for an email or alias if they want something emailed to "me")`;
+  }
+  return `Requester=${requester.alias} (${requester.email}; use alias "${requester.alias}" when they say me/my email)`;
 }
 
 const waha = new WahaClient();
@@ -161,10 +170,13 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
       senderId,
       membership,
     );
+    const requester = resolveRequester(senderId, membership.getLinkedIds(senderId));
     const prompt = [
       `WhatsApp ${msg.isGroup ? "group" : "DM"} chatId=${chatId}`,
       `Trigger=${reason}`,
       `From=${senderId}`,
+      `Today=${new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" })}`,
+      requesterContextLine(requester),
       ...propertyLines,
       "",
       "Recent chat context:",
@@ -175,7 +187,7 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
     ].join("\n");
 
     console.log(
-      `handling ${reason} chat=${chatId} from=${senderId}${images?.length ? " images=1" : ""}`,
+      `handling ${reason} chat=${chatId} from=${senderId} requester=${requester?.alias ?? "unknown"}${images?.length ? " images=1" : ""}`,
     );
     const answer = await askRonbot(chatId, prompt, images);
     if (isNoReply(answer)) {

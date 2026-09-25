@@ -6,7 +6,7 @@ import {
   type PropertyId,
   PROPERTY_IDS,
 } from "./env.js";
-import { extractParticipantIds, type WahaClient } from "./waha/client.js";
+import { extractParticipantIdentityGroups, type WahaClient } from "./waha/client.js";
 import type { WahaWebhookEvent } from "./waha/types.js";
 
 function sleep(ms: number): Promise<void> {
@@ -16,6 +16,21 @@ function sleep(ms: number): Promise<void> {
 const PROPERTY_ORDER = new Map(
   PROPERTY_IDS.map((id, index) => [id, index] as const),
 );
+
+/** Record that all `jids` belong to one participant. */
+function linkIdentities(links: Map<string, Set<string>>, jids: string[]): void {
+  if (jids.length < 2) return;
+  for (const jid of jids) {
+    let set = links.get(jid);
+    if (!set) {
+      set = new Set();
+      links.set(jid, set);
+    }
+    for (const other of jids) {
+      if (other !== jid) set.add(other);
+    }
+  }
+}
 
 /**
  * Union of participants across allowlisted groups.
@@ -27,6 +42,8 @@ export class MembershipCache {
   private members = new Set<string>();
   /** senderJid → properties from tagged groups they belong to */
   private memberProperties = new Map<string, Set<PropertyId>>();
+  /** jid → other identities of the same participant (LID ↔ phone) */
+  private linkedIds = new Map<string, Set<string>>();
   private lastRefreshMs = 0;
   private refreshing: Promise<void> | null = null;
 
@@ -43,6 +60,11 @@ export class MembershipCache {
     return [...set].sort(
       (a, b) => (PROPERTY_ORDER.get(a) ?? 99) - (PROPERTY_ORDER.get(b) ?? 99),
     );
+  }
+
+  /** Other identities (phone / LID) seen for the same participant; excludes `senderId`. */
+  getLinkedIds(senderId: string): string[] {
+    return [...(this.linkedIds.get(normalizeJid(senderId)) ?? [])];
   }
 
   size(): number {
@@ -84,21 +106,25 @@ export class MembershipCache {
   private async doRefresh(): Promise<void> {
     const next = new Set<string>();
     const nextProps = new Map<string, Set<PropertyId>>();
+    const nextLinks = new Map<string, Set<string>>();
 
     for (const group of config.groups) {
       if (!isAllowlistedGroup(group.id)) continue;
       try {
-        const ids = await this.waha.getGroupParticipants(group.id);
-        for (const id of ids) {
-          const jid = normalizeJid(id);
-          next.add(jid);
-          if (group.property) {
-            let set = nextProps.get(jid);
-            if (!set) {
-              set = new Set();
-              nextProps.set(jid, set);
+        const participants = await this.waha.getGroupParticipants(group.id);
+        for (const identities of participants) {
+          const jids = identities.map(normalizeJid);
+          linkIdentities(nextLinks, jids);
+          for (const jid of jids) {
+            next.add(jid);
+            if (group.property) {
+              let set = nextProps.get(jid);
+              if (!set) {
+                set = new Set();
+                nextProps.set(jid, set);
+              }
+              set.add(group.property);
             }
-            set.add(group.property);
           }
         }
       } catch (err) {
@@ -107,6 +133,7 @@ export class MembershipCache {
     }
     this.members = next;
     this.memberProperties = nextProps;
+    this.linkedIds = nextLinks;
     this.lastRefreshMs = Date.now();
     console.log(
       `membership cache: ${this.members.size} unique identities across ${config.groups.length} groups`,
@@ -131,7 +158,10 @@ export class MembershipCache {
     if (!groupId.endsWith("@g.us") || !isAllowlistedGroup(groupId)) return;
 
     const type = String(p?.type ?? "").toLowerCase();
-    const participants = extractParticipantIds(p?.participants ?? []).map(normalizeJid);
+    const identityGroups = extractParticipantIdentityGroups(p?.participants ?? []).map((ids) =>
+      ids.map(normalizeJid),
+    );
+    const participants = identityGroups.flat();
     const property = getGroupProperty(groupId);
 
     if (type.includes("leave") || type.includes("remove")) {
@@ -140,6 +170,7 @@ export class MembershipCache {
       return;
     }
     if (type.includes("join") || type.includes("add") || !type) {
+      for (const jids of identityGroups) linkIdentities(this.linkedIds, jids);
       for (const id of participants) {
         this.members.add(id);
         if (property) this.addMemberProperty(id, property);

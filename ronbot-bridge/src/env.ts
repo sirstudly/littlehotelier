@@ -139,6 +139,18 @@ export const config = {
   mcpEntry:
     env("RONBOT_MCP_ENTRY") ||
     path.join(repoRootDefault, "ronbot-mcp", "dist", "index.js"),
+  /** Shared with MCP; defaults to `<mcp package>/config/email-aliases.json` next to `mcpEntry`. */
+  emailAliasesPath:
+    env("RONBOT_EMAIL_ALIASES_PATH") ||
+    path.join(
+      path.dirname(
+        path.dirname(
+          env("RONBOT_MCP_ENTRY") || path.join(repoRootDefault, "ronbot-mcp", "dist", "index.js"),
+        ),
+      ),
+      "config",
+      "email-aliases.json",
+    ),
   cursorApiKey: env("CURSOR_API_KEY") || undefined,
   modelId: env("RONBOT_MODEL", "composer-2.5"),
   googleCredentials: env("GOOGLE_APPLICATION_CREDENTIALS"),

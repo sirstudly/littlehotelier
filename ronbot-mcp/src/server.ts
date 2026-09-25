@@ -384,7 +384,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "insert_job",
-    "Enqueue an allowlisted job into wp_lh_jobs (status=submitted). If parameters include email or to_emails (comma-delimited), shorthand aliases (accounts/hannah/jay/ron) are resolved to full addresses.",
+    "Enqueue an allowlisted job into wp_lh_jobs (status=submitted). If parameters include email or to_emails (comma-delimited), shorthand aliases (accounts/hannah/jay/ron) are resolved to full addresses. For \"email me\" requests from WhatsApp, pass the Requester alias from the prompt.",
     {
       property: propertySchema,
       job_type: z.string().min(1),

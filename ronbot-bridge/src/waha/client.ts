@@ -155,7 +155,8 @@ export class WahaClient {
     return null;
   }
 
-  async getGroupParticipants(groupId: string): Promise<string[]> {
+  /** One entry per participant: every identity WAHA gave for them (LID and/or phone). */
+  async getGroupParticipants(groupId: string): Promise<string[][]> {
     const id = encodeURIComponent(normalizeJid(groupId));
     const session = encodeURIComponent(this.session);
     const urls = [
@@ -176,8 +177,10 @@ export class WahaClient {
           continue;
         }
         const data = (await res.json()) as unknown;
-        const ids = [...new Set(extractParticipantIds(data).map(normalizeJid))];
-        if (ids.length > 0) return ids;
+        const groups = extractParticipantIdentityGroups(data).map((ids) => [
+          ...new Set(ids.map(normalizeJid)),
+        ]);
+        if (groups.length > 0) return groups;
         lastErr = new Error(`WAHA participants empty for ${groupId} via ${url}`);
       } catch (err) {
         lastErr = err instanceof Error ? err : new Error(String(err));
@@ -193,13 +196,20 @@ export class WahaClient {
  * DM ACL needs both so senders match whether webhook uses LID or @c.us.
  */
 export function extractParticipantIds(data: unknown): string[] {
+  return extractParticipantIdentityGroups(data).flat();
+}
+
+/** Same as `extractParticipantIds`, but keeps each participant's ids (LID + phone) together. */
+export function extractParticipantIdentityGroups(data: unknown): string[][] {
   if (Array.isArray(data)) {
-    return data.flatMap((item) => extractOneParticipant(item));
+    return data
+      .map((item) => extractOneParticipant(item))
+      .filter((ids) => ids.length > 0);
   }
   if (data && typeof data === "object") {
     const o = data as Record<string, unknown>;
-    if (Array.isArray(o.participants)) return extractParticipantIds(o.participants);
-    if (Array.isArray(o.data)) return extractParticipantIds(o.data);
+    if (Array.isArray(o.participants)) return extractParticipantIdentityGroups(o.participants);
+    if (Array.isArray(o.data)) return extractParticipantIdentityGroups(o.data);
   }
   return [];
 }

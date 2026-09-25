@@ -376,4 +376,86 @@ assert(extracted.includes("99900011122211@lid"), "keep @lid");
 assert(extracted.includes("447700900003@c.us"), "keep pn as @c.us");
 assert(extracted.includes("447700900010@c.us"), "normalize phoneNumber to @c.us");
 
+const { extractParticipantIdentityGroups } = await import("../src/waha/client.js");
+const identityGroups = extractParticipantIdentityGroups({
+  participants: [
+    { id: "99900011122211@lid", pn: "447700900003@c.us" },
+    { id: "447700900004@c.us" },
+  ],
+});
+assert(identityGroups.length === 2, "one identity group per participant");
+assert(
+  identityGroups[0]!.includes("99900011122211@lid") &&
+    identityGroups[0]!.includes("447700900003@c.us"),
+  "LID and phone kept together",
+);
+
+// Requester resolution (email-aliases.json whatsapp ids)
+const { resolveRequester, setUserDirectory, normalizeWhatsAppId } = await import(
+  "../src/users.js"
+);
+assert(normalizeWhatsAppId("+44 7700-900003") === "447700900003@c.us", "phone → @c.us");
+assert(
+  normalizeWhatsAppId("447700900003@s.whatsapp.net") === "447700900003@c.us",
+  "s.whatsapp.net → @c.us",
+);
+setUserDirectory({
+  office: "office@example.com",
+  alice: { email: "alice@example.com", whatsapp: ["+447700900003"] },
+  bob: { email: "bob@example.com", whatsapp: ["88800011122299@lid"] },
+});
+assert(
+  resolveRequester("447700900003@c.us")?.alias === "alice",
+  "phone sender resolves to configured user",
+);
+assert(
+  resolveRequester("99900011122211@lid", ["447700900003@c.us"])?.email ===
+    "alice@example.com",
+  "LID sender resolves via linked phone",
+);
+assert(resolveRequester("88800011122299@lid")?.alias === "bob", "configured LID matches");
+assert(resolveRequester("447700900099@c.us") === undefined, "unknown sender → undefined");
+assert(
+  resolveRequester("office@example.com") === undefined,
+  "string-only alias never matches a sender",
+);
+
+const { requesterContextLine } = await import("../src/server.js");
+assert(
+  requesterContextLine({ alias: "alice", email: "alice@example.com" }).startsWith(
+    "Requester=alice (alice@example.com",
+  ),
+  "requester line for known user",
+);
+assert(
+  requesterContextLine(undefined).startsWith("Requester=unknown"),
+  "requester line for unknown sender",
+);
+
+class LinkMembership extends MembershipCache {
+  constructor() {
+    super({} as never);
+  }
+}
+const linkMembership = new LinkMembership();
+const { config: linkConfig } = await import("../src/env.js");
+const linkGroup = "120363555555555555@g.us";
+if (!linkConfig.groups.some((g) => g.id === linkGroup)) linkConfig.groups.push({ id: linkGroup });
+linkMembership.applyParticipantEvent({
+  event: "group.v2.participants",
+  payload: {
+    group: { id: linkGroup },
+    type: "join",
+    participants: [{ id: "77700011122211@lid", pn: "447700900005@c.us" }],
+  },
+} as never);
+assert(
+  linkMembership.getLinkedIds("77700011122211@lid").includes("447700900005@c.us"),
+  "join event links LID → phone",
+);
+assert(
+  linkMembership.getLinkedIds("447700900005@c.us").includes("77700011122211@lid"),
+  "join event links phone → LID",
+);
+
 console.log("smoke-triggers: ok");

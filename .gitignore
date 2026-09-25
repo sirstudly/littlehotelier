@@ -13,6 +13,7 @@
 /.env
 /proxy/.env
 /ronbot-mcp/.env
+/ronbot-mcp/config/email-aliases.json
 /ronbot-bridge/.env
 /.idea
 /.gradle

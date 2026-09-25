@@ -46,9 +46,20 @@ Shorthand for job `email` parameters (config/`email-aliases.json`):
 
 | Alias | Address |
 |-------|---------|
-| `accounts` / `hannah` | accounts@macbackpackers.com |
-| `jay` | jay@macbackpackers.com |
-| `ron` | ron@macbackpackers.com |
+| `office` / `alice` | office@example.com |
+| `bob` | bob@example.com |
+| `carol` | carol@example.com |
+
+Each value is either an address string or an object with the user's WhatsApp identities:
+
+```json
+{
+  "office": "office@example.com",
+  "bob": { "email": "bob@example.com", "whatsapp": ["+447700900003", "12345678901234@lid"] }
+}
+```
+
+`whatsapp` entries are phone numbers (`+`, spaces and dashes ignored; stored as `<digits>@c.us`) or full JIDs (`@c.us` / `@lid`). `ronbot-bridge` reads the same file to resolve the WhatsApp sender to a `Requester=<alias>` prompt line, so "send me the latest channel report" is emailed to that user. MCP itself only resolves aliases; it never sees the sender.
 
 ### `enqueue_quarterly_evl_6plus_report`
 
@@ -120,6 +131,7 @@ See [`.cursor/mcp.json`](../.cursor/mcp.json). Point `args` at `ronbot-mcp/dist/
 - "Run the quarterly EVL nights 6+ report for hsh to accounts" → `enqueue_quarterly_evl_6plus_report` with `property=hsh`, `email=accounts`
 - "EVL over 5 nights report for all Edinburgh hostels, email jay" → `enqueue_quarterly_evl_6plus_report` with `property=all`, `email=jay`
 - "Channel report for August 2026 at rmb, email accounts and ron" → `enqueue_channel_production_report` with `property=rmb`, `year_month=2026-08`, `to_emails=["accounts","ron"]`
+- WhatsApp: "send me the latest channel report" (from a tagged hsh group, sender listed in `email-aliases.json`) → `enqueue_channel_production_report` with `property=hsh`, previous month, `to_emails=[<Requester alias>]`
 - "Revenue by channel at hsh for July 2026" → `get_channel_production` with `property=hsh`, `month=2026-07`
 - "Occupancy at rmb from 2026-06-01 to 2026-08-31" → `get_occupancy` with `property=rmb`, `from=2026-06-01`, `to=2026-08-31`
 

@@ -1,6 +1,6 @@
 {
-  "accounts": "accounts@macbackpackers.com",
-  "hannah": "accounts@macbackpackers.com",
-  "jay": "jay@macbackpackers.com",
-  "ron": "ron@macbackpackers.com"
+  "office": "office@example.com",
+  "alice": { "email": "alice@example.com", "whatsapp": [] },
+  "bob": { "email": "bob@example.com", "whatsapp": [] },
+  "carol": { "email": "carol@example.com", "whatsapp": [] }
 }

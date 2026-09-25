@@ -81,6 +81,10 @@ Build context is the **repo root**. The bridge image builds `ronbot-mcp` (`dist`
 
 Tagged groups inject `DefaultProperty` into the agent prompt. DMs infer the default from the sender’s tagged-group memberships; if they belong to multiple tagged properties, ronbot asks which one unless the message already names a property.
 
+### Requester ("email me")
+
+Each prompt carries `Requester=<alias>` when the sender's WhatsApp number/LID is listed under `whatsapp` in [`ronbot-mcp/config/email-aliases.json`](../ronbot-mcp/config/email-aliases.json) (otherwise `Requester=unknown`, and ronbot asks for an address). Senders arriving as `@lid` are matched through the phone number WAHA reports for the same group participant. The file is re-read when it changes (Compose mounts it read-only); override the path with `RONBOT_EMAIL_ALIASES_PATH`.
+
 Webhook is preconfigured in compose:
 
 `WHATSAPP_HOOK_URL=http://ronbot-bridge:8787/webhooks/waha`  
@@ -123,6 +127,7 @@ Validates `@ronbot` / follow-up / authorized DM / stranger DM ignore without WAH
 - `@ronbot timeline for reservation 1234567 at rmb`
 - `@ronbot how many beds free tomorrow at hsh?`
 - `@ronbot availability tonight across all hostels`
+- `@ronbot send me the latest channel report` (tagged group or single-property DM; emailed to the Requester)
 - DM (if you’re in a subscribed group): `if guest cancels last night on 1234567 crh, how much should we refund?`
 - `@ronbot how often do we attempt to charge a non-refundable hostelworld booking?`
 
