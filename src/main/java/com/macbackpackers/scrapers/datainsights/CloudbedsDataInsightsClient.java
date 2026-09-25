@@ -7,12 +7,9 @@ import java.time.LocalDate;
 import java.time.MonthDay;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.htmlunit.HttpMethod;
@@ -33,7 +30,8 @@ import com.macbackpackers.scrapers.CloudbedsAccessTokenService;
 import com.macbackpackers.scrapers.CloudbedsJsonRequestFactory;
 
 /**
- * Client for Cloudbeds Data Insights stock reports (Channel Production = stock report 191).
+ * Client for Cloudbeds Data Insights: Channel Production (stock report 191) and the classic
+ * Occupancy report.
  */
 @Component
 public class CloudbedsDataInsightsClient {
@@ -65,46 +63,13 @@ public class CloudbedsDataInsightsClient {
     private long cachedAccessTokenExp;
 
     /**
-     * Group columns for stay-night facts rolled up to Channel Production.
-     * Stock report 191 allows at most 3 {@code group_rows} ("Length must be between 1 and 3").
-     * Day × category × source is the finest CPR-compatible grain.
-     */
-    public static List<String> stayNightGroupColumns() {
-        return Arrays.asList(
-                "stay_date",
-                "reservation_source_category",
-                "reservation_source" );
-    }
-
-    /**
      * Group columns matching the default Channel Production UI (month × category × source).
-     * Same three dimensions as {@link #stayNightGroupColumns()}; callers add {@code modifier:month}
-     * on stay_date when needed.
+     * Stock report 191 allows at most 3 {@code group_rows} ("Length must be between 1 and 3").
      */
-    public static List<String> monthlySourceGroupColumns() {
-        return stayNightGroupColumns();
-    }
-
-    /**
-     * Queries Channel Production for stay dates in {@code [startDate, endDate]} (inclusive)
-     * using absolute ISO filters (same pattern as classic cancellation report).
-     *
-     * @param webClient Cloudbeds session client (cookies)
-     * @param startDate inclusive
-     * @param endDate inclusive
-     * @param groupColumns DI group_rows column names (no month modifier — day grain)
-     * @return parsed JSON root of {@code /query/data}
-     */
-    public JsonObject queryChannelProduction( WebClient webClient, LocalDate startDate, LocalDate endDate,
-            List<String> groupColumns ) throws IOException {
-        String propertyId = jsonRequestFactory.getPropertyId();
-        JsonObject body = buildChannelProductionBody( propertyId, startDate, endDate, groupColumns );
-        String url = DI_BASE + "/stock_reports/" + CHANNEL_PRODUCTION_STOCK_REPORT_ID
-                + "/query/data?mode=Run&format=formatted";
-        LOGGER.info( "Data Insights Channel Production query property={} stay=[{} .. {}] groups={}",
-                propertyId, startDate, endDate, groupColumns );
-        return postJson( webClient, url, propertyId, body );
-    }
+    private static final List<String> MONTHLY_SOURCE_GROUP_COLUMNS = Arrays.asList(
+            "stay_date",
+            "reservation_source_category",
+            "reservation_source" );
 
     /**
      * Queries Channel Production totals for a single calendar month of stay dates, grouped by
@@ -116,8 +81,7 @@ public class CloudbedsDataInsightsClient {
      */
     public JsonObject queryChannelProductionByMonth( WebClient webClient, YearMonth month ) throws IOException {
         String propertyId = jsonRequestFactory.getPropertyId();
-        JsonObject body = buildChannelProductionBody( propertyId, month.atDay( 1 ), month.atEndOfMonth(),
-                monthlySourceGroupColumns(), true );
+        JsonObject body = buildChannelProductionBody( propertyId, month.atDay( 1 ), month.atEndOfMonth() );
         String url = DI_BASE + "/stock_reports/" + CHANNEL_PRODUCTION_STOCK_REPORT_ID
                 + "/query/data?mode=Run&format=formatted";
         LOGGER.info( "Data Insights Channel Production monthly query property={} month={}", propertyId, month );
@@ -147,13 +111,7 @@ public class CloudbedsDataInsightsClient {
         return postJson( webClient, DI_BASE + "/classic_reports/production_reports/rooms_sold", propertyId, body );
     }
 
-    JsonObject buildChannelProductionBody( String propertyId, LocalDate startDate, LocalDate endDate,
-            List<String> groupColumns ) {
-        return buildChannelProductionBody( propertyId, startDate, endDate, groupColumns, false );
-    }
-
-    JsonObject buildChannelProductionBody( String propertyId, LocalDate startDate, LocalDate endDate,
-            List<String> groupColumns, boolean groupStayDateByMonth ) {
+    JsonObject buildChannelProductionBody( String propertyId, LocalDate startDate, LocalDate endDate ) {
         JsonObject body = new JsonObject();
         JsonArray propertyIds = new JsonArray();
         propertyIds.add( propertyId );
@@ -186,7 +144,7 @@ public class CloudbedsDataInsightsClient {
         body.add( "settings", settings );
 
         JsonArray groupRows = new JsonArray();
-        for ( String col : groupColumns ) {
+        for ( String col : MONTHLY_SOURCE_GROUP_COLUMNS ) {
             JsonObject gr = new JsonObject();
             JsonObject cdf = new JsonObject();
             cdf.addProperty( "type", "default" );
@@ -195,7 +153,7 @@ public class CloudbedsDataInsightsClient {
                 cdf.addProperty( "multi_level_id", Integer.parseInt( MULTI_LEVEL_SOURCE ) );
             }
             gr.add( "cdf", cdf );
-            if ( groupStayDateByMonth && "stay_date".equals( col ) ) {
+            if ( "stay_date".equals( col ) ) {
                 gr.addProperty( "modifier", "month" );
             }
             groupRows.add( gr );
@@ -317,49 +275,5 @@ public class CloudbedsDataInsightsClient {
             throw new IOException( "Data Insights HTTP " + status + ": " + StringUtils.left( text, 500 ) );
         }
         return gson.fromJson( text, JsonObject.class );
-    }
-
-    /**
-     * Extracts ordered group column names from a request body or response {@code group_rows}.
-     */
-    public static List<String> groupColumnsFromResponse( JsonObject root ) {
-        List<String> cols = new ArrayList<>();
-        if ( root == null || !root.has( "group_rows" ) || !root.get( "group_rows" ).isJsonArray() ) {
-            return cols;
-        }
-        for ( var el : root.getAsJsonArray( "group_rows" ) ) {
-            if ( el.isJsonPrimitive() ) {
-                cols.add( el.getAsString() );
-            }
-            else if ( el.isJsonObject() ) {
-                JsonObject o = el.getAsJsonObject();
-                if ( o.has( "cdf" ) && o.getAsJsonObject( "cdf" ).has( "column" ) ) {
-                    cols.add( o.getAsJsonObject( "cdf" ).get( "column" ).getAsString() );
-                }
-            }
-        }
-        return cols;
-    }
-
-    /** Convenience for tests / logging: flatten expected month totals from a parsed response. */
-    public static Map<String, BigDecimalPair> sumByNormalizedSource(
-            List<com.macbackpackers.beans.ChannelStayNight> rows,
-            com.macbackpackers.services.BookingSourceNormalizer normalizer ) {
-        Map<String, BigDecimalPair> map = new LinkedHashMap<>();
-        for ( var row : rows ) {
-            String src = row.getBookingSource();
-            if ( src == null ) {
-                continue;
-            }
-            BigDecimalPair p = map.computeIfAbsent( src, k -> new BigDecimalPair() );
-            p.revenue = p.revenue.add( row.getRoomRevenue() );
-            p.roomsSold += row.getRoomsSold();
-        }
-        return map;
-    }
-
-    public static final class BigDecimalPair {
-        public java.math.BigDecimal revenue = java.math.BigDecimal.ZERO;
-        public int roomsSold;
     }
 }

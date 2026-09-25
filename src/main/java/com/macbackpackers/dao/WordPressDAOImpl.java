@@ -8,7 +8,6 @@ import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
-import com.macbackpackers.beans.ChannelStayNight;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.HousekeepingBed;
@@ -2096,67 +2095,6 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "AND a.source = :guest AND a.reservationId IS NOT NULL AND a.reservationId > 0",
                 Long.class )
                 .setParameter( "guest", BookingAssignment.SOURCE_GUEST )
-                .getResultList();
-    }
-
-    @Override
-    @Transactional( timeout = BULK_PERSIST_TX_TIMEOUT_SECONDS )
-    public void replaceChannelStayNights( LocalDate startDate, LocalDate endDate, String dataOrigin,
-            List<ChannelStayNight> rows ) {
-        em.createQuery(
-                "DELETE FROM ChannelStayNight n WHERE n.stayDate >= :start AND n.stayDate <= :end "
-                        + "AND n.dataOrigin = :origin" )
-                .setParameter( "start", java.sql.Date.valueOf( startDate ) )
-                .setParameter( "end", java.sql.Date.valueOf( endDate ) )
-                .setParameter( "origin", dataOrigin )
-                .executeUpdate();
-        if ( rows == null || rows.isEmpty() ) {
-            return;
-        }
-        // multi-row INSERT: one round trip per chunk instead of one per row (IDENTITY disables JDBC batching)
-        final int chunkSize = 500;
-        final String columns = "INSERT INTO wp_lh_rpt_channel_stay_night (stay_date, reservation_id, "
-                + "reservation_number, room_id, room_number, booking_source_raw, booking_source, source_category, "
-                + "room_rate, room_revenue, rooms_sold, data_origin, fetched_at) VALUES ";
-        final String placeholders = "(?,?,?,?,?,?,?,?,?,?,?,?,?)";
-        for ( int from = 0 ; from < rows.size() ; from += chunkSize ) {
-            List<ChannelStayNight> chunk = rows.subList( from, Math.min( from + chunkSize, rows.size() ) );
-            Query q = em.createNativeQuery( columns
-                    + String.join( ",", Collections.nCopies( chunk.size(), placeholders ) ) );
-            q.setHint( "jakarta.persistence.query.timeout", BULK_PERSIST_TX_TIMEOUT_SECONDS * 1000 );
-            int p = 1;
-            for ( ChannelStayNight r : chunk ) {
-                q.setParameter( p++, java.sql.Date.valueOf( r.getStayDate() ) );
-                q.setParameter( p++, r.getReservationId() );
-                q.setParameter( p++, r.getReservationNumber() );
-                q.setParameter( p++, r.getRoomId() );
-                q.setParameter( p++, r.getRoomNumber() );
-                q.setParameter( p++, r.getBookingSourceRaw() );
-                q.setParameter( p++, r.getBookingSource() );
-                q.setParameter( p++, r.getSourceCategory() );
-                q.setParameter( p++, r.getRoomRate() );
-                q.setParameter( p++, r.getRoomRevenue() );
-                q.setParameter( p++, r.getRoomsSold() );
-                q.setParameter( p++, r.getDataOrigin() );
-                q.setParameter( p++, r.getFetchedAt() );
-            }
-            q.executeUpdate();
-        }
-    }
-
-    @Override
-    @Transactional( readOnly = true )
-    @SuppressWarnings( "unchecked" )
-    public List<Object[]> sumChannelStayNightsBySource( LocalDate startDate, LocalDate endDate ) {
-        return em.createQuery(
-                "SELECT n.bookingSource, SUM(n.roomRevenue), SUM(n.roomsSold) "
-                        + "FROM ChannelStayNight n "
-                        + "WHERE n.stayDate >= :start AND n.stayDate <= :end "
-                        + "AND n.bookingSource IS NOT NULL "
-                        + "GROUP BY n.bookingSource "
-                        + "ORDER BY n.bookingSource" )
-                .setParameter( "start", java.sql.Date.valueOf( startDate ) )
-                .setParameter( "end", java.sql.Date.valueOf( endDate ) )
                 .getResultList();
     }
 

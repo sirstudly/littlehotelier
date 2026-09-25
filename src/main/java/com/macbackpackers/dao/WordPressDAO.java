@@ -17,7 +17,6 @@ import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
-import com.macbackpackers.beans.ChannelStayNight;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.HousekeepingBed;
@@ -889,20 +888,4 @@ public interface WordPressDAO {
      * Distinct reservation ids among current guest assignments with null {@code last_rest_fetched_at}.
      */
     List<Long> fetchReservationIdsNeedingRestEnrich();
-
-    // --- Channel Production stay-night facts ---
-
-    /**
-     * Deletes {@code data_origin} rows with {@code stay_date} in {@code [start, end]} then inserts
-     * {@code rows}. Does not affect rows outside the window or other origins.
-     */
-    void replaceChannelStayNights( LocalDate startDate, LocalDate endDate, String dataOrigin,
-            List<ChannelStayNight> rows );
-
-    /**
-     * Aggregates room revenue and rooms sold by normalized booking source for a stay-date range.
-     *
-     * @return list of Object[]{ booking_source, sum(room_revenue), sum(rooms_sold) }
-     */
-    List<Object[]> sumChannelStayNightsBySource( LocalDate startDate, LocalDate endDate );
 }
