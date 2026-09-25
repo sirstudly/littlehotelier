@@ -115,6 +115,16 @@ public class ChannelProductionDto {
         private BigDecimal netRevenue = BigDecimal.ZERO;
         /** Net revenue / rooms sold; null when nothing was sold. */
         private BigDecimal avgPricePerBed;
+        /** Beds occupied for the month, 0–100; null if unavailable. */
+        private BigDecimal occupancyPct;
+
+        public BigDecimal getOccupancyPct() {
+            return occupancyPct;
+        }
+
+        public void setOccupancyPct( BigDecimal occupancyPct ) {
+            this.occupancyPct = occupancyPct;
+        }
 
         public BigDecimal getRevenue() {
             return revenue;

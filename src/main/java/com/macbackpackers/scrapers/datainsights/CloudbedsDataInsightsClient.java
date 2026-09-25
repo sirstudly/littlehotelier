@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.MonthDay;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -44,6 +46,8 @@ public class CloudbedsDataInsightsClient {
     public static final String MULTI_LEVEL_SOURCE = "4";
 
     private static final String DI_BASE = "https://api.cloudbeds.com/datainsights/v1.1";
+
+    private static final DateTimeFormatter MONTH_DAY_FORMAT = DateTimeFormatter.ofPattern( "MM-dd" );
 
     @Autowired
     private CloudbedsJsonRequestFactory jsonRequestFactory;
@@ -118,6 +122,29 @@ public class CloudbedsDataInsightsClient {
                 + "/query/data?mode=Run&format=formatted";
         LOGGER.info( "Data Insights Channel Production monthly query property={} month={}", propertyId, month );
         return postJson( webClient, url, propertyId, body );
+    }
+
+    /**
+     * Queries the classic Occupancy report for {@code [start, end]} (inclusive) within a single
+     * {@code year}; results are broken down by month.
+     *
+     * @param webClient Cloudbeds session client (cookies)
+     * @param year report year (the API cannot span years)
+     * @param start inclusive start within {@code year}
+     * @param end inclusive end within {@code year}
+     * @return parsed JSON root ({@code {"year":..., "results":[{"date":"MM","occupancy":..., ...}]}})
+     */
+    public JsonObject queryOccupancy( WebClient webClient, int year, MonthDay start, MonthDay end )
+            throws IOException {
+        String propertyId = jsonRequestFactory.getPropertyId();
+        JsonObject body = new JsonObject();
+        body.addProperty( "report_year", String.valueOf( year ) );
+        body.addProperty( "period_start", MONTH_DAY_FORMAT.format( start ) );
+        body.addProperty( "period_end", MONTH_DAY_FORMAT.format( end ) );
+        body.addProperty( "grouping", "month" );
+        LOGGER.info( "Data Insights Occupancy query property={} year={} period=[{} .. {}]",
+                propertyId, year, start, end );
+        return postJson( webClient, DI_BASE + "/classic_reports/production_reports/rooms_sold", propertyId, body );
     }
 
     JsonObject buildChannelProductionBody( String propertyId, LocalDate startDate, LocalDate endDate,

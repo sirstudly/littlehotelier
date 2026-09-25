@@ -53,7 +53,7 @@ public class ChannelProductionReportServiceTest {
                 line( "Booking.com", "14461.66", 382, "37.86" ),
                 line( "Hostelworld", "18774.27", 493, "38.08" ),
                 line( "Walk-In", "516", 14, "36.86" ),
-                line( "Website", "11791.19", 278, "42.41" ) ) );
+                line( "Website", "11791.19", 278, "42.41" ) ), new BigDecimal( "81.84" ) );
         MonthReport aug2025 = new MonthReport( YearMonth.of( 2025, 8 ), Arrays.asList(
                 line( "Booking.com", "1712.86", 48, "35.68" ),
                 line( "Hostelworld", "29982.80", 746, "40.19" ),
@@ -91,6 +91,9 @@ public class ChannelProductionReportServiceTest {
             assertEquals( "F4-'2025'!F4", formula( s2026, "F14" ) );
             assertEquals( "SUM(B10:B13)", formula( s2026, "F17" ) );
             assertEquals( "% OF BEDS OCCUPIED", string( s2026, "E18" ) );
+            assertEquals( 0.8184, number( s2026, "F18" ), 0.00001 );
+            assertEquals( "0.00%", cellAt( s2026, "F18" ).getCellStyle().getDataFormatString() );
+            assertNull( cellAt( wb.getSheet( "2025" ), "F18" ) );
             assertEquals( "F10/F17", formula( s2026, "F19" ) );
 
             assertEquals( "F10-'2024'!F10", formula( wb.getSheet( "2025" ), "F13" ) );

@@ -51,16 +51,22 @@ public class ChannelProductionReportService {
     private CloudbedsDataInsightsClient dataInsightsClient;
 
     @Autowired
+    private OccupancyReportService occupancyReportService;
+
+    @Autowired
     private Environment environment;
 
     /**
-     * Fetches Channel Production totals by source for the given stay-date month.
+     * Fetches Channel Production totals by source, plus occupancy, for the given stay-date month.
      */
     public MonthReport fetchMonth( WebClient webClient, YearMonth month ) throws IOException {
         JsonObject response = dataInsightsClient.queryChannelProductionByMonth( webClient, month );
-        MonthReport report = parseMonth( response, month );
-        LOGGER.info( "Channel Production {}: {} source(s)", month, report.getLines().size() );
-        return report;
+        MonthReport parsed = parseMonth( response, month );
+        BigDecimal occupancyPct = occupancyReportService
+                .fetchOccupancy( webClient, month.atDay( 1 ), month.atEndOfMonth() )
+                .getOccupancyPct();
+        LOGGER.info( "Channel Production {}: {} source(s), occupancy {}%", month, parsed.getLines().size(), occupancyPct );
+        return new MonthReport( month, parsed.getLines(), occupancyPct );
     }
 
     /**
@@ -222,6 +228,11 @@ public class ChannelProductionReportService {
         setString( sheet, 17, 4, "BEDS SOLD", null );
         setFormula( sheet, 17, 5, n == 0 ? "0" : "SUM(B" + roomNightsFirstRow + ":B" + roomNightsLastRow + ")", null );
         setString( sheet, 18, 4, "% OF BEDS OCCUPIED", styles.bold );
+        if ( report.getOccupancyPct() != null ) {
+            Cell occupied = cell( sheet, 18, 5 );
+            occupied.setCellValue( report.getOccupancyPct().movePointLeft( 2 ).doubleValue() );
+            occupied.setCellStyle( styles.percent );
+        }
         setString( sheet, 19, 4, "AVG PRICE PER BED", null );
         setFormula( sheet, 19, 5, "F10/F17", styles.currency );
 
@@ -285,6 +296,7 @@ public class ChannelProductionReportService {
         private final CellStyle currency;
         private final CellStyle bold;
         private final CellStyle boldCurrency;
+        private final CellStyle percent;
 
         private Styles( Workbook workbook ) {
             Font boldFont = workbook.createFont();
@@ -302,16 +314,25 @@ public class ChannelProductionReportService {
             boldCurrency = workbook.createCellStyle();
             boldCurrency.setDataFormat( gbp );
             boldCurrency.setFont( boldFont );
+
+            percent = workbook.createCellStyle();
+            percent.setDataFormat( workbook.createDataFormat().getFormat( "0.00%" ) );
         }
     }
 
     public static final class MonthReport {
         private final YearMonth month;
         private final List<SourceLine> lines;
+        private final BigDecimal occupancyPct;
 
         public MonthReport( YearMonth month, List<SourceLine> lines ) {
+            this( month, lines, null );
+        }
+
+        public MonthReport( YearMonth month, List<SourceLine> lines, BigDecimal occupancyPct ) {
             this.month = month;
             this.lines = Collections.unmodifiableList( new ArrayList<>( lines ) );
+            this.occupancyPct = occupancyPct;
         }
 
         public YearMonth getMonth() {
@@ -320,6 +341,11 @@ public class ChannelProductionReportService {
 
         public List<SourceLine> getLines() {
             return lines;
+        }
+
+        /** Beds occupied, 0–100; null if unavailable. */
+        public BigDecimal getOccupancyPct() {
+            return occupancyPct;
         }
     }
 

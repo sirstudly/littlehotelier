@@ -1,0 +1,77 @@
+{
+  "year": 2026,
+  "results": [
+    {
+      "date": "01",
+      "occupancy": 42.42636746143057,
+      "accommodations_booked": 605,
+      "revenue": 10758.820000000003
+    },
+    {
+      "date": "02",
+      "occupancy": 44.798136645962735,
+      "accommodations_booked": 577,
+      "revenue": 9923.910000000013
+    },
+    {
+      "date": "03",
+      "occupancy": 61.92145862552594,
+      "accommodations_booked": 883,
+      "revenue": 15825.260000000064
+    },
+    {
+      "date": "04",
+      "occupancy": 75.57971014492753,
+      "accommodations_booked": 1043,
+      "revenue": 20495.14000000007
+    },
+    {
+      "date": "05",
+      "occupancy": 81.90743338008416,
+      "accommodations_booked": 1168,
+      "revenue": 28398.3000000002
+    },
+    {
+      "date": "06",
+      "occupancy": 81.59420289855072,
+      "accommodations_booked": 1126,
+      "revenue": 27669.21000000005
+    },
+    {
+      "date": "07",
+      "occupancy": 81.13604488078542,
+      "accommodations_booked": 1157,
+      "revenue": 29202.79
+    },
+    {
+      "date": "08",
+      "occupancy": 81.83730715287517,
+      "accommodations_booked": 1167,
+      "revenue": 45543.12000000001
+    },
+    {
+      "date": "09",
+      "occupancy": 80.21739130434783,
+      "accommodations_booked": 1107,
+      "revenue": 21797.629999999954
+    },
+    {
+      "date": "10",
+      "occupancy": 51.89340813464236,
+      "accommodations_booked": 740,
+      "revenue": 19461.760000000064
+    },
+    {
+      "date": "11",
+      "occupancy": 15.0,
+      "accommodations_booked": 207,
+      "revenue": 5336.380000000002
+    },
+    {
+      "date": "12",
+      "occupancy": 4.207573632538569,
+      "accommodations_booked": 60,
+      "revenue": 1440.4600000000005
+    }
+  ]
+}

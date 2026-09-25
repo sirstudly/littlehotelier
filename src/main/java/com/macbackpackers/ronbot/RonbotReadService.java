@@ -45,6 +45,7 @@ import com.macbackpackers.ronbot.dto.BookingTimelineDto;
 import com.macbackpackers.ronbot.dto.ChannelProductionDto;
 import com.macbackpackers.ronbot.dto.ContinuingRoomDto;
 import com.macbackpackers.ronbot.dto.JobHistoryDto;
+import com.macbackpackers.ronbot.dto.OccupancyDto;
 import com.macbackpackers.ronbot.dto.RoomTypeAvailabilityDto;
 import com.macbackpackers.ronbot.dto.StayContinuationDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
@@ -52,6 +53,9 @@ import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.services.ChannelProductionReportService;
 import com.macbackpackers.services.ChannelProductionReportService.MonthReport;
 import com.macbackpackers.services.ChannelProductionReportService.SourceLine;
+import com.macbackpackers.services.OccupancyReportService;
+import com.macbackpackers.services.OccupancyReportService.MonthOccupancy;
+import com.macbackpackers.services.OccupancyReportService.OccupancyReport;
 
 @Profile( "ronbot-parent" )
 @Service
@@ -61,6 +65,8 @@ public class RonbotReadService {
 
     /** Cap full reservation loads when search returns many fuzzy hits (e.g. common names). */
     private static final int MAX_SEARCH_RESULTS = 20;
+
+    private static final int MAX_OCCUPANCY_NIGHTS = 366;
 
     private final PropertyContextRegistry propertyContexts;
 
@@ -417,6 +423,57 @@ public class RonbotReadService {
         totals.setNetRevenue( netRevenue );
         totals.setAvgPricePerBed( totalRooms == 0 ? null
                 : netRevenue.divide( BigDecimal.valueOf( totalRooms ), 2, RoundingMode.HALF_UP ) );
+        totals.setOccupancyPct( report.getOccupancyPct() );
+        return dto;
+    }
+
+    /**
+     * Beds-occupied rate over an inclusive stay-date range, with a monthly breakdown.
+     *
+     * @param fromRaw required YYYY-MM-DD
+     * @param toRaw required YYYY-MM-DD
+     */
+    public OccupancyDto getOccupancy( String property, String fromRaw, String toRaw ) throws IOException {
+        if ( StringUtils.isBlank( fromRaw ) || StringUtils.isBlank( toRaw ) ) {
+            throw new IllegalArgumentException( "from and to are required (YYYY-MM-DD)" );
+        }
+        LocalDate from = parseDateOrDefault( fromRaw, null );
+        LocalDate to = parseDateOrDefault( toRaw, null );
+        if ( to.isBefore( from ) ) {
+            throw new IllegalArgumentException( "to must be on or after from" );
+        }
+        long nights = ChronoUnit.DAYS.between( from, to ) + 1;
+        if ( nights > MAX_OCCUPANCY_NIGHTS ) {
+            throw new IllegalArgumentException( "Date range too long (max " + MAX_OCCUPANCY_NIGHTS
+                    + " nights inclusive); got " + nights );
+        }
+
+        ConfigurableApplicationContext ctx = propertyContexts.require( property );
+        OccupancyReportService occupancyService = ctx.getBean( OccupancyReportService.class );
+        try ( WebClient webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            LOGGER.info( "Fetching occupancy for property={} from={} to={}", property, from, to );
+            return toOccupancyDto( property, occupancyService.fetchOccupancy( webClient, from, to ) );
+        }
+    }
+
+    static OccupancyDto toOccupancyDto( String property, OccupancyReport report ) {
+        OccupancyDto dto = new OccupancyDto();
+        dto.setProperty( property );
+        dto.setFrom( report.getFrom().toString() );
+        dto.setTo( report.getTo().toString() );
+        dto.setOccupancyPct( report.getOccupancyPct() );
+        dto.setBedsBooked( report.getBedsBooked() );
+        dto.setRevenue( report.getRevenue() );
+        List<OccupancyDto.Month> months = new ArrayList<>();
+        for ( MonthOccupancy m : report.getMonths() ) {
+            OccupancyDto.Month month = new OccupancyDto.Month();
+            month.setMonth( m.getMonth().toString() );
+            month.setOccupancyPct( m.getOccupancyPct().setScale( 2, RoundingMode.HALF_UP ) );
+            month.setBedsBooked( m.getBedsBooked() );
+            month.setRevenue( m.getRevenue() );
+            months.add( month );
+        }
+        dto.setMonths( months );
         return dto;
     }
 

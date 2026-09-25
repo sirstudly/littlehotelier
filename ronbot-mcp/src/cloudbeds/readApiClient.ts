@@ -116,6 +116,19 @@ export async function getChannelProduction(params: {
   return request(`/ronbot/${property}/channel-production?${q}`);
 }
 
+/**
+ * Beds-occupied rate over an inclusive stay-date range (YYYY-MM-DD), with a monthly breakdown.
+ */
+export async function getOccupancy(params: {
+  property: string;
+  from: string;
+  to: string;
+}): Promise<unknown> {
+  const { property, from, to } = params;
+  const q = new URLSearchParams({ from: from.trim(), to: to.trim() });
+  return request(`/ronbot/${property}/occupancy?${q}`);
+}
+
 export async function health(): Promise<unknown> {
   return request("/ronbot/health");
 }

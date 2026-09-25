@@ -24,6 +24,7 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `check_stay_continuation` | Cleaning / extension: staying on past checkout? (same reservation or linked follow-on in same beds) |
 | `get_availability` | Live sellable beds/rooms by room type (read-api; single property, subset, or all hostels in one call) |
 | `get_channel_production` | Live Channel Production numbers by source for one month (read-api; single property, subset, or all hostels in one call) |
+| `get_occupancy` | Live % of beds occupied over a date range, with monthly breakdown (read-api; single property, subset, or all hostels) |
 | `insert_job` | Allowlisted enqueue only (`email` / `to_emails` params accept aliases accounts/hannah/jay/ron) |
 | `enqueue_quarterly_evl_6plus_report` | Enqueue EVL nights-6+ room revenue xlsx email job (Edinburgh crh/hsh/rmb or all) |
 | `enqueue_channel_production_report` | Enqueue Channel Production xlsx email job (month vs same month in previous 2 years) |
@@ -65,7 +66,13 @@ Shorthand for job `email` parameters (config/`email-aliases.json`):
 
 - Required: `month` (YYYY-MM); optional `property` / `properties` (omit both for all hostels)
 - Proxies `GET /ronbot/{property}/channel-production?month=YYYY-MM` on read-api
-- Returns per-source revenue, room nights, ADR and % shares, plus totals: `revenue`, `roomsSold`, `bdcCommission` (Booking.com revenue / 6.67), `netRevenue`, `avgPricePerBed`
+- Returns per-source revenue, room nights, ADR and % shares, plus totals: `revenue`, `roomsSold`, `bdcCommission` (Booking.com revenue / 6.67), `netRevenue`, `avgPricePerBed`, `occupancyPct`
+
+### `get_occupancy`
+
+- Required: `from`, `to` (YYYY-MM-DD, inclusive, max 366 nights); optional `property` / `properties` (omit both for all hostels)
+- Proxies `GET /ronbot/{property}/occupancy?from=&to=` on read-api (Data Insights classic Occupancy report; one request per calendar year)
+- Returns overall `occupancyPct` (weighted by nights of each month inside the range), `bedsBooked`, `revenue`, and `months[]` with the same fields per month
 
 ## Local development
 
@@ -114,6 +121,7 @@ See [`.cursor/mcp.json`](../.cursor/mcp.json). Point `args` at `ronbot-mcp/dist/
 - "EVL over 5 nights report for all Edinburgh hostels, email jay" → `enqueue_quarterly_evl_6plus_report` with `property=all`, `email=jay`
 - "Channel report for August 2026 at rmb, email accounts and ron" → `enqueue_channel_production_report` with `property=rmb`, `year_month=2026-08`, `to_emails=["accounts","ron"]`
 - "Revenue by channel at hsh for July 2026" → `get_channel_production` with `property=hsh`, `month=2026-07`
+- "Occupancy at rmb from 2026-06-01 to 2026-08-31" → `get_occupancy` with `property=rmb`, `from=2026-06-01`, `to=2026-08-31`
 
 ## Phase 2: Local SDK `Agent.prompt` smoke
 

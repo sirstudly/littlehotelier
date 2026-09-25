@@ -291,7 +291,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_channel_production",
-    "Live Channel Production numbers (Cloudbeds Data Insights) for one stay-date month via ronbot-read-api: revenue, room nights and ADR by source (Booking.com, Hostelworld, Website, Walk-In, ...) with % shares, plus totals (revenue, roomsSold, bdcCommission = Booking.com revenue / 6.67, netRevenue, avgPricePerBed). month is YYYY-MM. Pass properties for one or more hostels, or omit both properties and property to query all (crh/hsh/rmb/lsh) in one call. For year-on-year comparisons call once per month needed. To email the spreadsheet instead, use enqueue_channel_production_report.",
+    "Live Channel Production numbers (Cloudbeds Data Insights) for one stay-date month via ronbot-read-api: revenue, room nights and ADR by source (Booking.com, Hostelworld, Website, Walk-In, ...) with % shares, plus totals (revenue, roomsSold, bdcCommission = Booking.com revenue / 6.67, netRevenue, avgPricePerBed, occupancyPct = % of beds occupied for the month). month is YYYY-MM. Pass properties for one or more hostels, or omit both properties and property to query all (crh/hsh/rmb/lsh) in one call. For year-on-year comparisons call once per month needed. To email the spreadsheet instead, use enqueue_channel_production_report.",
     {
       month: yearMonth,
       properties: z.array(propertySchema).min(1).max(4).optional(),
@@ -322,6 +322,53 @@ export function createServer(): McpServer {
         });
 
         const payload = { month, results };
+        if (!results.some((r) => r.ok)) {
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+            isError: true,
+          };
+        }
+        return ok(payload);
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "get_occupancy",
+    "Occupancy rate (% of beds occupied, Cloudbeds Data Insights Occupancy report) over an inclusive stay-date range via ronbot-read-api. Returns overall occupancyPct (night-weighted across the range), bedsBooked, revenue, and a month-by-month breakdown. from/to are YYYY-MM-DD (max 366 nights). Pass properties for one or more hostels, or omit both properties and property to query all (crh/hsh/rmb/lsh) in one call.",
+    {
+      from: isoDate,
+      to: isoDate,
+      properties: z.array(propertySchema).min(1).max(4).optional(),
+      property: propertySchema.optional(),
+    },
+    async ({ from, to, properties, property }) => {
+      try {
+        let targets: PropertyId[];
+        if (properties && properties.length > 0) {
+          targets = [...new Set(properties)];
+        } else if (property) {
+          targets = [property];
+        } else {
+          targets = [...ALL_PROPERTIES];
+        }
+
+        const settled = await Promise.allSettled(
+          targets.map((p) => readApi.getOccupancy({ property: p, from, to })),
+        );
+        const results = settled.map((outcome, i) => {
+          const prop = targets[i];
+          if (outcome.status === "fulfilled") {
+            return { property: prop, ok: true as const, data: outcome.value };
+          }
+          const message =
+            outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+          return { property: prop, ok: false as const, error: message };
+        });
+
+        const payload = { from, to, results };
         if (!results.some((r) => r.ok)) {
           return {
             content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],

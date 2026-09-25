@@ -22,6 +22,7 @@ import com.macbackpackers.ronbot.dto.AvailabilityDto;
 import com.macbackpackers.ronbot.dto.BookingSummaryDto;
 import com.macbackpackers.ronbot.dto.BookingTimelineDto;
 import com.macbackpackers.ronbot.dto.ChannelProductionDto;
+import com.macbackpackers.ronbot.dto.OccupancyDto;
 import com.macbackpackers.ronbot.dto.StayContinuationDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
 
@@ -125,6 +126,17 @@ public class RonbotReadController {
             @PathVariable String property,
             @RequestParam( name = "month" ) String month ) throws IOException {
         return readService.getChannelProduction( property, month );
+    }
+
+    /**
+     * Beds-occupied rate over an inclusive stay-date range (max 366 nights), with a monthly breakdown.
+     */
+    @GetMapping( "/{property}/occupancy" )
+    public OccupancyDto occupancy(
+            @PathVariable String property,
+            @RequestParam( name = "from" ) String from,
+            @RequestParam( name = "to" ) String to ) throws IOException {
+        return readService.getOccupancy( property, from, to );
     }
 
     @ExceptionHandler( IllegalArgumentException.class )
