@@ -89,7 +89,7 @@ Each value is either an address string or an object with the user's WhatsApp ide
 
 ### `run_sql` / `describe_sql_tables`
 
-Ad-hoc read-only queries against `wp_<prop>_backoffice`, over a separate pool that logs in as a dedicated MySQL user with only `SELECT` and `SHOW VIEW`. The tools are registered only when these are set (repo-root `.env`, loaded by Cursor via `envFile` in `.cursor/mcp.json`):
+Ad-hoc read-only queries against `wp_<prop>_backoffice`, over a separate pool that logs in as a dedicated MySQL user with only `SELECT` and `SHOW VIEW`. The tools are registered only when these are set: locally from the repo-root `.env` (loaded by Cursor via `envFile` in `.cursor/mcp.json`); in production from the host `.env` via the `ronbot-bridge` Compose service, which forwards them to MCP with `RONBOT_SQL_RO_HOST=mysql-tailscale`:
 
 ```bash
 RONBOT_SQL_RO_USER=...
@@ -243,7 +243,7 @@ MCP `dist` is compiled inside the `ronbot-bridge` image; rebuilding the bridge i
 - MCP never calls Cloudbeds directly
 - `insert_job` classname comes only from `config/job-allowlist.json`
 - `run_sql` / `describe_sql_tables` use a dedicated read-only DB user (`SELECT` + `SHOW VIEW` only), never the read/write pool
-- Those tools are not registered unless `RONBOT_SQL_RO_USER` / `RONBOT_SQL_RO_PASSWORD` are set; `ronbot-bridge` does not forward them, so WhatsApp never sees them
+- Those tools are not registered unless `RONBOT_SQL_RO_USER` / `RONBOT_SQL_RO_PASSWORD` are set. `ronbot-bridge` forwards them to its MCP child when set (Compose uses `RONBOT_SQL_RO_HOST=mysql-tailscale`), so WhatsApp staff get them in production
 - Booking/transaction responses redact full card numbers
 - Optional shared secret: `X-Ronbot-Token` / `RONBOT_TOKEN`
 - Keep secrets in gitignored `.env` files (repo root and/or `ronbot-mcp/.env`); do not commit them

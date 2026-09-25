@@ -329,6 +329,10 @@ services:
       - LOG_DIR_RMB=/logs/rmb
       - LOG_DIR_LSH=/logs/lsh
       - HOME=/home/node
+      # MCP run_sql / describe_sql_tables (read-only MySQL user); hidden when user/password empty
+      - RONBOT_SQL_RO_HOST=mysql-tailscale
+      - RONBOT_SQL_RO_USER=${RONBOT_SQL_RO_USER:-}
+      - RONBOT_SQL_RO_PASSWORD=${RONBOT_SQL_RO_PASSWORD:-}
     volumes:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json:ro
       # MCP dist + node_modules are baked into the image (do not mount host dist —
@@ -348,6 +352,7 @@ services:
     depends_on:
       - waha
       - ronbot-read-api
+      - mysql-tailscale
     deploy:
       resources:
         limits:

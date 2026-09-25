@@ -58,7 +58,14 @@ GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/credentials/gcp-service-account
 RONBOT_TOKEN=...
 RONBOT_READ_API_URL=http://127.0.0.1:8080
 GCP_PROJECT_ID=macbackpackers-backoffice
+
+# Optional: read-only MySQL user for MCP run_sql / describe_sql_tables (tools hidden when unset).
+# Compose forces RONBOT_SQL_RO_HOST=mysql-tailscale for the container.
+RONBOT_SQL_RO_USER=readonly
+RONBOT_SQL_RO_PASSWORD=...
 ```
+
+The bridge forwards `RONBOT_SQL_RO_*` to the MCP child only when user and password are both set. The MySQL grant for that user must allow connections from the Tailscale egress node (`TS_HOSTNAME`, default `tailscale-mysql-egress`).
 
 ## Docker Compose
 
@@ -130,9 +137,12 @@ Validates `@ronbot` / follow-up / authorized DM / stranger DM ignore without WAH
 - `@ronbot send me the latest channel report` (tagged group or single-property DM; emailed to the Requester)
 - DM (if you’re in a subscribed group): `if guest cancels last night on 1234567 crh, how much should we refund?`
 - `@ronbot how often do we attempt to charge a non-refundable hostelworld booking?`
+- `@ronbot when did the last housekeeping job run at hsh?`
+- `@ronbot how many jobs failed at crh this week?` (may use read-only `run_sql`)
 
 ## Security notes
 
 - Unknown DMs are ignored (membership cache from allowlisted groups)
 - Refund answers are advisory only
 - `insert_job` only when staff explicitly request an allowlisted enqueue
+- Ad-hoc SQL (`run_sql`) runs as a dedicated read-only MySQL user (`SELECT` + `SHOW VIEW`); staff cannot change data through it

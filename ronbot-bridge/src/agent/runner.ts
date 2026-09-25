@@ -33,6 +33,12 @@ function mcpEnv(): Record<string, string> {
   if (config.googleCredentials) {
     env.GOOGLE_APPLICATION_CREDENTIALS = config.googleCredentials;
   }
+  if (config.sqlRoUser && config.sqlRoPassword) {
+    env.RONBOT_SQL_RO_USER = config.sqlRoUser;
+    env.RONBOT_SQL_RO_PASSWORD = config.sqlRoPassword;
+    if (config.sqlRoHost) env.RONBOT_SQL_RO_HOST = config.sqlRoHost;
+    if (config.sqlRoPort) env.RONBOT_SQL_RO_PORT = config.sqlRoPort;
+  }
   return env;
 }
 

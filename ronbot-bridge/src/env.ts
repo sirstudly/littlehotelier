@@ -161,6 +161,11 @@ export const config = {
   logDirHsh: env("LOG_DIR_HSH", path.join(repoRootDefault, "logs", "hsh")),
   logDirRmb: env("LOG_DIR_RMB", path.join(repoRootDefault, "logs", "rmb")),
   logDirLsh: env("LOG_DIR_LSH", path.join(repoRootDefault, "logs", "lsh")),
+  /** Read-only MySQL user for MCP run_sql / describe_sql_tables; tools are hidden when unset. */
+  sqlRoHost: env("RONBOT_SQL_RO_HOST"),
+  sqlRoPort: env("RONBOT_SQL_RO_PORT"),
+  sqlRoUser: env("RONBOT_SQL_RO_USER"),
+  sqlRoPassword: process.env.RONBOT_SQL_RO_PASSWORD ?? "",
 };
 
 export function isAllowlistedGroup(chatId: string): boolean {
