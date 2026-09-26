@@ -67,6 +67,9 @@ public class RunChannelProductionReportJob extends AbstractJob {
             for ( int i = 0; i < YEARS_TO_REPORT; i++ ) {
                 reports.add( reportService.fetchMonth( webClient, yearMonth.minusYears( i ) ) );
             }
+            if ( "lsh".equals( property ) ) {
+                reports.set( 0, reports.get( 0 ).withTourPayments( reportService.fetchTourPayments( webClient, yearMonth ) ) );
+            }
             tempFile = reportService.writeWorkbook( property, reports );
 
             String body = "<p>Attached is the <b>" + title + "</b> (compared against the same month in the previous "

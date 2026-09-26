@@ -31,7 +31,10 @@ import org.springframework.stereotype.Service;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.BookingSourceLookup;
+import com.macbackpackers.beans.cloudbeds.requests.ReservationListFilter;
+import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.dao.WordPressDAO;
+import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.datainsights.CloudbedsDataInsightsClient;
 
 /**
@@ -51,6 +54,9 @@ public class ChannelProductionReportService {
 
     @Autowired
     private OccupancyReportService occupancyReportService;
+
+    @Autowired
+    private CloudbedsScraper cloudbedsScraper;
 
     @Autowired
     private WordPressDAO dao;
@@ -74,6 +80,32 @@ public class ChannelProductionReportService {
         LOGGER.info( "Channel Production {}: {} source(s), occupancy {}%, {} commission rate(s)",
                 month, parsed.getLines().size(), occupancyPct, rates.size() );
         return new MonthReport( month, parsed.getLines(), occupancyPct, rates );
+    }
+
+    /**
+     * Sum of amounts paid (grand total less balance due) on "tour" group bookings (guest name
+     * contains "tour") checking in during the given month.
+     */
+    public BigDecimal fetchTourPayments( WebClient webClient, YearMonth month ) throws IOException {
+        List<Customer> matches = cloudbedsScraper.getReservationList( webClient, new ReservationListFilter()
+                .searchInput( "tour" )
+                .checkinDate( month.atDay( 1 ), month.atEndOfMonth() ), Integer.MAX_VALUE );
+        BigDecimal total = sumTourPayments( matches );
+        LOGGER.info( "Tour payments {}: {} from {} search match(es)", month, total, matches.size() );
+        return total;
+    }
+
+    static BigDecimal sumTourPayments( List<Customer> reservations ) {
+        BigDecimal total = BigDecimal.ZERO;
+        for ( Customer c : reservations ) {
+            String name = StringUtils.defaultString( c.getFirstName() ) + " " + StringUtils.defaultString( c.getLastName() );
+            if ( false == StringUtils.containsIgnoreCase( name, "tour" ) || StringUtils.isBlank( c.getGrandTotal() ) ) {
+                continue;
+            }
+            BigDecimal balanceDue = c.getBalanceDue() == null ? BigDecimal.ZERO : c.getBalanceDue();
+            total = total.add( new BigDecimal( c.getGrandTotal().trim() ).subtract( balanceDue ) );
+        }
+        return total;
     }
 
     /**
@@ -231,6 +263,12 @@ public class ChannelProductionReportService {
         setFormula( sheet, totalCommissionRow, 5, totalCommissionRow == SummaryLayout.FIRST_COMMISSION_ROW
                 ? "0"
                 : "SUM(F" + SummaryLayout.FIRST_COMMISSION_ROW + ":F" + ( totalCommissionRow - 1 ) + ")", styles.currency );
+        if ( report.getTourPayments() != null ) {
+            setString( sheet, layout.tourPaymentsRow, 4, "BEDS ALLOCATED TO TOURS", null );
+            Cell tours = cell( sheet, layout.tourPaymentsRow, 5 );
+            tours.setCellValue( report.getTourPayments().doubleValue() );
+            tours.setCellStyle( styles.currency );
+        }
         setString( sheet, layout.grossRow, 4, "GROSS REVENUE " + year, null );
         setFormula( sheet, layout.grossRow, 5, "B" + revenueTotalRow, styles.currency );
         setString( sheet, layout.netRow, 4, "NET REVENUE " + year + " (AFTER COMMISSION)", styles.bold );
@@ -355,6 +393,8 @@ public class ChannelProductionReportService {
         private static final int MAX_UNSHIFTED_COMMISSION_ROWS = 5;
 
         final int totalCommissionRow;
+        /** Tour payments row, a blank row below total commission; only when the report has tour payments (else 0). */
+        final int tourPaymentsRow;
         final int grossRow;
         final int netRow;
         /** Previous year's gross/net revenue rows; only on the newest sheet (else 0). */
@@ -366,9 +406,10 @@ public class ChannelProductionReportService {
         final int occupiedRow;
         final int avgPriceRow;
 
-        private SummaryLayout( int commissionRows, boolean withPreviousRevenue ) {
-            int shift = Math.max( 0, commissionRows - MAX_UNSHIFTED_COMMISSION_ROWS );
+        private SummaryLayout( int commissionRows, boolean withPreviousRevenue, boolean withTourPayments ) {
+            int shift = Math.max( 0, commissionRows + ( withTourPayments ? 2 : 0 ) - MAX_UNSHIFTED_COMMISSION_ROWS );
             totalCommissionRow = FIRST_COMMISSION_ROW + commissionRows;
+            tourPaymentsRow = withTourPayments ? totalCommissionRow + 2 : 0;
             grossRow = 9 + shift;
             netRow = 10 + shift;
             previousGrossRow = withPreviousRevenue ? 11 + shift : 0;
@@ -384,7 +425,7 @@ public class ChannelProductionReportService {
             int commissionRows = (int) report.getLines().stream()
                     .filter( line -> report.findCommissionRate( line.getSource() ) != null )
                     .count();
-            return new SummaryLayout( commissionRows, withPreviousRevenue );
+            return new SummaryLayout( commissionRows, withPreviousRevenue, report.getTourPayments() != null );
         }
     }
 
@@ -393,6 +434,7 @@ public class ChannelProductionReportService {
         private final List<SourceLine> lines;
         private final BigDecimal occupancyPct;
         private final List<CommissionRate> commissionRates;
+        private final BigDecimal tourPayments;
 
         public MonthReport( YearMonth month, List<SourceLine> lines ) {
             this( month, lines, null );
@@ -404,10 +446,26 @@ public class ChannelProductionReportService {
 
         public MonthReport( YearMonth month, List<SourceLine> lines, BigDecimal occupancyPct,
                 List<CommissionRate> commissionRates ) {
+            this( month, lines, occupancyPct, commissionRates, null );
+        }
+
+        private MonthReport( YearMonth month, List<SourceLine> lines, BigDecimal occupancyPct,
+                List<CommissionRate> commissionRates, BigDecimal tourPayments ) {
             this.month = month;
             this.lines = Collections.unmodifiableList( new ArrayList<>( lines ) );
             this.occupancyPct = occupancyPct;
             this.commissionRates = Collections.unmodifiableList( new ArrayList<>( commissionRates ) );
+            this.tourPayments = tourPayments;
+        }
+
+        /** Copy of this report with the given tour payments total. */
+        public MonthReport withTourPayments( BigDecimal tourPayments ) {
+            return new MonthReport( month, lines, occupancyPct, commissionRates, tourPayments );
+        }
+
+        /** Payments on tour bookings checking in this month; null if not reported. */
+        public BigDecimal getTourPayments() {
+            return tourPayments;
         }
 
         public List<CommissionRate> getCommissionRates() {

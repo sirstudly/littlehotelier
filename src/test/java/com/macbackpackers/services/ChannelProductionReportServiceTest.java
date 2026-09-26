@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.services.ChannelProductionReportService.CommissionRate;
 import com.macbackpackers.services.ChannelProductionReportService.MonthReport;
 import com.macbackpackers.services.ChannelProductionReportService.SourceLine;
@@ -196,6 +197,50 @@ public class ChannelProductionReportServiceTest {
             assertEquals( "F9-'2025'!F4", formula( s2026, "F16" ) );
             assertEquals( "F11/F18", formula( s2026, "F20" ) );
         }
+    }
+
+    @Test
+    public void testBuildWorkbookWithTourPayments() throws Exception {
+        MonthReport aug2026 = new MonthReport( YearMonth.of( 2026, 8 ), Arrays.asList(
+                line( "Agoda / Priceline", "398.42", 10, "39.84" ),
+                line( "Airbnb (API)", "450.06", 11, "40.91" ),
+                line( "Booking.com", "3509.25", 90, "38.99" ),
+                line( "Hostelworld", "10000.00", 250, "40.00" ) ), null, SEEDED_RATES )
+                .withTourPayments( new BigDecimal( "1234.50" ) );
+        MonthReport aug2025 = new MonthReport( YearMonth.of( 2025, 8 ), Arrays.asList(
+                line( "Booking.com", "1143.69", 30, "38.12" ) ), null, SEEDED_RATES );
+
+        try ( Workbook wb = ChannelProductionReportService.buildWorkbook( Arrays.asList( aug2026, aug2025 ) ) ) {
+            Sheet s2026 = wb.getSheet( "2026" );
+            assertEquals( "TOTAL COMMISSION", string( s2026, "E6" ) );
+            assertNull( cellAt( s2026, "E7" ) );
+            assertEquals( "BEDS ALLOCATED TO TOURS", string( s2026, "E8" ) );
+            assertEquals( 1234.50, number( s2026, "F8" ), 0.001 );
+            assertEquals( cellAt( s2026, "F6" ).getCellStyle().getDataFormatString(),
+                    cellAt( s2026, "F8" ).getCellStyle().getDataFormatString() );
+            assertEquals( "GROSS REVENUE 2026", string( s2026, "E9" ) );
+            assertEquals( "F9-F6", formula( s2026, "F10" ) );
+            assertEquals( "F10/F17", formula( s2026, "F19" ) );
+
+            assertNull( cellAt( wb.getSheet( "2025" ), "E6" ) );
+        }
+    }
+
+    @Test
+    public void testSumTourPayments() {
+        assertEquals( new BigDecimal( "550.00" ), ChannelProductionReportService.sumTourPayments( Arrays.asList(
+                customer( "Highland", "Tours Ltd", "500.00", "100.00" ),
+                customer( "TOUR", "Group", "150.00", null ),
+                customer( "Jane", "Smith", "80.00", "0.00" ) ) ) );
+    }
+
+    private static Customer customer( String first, String last, String grandTotal, String balanceDue ) {
+        Customer c = new Customer();
+        c.setFirstName( first );
+        c.setLastName( last );
+        c.setGrandTotal( grandTotal );
+        c.setBalanceDue( balanceDue == null ? null : new BigDecimal( balanceDue ) );
+        return c;
     }
 
     private static final List<CommissionRate> SEEDED_RATES = Arrays.asList(
