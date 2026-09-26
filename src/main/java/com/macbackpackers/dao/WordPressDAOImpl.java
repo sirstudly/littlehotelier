@@ -909,6 +909,14 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .createNativeQuery( "DELETE FROM wp_lh_rpt_guest_comments WHERE created_date < DATE_SUB(NOW(), INTERVAL 1 YEAR)" )
                 .executeUpdate();
         LOGGER.info( "Purge Job: deleted " + rowsDeleted + " records from wp_lh_rpt_guest_comments older than 1 year" );
+
+        int rowsUpdated = em
+                .createNativeQuery( "UPDATE wp_lh_booking_assignment "
+                        + "SET guest_name = NULL, email = NULL, notes = NULL, comments = NULL "
+                        + "WHERE checkout_date < DATE_SUB(CURDATE(), INTERVAL 2 WEEK) "
+                        + "AND (guest_name IS NOT NULL OR email IS NOT NULL OR notes IS NOT NULL OR comments IS NOT NULL)" )
+                .executeUpdate();
+        LOGGER.info( "Purge Job: cleared guest details on " + rowsUpdated + " records from wp_lh_booking_assignment checked out over 2 weeks ago" );
     }
 
     /**

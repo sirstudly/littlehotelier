@@ -409,7 +409,8 @@ public interface WordPressDAO {
     List<String> getReservationIdsForDepositChargeJobs( int jobIdStart, int jobIdEnd );
 
     /**
-     * Removes records older than the given date.
+     * Removes records older than the given date. Also clears guest details on
+     * {@code wp_lh_booking_assignment} rows checked out more than 2 weeks ago.
      * 
      * @param specifiedDate records older than this will be removed.
      */
