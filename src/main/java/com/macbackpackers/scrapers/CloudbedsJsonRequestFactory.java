@@ -11,6 +11,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -27,7 +28,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.google.gson.Gson;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.cloudbeds.requests.ReservationListFilter;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.dao.WordPressDAO;
@@ -48,6 +51,11 @@ public class CloudbedsJsonRequestFactory {
 
     // a default version which we'll probably get prompted to update
     private static final String DEFAULT_VERSION = "https://front.cloudbeds.com/mfd-root/app.js";
+
+    /** maximum page size accepted by {@code mapi/reservation/list} */
+    public static final int RESERVATION_LIST_PAGE_SIZE = 250;
+
+    private static final Gson GSON = new Gson();
 
     /**
      * Retrieves the current Cloudbeds property ID.
@@ -361,188 +369,31 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
-     * Get info on all customers including cancelled bookings by searching on a generic term.
+     * Returns a single page of reservations from the {@code mapi/reservation/list} endpoint
+     * matching the given filter, ordered by booking date descending.
      * 
-     * @param query whatever you want to search by
-     * @param billingPortalId
-     * @param frontVersion
+     * @param filter filter criteria
+     * @param page page number (1-based); page size is {@link #RESERVATION_LIST_PAGE_SIZE}
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetReservationsRequest( String query, String billingPortalId, String frontVersion ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        setCommonReservationsQueryParameters( webRequest,
-                new NameValuePair( "date_start[0]", "" ),
-                new NameValuePair( "date_start[1]", "" ),
-                new NameValuePair( "date_end[0]", "" ),
-                new NameValuePair( "date_end[1]", "" ),
-                new NameValuePair( "booking_date[0]", "" ),
-                new NameValuePair( "booking_date[1]", "" ),
-                new NameValuePair( "status", "all" ),
-                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
-                new NameValuePair( "billing_portal_id", billingPortalId ),
-                new NameValuePair( "is_bp_setup_completed", "1" ),
-                new NameValuePair( "frontVersion", frontVersion ),
-                new NameValuePair( "query", query ) );
+    public WebRequest createReservationListRequest( ReservationListFilter filter, int page ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/mapi/reservation/list" );
+        webRequest.setAdditionalHeader( "Accept", "application/json, text/plain, */*" );
+        webRequest.setAdditionalHeader( "Content-Type", "application/json" );
+        webRequest.setAdditionalHeader( "X-Property-Id", getPropertyId() );
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put( "propertyIDs", Arrays.asList( getPropertyId() ) );
+        body.put( "perPage", RESERVATION_LIST_PAGE_SIZE );
+        body.put( "page", page );
+        body.put( "orderBy", "bookingDatetime" );
+        body.put( "direction", "desc" );
+        Map<String, Object> filters = filter.toFiltersMap();
+        if ( false == filters.isEmpty() ) {
+            body.put( "filters", filters );
+        }
+        webRequest.setRequestBody( GSON.toJson( body ) );
         return webRequest;
-    }
-
-    /**
-     * Retrieves all reservations within the given checkin date range.
-     * 
-     * @param checkinDateStart checkin date (inclusive)
-     * @param checkinDateEnd checkin date (inclusive)
-     * @param billingPortalId
-     * @param frontVersion
-     * @return web request
-     * @throws IOException on i/o error
-     */
-    public WebRequest createGetReservationsRequestByCheckinDate( LocalDate checkinDateStart, LocalDate checkinDateEnd,
-                                                                 String billingPortalId, String frontVersion ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        setCommonReservationsQueryParameters( webRequest,
-                new NameValuePair( "date_start[0]", checkinDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_start[1]", checkinDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_end[0]", "" ),
-                new NameValuePair( "date_end[1]", "" ),
-                new NameValuePair( "booking_date[0]", "" ),
-                new NameValuePair( "booking_date[1]", "" ),
-                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
-                new NameValuePair( "billing_portal_id", billingPortalId ),
-                new NameValuePair( "is_bp_setup_completed", "1" ),
-                new NameValuePair( "frontVersion", frontVersion ) );
-        return webRequest;
-    }
-
-    /**
-     * Retrieves all reservations staying within the given date range.
-     * 
-     * @param stayDateStart checkin date (inclusive)
-     * @param stayDateEnd checkin date (inclusive)
-     * @param billingPortalId
-     * @param frontVersion
-     * @return web request
-     * @throws IOException on i/o error
-     */
-    public WebRequest createGetReservationsRequestByStayDate( LocalDate stayDateStart, LocalDate stayDateEnd,
-                                                              String billingPortalId, String frontVersion ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        setCommonReservationsQueryParameters( webRequest,
-                new NameValuePair( "date_start[0]", "" ),
-                new NameValuePair( "date_start[1]", "" ),
-                new NameValuePair( "date_end[0]", "" ),
-                new NameValuePair( "date_end[1]", "" ),
-                new NameValuePair( "date_stay[0]", stayDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_stay[1]", stayDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "booking_date[0]", "" ),
-                new NameValuePair( "booking_date[1]", "" ),
-                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
-                new NameValuePair( "billing_portal_id", billingPortalId ),
-                new NameValuePair( "is_bp_setup_completed", "1" ),
-                new NameValuePair( "frontVersion", frontVersion ) );
-        return webRequest;
-    }
-
-    /**
-     * Retrieves all reservations within the given checkin/stay date range.
-     * 
-     * @param stayDateStart checkin date (inclusive)
-     * @param stayDateEnd checkin date (inclusive)
-     * @param checkinDateStart checkin date (inclusive)
-     * @param checkinDateEnd checkin date (inclusive)
-     * @param checkoutDateStart checkout date (inclusive)
-     * @param checkoutDateEnd checkout date (inclusive)
-     * @param bookingDateStart booking date (inclusive)
-     * @param bookingDateEnd booking date (inclusive)
-     * @param statuses comma-delimited list of statuses (optional)
-     * @param billingPortalId
-     * @param frontVersion
-     * @return web request
-     * @throws IOException on i/o error
-     */
-    public WebRequest createGetReservationsRequest( LocalDate stayDateStart, LocalDate stayDateEnd,
-            LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate checkoutDateStart, LocalDate checkoutDateEnd,
-            LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses, String billingPortalId, String frontVersion ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        setCommonReservationsQueryParameters( webRequest,
-                new NameValuePair( "status", StringUtils.isBlank(statuses) ? "all" : statuses ),
-                new NameValuePair( "date_start[0]", checkinDateStart == null ? "" : checkinDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_start[1]", checkinDateEnd == null ? "" : checkinDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_end[0]", checkoutDateStart == null ? "" : checkoutDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_end[1]", checkoutDateEnd == null ? "" : checkoutDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_stay[0]", stayDateStart == null ? "" : stayDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_stay[1]", stayDateEnd == null ? "" : stayDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "booking_date[0]", bookingDateStart == null ? "" : bookingDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "booking_date[1]", bookingDateEnd == null ? "" : bookingDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
-                new NameValuePair( "billing_portal_id", billingPortalId ),
-                new NameValuePair( "is_bp_setup_completed", "1" ),
-                new NameValuePair( "frontVersion", frontVersion ) );
-        return webRequest;
-    }
-
-    /**
-     * Get all reservations matching the given booking source(s) and date filters (same fields as
-     * {@link #createGetReservationsRequest}).
-     *
-     * @param stayDateStart stay date (inclusive; optional)
-     * @param stayDateEnd stay date (inclusive; optional)
-     * @param checkinDateStart checkin date (inclusive; optional)
-     * @param checkinDateEnd checkin date (inclusive; optional)
-     * @param checkoutDateStart checkout date (inclusive; optional)
-     * @param checkoutDateEnd checkout date (inclusive; optional)
-     * @param bookingDateStart booking date (inclusive; optional)
-     * @param bookingDateEnd booking date (inclusive; optional)
-     * @param statuses comma-delimited list of statuses (optional)
-     * @param bookingSourceIds comma-delimited list of booking source Id(s)
-     * @param billingPortalId
-     * @param frontVersion
-     * @return web request
-     * @throws IOException on i/o error
-     */
-    public WebRequest createGetReservationsRequestByBookingSource(
-            LocalDate stayDateStart, LocalDate stayDateEnd,
-            LocalDate checkinDateStart, LocalDate checkinDateEnd,
-            LocalDate checkoutDateStart, LocalDate checkoutDateEnd,
-            LocalDate bookingDateStart, LocalDate bookingDateEnd,
-            String statuses, String bookingSourceIds, String billingPortalId, String frontVersion ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
-        setCommonReservationsQueryParameters( webRequest,
-                new NameValuePair( "status", StringUtils.isBlank( statuses ) ? "all" : statuses ),
-                new NameValuePair( "date_start[0]", checkinDateStart == null ? "" : checkinDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_start[1]", checkinDateEnd == null ? "" : checkinDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_end[0]", checkoutDateStart == null ? "" : checkoutDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_end[1]", checkoutDateEnd == null ? "" : checkoutDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_stay[0]", stayDateStart == null ? "" : stayDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_stay[1]", stayDateEnd == null ? "" : stayDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "booking_date[0]", bookingDateStart == null ? "" : bookingDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "booking_date[1]", bookingDateEnd == null ? "" : bookingDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "source", bookingSourceIds ),
-                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
-                new NameValuePair( "billing_portal_id", billingPortalId ),
-                new NameValuePair( "is_bp_setup_completed", "1" ),
-                new NameValuePair( "frontVersion", frontVersion ) );
-        return webRequest;
-    }
-
-    /**
-     * Get all reservations matching the given booking source(s) and booked dates.
-     *
-     * @param checkinDateStart checkin date (inclusive)
-     * @param checkinDateEnd checkin date (inclusive)
-     * @param bookedDateStart booked date (inclusive)
-     * @param bookedDateEnd booked date (inclusive)
-     * @param bookingSourceIds comma-delimited list of booking source Id(s)
-     * @param billingPortalId
-     * @param frontVersion
-     * @return web request
-     * @throws IOException on i/o error
-     */
-    public WebRequest createGetReservationsRequestByBookingSource(
-            LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate bookedDateStart,
-            LocalDate bookedDateEnd, String bookingSourceIds, String billingPortalId, String frontVersion ) throws IOException {
-        return createGetReservationsRequestByBookingSource( null, null, checkinDateStart, checkinDateEnd, null, null,
-                bookedDateStart, bookedDateEnd, "all", bookingSourceIds, billingPortalId, frontVersion );
     }
 
     /**

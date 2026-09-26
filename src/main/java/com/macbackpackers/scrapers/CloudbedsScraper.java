@@ -9,6 +9,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.cloudbeds.requests.ReservationListFilter;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.AddNoteResponse;
 import com.macbackpackers.beans.cloudbeds.responses.AddPaymentResponse;
@@ -18,6 +19,7 @@ import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.EmailTemplateInfo;
 import com.macbackpackers.beans.cloudbeds.responses.Guest;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.beans.cloudbeds.responses.ReservationListResponse;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.IORuntimeException;
@@ -57,6 +59,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -340,8 +343,7 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByStayDate(
-                stayDateStart, stayDateEnd, getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
+        return getReservationList( webClient, new ReservationListFilter().stayDate( stayDateStart, stayDateEnd ) );
     }
 
     /**
@@ -393,16 +395,16 @@ public class CloudbedsScraper {
     public List<Customer> getReservations( WebClient webClient, LocalDate stayDateStart, LocalDate stayDateEnd,
             LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate checkoutDateStart, LocalDate checkoutDateEnd,
             LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses, String[] bookingSourceNames ) throws IOException {
-        if ( bookingSourceNames == null || bookingSourceNames.length == 0 ) {
-            return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( stayDateStart, stayDateEnd,
-                    checkinDateStart, checkinDateEnd, checkoutDateStart, checkoutDateEnd, bookingDateStart, bookingDateEnd,
-                    statuses, getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
+        ReservationListFilter filter = new ReservationListFilter()
+                .stayDate( stayDateStart, stayDateEnd )
+                .checkinDate( checkinDateStart, checkinDateEnd )
+                .checkoutDate( checkoutDateStart, checkoutDateEnd )
+                .bookedDate( bookingDateStart, bookingDateEnd )
+                .statuses( statuses );
+        if ( bookingSourceNames != null && bookingSourceNames.length > 0 ) {
+            filter.sourceIds( lookupBookingSourceIds( webClient, bookingSourceNames ) );
         }
-        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByBookingSource(
-                stayDateStart, stayDateEnd, checkinDateStart, checkinDateEnd, checkoutDateStart, checkoutDateEnd,
-                bookingDateStart, bookingDateEnd, statuses,
-                lookupBookingSourceIds( webClient, bookingSourceNames ),
-                getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
+        return getReservationList( webClient, filter );
     }
 
     /**
@@ -415,8 +417,7 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<Customer> getReservationsByCheckinDate( WebClient webClient, LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByCheckinDate(
-                checkinDateStart, checkinDateEnd, getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
+        return getReservationList( webClient, new ReservationListFilter().checkinDate( checkinDateStart, checkinDateEnd ) );
     }
 
     /**
@@ -431,9 +432,9 @@ public class CloudbedsScraper {
      */
     public List<Customer> getReservationsByBookingDate( WebClient webClient,
             LocalDate bookingDateStart, LocalDate bookingDateEnd, String statuses ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest(
-                null, null, null, null, null, null,
-                bookingDateStart, bookingDateEnd, statuses, getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
+        return getReservationList( webClient, new ReservationListFilter()
+                .bookedDate( bookingDateStart, bookingDateEnd )
+                .statuses( statuses ) );
     }
 
     /**
@@ -445,8 +446,36 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<Customer> getReservations( WebClient webClient, String query ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequest( query,
-                getBillingPortalId( webClient ), getFrontVersion( webClient ) ) );
+        return getReservationList( webClient, new ReservationListFilter().searchInput( query ) );
+    }
+
+    /**
+     * Get all reservations matching the given filter from {@code mapi/reservation/list},
+     * fetching every page until the full resultset has been retrieved.
+     * 
+     * @param webClient web client instance to use
+     * @param filter filter criteria
+     * @return non-null list of customer reservations
+     * @throws IOException
+     */
+    private List<Customer> getReservationList( WebClient webClient, ReservationListFilter filter ) throws IOException {
+        // keyed by id: rows can shift across pages if bookings are created while paging
+        Map<String, Customer> results = new LinkedHashMap<>();
+        for ( int page = 1 ; ; page++ ) {
+            JsonObject jobject = doRequest( webClient, jsonRequestFactory.createReservationListRequest( filter, page ) );
+            ReservationListResponse response = gsonIdentity.fromJson( jobject, ReservationListResponse.class );
+            if ( response == null || response.getData() == null ) {
+                throw new MissingUserDataException( "Failed to retrieve reservations." );
+            }
+            response.getData().forEach( r -> results.putIfAbsent( r.getId(), r.toCustomer() ) );
+            LOGGER.debug( "Retrieved reservation list page {}: {} rows ({} of {} total)",
+                    page, response.getData().size(), results.size(), response.getTotal() );
+            if ( response.getData().size() < CloudbedsJsonRequestFactory.RESERVATION_LIST_PAGE_SIZE
+                    || results.size() >= response.getTotal() ) {
+                break;
+            }
+        }
+        return new ArrayList<>( results.values() );
     }
 
     /**
@@ -1386,10 +1415,10 @@ public class CloudbedsScraper {
     public List<Reservation> getReservationsForBookingSources( WebClient webClient,
             LocalDate checkinDateStart, LocalDate checkinDateEnd, 
             LocalDate bookedDateStart, LocalDate bookedDateEnd, String ... sourceNames ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetReservationsRequestByBookingSource(
-                checkinDateStart, checkinDateEnd, bookedDateStart, bookedDateEnd,
-                lookupBookingSourceIds( webClient, sourceNames ),
-                getBillingPortalId( webClient ), getFrontVersion( webClient ) ) )
+        return getReservationList( webClient, new ReservationListFilter()
+                .checkinDate( checkinDateStart, checkinDateEnd )
+                .bookedDate( bookedDateStart, bookedDateEnd )
+                .sourceIds( lookupBookingSourceIds( webClient, sourceNames ) ) )
                         .stream()
                         .map( c -> getReservationRetry( webClient, c.getId() ) )
                         .collect( Collectors.toList() );
