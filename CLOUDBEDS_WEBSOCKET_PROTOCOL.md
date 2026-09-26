@@ -473,7 +473,7 @@ Assignment key: `booking_rooms_id` when present, else `res:{booking_id}:{room_id
 | `EMPTY` | No overnight guest, or booked/confirmed and not in-house |
 | `CHANGE (CHECKED OUT)` | Effective checkout = today and not in-house |
 | `CHANGE (IN-HOUSE)` | Effective checkout = today and still in-house, or vacated by in-house room move |
-| `CHANGE (ROOM CLOSURE)` | OOS / blocked covering the overnight window |
+| `ROOM CLOSURE` | OOS / blocked covering the overnight window |
 | `NO CHANGE` | Still staying (after stay-continuation) |
 | `N DAY CHANGE` | `hbo_bedsheets_change_after_days` linen day |
 

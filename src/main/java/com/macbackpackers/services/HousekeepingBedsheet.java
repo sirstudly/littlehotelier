@@ -10,7 +10,7 @@ public final class HousekeepingBedsheet {
     public static final String N_DAY_CHANGE = "N DAY CHANGE";
     public static final String CHANGE_CHECKED_OUT = "CHANGE (CHECKED OUT)";
     public static final String CHANGE_IN_HOUSE = "CHANGE (IN-HOUSE)";
-    public static final String CHANGE_ROOM_CLOSURE = "CHANGE (ROOM CLOSURE)";
+    public static final String ROOM_CLOSURE = "ROOM CLOSURE";
 
     private HousekeepingBedsheet() {
     }

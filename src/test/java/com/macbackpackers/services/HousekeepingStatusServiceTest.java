@@ -41,9 +41,9 @@ public class HousekeepingStatusServiceTest {
     public void roomClosureChange() {
         OccupancyVersion o = closure( today.minusDays( 1 ), today.plusDays( 1 ) );
         assertThat( service.computeBedsheet( null, null, o, today, 3 ),
-                is( HousekeepingBedsheet.CHANGE_ROOM_CLOSURE ) );
+                is( HousekeepingBedsheet.ROOM_CLOSURE ) );
         assertThat( service.computeBedsheet( o, null, o, today, 3 ),
-                is( HousekeepingBedsheet.CHANGE_ROOM_CLOSURE ) );
+                is( HousekeepingBedsheet.ROOM_CLOSURE ) );
     }
 
     @Test

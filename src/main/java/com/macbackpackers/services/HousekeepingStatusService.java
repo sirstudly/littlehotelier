@@ -107,7 +107,7 @@ public class HousekeepingStatusService {
         if ( closure != null && ( overnight == null || closure == overnight ) ) {
             if ( isDepartingToday( closure.getCheckoutLocalDate(), selectedDate )
                     || coversSelectedOvernight( closure, selectedDate ) ) {
-                return HousekeepingBedsheet.CHANGE_ROOM_CLOSURE;
+                return HousekeepingBedsheet.ROOM_CLOSURE;
             }
         }
 
@@ -116,7 +116,7 @@ public class HousekeepingStatusService {
         }
 
         if ( overnight.isClosure() ) {
-            return HousekeepingBedsheet.CHANGE_ROOM_CLOSURE;
+            return HousekeepingBedsheet.ROOM_CLOSURE;
         }
 
         String status = StringUtils.defaultString( overnight.getBedStatus() ).toLowerCase();
