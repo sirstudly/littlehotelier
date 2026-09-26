@@ -53,14 +53,10 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
         Map<String, RoomBed> roomsById = indexRoomsById();
         List<BookingAssignment> desired = new ArrayList<>();
         eventIdToAssignmentKey.clear();
-        LocalDate windowStart = null;
-        LocalDate windowEnd = null;
+        LocalDate[] window = snapshotWindow( events );
+        LocalDate windowStart = window[0];
+        LocalDate windowEnd = window[1];
         for ( CloudbedsCalendarEvent event : events ) {
-            LocalDate start = parseDate( event.getStartDate() );
-            if ( start != null ) {
-                windowStart = windowStart == null || start.isBefore( windowStart ) ? start : windowStart;
-                windowEnd = windowEnd == null || start.isAfter( windowEnd ) ? start : windowEnd;
-            }
             BookingAssignment a = mapper.toAssignment( event, roomsById );
             if ( a == null ) {
                 // canceled / incomplete: reconcile below closes any current not in the desired set
@@ -74,7 +70,7 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
         LOGGER.info( "BookingAssignment WS snapshot: {} rows for property {} (window {} - {})",
                 desired.size(), propertyId, windowStart, windowEnd );
         // an empty snapshot says nothing about the calendar; don't close everything
-        if ( windowStart == null ) {
+        if ( windowStart == null || windowEnd == null ) {
             return;
         }
         dao.reconcileBookingAssignmentCurrents( desired, windowStart, windowEnd );
@@ -172,6 +168,28 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
             LOGGER.info( "BookingAssignment enrich: queued {} jobs ({} pending enrich)",
                     queued, reservationIds.size() );
         }
+    }
+
+    /**
+     * The date range the snapshot covers, as {@code [start, end]} (either may be null if no event
+     * has the date). Every event overlaps the covered range, so start dates can predate it by
+     * years (long closures, long-term stays) while end dates cannot: the range starts at the
+     * earliest end date and ends at the latest start date.
+     */
+    static LocalDate[] snapshotWindow( List<CloudbedsCalendarEvent> events ) {
+        LocalDate windowStart = null;
+        LocalDate windowEnd = null;
+        for ( CloudbedsCalendarEvent event : events ) {
+            LocalDate start = parseDate( event.getStartDate() );
+            LocalDate end = parseDate( event.getEndDate() );
+            if ( end != null && ( windowStart == null || end.isBefore( windowStart ) ) ) {
+                windowStart = end;
+            }
+            if ( start != null && ( windowEnd == null || start.isAfter( windowEnd ) ) ) {
+                windowEnd = start;
+            }
+        }
+        return new LocalDate[] { windowStart, windowEnd };
     }
 
     private static LocalDate parseDate( String value ) {

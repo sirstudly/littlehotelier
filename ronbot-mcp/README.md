@@ -106,8 +106,10 @@ RONBOT_SQL_RO_PASSWORD=...
   - Cancelled with `KILL QUERY` after 15s (MySQL 5.5 has no `max_execution_time`)
   - MySQL 5.5 syntax only: no CTEs/`WITH`, window functions or `JSON_*`
   - Dates are returned as stored (strings), not converted to UTC
-- `describe_sql_tables`: `property`, optional `table`. Without `table` lists tables; with `table` lists its columns
-- Key tables (hinted to the agent): `wp_lh_calendar`, `wp_lh_booking_assignment`, `wp_lh_jobs`, `wp_lh_job_param`, `job_scheduler`, `job_scheduler_param`, `wp_booking_lookup_key`, `wp_invoice`, `wp_invoice_notes`, `wp_lh_bedcounts`, `wp_lh_group_bookings`, `wp_lh_housekeeping_bed`, `wp_lh_occupancy`, `wp_lh_rpt_guest_comments`, `wp_lh_rpt_mostly_full_dorms`, `wp_lh_rpt_split_rooms`, `wp_lh_rpt_unpaid_deposit`, `wp_stripe_transaction`, `wp_stripe_tx_refund`, `wp_tx_refund`, `wp_hwl_cancel_booking_exempt`, `wp_options`
+- `describe_sql_tables`: `property`, optional `table`. Without `table` lists tables and views; with `table` lists its columns. Key and legacy tables carry `notes` (`TABLE_NOTES` in `src/db/adhocSql.ts`) explaining how to query them
+- Booking/stay SQL defaults to the `wp_lh_booking_assignment` views (`src/main/config/migrations/2026-09-26-booking-assignment-views.sql`): `v_wp_lh_booking_reservation` (one row per current reservation, money safe to sum), `v_wp_lh_booking_current` (one row per bed), `v_wp_lh_booking_removed` (cancelled/removed assignments), then `wp_lh_booking_assignment` itself for history and point-in-time queries
+- Key tables (hinted to the agent): `v_wp_lh_booking_reservation`, `v_wp_lh_booking_current`, `v_wp_lh_booking_removed`, `wp_lh_booking_assignment`, `wp_lh_rooms`, `wp_lh_jobs`, `wp_lh_job_param`, `job_scheduler`, `job_scheduler_param`, `wp_booking_lookup_key`, `wp_invoice`, `wp_invoice_notes`, `wp_lh_bedcounts`, `wp_lh_group_bookings`, `wp_lh_housekeeping_bed`, `wp_lh_occupancy`, `wp_lh_rpt_guest_comments`, `wp_lh_rpt_mostly_full_dorms`, `wp_lh_rpt_split_rooms`, `wp_lh_rpt_unpaid_deposit`, `wp_stripe_transaction`, `wp_stripe_tx_refund`, `wp_tx_refund`, `wp_hwl_cancel_booking_exempt`, `wp_options`
+- Legacy tables (still written, superseded): `wp_lh_calendar` (recent allocation snapshots only; use `wp_lh_booking_assignment`)
 - Defunct tables (not for current data): `wp_hw_booking`, `wp_hw_booking_dates`, `wp_pxpost_transaction`, `wp_sagepay_transaction`, `wp_sagepay_tx_auth`, `wp_sagepay_tx_refund`
 
 ## Local development
@@ -134,8 +136,10 @@ Read-api via Compose (MCP stays on the host for Cursor):
 
 ```bash
 export RONBOT_TOKEN='some-shared-secret'
-docker compose up -d --build ronbot-read-api
+scripts/compose-build.sh ronbot-read-api
 ```
+
+`scripts/compose-build.sh` wraps `docker compose up -d --build` and bakes the git commit into the image; check a running container with `docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' <container>`.
 
 Set the same `RONBOT_TOKEN` in `.cursor/mcp.json` when calling that read-api. Production WhatsApp uses MCP baked into the `ronbot-bridge` image — there is no separate `ronbot-mcp` Compose service.
 
@@ -160,7 +164,8 @@ See [`.cursor/mcp.json`](../.cursor/mcp.json). Point `args` at `ronbot-mcp/dist/
 - "Revenue by channel at hsh for July 2026" → `get_channel_production` with `property=hsh`, `month=2026-07`
 - "Occupancy at rmb from 2026-06-01 to 2026-08-31" → `get_occupancy` with `property=rmb`, `from=2026-06-01`, `to=2026-08-31`
 - "How many HousekeepingJob runs failed at hsh this week?" → `run_sql` on `wp_lh_jobs`
-- "Which beds in wp_lh_calendar at crh have checkin 2026-09-25?" → `describe_sql_tables` (`table=wp_lh_calendar`), then `run_sql`
+- "Which beds at crh have checkin 2026-09-25?" → `describe_sql_tables` (`table=v_wp_lh_booking_current`), then `run_sql`
+- "How many reservations checked in at hsh in March 2025 and what did they pay?" → `run_sql` on `v_wp_lh_booking_reservation`
 
 ## Phase 2: Local SDK `Agent.prompt` smoke
 
@@ -233,7 +238,7 @@ Ensure read-api is up (`docker compose up -d ronbot-read-api`), then `npm run sm
 Staff groups / authorized DMs via WAHA + [`ronbot-bridge`](../ronbot-bridge/README.md):
 
 ```bash
-docker compose up -d --build waha ronbot-bridge
+scripts/compose-build.sh waha ronbot-bridge
 ```
 
 MCP `dist` is compiled inside the `ronbot-bridge` image; rebuilding the bridge is enough after MCP source changes.

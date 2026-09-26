@@ -237,7 +237,7 @@ public class RunProcessor
             System.exit( exitCode );
         }
 
-        LOGGER.info( "Starting processor... " + new Date() );
+        LOGGER.info( "Starting processor... " + new Date() + " (commit " + System.getenv().getOrDefault( "GIT_COMMIT", "unknown" ) + ")" );
         ConfigurableApplicationContext context = SpringApplication.run( RunProcessor.class, args );
 
         // make sure there is only ever one process running

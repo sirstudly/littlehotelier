@@ -72,8 +72,10 @@ The bridge forwards `RONBOT_SQL_RO_*` to the MCP child only when user and passwo
 From repo root:
 
 ```bash
-docker compose up -d --build waha ronbot-bridge
+scripts/compose-build.sh waha ronbot-bridge
 ```
+
+The script wraps `docker compose up -d --build` and bakes the git commit into the image (`docker exec ronbot-bridge printenv GIT_COMMIT`).
 
 Build context is the **repo root**. The bridge image builds `ronbot-mcp` (`dist` + Linux `node_modules`) itself — no host `npm run build` and no `./ronbot-mcp/dist` mount (that mount used to shadow the image with an empty directory).
 

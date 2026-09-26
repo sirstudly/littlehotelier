@@ -138,6 +138,8 @@ public class WordPressDAOImpl implements WordPressDAO {
     private static final int CHUNK_TX_TIMEOUT_SECONDS = 180;
 
     private static final int BOOKING_ASSIGNMENT_RECONCILE_CHUNK_SIZE = 100;
+    private static final int BOOKING_ASSIGNMENT_RECONCILE_MAX_CLOSES = 500;
+    private static final double BOOKING_ASSIGNMENT_RECONCILE_MAX_CLOSE_FRACTION = 0.2;
 
     /** Timeout for other large bulk writes (occupancy / housekeeping). */
     private static final int BULK_PERSIST_TX_TIMEOUT_SECONDS = 300;
@@ -1342,15 +1344,9 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    public List<String> searchReservationIdsInLatestCalendar( String query, int maxResults ) {
+    public List<String> searchReservationIdsInBookingAssignments( String query, int maxResults ) {
         String q = StringUtils.trimToNull( query );
         if ( q == null || maxResults <= 0 ) {
-            return Collections.emptyList();
-        }
-
-        Integer jobId = getLastCompletedAllocationScraperJobId();
-        if ( jobId == null ) {
-            LOGGER.info( "No completed allocation scrape; skipping calendar search for query={}", q );
             return Collections.emptyList();
         }
 
@@ -1358,25 +1354,21 @@ public class WordPressDAOImpl implements WordPressDAO {
         String namePattern = "%" + q.toLowerCase().replaceAll( "\\s+", "%" ) + "%";
 
         int capped = Math.min( maxResults, 100 );
-        // Prefer one representative row per reservation (lowest id) without CTEs/window funcs.
+        // guest_name is nulled on backfilled history, so names only match recent/future stays
         @SuppressWarnings( "unchecked" )
         List<Number> reservationIds = em.createNativeQuery(
-                "SELECT a.reservation_id FROM wp_lh_calendar a "
-                        + " WHERE a.job_id = :jobId "
+                "SELECT a.reservation_id FROM wp_lh_booking_assignment a "
+                        + " WHERE a.valid_to IS NULL "
+                        + "   AND a.source = 'guest' "
                         + "   AND a.reservation_id > 0 "
-                        + "   AND a.id = ("
-                        + "         SELECT MIN(a2.id) FROM wp_lh_calendar a2 "
-                        + "          WHERE a2.job_id = a.job_id "
-                        + "            AND a2.reservation_id = a.reservation_id"
-                        + "       ) "
                         + "   AND ("
                         + "         LOWER(IFNULL(a.guest_name, '')) LIKE :namePattern "
                         + "      OR LOWER(IFNULL(a.booking_reference, '')) = :exact "
                         + "      OR CAST(a.reservation_id AS CHAR) = :exact"
                         + "       ) "
-                        + " ORDER BY a.checkin_date DESC, a.reservation_id "
+                        + " GROUP BY a.reservation_id "
+                        + " ORDER BY ABS(DATEDIFF(MIN(a.checkin_date), CURDATE())), a.reservation_id "
                         + " LIMIT " + capped )
-                .setParameter( "jobId", jobId )
                 .setParameter( "namePattern", namePattern )
                 .setParameter( "exact", q.toLowerCase() )
                 .getResultList();
@@ -1387,7 +1379,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                 out.add( String.valueOf( id.longValue() ) );
             }
         }
-        LOGGER.info( "Calendar search jobId={} query={} matches={}", jobId, q, out.size() );
+        LOGGER.info( "Booking assignment search query={} matches={}", q, out.size() );
         return out;
     }
 
@@ -2060,7 +2052,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     /** True when the assignment stay overlaps {@code [windowStart, windowEnd]} (null bounds = open). */
-    private static boolean overlapsWindow( BookingAssignment a, LocalDate windowStart, LocalDate windowEnd ) {
+    static boolean overlapsWindow( BookingAssignment a, LocalDate windowStart, LocalDate windowEnd ) {
         LocalDate checkin = a.getCheckinLocalDate();
         LocalDate checkout = a.getCheckoutLocalDate();
         if ( windowEnd != null && checkin != null && checkin.isAfter( windowEnd ) ) {
@@ -2070,6 +2062,37 @@ public class WordPressDAOImpl implements WordPressDAO {
             return false;
         }
         return true;
+    }
+
+    /** Most currents one snapshot may close without a replacement row. */
+    static int maxReconcileCloses( int currentsFetched ) {
+        return Math.max( BOOKING_ASSIGNMENT_RECONCILE_MAX_CLOSES,
+                (int) ( currentsFetched * BOOKING_ASSIGNMENT_RECONCILE_MAX_CLOSE_FRACTION ) );
+    }
+
+    /**
+     * When the close-only changes (a current with no replacement insert) exceed
+     * {@link #maxReconcileCloses}, removes all of them from the paired lists.
+     *
+     * @return number of close-only changes removed (0 when under the cap)
+     */
+    static int dropMassCloses( List<Long> closeIds, List<BookingAssignment> inserts, int currentsFetched ) {
+        int pureCloses = 0;
+        for ( int i = 0 ; i < inserts.size() ; i++ ) {
+            if ( closeIds.get( i ) != null && inserts.get( i ) == null ) {
+                pureCloses++;
+            }
+        }
+        if ( pureCloses <= maxReconcileCloses( currentsFetched ) ) {
+            return 0;
+        }
+        for ( int i = inserts.size() - 1 ; i >= 0 ; i-- ) {
+            if ( closeIds.get( i ) != null && inserts.get( i ) == null ) {
+                closeIds.remove( i );
+                inserts.remove( i );
+            }
+        }
+        return pureCloses;
     }
 
     @Override
@@ -2119,6 +2142,12 @@ public class WordPressDAOImpl implements WordPressDAO {
         if ( keptOutsideWindow > 0 ) {
             LOGGER.info( "BookingAssignment reconcile: kept {} currents outside snapshot window {} - {}",
                     keptOutsideWindow, windowStart, windowEnd );
+        }
+        int blockedCloses = dropMassCloses( closeIds, inserts, existing.size() );
+        if ( blockedCloses > 0 ) {
+            LOGGER.error( "BookingAssignment reconcile: refusing to close {} of {} currents missing from snapshot "
+                    + "window {} - {} (cap {}); applying the remaining changes only",
+                    blockedCloses, existing.size(), windowStart, windowEnd, maxReconcileCloses( existing.size() ) );
         }
         if ( inserts.isEmpty() ) {
             LOGGER.info( "BookingAssignment reconcile: no changes ({} currents)", existing.size() );

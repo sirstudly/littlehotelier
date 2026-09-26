@@ -48,5 +48,9 @@ RUN chmod +x /docker-entrypoint.sh \
 WORKDIR /app/bridge
 ENV HOME=/home/node
 EXPOSE 8787
+# Last so a new commit doesn't invalidate the cached layers above (see scripts/compose-build.sh)
+ARG GIT_COMMIT=unknown
+LABEL org.opencontainers.image.revision=$GIT_COMMIT
+ENV GIT_COMMIT=$GIT_COMMIT
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]

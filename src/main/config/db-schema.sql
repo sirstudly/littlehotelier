@@ -681,6 +681,72 @@ CREATE TABLE `wp_lh_booking_assignment` (
 
 -- Production migration: src/main/config/migrations/2026-09-22-booking-assignment-scd2.sql
 
+-- Query-friendly views over wp_lh_booking_assignment (current beds / current reservations / removed).
+-- Definitions and notes: src/main/config/migrations/2026-09-26-booking-assignment-views.sql
+CREATE OR REPLACE ALGORITHM=MERGE SQL SECURITY INVOKER VIEW `v_wp_lh_booking_current` AS
+SELECT a.id, a.assignment_key, a.reservation_id, a.booking_rooms_id,
+       a.room_id, a.room, a.bed_name, a.room_type_id, rm.room_type, rm.capacity,
+       a.guest_name, a.email,
+       a.checkin_date, a.checkout_date, DATEDIFF( a.checkout_date, a.checkin_date ) AS nights,
+       CASE WHEN a.checkout_date < CURDATE() THEN 'Y' ELSE 'N' END AS departed_yn,
+       a.bed_status, a.in_house_yn,
+       a.payment_total, a.payment_outstanding, a.visitor_levy_total,
+       a.rate_plan_name, a.num_guests, a.booking_reference, a.booking_source, a.hotel_collect_yn,
+       a.booked_date, a.notes, a.comments, a.data_href, a.valid_from
+  FROM wp_lh_booking_assignment a
+  LEFT JOIN wp_lh_rooms rm ON rm.id = a.room_id
+ WHERE a.valid_to IS NULL
+   AND a.source = 'guest';
+
+CREATE OR REPLACE ALGORITHM=TEMPTABLE SQL SECURITY INVOKER VIEW `v_wp_lh_booking_reservation` AS
+SELECT a.reservation_id,
+       MIN( a.checkin_date ) AS checkin_date,
+       MAX( a.checkout_date ) AS checkout_date,
+       DATEDIFF( MAX( a.checkout_date ), MIN( a.checkin_date ) ) AS nights,
+       CASE WHEN MAX( a.checkout_date ) < CURDATE() THEN 'Y' ELSE 'N' END AS departed_yn,
+       COUNT(*) AS num_beds,
+       GROUP_CONCAT( DISTINCT a.room ORDER BY a.room SEPARATOR ', ' ) AS rooms,
+       GROUP_CONCAT( DISTINCT a.bed_status ORDER BY a.bed_status SEPARATOR ', ' ) AS bed_statuses,
+       MAX( a.in_house_yn ) AS in_house_yn,
+       MAX( a.guest_name ) AS guest_name,
+       MAX( a.email ) AS email,
+       MAX( a.booking_reference ) AS booking_reference,
+       MAX( a.booking_source ) AS booking_source,
+       MAX( a.booked_date ) AS booked_date,
+       MAX( a.hotel_collect_yn ) AS hotel_collect_yn,
+       MAX( a.rate_plan_name ) AS rate_plan_name,
+       MAX( a.num_guests ) AS num_guests,
+       MAX( a.payment_total ) AS payment_total,
+       MAX( a.payment_outstanding ) AS payment_outstanding,
+       MAX( a.visitor_levy_total ) AS visitor_levy_total,
+       MAX( a.data_href ) AS data_href
+  FROM wp_lh_booking_assignment a
+ WHERE a.valid_to IS NULL
+   AND a.source = 'guest'
+   AND a.reservation_id > 0
+ GROUP BY a.reservation_id;
+
+CREATE OR REPLACE SQL SECURITY INVOKER VIEW `v_wp_lh_booking_removed` AS
+SELECT o.id, o.assignment_key, o.reservation_id, o.booking_rooms_id,
+       o.room_id, o.room, o.bed_name, o.room_type_id,
+       o.checkin_date, o.checkout_date, o.bed_status,
+       o.payment_total, o.payment_outstanding, o.visitor_levy_total,
+       o.num_guests, o.booking_reference, o.booking_source, o.booked_date,
+       o.valid_from, o.valid_to AS removed_at,
+       CASE WHEN EXISTS ( SELECT 1 FROM wp_lh_booking_assignment r
+                           WHERE r.reservation_id = o.reservation_id
+                             AND r.valid_to IS NULL
+                             AND r.source = 'guest' ) THEN 'Y' ELSE 'N' END AS reservation_current_yn
+  FROM wp_lh_booking_assignment o
+ WHERE o.valid_to IS NOT NULL
+   AND o.source = 'guest'
+   AND NOT EXISTS ( SELECT 1 FROM wp_lh_booking_assignment c
+                     WHERE c.assignment_key = o.assignment_key
+                       AND c.valid_to IS NULL )
+   AND NOT EXISTS ( SELECT 1 FROM wp_lh_booking_assignment l
+                     WHERE l.assignment_key = o.assignment_key
+                       AND l.valid_to > o.valid_to );
+
 -- Per-booking-source settings (commission = revenue / commission_divisor) for the Channel Production report.
 -- source matches the Cloudbeds reservation_source name (case-insensitive); valid_to is inclusive, null = open-ended.
 CREATE TABLE `wp_lh_booking_source_lookup` (

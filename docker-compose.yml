@@ -33,6 +33,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     container_name: crh-processor
     restart: unless-stopped
     stop_grace_period: 5m
@@ -80,6 +82,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     container_name: hsh-processor
     restart: unless-stopped
     stop_grace_period: 5m
@@ -127,6 +131,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     container_name: rmb-processor
     restart: unless-stopped
     stop_grace_period: 5m
@@ -174,6 +180,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     container_name: lsh-processor
     restart: unless-stopped
     stop_grace_period: 5m
@@ -221,6 +229,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     container_name: ronbot-read-api
     restart: unless-stopped
     stop_grace_period: 1m
@@ -301,6 +311,8 @@ services:
     build:
       context: .
       dockerfile: ronbot-bridge/Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     container_name: ronbot-bridge
     restart: unless-stopped
     ports:

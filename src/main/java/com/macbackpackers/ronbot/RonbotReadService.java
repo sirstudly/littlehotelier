@@ -79,9 +79,9 @@ public class RonbotReadService {
      * Search reservations by visible identifier, third-party/OTA ref, guest name,
      * or internal reservation id.
      * <p>
-     * Name-like queries hit the local allocation calendar first (fast), then load each
-     * match via Cloudbeds {@code get_reservation} by id. Cloudbeds free-text search is
-     * only used when the calendar has no hits (or for identifier-like queries).
+     * Name-like queries hit the local {@code wp_lh_booking_assignment} table first (fast), then
+     * load each match via Cloudbeds {@code get_reservation} by id. Cloudbeds free-text search is
+     * only used when the local table has no hits (or for identifier-like queries).
      *
      * @return non-empty list of booking summaries; exact id/identifier/third-party matches preferred
      */
@@ -97,11 +97,11 @@ public class RonbotReadService {
 
         try ( WebClient webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class ) ) {
             if ( !looksLikeReservationIdentifier( q ) ) {
-                List<BookingSummaryDto> fromDb = searchBookingsViaCalendar( property, q, scraper, dao, webClient );
+                List<BookingSummaryDto> fromDb = searchBookingsViaBookingAssignments( property, q, scraper, dao, webClient );
                 if ( !fromDb.isEmpty() ) {
                     return fromDb;
                 }
-                LOGGER.info( "Calendar miss for name-like query={}; falling back to Cloudbeds search", q );
+                LOGGER.info( "Booking assignment miss for name-like query={}; falling back to Cloudbeds search", q );
             }
 
             return searchBookingsViaCloudbeds( property, q, scraper, webClient );
@@ -112,7 +112,7 @@ public class RonbotReadService {
      * Resolve a unique reservation for timeline/transactions. Prefers exact id/identifier/third-party
      * matches; fails if search is ambiguous.
      * <p>
-     * For name-like queries: calendar DB first, then Cloudbeds by id. Identifier-like queries
+     * For name-like queries: {@code wp_lh_booking_assignment} first, then Cloudbeds. Identifier-like queries
      * try direct {@code get_reservation}, then Cloudbeds search.
      */
     public String requireUniqueReservationId( String property, String query ) throws IOException {
@@ -127,17 +127,17 @@ public class RonbotReadService {
 
         try ( WebClient webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class ) ) {
             if ( !looksLikeReservationIdentifier( q ) ) {
-                List<String> calendarIds = dao.searchReservationIdsInLatestCalendar( q, MAX_SEARCH_RESULTS );
-                if ( calendarIds.size() == 1 ) {
-                    LOGGER.info( "Resolved query={} via calendar db id={}", q, calendarIds.get( 0 ) );
-                    return calendarIds.get( 0 );
+                List<String> localIds = dao.searchReservationIdsInBookingAssignments( q, MAX_SEARCH_RESULTS );
+                if ( localIds.size() == 1 ) {
+                    LOGGER.info( "Resolved query={} via booking assignments id={}", q, localIds.get( 0 ) );
+                    return localIds.get( 0 );
                 }
-                if ( calendarIds.size() > 1 ) {
+                if ( localIds.size() > 1 ) {
                     throw new IllegalArgumentException(
-                            "Ambiguous query=" + q + ": " + calendarIds.size()
-                                    + " calendar matches. Use get_booking to pick one." );
+                            "Ambiguous query=" + q + ": " + localIds.size()
+                                    + " local booking matches. Use get_booking to pick one." );
                 }
-                LOGGER.info( "Calendar miss for name-like query={}; falling back to Cloudbeds", q );
+                LOGGER.info( "Booking assignment miss for name-like query={}; falling back to Cloudbeds", q );
             }
             else {
                 try {
@@ -197,14 +197,14 @@ public class RonbotReadService {
         return false;
     }
 
-    private List<BookingSummaryDto> searchBookingsViaCalendar( String property, String q,
+    private List<BookingSummaryDto> searchBookingsViaBookingAssignments( String property, String q,
             CloudbedsScraper scraper, WordPressDAO dao, WebClient webClient ) {
-        List<String> reservationIds = dao.searchReservationIdsInLatestCalendar( q, MAX_SEARCH_RESULTS );
+        List<String> reservationIds = dao.searchReservationIdsInBookingAssignments( q, MAX_SEARCH_RESULTS );
         if ( reservationIds.isEmpty() ) {
             return Collections.emptyList();
         }
 
-        LOGGER.info( "Resolved query={} via calendar db ({} id(s))", q, reservationIds.size() );
+        LOGGER.info( "Resolved query={} via booking assignments ({} id(s))", q, reservationIds.size() );
         List<BookingSummaryDto> results = new ArrayList<>( reservationIds.size() );
         for ( String reservationId : reservationIds ) {
             try {
@@ -214,7 +214,7 @@ public class RonbotReadService {
                 }
             }
             catch ( Exception ex ) {
-                LOGGER.warn( "get_reservation failed for calendar hit id={}: {}", reservationId, ex.toString() );
+                LOGGER.warn( "get_reservation failed for booking assignment hit id={}: {}", reservationId, ex.toString() );
             }
         }
         return results;

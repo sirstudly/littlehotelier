@@ -9,8 +9,11 @@ const PARSE_OPT = { database: "MySQL" };
 
 /** Hints for the agent only; queries are never restricted to these. */
 export const KEY_TABLES = [
-  "wp_lh_calendar",
+  "v_wp_lh_booking_reservation",
+  "v_wp_lh_booking_current",
+  "v_wp_lh_booking_removed",
   "wp_lh_booking_assignment",
+  "wp_lh_rooms",
   "wp_lh_jobs",
   "wp_lh_job_param",
   "job_scheduler",
@@ -32,6 +35,37 @@ export const KEY_TABLES = [
   "wp_hwl_cancel_booking_exempt",
   "wp_options",
 ] as const;
+
+/** Still written, but superseded; use the replacement noted in TABLE_NOTES. */
+export const LEGACY_TABLES = ["wp_lh_calendar"] as const;
+
+const BOOKING_ASSIGNMENT_NOTES =
+  "SCD2 snapshot of Cloudbeds bed assignments; the default source for cached booking/stay data. " +
+  "Current rows: valid_to IS NULL (includes departed stays back to 2024-01-01; departed means checkout_date < CURDATE(), not a bed_status — some past stays were never moved off 'confirmed'). " +
+  "As of time T: valid_from <= T AND (valid_to IS NULL OR valid_to > T). " +
+  "One row per bed: payment_total, payment_outstanding, visitor_levy_total and num_guests are reservation-level values repeated on every bed row — never SUM them over bed rows; use v_wp_lh_booking_reservation or MAX() per reservation_id. " +
+  "source='guest' is a stay, source='closure' a room block (out_of_service / blocked_dates). " +
+  "Cancellations are closed rows (see v_wp_lh_booking_removed), not current rows. " +
+  "guest_name, email, notes and comments are NULL on stays before ~2026-08 (privacy); use Cloudbeds tools for those. " +
+  "Join wp_lh_rooms ON wp_lh_rooms.id = room_id for room_type / capacity. " +
+  "crh history is still being backfilled; hsh/rmb/lsh history is complete.";
+
+/** Per-table guidance returned by describe_sql_tables. */
+export const TABLE_NOTES: Record<string, string> = {
+  wp_lh_booking_assignment: BOOKING_ASSIGNMENT_NOTES,
+  v_wp_lh_booking_reservation:
+    "One row per current reservation (reservation_id) from wp_lh_booking_assignment: stay dates, nights, departed_yn, num_beds, rooms, bed_statuses, and reservation-level money (payment_total, payment_outstanding, visitor_levy_total) safe to SUM. Materialised per query; for big ranges filter wp_lh_booking_assignment directly.",
+  v_wp_lh_booking_current:
+    "One row per bed for current guest stays (valid_to IS NULL, source='guest') with room_type, capacity, nights and departed_yn. Money columns repeat per bed — do not SUM them here.",
+  v_wp_lh_booking_removed:
+    "Latest closed version of each guest assignment that no longer has a current row: cancellations, deletions and beds removed from a reservation (reservation_current_yn='Y' means the reservation still has other beds). removed_at is when it was closed. Backfilled cancellations show bed_status canceled/no_show; live cancellations keep their previous status.",
+  wp_lh_calendar:
+    "Legacy: per-job allocation snapshots, recent jobs only (no history). Still dual-written by AllocationScraperJob but superseded — use wp_lh_booking_assignment / v_wp_lh_booking_* instead.",
+};
+
+/** One-line pointer for tool descriptions. */
+export const BOOKING_SQL_HINT =
+  "For booking/stay questions query v_wp_lh_booking_reservation (per reservation, money-safe) or v_wp_lh_booking_current (per bed) first, then wp_lh_booking_assignment for history / point-in-time (describe_sql_tables with table=wp_lh_booking_assignment explains it); wp_lh_calendar is legacy.";
 
 /** No longer written to; do not use for current data. */
 export const DEFUNCT_TABLES = [
@@ -270,31 +304,44 @@ export async function runAdhocSelect(
   }
 }
 
-export type TableHint = "key" | "defunct" | "other";
+export type TableHint = "key" | "legacy" | "defunct" | "other";
 
 function tableHint(name: string): TableHint {
   if ((KEY_TABLES as readonly string[]).includes(name)) return "key";
+  if ((LEGACY_TABLES as readonly string[]).includes(name)) return "legacy";
   if ((DEFUNCT_TABLES as readonly string[]).includes(name)) return "defunct";
   return "other";
 }
 
 async function listTables(
   property: string,
-): Promise<Array<{ name: string; type: string; hint: TableHint }>> {
+): Promise<Array<{ name: string; type: string; hint: TableHint; notes?: string }>> {
   const pool = await getReadOnlyPool(property);
   const [rows] = await pool.query<RowDataPacket[][]>({ sql: "SHOW FULL TABLES", rowsAsArray: true });
   return rows.map((r) => {
     const name = String((r as unknown[])[0]);
-    return { name, type: String((r as unknown[])[1] ?? "BASE TABLE"), hint: tableHint(name) };
+    const notes = TABLE_NOTES[name];
+    return {
+      name,
+      type: String((r as unknown[])[1] ?? "BASE TABLE"),
+      hint: tableHint(name),
+      ...(notes ? { notes } : {}),
+    };
   });
 }
 
 export async function describeTables(property: string, table?: string): Promise<unknown> {
   const tables = await listTables(property);
   if (!table) {
-    const order: Record<TableHint, number> = { key: 0, other: 1, defunct: 2 };
+    const keyOrder = (name: string) => (KEY_TABLES as readonly string[]).indexOf(name);
+    const order: Record<TableHint, number> = { key: 0, legacy: 1, other: 2, defunct: 3 };
     return {
-      tables: [...tables].sort((a, b) => order[a.hint] - order[b.hint] || a.name.localeCompare(b.name)),
+      tables: [...tables].sort(
+        (a, b) =>
+          order[a.hint] - order[b.hint] ||
+          (a.hint === "key" ? keyOrder(a.name) - keyOrder(b.name) : 0) ||
+          a.name.localeCompare(b.name),
+      ),
     };
   }
 
@@ -312,6 +359,7 @@ export async function describeTables(property: string, table?: string): Promise<
     table: match.name,
     type: match.type,
     hint: match.hint,
+    ...(match.notes ? { notes: match.notes } : {}),
     columns: cols.map((c) => ({
       name: c.Field,
       type: c.Type,

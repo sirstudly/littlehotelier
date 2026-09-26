@@ -9,9 +9,11 @@ import {
 } from "./config/emailAliases.js";
 import { assertProperty, loadJobAllowlist, loadProperties } from "./config/properties.js";
 import {
+  BOOKING_SQL_HINT,
   DEFUNCT_TABLES,
   HARD_MAX_ROWS,
   KEY_TABLES,
+  LEGACY_TABLES,
   describeTables,
   runAdhocSelect,
 } from "./db/adhocSql.js";
@@ -179,7 +181,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_booking",
-    "Booking search (via ronbot-read-api). query may be a visible reservation id, third-party/OTA ref, or guest name. Name-like queries resolve via local calendar DB first, then Cloudbeds get_reservation by id; Cloudbeds free-text search runs only when the calendar has no matches. Identifier-like queries go straight to Cloudbeds. Returns a list of matches (exact id matches preferred) — enough to pick a booking; for folio/notes/rooms call get_booking_timeline with reservationId. Prefer get_booking_timeline once when staff already have a unique ref.",
+    "Booking search (via ronbot-read-api). query may be a visible reservation id, third-party/OTA ref, or guest name. Name-like queries resolve via the local booking-assignment table (wp_lh_booking_assignment) first, then Cloudbeds get_reservation by id; Cloudbeds free-text search runs only when the local table has no matches. Guest names are only stored for recent/future stays (~2026-08 on); older stays match by reservation id or OTA ref. Identifier-like queries go straight to Cloudbeds. Returns a list of matches (exact id matches preferred) — enough to pick a booking; for folio/notes/rooms call get_booking_timeline with reservationId. Prefer get_booking_timeline once when staff already have a unique ref.",
     {
       property: propertySchema,
       query: z.string().min(1),
@@ -211,7 +213,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_booking_timeline",
-    "Preferred one-shot live booking + folio transactions + DB job history. Pass the exact staff ref (visible id / OTA ref / HW number) once; do not also call get_booking or list_transactions, and do not probe spelling variants unless this returns no match. Name-like queries resolve via local calendar first (then Cloudbeds by id) before free-text Cloudbeds search. Fails if the query is ambiguous.",
+    "Preferred one-shot live booking + folio transactions + DB job history. Pass the exact staff ref (visible id / OTA ref / HW number) once; do not also call get_booking or list_transactions, and do not probe spelling variants unless this returns no match. Name-like queries resolve via the local booking-assignment table (wp_lh_booking_assignment) first (then Cloudbeds by id) before free-text Cloudbeds search. Fails if the query is ambiguous.",
     {
       property: propertySchema,
       reservation_id: z.string().min(1),
@@ -562,7 +564,7 @@ export function createServer(): McpServer {
   if (isReadOnlySqlConfigured()) {
     server.tool(
       "describe_sql_tables",
-      "List tables in a property's backoffice DB (each tagged key / other / defunct), or pass table to get its columns (name, type, nullable, key, default). Use before run_sql when unsure of table or column names.",
+      "List tables and views in a property's backoffice DB (each tagged key / legacy / other / defunct, with usage notes on key tables), or pass table to get its columns (name, type, nullable, key, default) plus notes. Use before run_sql when unsure of table or column names; always read the notes for wp_lh_booking_assignment before querying bookings.",
       {
         property: propertySchema,
         table: z.string().min(1).max(64).optional(),
@@ -578,7 +580,7 @@ export function createServer(): McpServer {
 
     server.tool(
       "run_sql",
-      `Run one read-only ad-hoc SELECT against a property's backoffice DB (dedicated read-only MySQL user). MySQL 5.5 syntax: no CTEs/WITH, window functions or JSON_*. Any table may be queried (UNIONs, subqueries and cross-database joins like wp_hsh_backoffice.wp_lh_calendar are fine). Key tables: ${KEY_TABLES.join(", ")}. Defunct tables, not for current data: ${DEFUNCT_TABLES.join(", ")}. Rows are capped by max_rows (default 200, max ${HARD_MAX_ROWS}); truncated=true means more rows exist. Queries are cancelled after 15s. SLEEP/BENCHMARK/GET_LOCK/LOAD_FILE, FOR UPDATE, LOCK IN SHARE MODE and SELECT ... INTO are rejected. Call describe_sql_tables first if unsure of tables or columns. Prefer the specific tools (get_job, list_jobs, get_booking, get_occupancy, ...) when they answer the question.`,
+      `Run one read-only ad-hoc SELECT against a property's backoffice DB (dedicated read-only MySQL user). MySQL 5.5 syntax: no CTEs/WITH, window functions or JSON_*. Any table may be queried (UNIONs, subqueries and cross-database joins like wp_hsh_backoffice.wp_lh_booking_assignment are fine). ${BOOKING_SQL_HINT} Key tables: ${KEY_TABLES.join(", ")}. Legacy tables (superseded): ${LEGACY_TABLES.join(", ")}. Defunct tables, not for current data: ${DEFUNCT_TABLES.join(", ")}. Rows are capped by max_rows (default 200, max ${HARD_MAX_ROWS}); truncated=true means more rows exist. Queries are cancelled after 15s. SLEEP/BENCHMARK/GET_LOCK/LOAD_FILE, FOR UPDATE, LOCK IN SHARE MODE and SELECT ... INTO are rejected. Call describe_sql_tables first if unsure of tables or columns. Prefer the specific tools (get_job, list_jobs, get_booking, get_occupancy, ...) when they answer the question.`,
       {
         property: propertySchema,
         sql: z.string().min(1).max(10000),
