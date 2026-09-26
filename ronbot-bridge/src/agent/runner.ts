@@ -26,6 +26,7 @@ function mcpEnv(): Record<string, string> {
     LOG_DIR_HSH: config.logDirHsh,
     LOG_DIR_RMB: config.logDirRmb,
     LOG_DIR_LSH: config.logDirLsh,
+    RONBOT_SEARCH_MAX_ROWS: "200",
     // Ensure MCP child inherits enough PATH for `node`
     PATH: process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin",
     HOME: process.env.HOME ?? "/home/node",

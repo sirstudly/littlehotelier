@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if commit=$(git rev-parse --short HEAD 2>/dev/null); then
-    if [ -n "$(git status --porcelain -- src pom.xml Dockerfile docker-entrypoint.sh ronbot-bridge ronbot-mcp 2>/dev/null)" ]; then
+    if [ -n "$(git status --porcelain --untracked-files=no -- src pom.xml Dockerfile docker-entrypoint.sh ronbot-bridge ronbot-mcp 2>/dev/null)" ]; then
         commit="${commit}-dirty"
     fi
 else

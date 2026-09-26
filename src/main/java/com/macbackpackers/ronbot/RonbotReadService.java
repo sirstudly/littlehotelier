@@ -9,6 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -32,6 +33,7 @@ import org.springframework.stereotype.Service;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.macbackpackers.beans.cloudbeds.requests.ReservationListFilter;
 import com.macbackpackers.beans.cloudbeds.responses.BookingNote;
 import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
@@ -46,6 +48,8 @@ import com.macbackpackers.ronbot.dto.ChannelProductionDto;
 import com.macbackpackers.ronbot.dto.ContinuingRoomDto;
 import com.macbackpackers.ronbot.dto.JobHistoryDto;
 import com.macbackpackers.ronbot.dto.OccupancyDto;
+import com.macbackpackers.ronbot.dto.ReservationSearchCriteria;
+import com.macbackpackers.ronbot.dto.ReservationSearchDto;
 import com.macbackpackers.ronbot.dto.RoomTypeAvailabilityDto;
 import com.macbackpackers.ronbot.dto.StayContinuationDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
@@ -68,6 +72,8 @@ public class RonbotReadService {
     private static final int MAX_SEARCH_RESULTS = 20;
 
     private static final int MAX_OCCUPANCY_NIGHTS = 366;
+
+    static final int MAX_RESERVATION_SEARCH_RESULTS = 1000;
 
     private final PropertyContextRegistry propertyContexts;
 
@@ -106,6 +112,110 @@ public class RonbotReadService {
 
             return searchBookingsViaCloudbeds( property, q, scraper, webClient );
         }
+    }
+
+    /**
+     * Cloudbeds reservation list search by free text and/or date ranges, statuses and OTA sources.
+     * Returns up to {@code limit} rows (default/max {@value #MAX_RESERVATION_SEARCH_RESULTS});
+     * requires a query or at least one date range.
+     */
+    public ReservationSearchDto searchReservations( String property, ReservationSearchCriteria criteria )
+            throws IOException {
+        ReservationListFilter filter = toReservationListFilter( criteria );
+        int limit = reservationSearchLimit( criteria.getLimit() );
+
+        ConfigurableApplicationContext ctx = propertyContexts.require( property );
+        CloudbedsScraper scraper = ctx.getBean( CloudbedsScraper.class );
+        try ( WebClient webClient = ctx.getBean( "webClientForCloudbeds", WebClient.class ) ) {
+            String sources = StringUtils.trimToNull( criteria.getSources() );
+            if ( sources != null ) {
+                filter.sourceIds( scraper.lookupBookingSourceIds( webClient, Arrays.stream( sources.split( "," ) )
+                        .map( String::trim )
+                        .filter( StringUtils::isNotBlank )
+                        .toArray( String[]::new ) ) );
+            }
+            LOGGER.info( "Searching Cloudbeds reservation list for property={} filter={}", property, filter );
+            List<Customer> matches = scraper.getReservationList( webClient, filter, limit + 1 );
+
+            ReservationSearchDto dto = new ReservationSearchDto();
+            dto.setProperty( property );
+            dto.setTruncated( matches.size() > limit );
+            dto.setReservations( matches.stream()
+                    .limit( limit )
+                    .map( RonbotReadService::toReservationSearchRow )
+                    .collect( Collectors.toList() ) );
+            dto.setCount( dto.getReservations().size() );
+            return dto;
+        }
+    }
+
+    static int reservationSearchLimit( Integer requested ) {
+        if ( requested == null ) {
+            return MAX_RESERVATION_SEARCH_RESULTS;
+        }
+        if ( requested < 1 ) {
+            throw new IllegalArgumentException( "limit must be at least 1" );
+        }
+        return Math.min( requested, MAX_RESERVATION_SEARCH_RESULTS );
+    }
+
+    static ReservationListFilter toReservationListFilter( ReservationSearchCriteria c ) {
+        LocalDate[] stay = parseDateRange( "stay", c.getStayFrom(), c.getStayTo() );
+        LocalDate[] checkin = parseDateRange( "checkin", c.getCheckinFrom(), c.getCheckinTo() );
+        LocalDate[] checkout = parseDateRange( "checkout", c.getCheckoutFrom(), c.getCheckoutTo() );
+        LocalDate[] booked = parseDateRange( "booked", c.getBookedFrom(), c.getBookedTo() );
+        String query = StringUtils.trimToNull( c.getQuery() );
+        if ( query == null && stay[0] == null && checkin[0] == null && checkout[0] == null && booked[0] == null ) {
+            throw new IllegalArgumentException( "Provide query and/or at least one date range "
+                    + "(stayFrom/stayTo, checkinFrom/checkinTo, checkoutFrom/checkoutTo, bookedFrom/bookedTo)" );
+        }
+        return new ReservationListFilter()
+                .searchInput( query )
+                .stayDate( stay[0], stay[1] )
+                .checkinDate( checkin[0], checkin[1] )
+                .checkoutDate( checkout[0], checkout[1] )
+                .bookedDate( booked[0], booked[1] )
+                .statuses( StringUtils.trimToNull( c.getStatuses() ) );
+    }
+
+    /**
+     * @return {from, to}; both null when neither is given, a single day when only one is given
+     */
+    private static LocalDate[] parseDateRange( String name, String fromRaw, String toRaw ) {
+        LocalDate from = parseDateOrDefault( fromRaw, null );
+        LocalDate to = parseDateOrDefault( toRaw, from );
+        if ( from == null ) {
+            from = to;
+        }
+        if ( from != null && to.isBefore( from ) ) {
+            throw new IllegalArgumentException( name + "To must be on or after " + name + "From" );
+        }
+        return new LocalDate[] { from, to };
+    }
+
+    private static ReservationSearchDto.Row toReservationSearchRow( Customer c ) {
+        ReservationSearchDto.Row row = new ReservationSearchDto.Row();
+        row.setReservationId( c.getId() );
+        row.setIdentifier( c.getIdentifier() );
+        row.setThirdPartyIdentifier( c.getThirdPartyIdentifier() );
+        row.setStatus( c.getStatus() );
+        row.setFirstName( c.getFirstName() );
+        row.setLastName( c.getLastName() );
+        row.setSourceName( c.getSourceName() );
+        row.setCheckinDate( c.getCheckinDate() );
+        row.setCheckoutDate( c.getCheckoutDate() );
+        row.setNights( c.getNights() );
+        row.setBookingDate( c.getBookingDate() );
+        row.setBalanceDue( c.getBalanceDue() );
+        if ( StringUtils.isNotBlank( c.getGrandTotal() ) ) {
+            try {
+                row.setGrandTotal( new BigDecimal( c.getGrandTotal().trim() ) );
+            }
+            catch ( NumberFormatException ignored ) {
+                // leave null
+            }
+        }
+        return row;
     }
 
     /**

@@ -46,6 +46,35 @@ export async function getBooking(params: {
   return request(`/ronbot/${property}/reservations?${q}`);
 }
 
+export type ReservationSearchParams = {
+  property: string;
+  query?: string;
+  stayFrom?: string;
+  stayTo?: string;
+  checkinFrom?: string;
+  checkinTo?: string;
+  checkoutFrom?: string;
+  checkoutTo?: string;
+  bookedFrom?: string;
+  bookedTo?: string;
+  statuses?: string;
+  sources?: string;
+  limit: number;
+};
+
+/**
+ * Cloudbeds reservation list (up to `limit` rows; `truncated` when more matched) for free text
+ * and/or inclusive date ranges, statuses and OTA source names. Requires query or at least one date range.
+ */
+export async function searchReservations(params: ReservationSearchParams): Promise<unknown> {
+  const { property, limit, ...criteria } = params;
+  const q = new URLSearchParams({ limit: String(limit) });
+  for (const [key, value] of Object.entries(criteria)) {
+    if (value?.trim()) q.set(key, value.trim());
+  }
+  return request(`/ronbot/${property}/reservation-search?${q}`);
+}
+
 /**
  * Folio transactions. `query` must resolve to a unique reservation
  * (prefer the internal reservationId from a prior get_booking result).

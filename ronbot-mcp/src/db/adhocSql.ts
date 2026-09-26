@@ -46,7 +46,7 @@ const BOOKING_ASSIGNMENT_NOTES =
   "One row per bed: payment_total, payment_outstanding, visitor_levy_total and num_guests are reservation-level values repeated on every bed row — never SUM them over bed rows; use v_wp_lh_booking_reservation or MAX() per reservation_id. " +
   "source='guest' is a stay, source='closure' a room block (out_of_service / blocked_dates). " +
   "Cancellations are closed rows (see v_wp_lh_booking_removed), not current rows. " +
-  "guest_name, email, notes and comments are NULL on stays before ~2026-08 (privacy); use Cloudbeds tools for those. " +
+  "guest_name, email, notes and comments are NULL on stays before ~2026-08 (privacy), so never filter on guest_name (e.g. LIKE '%tour%') for historical questions: call search_reservations (query + date range) to get the reservation ids from Cloudbeds, then filter here with reservation_id IN (...). " +
   "Join wp_lh_rooms ON wp_lh_rooms.id = room_id for room_type / capacity. " +
   "crh history is still being backfilled; hsh/rmb/lsh history is complete.";
 
@@ -65,7 +65,7 @@ export const TABLE_NOTES: Record<string, string> = {
 
 /** One-line pointer for tool descriptions. */
 export const BOOKING_SQL_HINT =
-  "For booking/stay questions query v_wp_lh_booking_reservation (per reservation, money-safe) or v_wp_lh_booking_current (per bed) first, then wp_lh_booking_assignment for history / point-in-time (describe_sql_tables with table=wp_lh_booking_assignment explains it); wp_lh_calendar is legacy.";
+  "For booking/stay questions query v_wp_lh_booking_reservation (per reservation, money-safe) or v_wp_lh_booking_current (per bed) first, then wp_lh_booking_assignment for history / point-in-time (describe_sql_tables with table=wp_lh_booking_assignment explains it); wp_lh_calendar is legacy. Guest names are NULL on older stays: to filter by name (e.g. LSH \"tour\" group bookings), get reservation ids from search_reservations first, then use reservation_id IN (...).";
 
 /** No longer written to; do not use for current data. */
 export const DEFUNCT_TABLES = [

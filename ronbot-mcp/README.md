@@ -19,6 +19,7 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `get_job_queue_stats` | submitted / processing / retry counts |
 | `search_logs` | Grep property log dirs |
 | `get_booking` | Booking search by visible id / OTA ref / guest name (calendar DB first for names, then Cloudbeds; returns a list) |
+| `search_reservations` | Live Cloudbeds reservation list by free text and/or stay/checkin/checkout/booked date ranges, statuses, OTA sources (read-api; max 1000 rows, 200 via ronbot-bridge) |
 | `list_transactions` | Live folio lines (read-api; unique match required) |
 | `get_booking_timeline` | Live booking + transactions + job history (name queries: calendar first) |
 | `check_stay_continuation` | Cleaning / extension: staying on past checkout? (same reservation or linked follow-on in same beds) |
@@ -86,6 +87,14 @@ Each value is either an address string or an object with the user's WhatsApp ide
 - Required: `from`, `to` (YYYY-MM-DD, inclusive, max 366 nights); optional `property` / `properties` (omit both for all hostels)
 - Proxies `GET /ronbot/{property}/occupancy?from=&to=` on read-api (Data Insights classic Occupancy report; one request per calendar year)
 - Returns overall `occupancyPct` (weighted by nights of each month inside the range), `bedsBooked`, `revenue`, and `months[]` with the same fields per month
+
+### `search_reservations`
+
+- Optional: `query` (free text: name, reservation number, OTA ref), `stay_from`/`stay_to`, `checkin_from`/`checkin_to`, `checkout_from`/`checkout_to`, `booked_from`/`booked_to` (YYYY-MM-DD, inclusive; a lone from/to is a single day), `statuses` (comma-separated), `sources` (comma-separated OTA names as in Cloudbeds), `max_rows`. At least `query` or one date range is required.
+- Proxies `GET /ronbot/{property}/reservation-search?query=&stayFrom=&stayTo=&...&limit=` on read-api (Cloudbeds `mapi/reservation/list`, paging stops at the limit)
+- Row cap: read-api default/hard max 1000; the MCP caps at `RONBOT_SEARCH_MAX_ROWS` (default 1000, set to 200 by ronbot-bridge); `max_rows` can only lower it
+- Returns `count`, `truncated` (more rows matched) and compact `reservations[]` rows (reservationId, identifier, thirdPartyIdentifier, status, names, source, dates, nights, bookingDate, grandTotal, balanceDue)
+- Use it to resolve name-based filters for SQL: guest names are NULL on older `wp_lh_booking_assignment` rows, so e.g. LSH "tour" bookings are found with `query=tour` + a date range, then `run_sql ... WHERE reservation_id IN (...)`.
 
 ### `run_sql` / `describe_sql_tables`
 
@@ -165,6 +174,7 @@ See [`.cursor/mcp.json`](../.cursor/mcp.json). Point `args` at `ronbot-mcp/dist/
 - "Occupancy at rmb from 2026-06-01 to 2026-08-31" → `get_occupancy` with `property=rmb`, `from=2026-06-01`, `to=2026-08-31`
 - "How many HousekeepingJob runs failed at hsh this week?" → `run_sql` on `wp_lh_jobs`
 - "Which beds at crh have checkin 2026-09-25?" → `describe_sql_tables` (`table=v_wp_lh_booking_current`), then `run_sql`
+- "How many tour bookings at lsh in March 2025?" → `search_reservations` with `property=lsh`, `query=tour`, `stay_from=2025-03-01`, `stay_to=2025-03-31`; if bed/room detail is needed, `run_sql` on `v_wp_lh_booking_reservation` with `reservation_id IN (...)`
 - "How many reservations checked in at hsh in March 2025 and what did they pay?" → `run_sql` on `v_wp_lh_booking_reservation`
 
 ## Phase 2: Local SDK `Agent.prompt` smoke

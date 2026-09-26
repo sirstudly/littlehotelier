@@ -45,6 +45,12 @@ const ALL_PROPERTIES = ["crh", "hsh", "rmb", "lsh"] as const;
 type PropertyId = (typeof ALL_PROPERTIES)[number];
 const yearMonth = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Expected YYYY-MM");
 
+/** search_reservations row cap; read-api enforces 1000, ronbot-bridge sets RONBOT_SEARCH_MAX_ROWS=200. */
+const SEARCH_MAX_ROWS = Math.min(
+  1000,
+  Math.max(1, Number.parseInt(process.env.RONBOT_SEARCH_MAX_ROWS ?? "", 10) || 1000),
+);
+
 export function createServer(): McpServer {
   const server = new McpServer({
     name: "ronbot-ops",
@@ -181,7 +187,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_booking",
-    "Booking search (via ronbot-read-api). query may be a visible reservation id, third-party/OTA ref, or guest name. Name-like queries resolve via the local booking-assignment table (wp_lh_booking_assignment) first, then Cloudbeds get_reservation by id; Cloudbeds free-text search runs only when the local table has no matches. Guest names are only stored for recent/future stays (~2026-08 on); older stays match by reservation id or OTA ref. Identifier-like queries go straight to Cloudbeds. Returns a list of matches (exact id matches preferred) — enough to pick a booking; for folio/notes/rooms call get_booking_timeline with reservationId. Prefer get_booking_timeline once when staff already have a unique ref.",
+    "Booking search (via ronbot-read-api). query may be a visible reservation id, third-party/OTA ref, or guest name. Name-like queries resolve via the local booking-assignment table (wp_lh_booking_assignment) first, then Cloudbeds get_reservation by id; Cloudbeds free-text search runs only when the local table has no matches. Guest names are only stored for recent/future stays (~2026-08 on); older stays match by reservation id or OTA ref. Identifier-like queries go straight to Cloudbeds. Returns a list of matches (exact id matches preferred) — enough to pick a booking; for folio/notes/rooms call get_booking_timeline with reservationId. Prefer get_booking_timeline once when staff already have a unique ref. Capped at 20 matches with no date filter — to list every booking matching a name/term over a date range use search_reservations.",
     {
       property: propertySchema,
       query: z.string().min(1),
@@ -240,6 +246,49 @@ export function createServer(): McpServer {
     async ({ property, query, as_of }) => {
       try {
         return ok(await readApi.getStayContinuation({ property, query, asOf: as_of }));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "search_reservations",
+    `Live Cloudbeds reservation list search via ronbot-read-api; returns up to max_rows (default and max ${SEARCH_MAX_ROWS}) matching reservations — truncated=true means more matched, so narrow the criteria (shorter date range, statuses, sources) rather than reporting a partial count as the total. Compact rows: reservationId, identifier, thirdPartyIdentifier, status, firstName, lastName, sourceName, checkinDate, checkoutDate, nights, bookingDate, grandTotal, balanceDue. Criteria (combine freely; at least query or one date range required): query = free text (guest name, reservation number, OTA ref — e.g. "tour"); stay_from/stay_to (reservations staying any night in range), checkin_from/checkin_to, checkout_from/checkout_to, booked_from/booked_to (YYYY-MM-DD, inclusive; a lone from or to means that single day); statuses = comma-separated (confirmed, not_confirmed, checked_in, checked_out, canceled, no_show; default all); sources = comma-separated OTA names exactly as in Cloudbeds (e.g. Booking.com, Hostelworld). Use this (not get_booking) to list bookings by name/criteria over a date range, e.g. to collect reservation ids and then join to wp_lh_booking_assignment / the views with run_sql (reservation_id IN (...)). Keep date ranges tight.`,
+    {
+      property: propertySchema,
+      query: z.string().min(1).optional(),
+      stay_from: isoDate.optional(),
+      stay_to: isoDate.optional(),
+      checkin_from: isoDate.optional(),
+      checkin_to: isoDate.optional(),
+      checkout_from: isoDate.optional(),
+      checkout_to: isoDate.optional(),
+      booked_from: isoDate.optional(),
+      booked_to: isoDate.optional(),
+      statuses: z.string().min(1).optional(),
+      sources: z.string().min(1).optional(),
+      max_rows: z.number().int().min(1).optional(),
+    },
+    async (args) => {
+      try {
+        return ok(
+          await readApi.searchReservations({
+            property: args.property,
+            query: args.query,
+            stayFrom: args.stay_from,
+            stayTo: args.stay_to,
+            checkinFrom: args.checkin_from,
+            checkinTo: args.checkin_to,
+            checkoutFrom: args.checkout_from,
+            checkoutTo: args.checkout_to,
+            bookedFrom: args.booked_from,
+            bookedTo: args.booked_to,
+            statuses: args.statuses,
+            sources: args.sources,
+            limit: Math.min(args.max_rows ?? SEARCH_MAX_ROWS, SEARCH_MAX_ROWS),
+          }),
+        );
       } catch (err) {
         return fail(err);
       }

@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -23,6 +24,8 @@ import com.macbackpackers.ronbot.dto.BookingSummaryDto;
 import com.macbackpackers.ronbot.dto.BookingTimelineDto;
 import com.macbackpackers.ronbot.dto.ChannelProductionDto;
 import com.macbackpackers.ronbot.dto.OccupancyDto;
+import com.macbackpackers.ronbot.dto.ReservationSearchCriteria;
+import com.macbackpackers.ronbot.dto.ReservationSearchDto;
 import com.macbackpackers.ronbot.dto.StayContinuationDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
 
@@ -78,6 +81,17 @@ public class RonbotReadController {
             @PathVariable String property,
             @PathVariable String query ) throws IOException {
         return readService.searchBookings( property, query );
+    }
+
+    /**
+     * Full Cloudbeds reservation list for free text and/or inclusive date ranges
+     * (stay/checkin/checkout/booked), statuses and OTA source names.
+     */
+    @GetMapping( "/{property}/reservation-search" )
+    public ReservationSearchDto searchReservations(
+            @PathVariable String property,
+            @ModelAttribute ReservationSearchCriteria criteria ) throws IOException {
+        return readService.searchReservations( property, criteria );
     }
 
     @GetMapping( "/{property}/reservations/{query}/transactions" )

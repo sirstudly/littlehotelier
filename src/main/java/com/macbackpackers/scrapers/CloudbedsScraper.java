@@ -459,9 +459,23 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     private List<Customer> getReservationList( WebClient webClient, ReservationListFilter filter ) throws IOException {
+        return getReservationList( webClient, filter, Integer.MAX_VALUE );
+    }
+
+    /**
+     * Same as {@link #getReservationList(WebClient, ReservationListFilter)} but stops paging once
+     * {@code maxResults} rows have been retrieved.
+     * 
+     * @param webClient web client instance to use
+     * @param filter filter criteria
+     * @param maxResults maximum number of rows to return
+     * @return non-null list of at most {@code maxResults} customer reservations
+     * @throws IOException
+     */
+    public List<Customer> getReservationList( WebClient webClient, ReservationListFilter filter, int maxResults ) throws IOException {
         // keyed by id: rows can shift across pages if bookings are created while paging
         Map<String, Customer> results = new LinkedHashMap<>();
-        for ( int page = 1 ; ; page++ ) {
+        for ( int page = 1 ; results.size() < maxResults ; page++ ) {
             JsonObject jobject = doRequest( webClient, jsonRequestFactory.createReservationListRequest( filter, page ) );
             ReservationListResponse response = gsonIdentity.fromJson( jobject, ReservationListResponse.class );
             if ( response == null || response.getData() == null ) {
@@ -475,7 +489,7 @@ public class CloudbedsScraper {
                 break;
             }
         }
-        return new ArrayList<>( results.values() );
+        return results.values().stream().limit( maxResults ).collect( Collectors.toList() );
     }
 
     /**
