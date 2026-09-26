@@ -94,13 +94,14 @@ public class MercurePublisher {
     }
 
     /**
-     * Matches PHP housekeeping totals: Castle Rock gets floor buckets (20s/40s/50s/60–70s);
+     * Matches PHP housekeeping totals: Castle Rock gets floor buckets (10s/20s/40s/50s/60–70s);
      * other hostels only get a single {@code total}.
      */
     private JsonObject computeTotals( List<HousekeepingBed> beds ) {
         boolean castleRock = StringUtils.defaultString( dao.getOption( "siteurl" ) ).contains( "castlerock" );
         JsonObject totals = new JsonObject();
         int total = 0;
+        int level1 = 0;
         int level2 = 0;
         int level4 = 0;
         int level5 = 0;
@@ -116,7 +117,10 @@ public class MercurePublisher {
                     continue;
                 }
                 String room = StringUtils.defaultString( b.getRoom() );
-                if ( room.matches( "^2.*" ) ) {
+                if ( room.matches( "^1.*" ) ) {
+                    level1 += incr;
+                }
+                else if ( room.matches( "^2.*" ) ) {
                     level2 += incr;
                 }
                 else if ( room.matches( "^4.*" ) ) {
@@ -133,12 +137,13 @@ public class MercurePublisher {
         totals.addProperty( "total", total );
         if ( castleRock ) {
             // CRH total is floors that match room-number patterns only (same as PHP)
+            totals.addProperty( "level1", level1 );
             totals.addProperty( "level2", level2 );
             totals.addProperty( "level4", level4 );
             totals.addProperty( "level5", level5 );
             totals.addProperty( "level6_7", level6_7 );
             totals.addProperty( "upstairs", level4 + level5 + level6_7 );
-            totals.addProperty( "total", level2 + level4 + level5 + level6_7 );
+            totals.addProperty( "total", level1 + level2 + level4 + level5 + level6_7 );
         }
         return totals;
     }
