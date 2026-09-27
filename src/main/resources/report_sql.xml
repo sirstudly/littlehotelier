@@ -12,12 +12,13 @@ SELECT :jobId, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
   FROM wp_lh_booking_assignment rep
  WHERE rep.valid_to IS NULL
    AND rep.checkout_date >= CURDATE()
+   AND rep.bed_status = 'confirmed' -- excludes inquiries (pending_payment), checked-in guests, etc.
    AND (
        EXISTS (
            SELECT t.reservation_id, t.room_type_id, MAX(t.capacity) AS capacity, SUM(t.num_beds) AS total_beds, COUNT(1) AS num_rooms
              FROM ( -- for each reservation, determine which rooms are they assigned to
                   SELECT c.reservation_id, rm.room, rm.room_type_id, rm.capacity, count(1) AS num_beds
-                    FROM (SELECT DISTINCT reservation_id, room_id FROM wp_lh_booking_assignment WHERE valid_to IS NULL AND checkout_date >= CURDATE()) c
+                    FROM (SELECT DISTINCT reservation_id, room_id FROM wp_lh_booking_assignment WHERE valid_to IS NULL AND checkout_date >= CURDATE() AND bed_status = 'confirmed') c
                     JOIN wp_lh_rooms rm ON c.room_id = rm.id 
                    WHERE rm.room_type NOT IN ('LT_MALE', 'LT_FEMALE', 'DBL', 'TRIPLE', 'QUAD', 'TWIN')
                      AND c.reservation_id > 0 -- do not include room closures
@@ -35,6 +36,7 @@ SELECT :jobId, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
             WHERE c.room_id IS NULL -- unallocated reservations don't have this set
               AND c.valid_to IS NULL
               AND c.checkout_date >= CURDATE()
+              AND c.bed_status = 'confirmed'
               AND c.reservation_id = rep.reservation_id
        ) -- end exists
     )
