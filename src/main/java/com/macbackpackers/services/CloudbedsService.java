@@ -1219,20 +1219,38 @@ public class CloudbedsService {
      * @param stayDate the date we're searching on
      * @return non-null list of (staff) bed names
      */
-    private List<String> extractStaffBedsFromRoomAssignmentReport( JsonObject rpt, LocalDate stayDate ) {
-        return rpt.get( "rooms" ).getAsJsonObject()
+    static List<String> extractStaffBedsFromRoomAssignmentReport( JsonObject rpt, LocalDate stayDate ) {
+        List<Map.Entry<String, JsonElement>> beds = rpt.get( "rooms" ).getAsJsonObject()
                 .get( stayDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) ).getAsJsonObject()
                 .entrySet().stream() // now streaming room types...
                 .flatMap( e -> e.getValue().getAsJsonObject()
                         .get( "rooms" ).getAsJsonObject()
                         .entrySet().stream() ) // now streaming beds
-                // only match beds where type is "Blocked Dates" or "Out of Service"
-                .filter( e -> StreamSupport.stream( e.getValue().getAsJsonArray().spliterator(), false )
-                        .anyMatch( x -> x.getAsJsonObject().has( "type" )
-                                && Arrays.asList( "Blocked Dates", "Out of Service" ).contains(
-                                        x.getAsJsonObject().get( "type" ).getAsString() ) ) )
-                .map( e -> e.getKey().trim() )
                 .collect( Collectors.toList() );
+
+        // the same room/bed label can be listed under more than one room type (e.g. a room moved
+        // from a defunct room type that is kept closed); it's only a staff bed if closed in all of them
+        Set<String> openBeds = beds.stream()
+                .filter( e -> false == isClosedBed( e.getValue() ) )
+                .map( e -> e.getKey().trim() )
+                .collect( Collectors.toSet() );
+
+        return beds.stream()
+                .filter( e -> isClosedBed( e.getValue() ) )
+                .map( e -> e.getKey().trim() )
+                .filter( bed -> false == openBeds.contains( bed ) )
+                .distinct()
+                .collect( Collectors.toList() );
+    }
+
+    /**
+     * True if the room assignment report entries for a bed include "Blocked Dates" or "Out of Service".
+     */
+    private static boolean isClosedBed( JsonElement bedEntries ) {
+        return StreamSupport.stream( bedEntries.getAsJsonArray().spliterator(), false )
+                .anyMatch( x -> x.getAsJsonObject().has( "type" )
+                        && Arrays.asList( "Blocked Dates", "Out of Service" ).contains(
+                                x.getAsJsonObject().get( "type" ).getAsString() ) );
     }
 
     /**
