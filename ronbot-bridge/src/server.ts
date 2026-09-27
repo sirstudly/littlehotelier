@@ -7,7 +7,9 @@ import {
   normalizeJid,
   type PropertyId,
 } from "./env.js";
+import { timingSafeEqual } from "node:crypto";
 import { askRonbot, chunkWhatsAppText } from "./agent/runner.js";
+import { extractGuestRequests, guestRequestInputSchema } from "./agent/guestRequests.js";
 import { MembershipCache } from "./membership.js";
 import { TranscriptStore } from "./transcript.js";
 import { isDirectChat, shouldHandle } from "./triggers.js";
@@ -83,6 +85,39 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   const payload = typeof body === "string" ? body : JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(payload);
+}
+
+/** Internal endpoints require `Authorization: Bearer $RONBOT_TOKEN`; port 8787 is published on the host. */
+export function isAuthorizedInternal(authHeader: string | undefined): boolean {
+  if (!config.ronbotToken || !authHeader) return false;
+  const expected = Buffer.from(`Bearer ${config.ronbotToken}`);
+  const actual = Buffer.from(authHeader);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+async function handleGuestRequests(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!isAuthorizedInternal(req.headers.authorization)) {
+    send(res, 401, { error: "unauthorized" });
+    return;
+  }
+  let body: unknown;
+  try {
+    body = await readJson(req);
+  } catch {
+    send(res, 400, { error: "invalid json" });
+    return;
+  }
+  const input = guestRequestInputSchema.safeParse(body);
+  if (!input.success) {
+    send(res, 400, { error: input.error.message });
+    return;
+  }
+  try {
+    send(res, 200, await extractGuestRequests(input.data));
+  } catch (err) {
+    console.error("guest-requests failed", err);
+    send(res, 502, { error: (err as Error).message.slice(0, 500) });
+  }
 }
 
 async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
@@ -247,6 +282,11 @@ export function startServer(): void {
         console.error("webhook parse error", err);
         send(res, 400, { error: "invalid json" });
       }
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/internal/guest-requests") {
+      await handleGuestRequests(req, res);
       return;
     }
 

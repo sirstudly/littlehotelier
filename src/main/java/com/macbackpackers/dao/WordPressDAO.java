@@ -617,11 +617,30 @@ public interface WordPressDAO {
 
     /**
      * Inserts/updates the table for guest comments with a block of guest comments.
-     * {@code reservationId} and {@code comments} must be populated.
+     * {@code reservationId} and {@code comments} must be populated. Rows whose comments
+     * text changed are marked for guest request re-extraction ({@code classified_date} nulled).
      * 
      * @param comments the guest comment (if applicable) for the reservation
      */
     void updateGuestCommentsForReservations( List<GuestCommentReportEntry> comments );
+
+    /**
+     * Returns guest comments still awaiting guest request extraction, limited to reservations
+     * with a current guest booking assignment checking out on or after yesterday.
+     *
+     * @param maxResults maximum number of rows to return
+     * @return non-null list ordered by reservation id
+     */
+    List<GuestCommentReportEntry> fetchUnclassifiedGuestComments( int maxResults );
+
+    /**
+     * Saves the extracted guest request and stamps {@code classified_date}. Clears
+     * {@code acknowledged_date} when a previously saved (non-null) request is replaced by a different one.
+     *
+     * @param reservationId reservation id
+     * @param guestRequest actionable guest request, or null if nothing to action
+     */
+    void updateGuestRequest( int reservationId, String guestRequest );
 
     /**
      * Returns the wordpress option for the given property.

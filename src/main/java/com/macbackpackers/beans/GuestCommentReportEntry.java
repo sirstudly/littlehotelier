@@ -25,11 +25,17 @@ public class GuestCommentReportEntry {
     @Column( name = "comments" )
     private String comments;
 
+    @Column( name = "guest_request" )
+    private String guestRequest;
+
     @Column( name = "acknowledged_date" )
     private java.util.Date acknowledgedDate;
 
     @Column( name = "created_date" )
     private Timestamp createdDate;
+
+    @Column( name = "classified_date" )
+    private Timestamp classifiedDate;
 
     public GuestCommentReportEntry() {
         // default constructor
@@ -62,6 +68,22 @@ public class GuestCommentReportEntry {
 
     public void setComments( String comments ) {
         this.comments = comments;
+    }
+
+    public String getGuestRequest() {
+        return guestRequest;
+    }
+
+    public void setGuestRequest( String guestRequest ) {
+        this.guestRequest = guestRequest;
+    }
+
+    public Timestamp getClassifiedDate() {
+        return classifiedDate;
+    }
+
+    public void setClassifiedDate( Timestamp classifiedDate ) {
+        this.classifiedDate = classifiedDate;
     }
 
     public java.util.Date getAcknowledgedDate() {

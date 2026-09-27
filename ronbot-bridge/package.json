@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "smoke:triggers": "node --import tsx scripts/smoke-triggers.ts"
+    "smoke:triggers": "node --import tsx scripts/smoke-triggers.ts",
+    "smoke:guest-requests": "node --import tsx scripts/smoke-guest-requests.ts"
   },
   "engines": {
     "node": ">=22.13"

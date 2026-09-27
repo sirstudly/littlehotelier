@@ -1473,6 +1473,8 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + " VALUES " + StringUtils.repeat( "( ?, ? )", ",", batch.size() )
                         + " ON DUPLICATE KEY UPDATE "
                         + " reservation_id = VALUES( reservation_id ), "
+                        // assignments run left to right: compare against the old comments before replacing them
+                        + " classified_date = IF( comments <=> VALUES( comments ), classified_date, NULL ), "
                         + " comments = VALUES( comments )" );
                 q.setHint( "jakarta.persistence.query.timeout", CHUNK_TX_TIMEOUT_SECONDS * 1000 );
                 for ( int i = 0 ; i < batch.size() ; i++ ) {
@@ -1485,6 +1487,46 @@ public class WordPressDAOImpl implements WordPressDAO {
             totalUpdated += batch.size();
             LOGGER.info( "Updated {}/{} guest comments.", totalUpdated, comments.size() );
         }
+    }
+
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public List<GuestCommentReportEntry> fetchUnclassifiedGuestComments( int maxResults ) {
+        return em.createNativeQuery(
+                "SELECT g.* FROM wp_lh_rpt_guest_comments g "
+                        + " WHERE g.classified_date IS NULL "
+                        + "   AND g.comments IS NOT NULL "
+                        + "   AND EXISTS ( SELECT 1 FROM wp_lh_booking_assignment c "
+                        + "                 WHERE c.reservation_id = g.reservation_id "
+                        + "                   AND c.valid_to IS NULL "
+                        + "                   AND c.source = :source "
+                        + "                   AND c.checkout_date >= DATE_SUB( CURDATE(), INTERVAL 1 DAY ) ) "
+                        + " ORDER BY g.reservation_id",
+                GuestCommentReportEntry.class )
+                .setParameter( "source", BookingAssignment.SOURCE_GUEST )
+                .setMaxResults( maxResults )
+                .getResultList();
+    }
+
+    @Override
+    public void updateGuestRequest( int reservationId, String guestRequest ) {
+        if ( guestRequest == null ) {
+            em.createNativeQuery( "UPDATE wp_lh_rpt_guest_comments "
+                    + "   SET guest_request = NULL, classified_date = NOW() "
+                    + " WHERE reservation_id = :reservationId" )
+                    .setParameter( "reservationId", reservationId )
+                    .executeUpdate();
+            return;
+        }
+        // acknowledged_date is assigned before guest_request so it compares against the old request
+        em.createNativeQuery( "UPDATE wp_lh_rpt_guest_comments "
+                + "   SET acknowledged_date = IF( guest_request IS NOT NULL AND guest_request <> :request, NULL, acknowledged_date ), "
+                + "       guest_request = :request, "
+                + "       classified_date = NOW() "
+                + " WHERE reservation_id = :reservationId" )
+                .setParameter( "request", guestRequest )
+                .setParameter( "reservationId", reservationId )
+                .executeUpdate();
     }
 
     @SuppressWarnings( "unchecked" )

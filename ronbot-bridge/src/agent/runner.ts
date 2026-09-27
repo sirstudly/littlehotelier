@@ -43,7 +43,7 @@ function mcpEnv(): Record<string, string> {
   return env;
 }
 
-async function resolveApiKey(): Promise<string | undefined> {
+export async function resolveApiKey(): Promise<string | undefined> {
   if (config.cursorApiKey) return config.cursorApiKey;
   const status = await Cursor.auth.status();
   if (status.status === "logged-in") return undefined;

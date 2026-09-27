@@ -153,6 +153,7 @@ export const config = {
     ),
   cursorApiKey: env("CURSOR_API_KEY") || undefined,
   modelId: env("RONBOT_MODEL", "composer-2.5"),
+  extractModelId: env("RONBOT_EXTRACT_MODEL", "composer-2.5"),
   googleCredentials: env("GOOGLE_APPLICATION_CREDENTIALS"),
   gcpProjectId: env("GCP_PROJECT_ID", "macbackpackers-backoffice"),
   ronbotReadApiUrl: env("RONBOT_READ_API_URL", "http://127.0.0.1:8080"),

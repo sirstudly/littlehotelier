@@ -162,6 +162,38 @@ public class WordPressDAOTest {
     }
 
     @Test
+    public void testGuestRequestReclassifiedOnlyWhenCommentsChange() throws Exception {
+        int reservationId = 12345681;
+        dao.updateGuestCommentsForReservations( List.of( new GuestCommentReportEntry( reservationId, "Bottom bunk please" ) ) );
+        dao.updateGuestRequest( reservationId, "Bottom bunk please" );
+        assertNotNull( dao.fetchGuestComments( reservationId ).getClassifiedDate(), "classified after extraction" );
+
+        // same text: stays classified
+        dao.updateGuestCommentsForReservations( List.of( new GuestCommentReportEntry( reservationId, "Bottom bunk please" ) ) );
+        assertNotNull( dao.fetchGuestComments( reservationId ).getClassifiedDate(), "unchanged text keeps classification" );
+
+        // changed text: pending re-extraction, previous request kept until then
+        dao.updateGuestCommentsForReservations( List.of( new GuestCommentReportEntry( reservationId, "Top bunk please" ) ) );
+        GuestCommentReportEntry changed = dao.fetchGuestComments( reservationId );
+        assertEquals( null, changed.getClassifiedDate(), "changed text resets classification" );
+        assertEquals( "Bottom bunk please", changed.getGuestRequest() );
+    }
+
+    @Test
+    public void testUpdateGuestRequestResetsAcknowledgedOnlyWhenRequestChanges() throws Exception {
+        int reservationId = 12345682;
+        dao.updateGuestCommentsForReservations( List.of( new GuestCommentReportEntry( reservationId, "Bottom bunk please" ) ) );
+        dao.updateGuestRequest( reservationId, "Bottom bunk please" );
+        testDAO.runSQL( "UPDATE wp_lh_rpt_guest_comments SET acknowledged_date = NOW() WHERE reservation_id = " + reservationId );
+
+        dao.updateGuestRequest( reservationId, "Bottom bunk please" );
+        assertNotNull( dao.fetchGuestComments( reservationId ).getAcknowledgedDate(), "same request stays acknowledged" );
+
+        dao.updateGuestRequest( reservationId, "Top bunk please" );
+        assertEquals( null, dao.fetchGuestComments( reservationId ).getAcknowledgedDate(), "changed request is re-flagged" );
+    }
+
+    @Test
     public void testInsertJob() throws Exception {
         Job j = new AllocationScraperJob();
         j.setStatus( JobStatus.submitted );

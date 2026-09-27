@@ -24,6 +24,13 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
         insertGroupBookingsReportJob();
         insertMostlyFullDormReportJob();
         insertBlacklistEmailJob();
+        insertExtractGuestRequestsJob();
+    }
+
+    private void insertExtractGuestRequestsJob() {
+        ExtractGuestRequestsJob extractJob = new ExtractGuestRequestsJob();
+        extractJob.setStatus( JobStatus.submitted );
+        dao.insertJob( extractJob );
     }
 
     private void insertSplitRoomReportJob() {

@@ -48,6 +48,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
       - DB_HOST=mysql-tailscale
       - SHAREDDB_HOST=mysql-tailscale
+      - RONBOT_TOKEN=${RONBOT_TOKEN:-}
     volumes:
       - ./logs/crh:/app/logs
       - ./chromeprofile/crh:/app/chromeprofile
@@ -97,6 +98,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
       - DB_HOST=mysql-tailscale
       - SHAREDDB_HOST=mysql-tailscale
+      - RONBOT_TOKEN=${RONBOT_TOKEN:-}
     volumes:
       - ./logs/hsh:/app/logs
       - ./chromeprofile/hsh:/app/chromeprofile
@@ -146,6 +148,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
       - DB_HOST=mysql-tailscale
       - SHAREDDB_HOST=mysql-tailscale
+      - RONBOT_TOKEN=${RONBOT_TOKEN:-}
     volumes:
       - ./logs/rmb:/app/logs
       - ./chromeprofile/rmb:/app/chromeprofile
@@ -195,6 +198,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
       - DB_HOST=mysql-tailscale
       - SHAREDDB_HOST=mysql-tailscale
+      - RONBOT_TOKEN=${RONBOT_TOKEN:-}
     volumes:
       - ./logs/lsh:/app/logs
       - ./chromeprofile/lsh:/app/chromeprofile
@@ -330,6 +334,7 @@ services:
       - RONBOT_MENTION=${RONBOT_MENTION:-@ronbot}
       - RONBOT_FOLLOWUP_MINUTES=${RONBOT_FOLLOWUP_MINUTES:-15}
       - CURSOR_API_KEY=${CURSOR_API_KEY:-}
+      - RONBOT_EXTRACT_MODEL=${RONBOT_EXTRACT_MODEL:-composer-2.5}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-macbackpackers-backoffice}
       - RONBOT_READ_API_URL=http://ronbot-read-api:8080

@@ -105,6 +105,19 @@ events: `message`, `group.v2.participants`
 curl -s http://127.0.0.1:8787/health
 ```
 
+### Guest request extraction
+
+`POST /internal/guest-requests` backs the WordPress guest comments report. The hostel processors
+(`ExtractGuestRequestsJob`) send up to 100 Cloudbeds special-request texts and get back only what the
+guest wrote that staff need to action (`null` when it's all OTA boilerplate). It runs a text-only
+agent (`tools: []`, no MCP) on `RONBOT_EXTRACT_MODEL` and requires `Authorization: Bearer $RONBOT_TOKEN`.
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/internal/guest-requests \
+  -H "Authorization: Bearer $RONBOT_TOKEN" -H 'Content-Type: application/json' \
+  -d '[{"id":1,"text":"<br />Bottom bunk please. The virtual card expires on 2027-10-01."}]'
+```
+
 ## Local dev (without Docker for the bridge)
 
 ```bash

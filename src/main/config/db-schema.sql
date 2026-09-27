@@ -209,8 +209,10 @@ CREATE TABLE `wp_lh_rpt_guest_comments` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `reservation_id` bigint(20) unsigned DEFAULT NULL,
   `comments` text,
+  `guest_request` text,
   `acknowledged_date` timestamp NULL DEFAULT NULL,
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `classified_date` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `lh_rpt_gc_reservation` (`reservation_id`),
   UNIQUE (`reservation_id`)
