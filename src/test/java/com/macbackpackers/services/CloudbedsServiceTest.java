@@ -224,7 +224,7 @@ public class CloudbedsServiceTest {
 
     @Test
     public void testCreateEmailsForBookingsOnBlacklist() throws Exception {
-        cloudbedsService.createEmailsForBookingsOnBlacklist( 543745 );
+        cloudbedsService.createEmailsForBookingsOnBlacklist();
     }
 
     @Test

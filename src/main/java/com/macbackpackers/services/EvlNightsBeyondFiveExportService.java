@@ -52,7 +52,6 @@ public class EvlNightsBeyondFiveExportService {
     private static final String[] FIXED_HEADERS = {
             "reservation_id",
             "booking_reference",
-            "guest_name",
             "booking_source",
             "hotel_collect_yn",
             "room_types",
@@ -71,14 +70,13 @@ public class EvlNightsBeyondFiveExportService {
             "eligible_night_count"
     };
 
-    private static final int COL_CHECKOUT_DATE = 10;
+    private static final int COL_CHECKOUT_DATE = 9;
     private static final int COL_FIRST_PER_NIGHT = FIXED_HEADERS.length;
 
     private static final String CANDIDATE_SQL =
             "SELECT "
                     + "  a.reservation_id, "
                     + "  MAX(a.booking_reference) AS booking_reference, "
-                    + "  MAX(a.guest_name) AS guest_name, "
                     + "  MAX(a.booking_source) AS booking_source, "
                     + "  MAX(a.hotel_collect_yn) AS hotel_collect_yn, "
                     + "  MAX(a.rate_plan_name) AS room_types, "
@@ -86,16 +84,11 @@ public class EvlNightsBeyondFiveExportService {
                     + "  MAX(a.payment_outstanding) AS payment_outstanding, "
                     + "  MAX(a.booked_date) AS booked_date, "
                     + "  MIN(a.checkin_date) AS checkin_date "
-                    + "FROM wp_lh_calendar a "
-                    + "INNER JOIN ( "
-                    + "  SELECT reservation_id, MAX(job_id) AS job_id "
-                    + "  FROM wp_lh_calendar "
-                    + "  WHERE reservation_id > 0 "
-                    + "  GROUP BY reservation_id "
-                    + ") latest "
-                    + "  ON latest.reservation_id = a.reservation_id "
-                    + " AND latest.job_id = a.job_id "
-                    + "WHERE a.reservation_id > 0 "
+                    + "FROM wp_lh_booking_assignment a "
+                    + "WHERE a.valid_to IS NULL "
+                    + "  AND a.source = 'guest' "
+                    + "  AND a.reservation_id > 0 "
+                    + "  AND a.bed_status <> 'pending_payment' "
                     + "GROUP BY a.reservation_id "
                     + "HAVING MAX(a.visitor_levy_total) > 0 "
                     + "   AND MAX(a.checkout_date) > '2026-07-24' "
@@ -361,26 +354,25 @@ public class EvlNightsBeyondFiveExportService {
         setString( row, 2, asString( c[2] ), bodyStyle );
         setString( row, 3, asString( c[3] ), bodyStyle );
         setString( row, 4, asString( c[4] ), bodyStyle );
-        setString( row, 5, asString( c[5] ), bodyStyle );
+        setCurrency( row, 5, toBigDecimal( c[5] ), currencyStyle );
         setCurrency( row, 6, toBigDecimal( c[6] ), currencyStyle );
-        setCurrency( row, 7, toBigDecimal( c[7] ), currencyStyle );
-        setDate( row, 8, c[8], dateStyle );
+        setDate( row, 7, c[7], dateStyle );
 
-        setDate( row, 9, exportRow.checkinDate, dateStyle );
-        setDate( row, 10, exportRow.checkoutDate, dateStyle );
-        setString( row, 11, exportRow.cloudbedsNights, bodyStyle );
+        setDate( row, 8, exportRow.checkinDate, dateStyle );
+        setDate( row, 9, exportRow.checkoutDate, dateStyle );
+        setString( row, 10, exportRow.cloudbedsNights, bodyStyle );
         if ( exportRow.numGuests != null ) {
-            setNumber( row, 12, BigDecimal.valueOf( exportRow.numGuests ), bodyStyle );
+            setNumber( row, 11, BigDecimal.valueOf( exportRow.numGuests ), bodyStyle );
         }
         else {
-            setString( row, 12, "", bodyStyle );
+            setString( row, 11, "", bodyStyle );
         }
-        setString( row, 13, exportRow.status, bodyStyle );
-        setCurrency( row, 14, exportRow.visitorLevyTotal, currencyStyle );
-        setCurrency( row, 15, exportRow.grandTotal, currencyStyle );
-        setCurrency( row, 16, exportRow.roomRevenueAllNights, currencyStyle );
-        setCurrency( row, 17, exportRow.roomRevenueEligibleNights1To5, currencyStyle );
-        setNumber( row, 18, BigDecimal.valueOf( exportRow.eligibleNightCount ), bodyStyle );
+        setString( row, 12, exportRow.status, bodyStyle );
+        setCurrency( row, 13, exportRow.visitorLevyTotal, currencyStyle );
+        setCurrency( row, 14, exportRow.grandTotal, currencyStyle );
+        setCurrency( row, 15, exportRow.roomRevenueAllNights, currencyStyle );
+        setCurrency( row, 16, exportRow.roomRevenueEligibleNights1To5, currencyStyle );
+        setNumber( row, 17, BigDecimal.valueOf( exportRow.eligibleNightCount ), bodyStyle );
 
         int col = COL_FIRST_PER_NIGHT;
         for ( int night = MAX_LEVY_NIGHTS + 1; night <= maxNightColumn; night++ ) {

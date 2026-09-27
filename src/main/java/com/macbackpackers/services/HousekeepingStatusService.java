@@ -122,7 +122,7 @@ public class HousekeepingStatusService {
         String status = StringUtils.defaultString( overnight.getBedStatus() ).toLowerCase();
         // Booked but not checked in → treat as empty for cleaning
         if ( "confirmed".equals( status ) || "booked".equals( status ) || "not_confirmed".equals( status )
-                || "courtesy_hold".equals( status ) ) {
+                || "courtesy_hold".equals( status ) || "pending_payment".equals( status ) ) {
             if ( false == overnight.isInHouse() ) {
                 return HousekeepingBedsheet.EMPTY;
             }

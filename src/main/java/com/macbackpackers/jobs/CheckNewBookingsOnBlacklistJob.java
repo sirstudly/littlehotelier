@@ -22,7 +22,7 @@ public class CheckNewBookingsOnBlacklistJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        cloudbedsService.createEmailsForBookingsOnBlacklist( getAllocationScraperJobId() );
+        cloudbedsService.createEmailsForBookingsOnBlacklist();
     }
 
     public int getAllocationScraperJobId() {

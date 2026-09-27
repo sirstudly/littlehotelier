@@ -560,6 +560,11 @@ public class WordPressDAOTest {
     }
 
     @Test
+    public void testCompareBedCountsWithBookingAssignment() {
+        dao.compareBedCountsWithBookingAssignment( 557130, LocalDate.of( 2023, 8, 26 ) );
+    }
+
+    @Test
     public void testDeleteHostelworldBookingsWithBookedDate() {
         Calendar c = Calendar.getInstance();
         dao.deleteHostelworldBookingsWithBookedDate( c.getTime() );
@@ -645,8 +650,8 @@ public class WordPressDAOTest {
     }
 
     @Test
-    public void testFetchBookingsMatchingBlacklist() {
-        List<Allocation> allocations = dao.fetchBookingsMatchingBlacklist( 453596, sharedDao.fetchBlacklistEntries() );
-        LOGGER.info( "Found {} records.", allocations.size() );
+    public void testFetchReservationIdsMatchingBlacklist() {
+        List<Long> reservationIds = dao.fetchReservationIdsMatchingBlacklist( sharedDao.fetchBlacklistEntries() );
+        LOGGER.info( "Found {} records.", reservationIds.size() );
     }
 }

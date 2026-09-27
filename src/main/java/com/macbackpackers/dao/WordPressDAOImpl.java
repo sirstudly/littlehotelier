@@ -59,6 +59,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -67,8 +68,11 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -1227,31 +1231,35 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    public List<Allocation> fetchBookingsMatchingBlacklist( int allocationScraperJobId, List<BlacklistEntry> blacklistEntries ) {
-        if ( blacklistEntries.size() > 0 ) {
-            List<String> sqlClauses = new ArrayList<>();
-            List<Object> params = new ArrayList<>();
-            blacklistEntries.stream()
-                    .forEach( e -> {
-                        if( StringUtils.isNotBlank( e.getFirstName() ) && StringUtils.isNotBlank( e.getLastName() ) ) {
-                            sqlClauses.add( "LOWER(c.guestName) = ?" + (sqlClauses.size() + 1) );
-                            params.add( (e.getFirstName() + " " + e.getLastName()).toLowerCase() );
-                        }
-                        if( StringUtils.isNotBlank( e.getEmail() ) ) {
-                            sqlClauses.add( "LOWER(c.email) = ?" + (sqlClauses.size() + 1) );
-                            params.add( e.getEmail().toLowerCase() );
-                        }
-                    } );
-            TypedQuery<Allocation> query = em.createQuery( "FROM Allocation c "
-                            + " WHERE c.jobId = :allocationScraperJobId "
-                            + "   AND (" + sqlClauses.stream().collect(Collectors.joining(" OR ")) +  ")", Allocation.class )
-                    .setParameter( "allocationScraperJobId", allocationScraperJobId );
-            for( int i = 0; i < params.size(); i++ ) {
-                query.setParameter(i + 1, params.get( i ));
-            }
-            return query.getResultList();
+    public List<Long> fetchReservationIdsMatchingBlacklist( List<BlacklistEntry> blacklistEntries ) {
+        List<String> sqlClauses = new ArrayList<>();
+        List<Object> params = new ArrayList<>();
+        blacklistEntries.stream()
+                .forEach( e -> {
+                    if( StringUtils.isNotBlank( e.getFirstName() ) && StringUtils.isNotBlank( e.getLastName() ) ) {
+                        sqlClauses.add( "LOWER(c.guestName) = ?" + (sqlClauses.size() + 1) );
+                        params.add( (e.getFirstName() + " " + e.getLastName()).toLowerCase() );
+                    }
+                    if( StringUtils.isNotBlank( e.getEmail() ) ) {
+                        sqlClauses.add( "LOWER(c.email) = ?" + (sqlClauses.size() + 1) );
+                        params.add( e.getEmail().toLowerCase() );
+                    }
+                } );
+        if ( sqlClauses.isEmpty() ) {
+            return Collections.emptyList();
         }
-        return Collections.emptyList();
+        TypedQuery<Long> query = em.createQuery( "SELECT DISTINCT c.reservationId FROM BookingAssignment c "
+                        + " WHERE c.validTo IS NULL "
+                        + "   AND c.source = :source "
+                        + "   AND c.reservationId > 0 "
+                        + "   AND c.checkoutDate >= :checkoutFrom "
+                        + "   AND (" + sqlClauses.stream().collect(Collectors.joining(" OR ")) +  ")", Long.class )
+                .setParameter( "source", BookingAssignment.SOURCE_GUEST )
+                .setParameter( "checkoutFrom", java.sql.Date.valueOf( LocalDate.now().minusDays( 1 ) ) );
+        for( int i = 0; i < params.size(); i++ ) {
+            query.setParameter(i + 1, params.get( i ));
+        }
+        return query.getResultList();
     }
 
     @Override
@@ -1335,6 +1343,62 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( "selectionDate", selectionDate )
                 .executeUpdate();
         LOGGER.info( "Added " + rowsAdded + " records to wp_lh_bedcounts" );
+    }
+
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public int compareBedCountsWithBookingAssignment( int bedCountJobId, LocalDate selectionDate ) {
+        Map<String, List<Object>> legacy = new TreeMap<>();
+        for ( Object[] r : (List<Object[]>) em.createNativeQuery( sql.getProperty( "bedcounts.report.select" ) )
+                .setParameter( "jobId", bedCountJobId )
+                .setParameter( "selectionDate", selectionDate )
+                .getResultList() ) {
+            legacy.put( String.valueOf( r[0] ), bedCountValues( r ) );
+        }
+        Map<String, List<Object>> assignment = new TreeMap<>();
+        for ( Object[] r : (List<Object[]>) em.createNativeQuery( sql.getProperty( "bedcounts.report.select.booking.assignment" ) )
+                .setParameter( "selectionDate", selectionDate )
+                .getResultList() ) {
+            assignment.put( String.valueOf( r[0] ), bedCountValues( r ) );
+        }
+
+        Set<String> rooms = new TreeSet<>( legacy.keySet() );
+        rooms.addAll( assignment.keySet() );
+        int[] legacyTotals = new int[4];
+        int[] assignmentTotals = new int[4];
+        int differences = 0;
+        for ( String room : rooms ) {
+            List<Object> l = legacy.get( room );
+            List<Object> a = assignment.get( room );
+            addBedCountTotals( legacyTotals, l );
+            addBedCountTotals( assignmentTotals, a );
+            if ( false == Objects.equals( l, a ) ) {
+                differences++;
+                LOGGER.warn( "Bedcount shadow diff for {} room {} [empty, staff, paid, noshow]: calendar={} booking_assignment={}",
+                        selectionDate, room, l, a );
+            }
+        }
+        LOGGER.info( "Bedcount shadow compare for {}: {} of {} rooms differ; totals [empty, staff, paid, noshow] "
+                + "calendar={} booking_assignment={}", selectionDate, differences, rooms.size(),
+                Arrays.toString( legacyTotals ), Arrays.toString( assignmentTotals ) );
+        return differences;
+    }
+
+    /** num_empty, num_staff, num_paid, num_noshow from a bedcounts select row. */
+    private static List<Object> bedCountValues( Object[] r ) {
+        return Arrays.asList( toInt( r[3] ), toInt( r[4] ), toInt( r[5] ), toInt( r[6] ) );
+    }
+
+    private static int toInt( Object value ) {
+        return value == null ? 0 : ( (Number) value ).intValue();
+    }
+
+    private static void addBedCountTotals( int[] totals, List<Object> values ) {
+        if ( values != null ) {
+            for ( int i = 0; i < totals.length; i++ ) {
+                totals[i] += (Integer) values.get( i );
+            }
+        }
     }
 
     @Override

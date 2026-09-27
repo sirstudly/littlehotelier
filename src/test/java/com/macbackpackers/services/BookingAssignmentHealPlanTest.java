@@ -47,6 +47,22 @@ public class BookingAssignmentHealPlanTest {
     }
 
     @Test
+    public void nullRefreshEndSkipsNearTermRefresh() {
+        Map<Long, Customer> list = new HashMap<>();
+        Map<Long, List<BookingAssignment>> currents = new HashMap<>();
+        put( list, currents, 1L, customer( 1, "2026-09-24", "2026-09-27", "checked_in", "0.00", "30.00" ),
+                row( 1, "2026-09-24", "2026-09-27", "checked_in", "0.00", "30.00" ) );
+        put( list, currents, 2L, customer( 2, "2026-09-24", "2026-09-26", "checked_out", "0.00", "30.00" ),
+                row( 2, "2026-09-24", "2026-09-26", "checked_in", "0.00", "30.00" ) );
+
+        BookingAssignmentEnrichService.HealPlan plan = BookingAssignmentEnrichService.planHeal(
+                list, currents, TODAY.minusDays( 1 ), TODAY.plusDays( 1 ), null );
+        assertThat( plan.toFetch, contains( 2L ) );
+        assertThat( plan.nearTerm, is( 0 ) );
+        assertThat( plan.changed, is( 1 ) );
+    }
+
+    @Test
     public void missingReservationIsFetched() {
         Map<Long, Customer> list = new HashMap<>();
         list.put( 7L, customer( 7, "2027-01-10", "2027-01-12", "confirmed", "30.00", "30.00" ) );

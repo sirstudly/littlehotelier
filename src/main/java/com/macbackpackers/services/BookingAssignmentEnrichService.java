@@ -108,6 +108,20 @@ public class BookingAssignmentEnrichService {
      */
     public void healAndDualWrite( WebClient webClient, int jobId, LocalDate startDate,
             LocalDate endDate ) throws IOException {
+        LocalDate refreshEnd = startDate.plusDays(
+                Integer.parseInt( dao.getDefaultOption( OPTION_HEAL_REFRESH_DAYS, "14" ) ) );
+        heal( webClient, startDate, endDate, refreshEnd );
+        dualWriteCalendar( jobId );
+    }
+
+    /**
+     * Heal as in {@link #healAndDualWrite} without the calendar projection.
+     *
+     * @param refreshEnd stays starting on or before this date are always REST-refreshed; null to only
+     *            fetch reservations that are missing, never enriched, changed or absent from the list
+     */
+    public void heal( WebClient webClient, LocalDate startDate, LocalDate endDate,
+            LocalDate refreshEnd ) throws IOException {
         Map<Long, Customer> listById = new HashMap<>();
         for ( Customer c : scraper.getReservations( webClient, startDate, endDate ) ) {
             try {
@@ -126,8 +140,6 @@ public class BookingAssignmentEnrichService {
             currentsByRes.computeIfAbsent( a.getReservationId(), k -> new ArrayList<>() ).add( a );
         }
 
-        LocalDate refreshEnd = startDate.plusDays(
-                Integer.parseInt( dao.getDefaultOption( OPTION_HEAL_REFRESH_DAYS, "14" ) ) );
         HealPlan plan = planHeal( listById, currentsByRes, startDate, endDate, refreshEnd );
 
         for ( Long id : plan.toClose ) {
@@ -140,8 +152,6 @@ public class BookingAssignmentEnrichService {
         if ( false == plan.toFetch.isEmpty() ) {
             fetchAndApply( webClient, new ArrayList<>( plan.toFetch ) );
         }
-
-        dualWriteCalendar( jobId );
     }
 
     /** Decides which reservations heal must REST-fetch or close. */
@@ -180,7 +190,7 @@ public class BookingAssignmentEnrichService {
             }
             else {
                 LocalDate checkin = parseDate( c.getCheckinDate() );
-                if ( checkin != null && false == checkin.isAfter( refreshEnd ) ) {
+                if ( refreshEnd != null && checkin != null && false == checkin.isAfter( refreshEnd ) ) {
                     plan.toFetch.add( id );
                     plan.nearTerm++;
                 }

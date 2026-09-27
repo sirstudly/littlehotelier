@@ -720,14 +720,12 @@ public class CloudbedsService {
 
     /**
      * Creates a job that sends a support email if a booking matches a name/email against the blacklist.
-     *
-     * @param allocationScraperJobId allocation scraper job ID
      */
-    public void createEmailsForBookingsOnBlacklist( int allocationScraperJobId ) {
+    public void createEmailsForBookingsOnBlacklist() {
         try (WebClient webClient = appContext.getBean( "webClientForCloudbeds", WebClient.class )) {
             String backofficeUrl = dao.getMandatoryOption("hbo_backoffice_url") + "/" + dao.getMandatoryOption("hbo_blacklist_url");
-            dao.fetchBookingsMatchingBlacklist( allocationScraperJobId, sharedDao.fetchBlacklistEntries() ).stream()
-                .map( a -> scraper.getReservationRetry( webClient, String.valueOf( a.getReservationId() ) ) )
+            dao.fetchReservationIdsMatchingBlacklist( sharedDao.fetchBlacklistEntries() ).stream()
+                .map( reservationId -> scraper.getReservationRetry( webClient, String.valueOf( reservationId ) ) )
                 .filter( r -> false == r.containsNote( "Guest Blacklisted email sent." ) )
                 .filter( r -> "confirmed".equals( r.getStatus() ) || "not_confirmed".equals( r.getStatus() ) )
                 .forEach( r -> {

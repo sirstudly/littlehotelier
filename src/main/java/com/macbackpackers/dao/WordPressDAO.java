@@ -464,13 +464,13 @@ public interface WordPressDAO {
     List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithOutstandingBalance();
 
     /**
-     * Fetch any allocations matching any entries in the given blacklist.
+     * Fetch reservation ids of current guest booking assignments (checking out on or after
+     * yesterday) matching any entries in the given blacklist by name or email.
      *
-     * @param allocationScraperJobId PK of allocation job
      * @param blacklistEntries non-null list of blacklist entries to match
-     * @return non-null list of matching Allocation
+     * @return non-null list of distinct matching reservation ids
      */
-    List<Allocation> fetchBookingsMatchingBlacklist( int allocationScraperJobId, List<BlacklistEntry> blacklistEntries );
+    List<Long> fetchReservationIdsMatchingBlacklist( List<BlacklistEntry> blacklistEntries );
 
     /**
      * Retrieves all Agoda bookings that don't have a no charge note in either the user comments nor
@@ -509,6 +509,17 @@ public interface WordPressDAO {
      * @param selectionDate the report date in which to run for
      */
     void runBedCountsReport( int bedCountJobId, LocalDate selectionDate );
+
+    /**
+     * Shadow check while bedcounts move off {@code wp_lh_calendar}: runs the legacy calendar select
+     * and the booking-assignment select for the same date and logs any per-room differences.
+     * Does not write anything.
+     *
+     * @param bedCountJobId job ID of the bed count job whose calendar rows the legacy select uses
+     * @param selectionDate the report date
+     * @return number of rooms whose counts differ
+     */
+    int compareBedCountsWithBookingAssignment( int bedCountJobId, LocalDate selectionDate );
 
     /**
      * Returns the list of HW/HB reservation IDs for which the deposit amount has not yet been

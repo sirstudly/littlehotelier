@@ -15,6 +15,7 @@ import org.htmlunit.WebClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
+import com.macbackpackers.services.BookingAssignmentEnrichService;
 import com.macbackpackers.services.CloudbedsService;
 
 /**
@@ -28,6 +29,10 @@ public class BedCountJob extends AbstractJob {
     @Autowired
     @Transient
     private CloudbedsService cloudbedsService;
+
+    @Autowired
+    @Transient
+    private BookingAssignmentEnrichService bookingAssignmentEnrichService;
 
     @Autowired
     @Transient
@@ -48,6 +53,8 @@ public class BedCountJob extends AbstractJob {
     public void processJob() throws Exception {
         if ( dao.isCloudbeds() ) {
             LocalDate selectedDate = getSelectedLocalDate();
+            bookingAssignmentEnrichService.heal( webClient,
+                    selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ), null );
             cloudbedsService.dumpAllocationsFrom( webClient,
                     getId(), selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
 
