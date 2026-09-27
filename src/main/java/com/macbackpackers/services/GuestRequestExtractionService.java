@@ -69,7 +69,7 @@ public class GuestRequestExtractionService {
 
     @FunctionalInterface
     interface GuestRequestSink {
-        void save( int reservationId, String guestRequest );
+        void save( GuestCommentReportEntry entry, String guestRequest );
     }
 
     /**
@@ -98,10 +98,11 @@ public class GuestRequestExtractionService {
 
     /**
      * Extracts guest requests for comments that are new or changed since they were last extracted.
+     * Synchronized so overlapping jobs don't send the same pending comments to the bridge twice.
      *
      * @throws IOException if the bridge is unreachable or keeps failing
      */
-    public void extractPendingGuestRequests() throws IOException {
+    public synchronized void extractPendingGuestRequests() throws IOException {
         String bridgeUrl = StringUtils.removeEnd(
                 dao.getDefaultOption( OPTION_BRIDGE_URL, "http://ronbot-bridge:8787" ), "/" );
         int maxBatches = Integer.parseInt( dao.getDefaultOption( OPTION_MAX_BATCHES, "5" ) );
@@ -110,7 +111,8 @@ public class GuestRequestExtractionService {
         }
         List<GuestCommentReportEntry> pending = dao.fetchUnclassifiedGuestComments( maxBatches * BATCH_SIZE );
         LOGGER.info( "Guest request extraction: {} pending (cap {} batches of {})", pending.size(), maxBatches, BATCH_SIZE );
-        RunSummary summary = extract( pending, batch -> postToBridge( bridgeUrl, batch ), dao::updateGuestRequest );
+        RunSummary summary = extract( pending, batch -> postToBridge( bridgeUrl, batch ),
+                ( entry, request ) -> dao.updateGuestRequest( entry.getReservationId(), entry.getComments(), request ) );
         LOGGER.info( "Guest request extraction: classified {}, failed {}, bridge calls {}",
                 summary.classified, summary.failed, summary.calls );
     }
@@ -167,7 +169,7 @@ public class GuestRequestExtractionService {
             }
         }
         for ( GuestCommentReportEntry entry : batch ) {
-            sink.save( entry.getReservationId(), StringUtils.trimToNull( results.get( entry.getReservationId() ) ) );
+            sink.save( entry, StringUtils.trimToNull( results.get( entry.getReservationId() ) ) );
             summary.classified++;
         }
     }

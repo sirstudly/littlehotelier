@@ -1509,12 +1509,16 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
-    public void updateGuestRequest( int reservationId, String guestRequest ) {
+    public void updateGuestRequest( int reservationId, String comments, String guestRequest ) {
+        String unchangedSinceRead = " WHERE reservation_id = :reservationId "
+                + "   AND classified_date IS NULL "
+                + "   AND comments = :comments";
         if ( guestRequest == null ) {
             em.createNativeQuery( "UPDATE wp_lh_rpt_guest_comments "
                     + "   SET guest_request = NULL, classified_date = NOW() "
-                    + " WHERE reservation_id = :reservationId" )
+                    + unchangedSinceRead )
                     .setParameter( "reservationId", reservationId )
+                    .setParameter( "comments", comments )
                     .executeUpdate();
             return;
         }
@@ -1523,9 +1527,10 @@ public class WordPressDAOImpl implements WordPressDAO {
                 + "   SET acknowledged_date = IF( guest_request IS NOT NULL AND guest_request <> :request, NULL, acknowledged_date ), "
                 + "       guest_request = :request, "
                 + "       classified_date = NOW() "
-                + " WHERE reservation_id = :reservationId" )
+                + unchangedSinceRead )
                 .setParameter( "request", guestRequest )
                 .setParameter( "reservationId", reservationId )
+                .setParameter( "comments", comments )
                 .executeUpdate();
     }
 

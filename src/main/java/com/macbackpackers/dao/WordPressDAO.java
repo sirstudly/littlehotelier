@@ -636,11 +636,14 @@ public interface WordPressDAO {
     /**
      * Saves the extracted guest request and stamps {@code classified_date}. Clears
      * {@code acknowledged_date} when a previously saved (non-null) request is replaced by a different one.
+     * Does nothing if the row has since been classified or its comments no longer match
+     * {@code comments}, so a stale or duplicate extraction can't overwrite a newer one.
      *
      * @param reservationId reservation id
+     * @param comments the comments text the request was extracted from
      * @param guestRequest actionable guest request, or null if nothing to action
      */
-    void updateGuestRequest( int reservationId, String guestRequest );
+    void updateGuestRequest( int reservationId, String comments, String guestRequest );
 
     /**
      * Returns the wordpress option for the given property.

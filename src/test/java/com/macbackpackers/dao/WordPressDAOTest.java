@@ -165,7 +165,7 @@ public class WordPressDAOTest {
     public void testGuestRequestReclassifiedOnlyWhenCommentsChange() throws Exception {
         int reservationId = 12345681;
         dao.updateGuestCommentsForReservations( List.of( new GuestCommentReportEntry( reservationId, "Bottom bunk please" ) ) );
-        dao.updateGuestRequest( reservationId, "Bottom bunk please" );
+        dao.updateGuestRequest( reservationId, "Bottom bunk please", "Bottom bunk please" );
         assertNotNull( dao.fetchGuestComments( reservationId ).getClassifiedDate(), "classified after extraction" );
 
         // same text: stays classified
@@ -183,14 +183,38 @@ public class WordPressDAOTest {
     public void testUpdateGuestRequestResetsAcknowledgedOnlyWhenRequestChanges() throws Exception {
         int reservationId = 12345682;
         dao.updateGuestCommentsForReservations( List.of( new GuestCommentReportEntry( reservationId, "Bottom bunk please" ) ) );
-        dao.updateGuestRequest( reservationId, "Bottom bunk please" );
+        dao.updateGuestRequest( reservationId, "Bottom bunk please", "Bottom bunk please" );
         testDAO.runSQL( "UPDATE wp_lh_rpt_guest_comments SET acknowledged_date = NOW() WHERE reservation_id = " + reservationId );
 
-        dao.updateGuestRequest( reservationId, "Bottom bunk please" );
+        dao.updateGuestCommentsForReservations( List.of( new GuestCommentReportEntry( reservationId, "Bottom bunk please!" ) ) );
+        dao.updateGuestRequest( reservationId, "Bottom bunk please!", "Bottom bunk please" );
         assertNotNull( dao.fetchGuestComments( reservationId ).getAcknowledgedDate(), "same request stays acknowledged" );
 
-        dao.updateGuestRequest( reservationId, "Top bunk please" );
+        dao.updateGuestCommentsForReservations( List.of( new GuestCommentReportEntry( reservationId, "Top bunk please" ) ) );
+        dao.updateGuestRequest( reservationId, "Top bunk please", "Top bunk please" );
         assertEquals( null, dao.fetchGuestComments( reservationId ).getAcknowledgedDate(), "changed request is re-flagged" );
+    }
+
+    @Test
+    public void testUpdateGuestRequestIgnoresStaleOrDuplicateExtraction() throws Exception {
+        int reservationId = 12345683;
+        dao.updateGuestCommentsForReservations( List.of( new GuestCommentReportEntry( reservationId, "Bottom bunk please" ) ) );
+
+        // comments changed while the extraction was in flight
+        dao.updateGuestCommentsForReservations( List.of( new GuestCommentReportEntry( reservationId, "Top bunk please" ) ) );
+        dao.updateGuestRequest( reservationId, "Bottom bunk please", "Bottom bunk please" );
+        GuestCommentReportEntry stale = dao.fetchGuestComments( reservationId );
+        assertEquals( null, stale.getGuestRequest(), "stale extraction discarded" );
+        assertEquals( null, stale.getClassifiedDate(), "still pending extraction" );
+
+        dao.updateGuestRequest( reservationId, "Top bunk please", "Top bunk please" );
+        testDAO.runSQL( "UPDATE wp_lh_rpt_guest_comments SET acknowledged_date = NOW() WHERE reservation_id = " + reservationId );
+
+        // a second extraction of the same text doesn't replace the request or its acknowledgement
+        dao.updateGuestRequest( reservationId, "Top bunk please", "Upper bunk requested" );
+        GuestCommentReportEntry duplicate = dao.fetchGuestComments( reservationId );
+        assertEquals( "Top bunk please", duplicate.getGuestRequest() );
+        assertNotNull( duplicate.getAcknowledgedDate(), "duplicate extraction keeps acknowledgement" );
     }
 
     @Test

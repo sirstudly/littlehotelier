@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.services.GuestRequestExtractionService.GuestRequestClient;
 import com.macbackpackers.services.GuestRequestExtractionService.GuestRequestContentException;
+import com.macbackpackers.services.GuestRequestExtractionService.GuestRequestSink;
 import com.macbackpackers.services.GuestRequestExtractionService.RunSummary;
 
 /**
@@ -28,6 +29,7 @@ import com.macbackpackers.services.GuestRequestExtractionService.RunSummary;
 public class GuestRequestExtractionServiceTest {
 
     private final Map<Integer, String> saved = new LinkedHashMap<>();
+    private final GuestRequestSink sink = ( entry, request ) -> saved.put( entry.getReservationId(), request );
     private final List<Integer> batchSizes = new ArrayList<>();
 
     private static List<GuestCommentReportEntry> entries( int count ) {
@@ -60,7 +62,7 @@ public class GuestRequestExtractionServiceTest {
 
     @Test
     public void classifiesInBatchesOfOneHundred() throws Exception {
-        RunSummary summary = GuestRequestExtractionService.extract( entries( 250 ), echoClient(), saved::put );
+        RunSummary summary = GuestRequestExtractionService.extract( entries( 250 ), echoClient(), sink );
 
         assertEquals( List.of( 100, 100, 50 ), batchSizes );
         assertEquals( 250, summary.classified );
@@ -78,14 +80,14 @@ public class GuestRequestExtractionServiceTest {
             Map<Integer, String> out = new HashMap<>();
             out.put( 1, "   " );
             return out;
-        }, saved::put );
+        }, sink );
         assertTrue( saved.containsKey( 1 ) );
         assertNull( saved.get( 1 ) );
     }
 
     @Test
     public void poisonEntryIsolatedBySplittingInFewCalls() throws Exception {
-        RunSummary summary = GuestRequestExtractionService.extract( entries( 100 ), poisonClient( Set.of( 7 ) ), saved::put );
+        RunSummary summary = GuestRequestExtractionService.extract( entries( 100 ), poisonClient( Set.of( 7 ) ), sink );
 
         assertEquals( 99, summary.classified );
         assertEquals( 1, summary.failed );
@@ -97,7 +99,7 @@ public class GuestRequestExtractionServiceTest {
     @Test
     public void severalPoisonEntriesDoNotAbortTheRun() throws Exception {
         RunSummary summary = GuestRequestExtractionService.extract( entries( 300 ),
-                poisonClient( Set.of( 1, 2, 150, 299 ) ), saved::put );
+                poisonClient( Set.of( 1, 2, 150, 299 ) ), sink );
 
         assertEquals( 296, summary.classified );
         assertEquals( 4, summary.failed );
@@ -114,7 +116,7 @@ public class GuestRequestExtractionServiceTest {
                 out.put( 1, "only one" );
             }
             return out;
-        }, saved::put );
+        }, sink );
 
         assertEquals( 2, summary.classified );
         assertEquals( "ok", saved.get( 1 ), "batch result discarded, split retry saved" );
@@ -127,7 +129,7 @@ public class GuestRequestExtractionServiceTest {
                 entries( 300 ), batch -> {
                     batchSizes.add( batch.size() );
                     throw new IOException( "connection refused" );
-                }, saved::put ) );
+                }, sink ) );
         assertEquals( List.of( 100 ), batchSizes, "no split / retry on non-content failures" );
         assertTrue( saved.isEmpty() );
     }
@@ -138,7 +140,7 @@ public class GuestRequestExtractionServiceTest {
                 entries( 300 ), batch -> {
                     batchSizes.add( batch.size() );
                     throw new GuestRequestContentException( "model unavailable" );
-                }, saved::put ) );
+                }, sink ) );
         assertTrue( ex.getMessage().contains( "16 failed calls in a row" ) );
         assertEquals( GuestRequestExtractionService.MAX_CONSECUTIVE_FAILED_CALLS, batchSizes.size() );
         assertTrue( saved.isEmpty() );
