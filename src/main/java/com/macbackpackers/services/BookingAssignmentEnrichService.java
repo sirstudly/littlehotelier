@@ -52,6 +52,12 @@ public class BookingAssignmentEnrichService {
 
     private static final String STATUS_NO_SHOW = "no_show";
 
+    private static final String STATUS_CONFIRMED = "confirmed";
+
+    private static final String STATUS_CHECKED_IN = "checked_in";
+
+    private static final String STATUS_CHECKED_OUT = "checked_out";
+
     /** Stays starting within this many days are REST-refreshed every heal (catches room moves). */
     static final String OPTION_HEAL_REFRESH_DAYS = "hbo_booking_assignment_heal_refresh_days";
 
@@ -351,6 +357,11 @@ public class BookingAssignmentEnrichService {
             return;
         }
 
+        Map<String, BookingAssignment> currentsByKey = new HashMap<>();
+        for ( BookingAssignment cur : dao.fetchCurrentBookingAssignmentsForReservation( reservationId ) ) {
+            currentsByKey.put( cur.getAssignmentKey(), cur );
+        }
+
         Set<String> liveKeys = new HashSet<>();
         for ( BookingAssignment fromRest : buildAssignments( r ) ) {
             // WS drops canceled tiles; do the same so canceled rows never linger as currents
@@ -359,15 +370,36 @@ public class BookingAssignmentEnrichService {
                 continue;
             }
             liveKeys.add( fromRest.getAssignmentKey() );
+            keepCalendarBedStatus( fromRest, currentsByKey.get( fromRest.getAssignmentKey() ) );
             dao.upsertBookingAssignment( fromRest );
             dao.patchBookingAssignmentFolio( fromRest.getAssignmentKey(), fromRest );
         }
 
         // booking rooms removed from the reservation (or superseded res:… fallback keys)
-        for ( BookingAssignment cur : dao.fetchCurrentBookingAssignmentsForReservation( reservationId ) ) {
+        for ( BookingAssignment cur : currentsByKey.values() ) {
             if ( false == liveKeys.contains( cur.getAssignmentKey() ) ) {
                 dao.closeBookingAssignment( cur.getAssignmentKey() );
             }
+        }
+    }
+
+    /**
+     * REST only has a per-bed {@code in_house} flag, so a bed checked out early (or a reservation
+     * whose status lags) comes back as {@code confirmed} / {@code checked_in}. The calendar (WS)
+     * status is per bed; don't let REST move a bed backwards from it.
+     */
+    static void keepCalendarBedStatus( BookingAssignment fromRest, BookingAssignment current ) {
+        if ( current == null ) {
+            return;
+        }
+        String cur = current.getBedStatus();
+        String rest = fromRest.getBedStatus();
+        boolean backwards = ( STATUS_CHECKED_OUT.equals( cur )
+                && ( STATUS_CONFIRMED.equals( rest ) || STATUS_CHECKED_IN.equals( rest ) ) )
+                || ( STATUS_CHECKED_IN.equals( cur ) && STATUS_CONFIRMED.equals( rest ) );
+        if ( backwards ) {
+            fromRest.setBedStatus( cur );
+            fromRest.setInHouseYn( current.getInHouseYn() );
         }
     }
 
