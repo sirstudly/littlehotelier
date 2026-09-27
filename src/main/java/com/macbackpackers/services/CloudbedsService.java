@@ -42,6 +42,7 @@ import com.macbackpackers.scrapers.BookingComSeleniumScraper;
 import com.macbackpackers.scrapers.CloudbedsJsonRequestFactory;
 import com.macbackpackers.scrapers.CloudbedsRoomBedSyncMapper;
 import com.macbackpackers.scrapers.CloudbedsScraper;
+import com.macbackpackers.scrapers.datainsights.RoomAssignmentsReportRow;
 import com.macbackpackers.scrapers.matchers.BedAssignment;
 import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 import org.apache.commons.io.IOUtils;
@@ -280,7 +281,7 @@ public class CloudbedsService {
         LocalDate stayDatePlus1 = stayDate.plusDays( 1 );
         LocalDate stayDatePlus2 = stayDate.plusDays( 2 );
 
-        JsonObject rpt = scraper.getRoomAssignmentsReport( webClient, stayDate );
+        List<RoomAssignmentsReportRow> rpt = scraper.getRoomAssignmentsReport( webClient, stayDate );
         List<String> staffBedsBefore = extractStaffBedsFromRoomAssignmentReport( rpt, stayDate );
         List<String> staffBedsAfter = extractStaffBedsFromRoomAssignmentReport( rpt, stayDatePlus1 );
         Map<RoomBedLookup, RoomBed> roomBedMap = dao.fetchAllRoomBeds();
@@ -297,7 +298,8 @@ public class CloudbedsService {
             roomBedMap = dao.fetchAllRoomBeds();
         }
         return buildStaffAllocationListTwoDaySpan(
-                staffBedsBefore, staffBedsAfter, roomBedMap, stayDate, stayDatePlus1, stayDatePlus2 );
+                retainKnownBeds( staffBedsBefore, roomBedMap ), retainKnownBeds( staffBedsAfter, roomBedMap ),
+                roomBedMap, stayDate, stayDatePlus1, stayDatePlus2 );
     }
 
     /**
@@ -310,7 +312,7 @@ public class CloudbedsService {
      */
     public List<Allocation> getAllStaffAllocationsDaily( WebClient webClient, LocalDate stayDate ) throws IOException {
 
-        JsonObject rpt = scraper.getRoomAssignmentsReport( webClient, stayDate );
+        List<RoomAssignmentsReportRow> rpt = scraper.getRoomAssignmentsReport( webClient, stayDate );
         List<String> staffBeds = extractStaffBedsFromRoomAssignmentReport( rpt, stayDate );
         Map<RoomBedLookup, RoomBed> roomBedMap = dao.fetchAllRoomBeds();
 
@@ -320,7 +322,25 @@ public class CloudbedsService {
             syncRoomsFromCloudbeds( webClient );
             roomBedMap = dao.fetchAllRoomBeds();
         }
-        return buildStaffAllocationListDaily( staffBeds, roomBedMap, stayDate );
+        return buildStaffAllocationListDaily( retainKnownBeds( staffBeds, roomBedMap ), roomBedMap, stayDate );
+    }
+
+    /**
+     * Drops (with a warning) bed labels that have no {@code wp_lh_rooms} row even after a room sync;
+     * the report covers every Cloudbeds room type, including ones never synced.
+     */
+    private List<String> retainKnownBeds( List<String> staffBedLabels, Map<RoomBedLookup, RoomBed> roomBedMap ) {
+        List<String> known = new ArrayList<>();
+        for ( String bedname : staffBedLabels ) {
+            BedAssignment bedAssign = roomBedMatcher.parse( bedname );
+            if ( roomBedMap.get( new RoomBedLookup( bedAssign.getRoom(), bedAssign.getBedName() ) ) == null ) {
+                LOGGER.warn( "Ignoring closed bed '{}' with no wp_lh_rooms mapping.", bedname );
+            }
+            else {
+                known.add( bedname );
+            }
+        }
+        return known;
     }
 
     /**
@@ -1072,19 +1092,15 @@ public class CloudbedsService {
     public void createFixedRateLongTermReservations(WebClient webClient, LocalDate forDate, int days, BigDecimal dailyRate ) throws IOException {
 
         // first find out the room assignments from forDate for the next week so we know of any clashes
-        JsonObject rpt = scraper.getRoomAssignmentsReport( webClient, forDate, forDate.plusDays( days ) );
-        Set<String> conflictBeds = new HashSet<>();
-        for(LocalDate d = forDate; d.isBefore( forDate.plusDays( days ) ); d = d.plusDays( 1 )) {
-            conflictBeds.addAll(rpt.get( "rooms" ).getAsJsonObject()
-                .get( d.format( DateTimeFormatter.ISO_LOCAL_DATE ) ).getAsJsonObject()
-                .entrySet().stream() // now streaming room types...
-                .flatMap( e -> e.getValue().getAsJsonObject()
-                        .get( "rooms" ).getAsJsonObject()
-                        .entrySet().stream() ) // now streaming beds
-                // only match beds where there has been an assignment
-                .filter( e -> e.getValue().getAsJsonArray().iterator().hasNext() )
-                .map( e -> e.getKey().trim() )
-                .collect( Collectors.toList() ));
+        LocalDate endDate = forDate.plusDays( days );
+        List<RoomAssignmentsReportRow> rpt = scraper.getRoomAssignmentsReport( webClient, forDate, endDate );
+        Set<String> conflictBeds = rpt.stream()
+                .filter( r -> r.getStayDate().isBefore( endDate ) )
+                .filter( r -> r.isReserved() || r.getCourtesyHoldCount() > 0 )
+                .map( RoomAssignmentsReportRow::getRoomName )
+                .collect( Collectors.toSet() );
+        for ( LocalDate d = forDate; d.isBefore( endDate ); d = d.plusDays( 1 ) ) {
+            conflictBeds.addAll( extractStaffBedsFromRoomAssignmentReport( rpt, d ) );
         }
 
         scraper.getReservations( webClient, forDate.minusDays( 1 ), forDate.minusDays( 1 ) ).stream()
@@ -1215,42 +1231,28 @@ public class CloudbedsService {
     /**
      * Extracts all staff beds from the given assignment report.
      * 
-     * @param rpt the JSON report
+     * @param rpt the room assignments report
      * @param stayDate the date we're searching on
      * @return non-null list of (staff) bed names
      */
-    static List<String> extractStaffBedsFromRoomAssignmentReport( JsonObject rpt, LocalDate stayDate ) {
-        List<Map.Entry<String, JsonElement>> beds = rpt.get( "rooms" ).getAsJsonObject()
-                .get( stayDate.format( DateTimeFormatter.ISO_LOCAL_DATE ) ).getAsJsonObject()
-                .entrySet().stream() // now streaming room types...
-                .flatMap( e -> e.getValue().getAsJsonObject()
-                        .get( "rooms" ).getAsJsonObject()
-                        .entrySet().stream() ) // now streaming beds
+    static List<String> extractStaffBedsFromRoomAssignmentReport( List<RoomAssignmentsReportRow> rpt, LocalDate stayDate ) {
+        List<RoomAssignmentsReportRow> beds = rpt.stream()
+                .filter( r -> stayDate.equals( r.getStayDate() ) && StringUtils.isNotBlank( r.getRoomName() ) )
                 .collect( Collectors.toList() );
 
         // the same room/bed label can be listed under more than one room type (e.g. a room moved
         // from a defunct room type that is kept closed); it's only a staff bed if closed in all of them
         Set<String> openBeds = beds.stream()
-                .filter( e -> false == isClosedBed( e.getValue() ) )
-                .map( e -> e.getKey().trim() )
+                .filter( r -> false == r.isClosed() )
+                .map( RoomAssignmentsReportRow::getRoomName )
                 .collect( Collectors.toSet() );
 
         return beds.stream()
-                .filter( e -> isClosedBed( e.getValue() ) )
-                .map( e -> e.getKey().trim() )
+                .filter( RoomAssignmentsReportRow::isClosed )
+                .map( RoomAssignmentsReportRow::getRoomName )
                 .filter( bed -> false == openBeds.contains( bed ) )
                 .distinct()
                 .collect( Collectors.toList() );
-    }
-
-    /**
-     * True if the room assignment report entries for a bed include "Blocked Dates" or "Out of Service".
-     */
-    private static boolean isClosedBed( JsonElement bedEntries ) {
-        return StreamSupport.stream( bedEntries.getAsJsonArray().spliterator(), false )
-                .anyMatch( x -> x.getAsJsonObject().has( "type" )
-                        && Arrays.asList( "Blocked Dates", "Out of Service" ).contains(
-                                x.getAsJsonObject().get( "type" ).getAsString() ) );
     }
 
     /**

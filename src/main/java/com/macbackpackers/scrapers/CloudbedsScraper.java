@@ -30,6 +30,8 @@ import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.cloudbedsws.EdinburghVisitorLevyBookingCriteria;
 import com.macbackpackers.scrapers.cloudbedsws.NonRefundableBookingCriteria;
+import com.macbackpackers.scrapers.datainsights.CloudbedsDataInsightsClient;
+import com.macbackpackers.scrapers.datainsights.RoomAssignmentsReportRow;
 import com.macbackpackers.services.EdinburghVisitorLevyCalculator;
 import org.apache.commons.lang3.StringUtils;
 import org.htmlunit.Page;
@@ -155,6 +157,9 @@ public class CloudbedsScraper {
 
     @Autowired
     private CloudbedsJsonRequestFactory jsonRequestFactory;
+
+    @Autowired
+    private CloudbedsDataInsightsClient dataInsightsClient;
 
     @Value( "${process.jobs.retries:3}" )
     private int MAX_RETRY;
@@ -879,32 +884,31 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Runs Room Assignments report and returns the raw response.
+     * Runs the Room Assignments report for the given stay date and the day after.
      * 
      * @param webClient web client instance to use
      * @param stayDate the date we're searching on
-     * @return non-null raw JSON object holding all bed assignments
+     * @return non-null list of bed assignments
      * @throws IOException on failure
      */
-    public JsonObject getRoomAssignmentsReport( WebClient webClient, LocalDate stayDate ) throws IOException {
+    public List<RoomAssignmentsReportRow> getRoomAssignmentsReport( WebClient webClient, LocalDate stayDate ) throws IOException {
         return getRoomAssignmentsReport( webClient, stayDate, stayDate.plusDays( 1 ) );
     }
 
     /**
-     * Runs Room Assignments report and returns the raw response.
+     * Runs the Room Assignments report (Data Insights) for all room types.
      * 
-     * @param webClient
-     * @param stayDateFrom
-     * @param stayDateTo
-     * @return non-null JSON response
-     * @throws IOException
+     * @param webClient web client instance to use
+     * @param stayDateFrom first stay date (inclusive)
+     * @param stayDateTo last stay date (inclusive)
+     * @return non-null list of bed assignments, one per bed per room type per stay date
+     * @throws IOException on failure
      */
-    public JsonObject getRoomAssignmentsReport( WebClient webClient, LocalDate stayDateFrom, LocalDate stayDateTo ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createGetRoomAssignmentsReport( stayDateFrom, stayDateTo,
-                getBillingPortalId( webClient ), getFrontVersion( webClient ) );
-        LOGGER.info( "Fetching staff allocations for " + stayDateFrom.format( DateTimeFormatter.ISO_LOCAL_DATE )
+    public List<RoomAssignmentsReportRow> getRoomAssignmentsReport( WebClient webClient, LocalDate stayDateFrom,
+            LocalDate stayDateTo ) throws IOException {
+        LOGGER.info( "Fetching room assignments for " + stayDateFrom.format( DateTimeFormatter.ISO_LOCAL_DATE )
                 + " to " + stayDateTo.format( DateTimeFormatter.ISO_LOCAL_DATE ) );
-        return doRequest( webClient, requestSettings );
+        return dataInsightsClient.queryRoomAssignments( webClient, stayDateFrom, stayDateTo );
     }
 
     /**

@@ -12,10 +12,11 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.ronbot.RonbotReadService.RoomAssignmentHit;
+import com.macbackpackers.scrapers.datainsights.CloudbedsDataInsightsClient;
+import com.macbackpackers.scrapers.datainsights.RoomAssignmentsReportRow;
 
 public class RonbotReadServiceStayContinuationTest {
 
@@ -63,34 +64,37 @@ public class RonbotReadServiceStayContinuationTest {
 
     @Test
     public void indexAssignmentsByBedFromFixture() throws Exception {
-        JsonObject report;
-        try ( InputStreamReader reader = new InputStreamReader(
-                getClass().getResourceAsStream( "/room_assignments_report.json" ),
-                StandardCharsets.UTF_8 ) ) {
-            report = JsonParser.parseReader( reader ).getAsJsonObject();
-        }
+        List<RoomAssignmentsReportRow> report = loadReport();
 
         Map<String, List<RoomAssignmentHit>> byBed =
-                RonbotReadService.indexAssignmentsByBed( report, LocalDate.of( 2021, 1, 6 ) );
+                RonbotReadService.indexAssignmentsByBed( report, LocalDate.of( 2026, 9, 26 ) );
 
-        assertTrue( byBed.containsKey( "21-04- Stag" ) );
-        assertEquals( "38059804", byBed.get( "21-04- Stag" ).get( 0 ).bookingId );
-        assertEquals( "Mercedes", byBed.get( "21-04- Stag" ).get( 0 ).guestFirstName );
+        // one hit per bed: the blocked defunct listing of room 21 has no booking
+        assertEquals( 1, byBed.get( "21-04- Stag" ).size() );
+        assertEquals( "183380606", byBed.get( "21-04- Stag" ).get( 0 ).bookingId );
+        assertEquals( "Test", byBed.get( "21-04- Stag" ).get( 0 ).guestLastName );
 
-        assertTrue( byBed.containsKey( "21-08- Let It Be" ) );
-        assertEquals( "38059811", byBed.get( "21-08- Let It Be" ).get( 0 ).bookingId );
+        assertEquals( "183945221", byBed.get( "21-08- Let It Be" ).get( 0 ).bookingId );
 
-        // Empty assignment arrays are omitted
-        assertFalse( byBed.containsKey( "21-01- VW" ) );
+        // closed and unassigned beds are omitted
+        assertFalse( byBed.containsKey( "11-01- Night & Day" ) );
+        assertFalse( byBed.containsKey( "PB((4)" ) );
     }
 
     @Test
-    public void indexAssignmentsByBedEmptyWhenDateMissing() {
-        JsonObject report = JsonParser.parseString(
-                "{\"success\":true,\"rooms\":{\"2021-01-06\":{}}}" ).getAsJsonObject();
+    public void indexAssignmentsByBedEmptyWhenDateMissing() throws Exception {
         Map<String, List<RoomAssignmentHit>> byBed =
-                RonbotReadService.indexAssignmentsByBed( report, LocalDate.of( 2021, 1, 7 ) );
+                RonbotReadService.indexAssignmentsByBed( loadReport(), LocalDate.of( 2026, 9, 27 ) );
         assertTrue( byBed.isEmpty() );
+    }
+
+    private List<RoomAssignmentsReportRow> loadReport() throws Exception {
+        try ( InputStreamReader reader = new InputStreamReader(
+                getClass().getResourceAsStream( "/room_assignments_report_datainsights.json" ),
+                StandardCharsets.UTF_8 ) ) {
+            return CloudbedsDataInsightsClient.parseRoomAssignments(
+                    JsonParser.parseReader( reader ).getAsJsonObject() );
+        }
     }
 
     @Test

@@ -239,8 +239,8 @@ public class CloudbedsScraperTest {
 
     @Test
     public void testGetRoomAssignmentsReport() throws Exception {
-        JsonObject rpt = cloudbedsScraper.getRoomAssignmentsReport( webClient, LocalDate.now() );
-        LOGGER.info( rpt.toString() );
+        cloudbedsScraper.getRoomAssignmentsReport( webClient, LocalDate.now() )
+                .forEach( r -> LOGGER.info( ToStringBuilder.reflectionToString( r ) ) );
     }
 
     @Test

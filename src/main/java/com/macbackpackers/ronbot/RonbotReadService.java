@@ -38,6 +38,7 @@ import com.macbackpackers.beans.cloudbeds.responses.BookingNote;
 import com.macbackpackers.beans.cloudbeds.responses.BookingRoom;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
+import com.macbackpackers.scrapers.datainsights.RoomAssignmentsReportRow;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.MissingUserDataException;
@@ -633,7 +634,7 @@ public class RonbotReadService {
                 }
             }
             else if ( checkout.equals( asOf ) ) {
-                JsonObject report = scraper.getRoomAssignmentsReport( webClient, checkout );
+                List<RoomAssignmentsReportRow> report = scraper.getRoomAssignmentsReport( webClient, checkout );
                 Map<String, List<RoomAssignmentHit>> byBed = indexAssignmentsByBed( report, checkout );
                 Map<String, Reservation> loadedFollowOns = new LinkedHashMap<>();
 
@@ -778,51 +779,23 @@ public class RonbotReadService {
     /**
      * Index room-assignments report hits by normalized bed label for a single night.
      */
-    static Map<String, List<RoomAssignmentHit>> indexAssignmentsByBed( JsonObject report, LocalDate night ) {
+    static Map<String, List<RoomAssignmentHit>> indexAssignmentsByBed( List<RoomAssignmentsReportRow> report,
+            LocalDate night ) {
         Map<String, List<RoomAssignmentHit>> byBed = new LinkedHashMap<>();
         if ( report == null ) {
             return byBed;
         }
-        JsonElement roomsEl = report.get( "rooms" );
-        if ( roomsEl == null || !roomsEl.isJsonObject() ) {
-            return byBed;
-        }
-        JsonObject roomsByDate = roomsEl.getAsJsonObject();
-        JsonElement dayEl = roomsByDate.get( night.format( DateTimeFormatter.ISO_LOCAL_DATE ) );
-        if ( dayEl == null || !dayEl.isJsonObject() ) {
-            return byBed;
-        }
-        for ( Map.Entry<String, JsonElement> roomTypeEntry : dayEl.getAsJsonObject().entrySet() ) {
-            if ( !roomTypeEntry.getValue().isJsonObject() ) {
+        for ( RoomAssignmentsReportRow row : report ) {
+            String bedKey = normalizeBedLabel( row.getRoomName() );
+            if ( !night.equals( row.getStayDate() ) || bedKey.isEmpty()
+                    || StringUtils.isBlank( row.getBookingId() ) ) {
                 continue;
             }
-            JsonObject roomTypeObj = roomTypeEntry.getValue().getAsJsonObject();
-            JsonElement bedsEl = roomTypeObj.get( "rooms" );
-            if ( bedsEl == null || !bedsEl.isJsonObject() ) {
-                continue;
-            }
-            for ( Map.Entry<String, JsonElement> bedEntry : bedsEl.getAsJsonObject().entrySet() ) {
-                String bedKey = normalizeBedLabel( bedEntry.getKey() );
-                if ( bedKey.isEmpty() || !bedEntry.getValue().isJsonArray() ) {
-                    continue;
-                }
-                JsonArray arr = bedEntry.getValue().getAsJsonArray();
-                for ( JsonElement hitEl : arr ) {
-                    if ( !hitEl.isJsonObject() ) {
-                        continue;
-                    }
-                    JsonObject hit = hitEl.getAsJsonObject();
-                    String bookingId = jsonString( hit, "booking_id" );
-                    if ( bookingId.isEmpty() ) {
-                        continue;
-                    }
-                    byBed.computeIfAbsent( bedKey, k -> new ArrayList<>() )
-                            .add( new RoomAssignmentHit(
-                                    bookingId,
-                                    jsonString( hit, "guest_first_name" ),
-                                    jsonString( hit, "guest_last_name" ) ) );
-                }
-            }
+            byBed.computeIfAbsent( bedKey, k -> new ArrayList<>() )
+                    .add( new RoomAssignmentHit(
+                            row.getBookingId(),
+                            StringUtils.defaultString( row.getGuestFirstName() ),
+                            StringUtils.defaultString( row.getGuestLastName() ) ) );
         }
         return byBed;
     }

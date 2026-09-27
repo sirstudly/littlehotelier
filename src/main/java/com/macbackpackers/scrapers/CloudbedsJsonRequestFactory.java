@@ -430,36 +430,6 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
-     * Retrieves all reservations staying within the given date range.
-     * 
-     * @param dateStart checkin date (inclusive)
-     * @param dateEnd checkin date (inclusive)
-     * @param billingPortalId
-     * @param frontVersion
-     * @return web request
-     * @throws IOException on i/o error
-     */
-    public WebRequest createGetRoomAssignmentsReport( LocalDate dateStart, LocalDate dateEnd, String billingPortalId, String frontVersion ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reports/get_room_assignments_report" );
-        webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "booking_date[0]", dateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "booking_date[1]", dateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "room_types", dao.getAllRoomTypeIds().stream()
-                        .map( rt -> rt.toString() )
-                        .collect( Collectors.joining( "," ) ) ),
-                new NameValuePair( "show_assigned_unassigned", "show_assigned_rooms,show_unassigned_rooms" ),
-                new NameValuePair( "view", "room_assignments_report" ),
-                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
-                new NameValuePair( "billing_portal_id", billingPortalId ),
-                new NameValuePair( "is_bp_setup_completed", "1" ),
-                new NameValuePair( "frontVersion", frontVersion ),
-                new NameValuePair( "property_id", getPropertyId() ),
-                new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
-        return webRequest;
-    }
-
-    /**
      * Retrieves all activity for a reservation.
      * 
      * @param reservationId the cloudbeds reservation id
