@@ -1,7 +1,10 @@
 import { config, normalizeJid } from "../env.js";
+import type { WahaMessagePayload } from "./types.js";
 
 /** Max inbound image size passed to Cursor (bytes). */
 export const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
+
+const HISTORY_TIMEOUT_MS = 5000;
 
 export interface DownloadedImage {
   data: string;
@@ -91,6 +94,29 @@ export class WahaClient {
       return data.id ?? data.key?.id;
     } catch {
       return undefined;
+    }
+  }
+
+  /** Best-effort recent chat history (any order). Returns [] on failure so replies are never blocked. */
+  async getChatMessages(chatId: string, limit: number): Promise<WahaMessagePayload[]> {
+    const session = encodeURIComponent(this.session);
+    const id = encodeURIComponent(normalizeJid(chatId));
+    const url = `${this.baseUrl}/api/${session}/chats/${id}/messages?limit=${limit}&downloadMedia=false`;
+    try {
+      const res = await fetch(url, {
+        headers: this.headers(),
+        signal: AbortSignal.timeout(HISTORY_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.warn(`WAHA chat messages ${res.status} for ${chatId}: ${body.slice(0, 200)}`);
+        return [];
+      }
+      const data = (await res.json()) as unknown;
+      return Array.isArray(data) ? (data as WahaMessagePayload[]) : [];
+    } catch (err) {
+      console.warn(`WAHA chat messages failed for ${chatId}`, err);
+      return [];
     }
   }
 

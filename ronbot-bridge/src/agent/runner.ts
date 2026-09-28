@@ -52,6 +52,11 @@ export async function resolveApiKey(): Promise<string | undefined> {
   );
 }
 
+/** False until the first `askRonbot` for this chat since startup has sent the system prompt. */
+export function hasPrimedAgent(chatId: string): boolean {
+  return agents.get(chatId)?.primed ?? false;
+}
+
 async function getOrCreateAgent(chatId: string): Promise<SDKAgent> {
   const existing = agents.get(chatId);
   if (existing) return existing.agent;

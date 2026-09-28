@@ -8,10 +8,14 @@ import {
   type PropertyId,
 } from "./env.js";
 import { timingSafeEqual } from "node:crypto";
-import { askRonbot, chunkWhatsAppText } from "./agent/runner.js";
+import { askRonbot, chunkWhatsAppText, hasPrimedAgent } from "./agent/runner.js";
 import { extractGuestRequests, guestRequestInputSchema } from "./agent/guestRequests.js";
 import { MembershipCache } from "./membership.js";
-import { TranscriptStore } from "./transcript.js";
+import {
+  TranscriptStore,
+  transcriptEntryFromPayload,
+  type TranscriptEntry,
+} from "./transcript.js";
 import { isDirectChat, shouldHandle } from "./triggers.js";
 import { resolveRequester, type Requester } from "./users.js";
 import { WahaClient } from "./waha/client.js";
@@ -55,11 +59,52 @@ export function requesterContextLine(requester: Requester | undefined): string {
   return `Requester=${requester.alias} (${requester.email}; use alias "${requester.alias}" when they say me/my email)`;
 }
 
+/**
+ * All DM chat ids for one person (phone `@c.us` and linked `@lid`), canonical key first.
+ * The phone id is preferred as the key so it stays stable once linked ids are known.
+ */
+export function dmChatIds(chatId: string, membership: MembershipCache): string[] {
+  const ids = [
+    ...new Set([chatId, ...membership.getLinkedIds(chatId)].map(normalizeJid)),
+  ].filter(isDirectChat);
+  const phones = ids.filter((id) => id.endsWith("@c.us")).sort();
+  const key = phones[0] ?? normalizeJid(chatId);
+  return [key, ...ids.filter((id) => id !== key)];
+}
+
 const waha = new WahaClient();
 const membership = new MembershipCache(waha);
 const transcript = new TranscriptStore();
 const recentMessageIds = new Set<string>();
 const processingChats = new Set<string>();
+const historyLoads = new Map<string, Promise<void>>();
+
+/** Load recent WhatsApp history into the transcript once per chat key since startup. */
+async function ensureHistory(chatKey: string, chatIds: string[]): Promise<void> {
+  if (transcript.isSeeded(chatKey)) return;
+  if (config.backfillLimit <= 0) {
+    transcript.seed(chatKey, []);
+    return;
+  }
+  let load = historyLoads.get(chatKey);
+  if (!load) {
+    load = (async () => {
+      const batches = await Promise.all(
+        chatIds.map((id) => waha.getChatMessages(id, config.backfillLimit)),
+      );
+      const entries = batches
+        .flat()
+        .map(transcriptEntryFromPayload)
+        .filter((e): e is TranscriptEntry => e !== null);
+      transcript.seed(chatKey, entries);
+      console.log(
+        `history loaded chat=${chatKey} ids=${chatIds.length} messages=${entries.length}`,
+      );
+    })().finally(() => historyLoads.delete(chatKey));
+    historyLoads.set(chatKey, load);
+  }
+  await load;
+}
 
 /** Agent silence contract: exact NO_REPLY (trim + case-insensitive) means skip send. */
 export function isNoReply(answer: string): boolean {
@@ -142,8 +187,13 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
   const trackGroup = msg.isGroup && isAllowlistedGroup(chatId);
   const trackDm =
     !msg.isGroup && isDirectChat(chatId) && membership.isAuthorizedDmSender(senderId);
+  const chatIds = msg.isGroup ? [chatId] : dmChatIds(chatId, membership);
+  const chatKey = chatIds[0]!;
+  if (trackGroup || trackDm) {
+    await ensureHistory(chatKey, chatIds);
+  }
   if ((trackGroup || trackDm) && transcriptBody) {
-    transcript.append(chatId, {
+    transcript.append(chatKey, {
       at: msg.timestampMs,
       senderId,
       body: transcriptBody,
@@ -152,7 +202,7 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
     });
   }
 
-  const reason = shouldHandle(msg, membership, transcript);
+  const reason = shouldHandle(msg, membership, transcript, chatKey);
   if (!reason) return;
 
   if (recentMessageIds.has(msg.messageId)) return;
@@ -162,7 +212,7 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
     if (first) recentMessageIds.delete(first);
   }
 
-  if (processingChats.has(chatId)) {
+  if (processingChats.has(chatKey)) {
     await waha.sendText(
       chatId,
       "Still working on the previous question in this chat — please wait a moment.",
@@ -170,7 +220,7 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
     return;
   }
 
-  processingChats.add(chatId);
+  processingChats.add(chatKey);
   let typingTimer: ReturnType<typeof setInterval> | undefined;
   try {
     await waha.startTyping(chatId);
@@ -193,7 +243,14 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
       }
     }
 
-    const context = transcript.formatForPrompt(chatId);
+    const context = transcript.formatForPrompt(chatKey);
+    const exchanges = transcript.formatRonbotExchanges(chatKey);
+    const restartLines =
+      !hasPrimedAgent(chatKey) && transcript.hasBackfilledHistory(chatKey)
+        ? [
+            "Note: bridge restarted; the history below was reloaded from WhatsApp and you have no memory of earlier turns beyond it.",
+          ]
+        : [];
     const latestLines = [
       msg.body || "(no caption)",
       images?.length
@@ -214,6 +271,10 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
       `Today=${new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" })}`,
       requesterContextLine(requester),
       ...propertyLines,
+      ...restartLines,
+      "",
+      "Recent ronbot exchanges (oldest first):",
+      exchanges || "(none)",
       "",
       "Recent chat context:",
       context || "(empty)",
@@ -223,9 +284,9 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
     ].join("\n");
 
     console.log(
-      `handling ${reason} chat=${chatId} from=${senderId} requester=${requester?.alias ?? "unknown"}${images?.length ? " images=1" : ""}`,
+      `handling ${reason} chat=${chatId}${chatKey !== chatId ? ` key=${chatKey}` : ""} from=${senderId} requester=${requester?.alias ?? "unknown"}${images?.length ? " images=1" : ""}${restartLines.length ? " history=reloaded" : ""}`,
     );
-    const answer = await askRonbot(chatId, prompt, images);
+    const answer = await askRonbot(chatKey, prompt, images);
     if (isNoReply(answer)) {
       console.log(`silence NO_REPLY chat=${chatId} from=${senderId}`);
       return;
@@ -234,7 +295,7 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
     let lastId: string | undefined;
     for (const chunk of chunks) {
       lastId = await waha.sendText(chatId, chunk);
-      transcript.append(chatId, {
+      transcript.append(chatKey, {
         at: Date.now(),
         senderId: "ronbot",
         body: chunk,
@@ -242,7 +303,7 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
         messageId: lastId,
       });
     }
-    transcript.markBotReply(chatId, lastId, senderId);
+    transcript.markBotReply(chatKey, lastId, senderId);
   } catch (err) {
     console.error("handle failed", err);
     try {
@@ -256,7 +317,7 @@ async function handleWahaWebhook(event: WahaWebhookEvent): Promise<void> {
   } finally {
     if (typingTimer) clearInterval(typingTimer);
     await waha.stopTyping(chatId);
-    processingChats.delete(chatId);
+    processingChats.delete(chatKey);
   }
 }
 

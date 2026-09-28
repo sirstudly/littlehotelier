@@ -68,8 +68,15 @@ export interface NormalizedInbound {
 
 export function normalizeInbound(event: WahaWebhookEvent): NormalizedInbound | null {
   if (event.event !== "message") return null;
-  const p = event.payload;
-  if (!p?.from) return null;
+  return event.payload ? normalizeMessagePayload(event.payload, event.event) : null;
+}
+
+/** Webhook payloads and `GET /chats/{id}/messages` items share this shape. */
+export function normalizeMessagePayload(
+  p: WahaMessagePayload,
+  event = "message",
+): NormalizedInbound | null {
+  if (!p.from) return null;
 
   const from = String(p.from);
   const isGroup = from.endsWith("@g.us");
@@ -83,7 +90,7 @@ export function normalizeInbound(event: WahaWebhookEvent): NormalizedInbound | n
   const media = extractAllowedImageMedia(p);
 
   return {
-    event: event.event,
+    event,
     messageId: String(p.id ?? `${chatId}:${timestampMs}`),
     chatId,
     senderId,

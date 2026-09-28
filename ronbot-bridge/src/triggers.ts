@@ -10,6 +10,8 @@ export function shouldHandle(
   msg: NormalizedInbound,
   membership: MembershipCache,
   transcript: TranscriptStore,
+  /** Transcript key when it differs from `msg.chatId` (one per person for DMs). */
+  chatKey?: string,
 ): TriggerReason {
   if (msg.fromMe) return null;
 
@@ -21,7 +23,7 @@ export function shouldHandle(
     if (!isAllowlistedGroup(chatId)) return null;
     if (mentionsRonbot(msg)) return "mention";
     if (!hasContent) return null;
-    if (isFollowUp(chatId, msg, transcript)) return "followup";
+    if (isFollowUp(chatKey ?? chatId, msg, transcript)) return "followup";
     return null;
   }
 

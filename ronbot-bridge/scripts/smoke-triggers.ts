@@ -458,4 +458,86 @@ assert(
   "join event links phone → LID",
 );
 
+// History backfill: dedupe, ordering, restored bot reply ids
+const { transcriptEntryFromPayload } = await import("../src/transcript.js");
+{
+  const seedChat = "120363777777777777@g.us";
+  const store = new TranscriptStore();
+  store.append(seedChat, {
+    at: 3_000,
+    senderId: member,
+    body: "live message",
+    fromMe: false,
+    messageId: "live-1",
+  });
+  const history = [
+    { id: "h-bot", timestamp: 2, from: seedChat, participant: "447700900010@c.us", fromMe: true, body: "Booking 123 is checked in." },
+    { id: "h-q", timestamp: 1, from: seedChat, participant: member, fromMe: false, body: "status of 123?" },
+    { id: "live-1", timestamp: 3, from: seedChat, participant: member, fromMe: false, body: "live message" },
+    { id: "h-empty", timestamp: 1, from: seedChat, participant: member, fromMe: false, body: "" },
+  ]
+    .map(transcriptEntryFromPayload)
+    .filter((e) => e !== null);
+  assert(history.length === 3, "empty history messages dropped");
+  assert(!store.isSeeded(seedChat), "not seeded before backfill");
+  store.seed(seedChat, history);
+  assert(store.isSeeded(seedChat), "seeded after backfill");
+  assert(store.hasBackfilledHistory(seedChat), "backfill added entries");
+  const ids = store.recent(seedChat).map((e) => e.messageId);
+  assert(JSON.stringify(ids) === JSON.stringify(["h-q", "h-bot", "live-1"]), `seed dedupes + sorts (got ${ids})`);
+  assert(store.recent(seedChat)[1]!.senderId === "ronbot", "history bot message labelled ronbot");
+  assert(store.isReplyToBot(seedChat, "h-bot"), "reply to pre-restart bot message counts as follow-up");
+  assert(store.lastHumanTriggerId(seedChat) === member, "follow-up sender restored from history");
+
+  store.append(seedChat, { at: 4_000, senderId: member, body: "live message", fromMe: false, messageId: "live-1" });
+  assert(store.recent(seedChat).length === 3, "append skips duplicate messageId");
+
+  const empty = new TranscriptStore();
+  empty.seed("x@g.us", []);
+  assert(empty.isSeeded("x@g.us") && !empty.hasBackfilledHistory("x@g.us"), "empty backfill still marks seeded");
+}
+
+// Recent ronbot exchanges: pairs, chunk merging, limit
+{
+  const exChat = "120363888888888888@g.us";
+  const store = new TranscriptStore();
+  const add = (at: number, body: string, fromMe = false, senderId = member) =>
+    store.append(exChat, { at, senderId: fromMe ? "ronbot" : senderId, body, fromMe, messageId: `e-${at}` });
+  add(1, "chatter");
+  add(2, "ronbot how many beds free at hsh?");
+  add(3, "hsh has 12 beds free.", true);
+  add(4, "and rmb?");
+  add(5, "rmb part 1", true);
+  add(6, "rmb part 2", true);
+  add(7, "unrelated", false, otherMember);
+  const out = store.formatRonbotExchanges(exChat, 5);
+  const lines = out.split("\n");
+  assert(lines.length === 4, `two exchanges, two lines each (got ${lines.length})`);
+  assert(out.includes("how many beds free at hsh?") && out.includes("hsh has 12 beds free."), "first pair");
+  assert(out.includes("and rmb?") && out.includes("rmb part 1 rmb part 2"), "chunked answer merged");
+  assert(!out.includes("unrelated") && !out.includes("chatter"), "non-exchange messages excluded");
+  assert(store.formatRonbotExchanges(exChat, 1).split("\n").length === 2, "maxPairs limits output");
+  assert(new TranscriptStore().formatRonbotExchanges("none@g.us") === "", "no exchanges → empty");
+}
+
+// One conversation per person across phone + LID DM ids
+{
+  const { dmChatIds } = await import("../src/server.js");
+  const lid = "77700011122211@lid";
+  const phone = "447700900005@c.us";
+  assert(
+    JSON.stringify(dmChatIds(lid, linkMembership)) === JSON.stringify([phone, lid]),
+    "LID DM keyed by linked phone id",
+  );
+  assert(
+    JSON.stringify(dmChatIds(phone, linkMembership)) === JSON.stringify([phone, lid]),
+    "phone DM keyed by itself, LID included",
+  );
+  assert(
+    JSON.stringify(dmChatIds("55500011122299@lid", linkMembership)) ===
+      JSON.stringify(["55500011122299@lid"]),
+    "unlinked LID keeps its own id",
+  );
+}
+
 console.log("smoke-triggers: ok");

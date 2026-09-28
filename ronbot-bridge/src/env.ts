@@ -133,6 +133,10 @@ export const config = {
   mention: env("RONBOT_MENTION", "@ronbot"),
   followUpMinutes: envInt("RONBOT_FOLLOWUP_MINUTES", 15),
   transcriptLimit: envInt("RONBOT_TRANSCRIPT_LIMIT", 40),
+  /** Messages fetched from WAHA per chat id the first time a chat is seen after startup; 0 disables. */
+  backfillLimit: envInt("RONBOT_BACKFILL_LIMIT", 40),
+  /** Recent question/answer pairs shown in the "Recent ronbot exchanges" prompt section. */
+  exchangePairs: envInt("RONBOT_EXCHANGE_PAIRS", 5),
   membershipRefreshMs: envInt("RONBOT_MEMBERSHIP_REFRESH_MS", 5 * 60 * 1000),
   /** WAHA session health poll interval; 0 disables alerting. */
   sessionCheckMs: envInt("RONBOT_SESSION_CHECK_MS", 2 * 60 * 1000),
