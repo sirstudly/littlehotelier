@@ -15,6 +15,7 @@ import { TranscriptStore } from "./transcript.js";
 import { isDirectChat, shouldHandle } from "./triggers.js";
 import { resolveRequester, type Requester } from "./users.js";
 import { WahaClient } from "./waha/client.js";
+import { startSessionMonitor } from "./waha/sessionMonitor.js";
 import { normalizeInbound, type WahaWebhookEvent } from "./waha/types.js";
 
 /** Prompt lines for default / candidate property context (empty if none). */
@@ -300,6 +301,7 @@ export function startServer(): void {
     void membership.refresh(true);
     setInterval(() => void membership.refresh(false), config.membershipRefreshMs);
     setInterval(() => void refreshBotIdentity(), config.membershipRefreshMs);
+    startSessionMonitor(waha);
   });
 }
 

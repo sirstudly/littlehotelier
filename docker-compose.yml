@@ -253,6 +253,9 @@ services:
     volumes:
       - ./docker-entrypoint.sh:/docker-entrypoint.sh:ro
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json:ro
+      # Gmail used by POST /ronbot/{property}/alerts/email (must match RONBOT_ALERT_PROPERTY on ronbot-bridge).
+      # Writable: the Gmail client persists refreshed OAuth tokens here.
+      - ./credentials/${RONBOT_ALERT_PROPERTY:-crh}_gmail:/app/credentials/gmail
       - ./logs/crh:/app/logs/crh
       - ./logs/hsh:/app/logs/hsh
       - ./logs/rmb:/app/logs/rmb
@@ -333,6 +336,11 @@ services:
       - RONBOT_WHATSAPP_GROUPS=${RONBOT_WHATSAPP_GROUPS:-}
       - RONBOT_MENTION=${RONBOT_MENTION:-@ronbot}
       - RONBOT_FOLLOWUP_MINUTES=${RONBOT_FOLLOWUP_MINUTES:-15}
+      # WAHA session-down email alerts (sent via ronbot-read-api Gmail); CHECK_MS=0 disables
+      - RONBOT_SESSION_CHECK_MS=${RONBOT_SESSION_CHECK_MS:-120000}
+      - RONBOT_SESSION_ALERT_THRESHOLD=${RONBOT_SESSION_ALERT_THRESHOLD:-3}
+      - RONBOT_ALERT_PROPERTY=${RONBOT_ALERT_PROPERTY:-crh}
+      - RONBOT_ALERT_EMAIL_TO=${RONBOT_ALERT_EMAIL_TO:-}
       - CURSOR_API_KEY=${CURSOR_API_KEY:-}
       - RONBOT_EXTRACT_MODEL=${RONBOT_EXTRACT_MODEL:-composer-2.5}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json

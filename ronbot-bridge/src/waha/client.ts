@@ -155,6 +155,21 @@ export class WahaClient {
     return null;
   }
 
+  /** Current session status (WORKING, STARTING, FAILED, STOPPED, SCAN_QR_CODE). Throws if WAHA is unreachable. */
+  async getSessionStatus(): Promise<{ status: string; detail?: string }> {
+    const res = await fetch(
+      `${this.baseUrl}/api/sessions/${encodeURIComponent(this.session)}`,
+      { headers: this.headers() },
+    );
+    if (res.status === 404) return { status: "MISSING", detail: "session not found in WAHA" };
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`WAHA session status ${res.status}: ${body.slice(0, 200)}`);
+    }
+    const data = (await res.json()) as { status?: unknown };
+    return { status: typeof data.status === "string" ? data.status : "UNKNOWN" };
+  }
+
   /** One entry per participant: every identity WAHA gave for them (LID and/or phone). */
   async getGroupParticipants(groupId: string): Promise<string[][]> {
     const id = encodeURIComponent(normalizeJid(groupId));

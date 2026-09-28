@@ -134,6 +134,13 @@ export const config = {
   followUpMinutes: envInt("RONBOT_FOLLOWUP_MINUTES", 15),
   transcriptLimit: envInt("RONBOT_TRANSCRIPT_LIMIT", 40),
   membershipRefreshMs: envInt("RONBOT_MEMBERSHIP_REFRESH_MS", 5 * 60 * 1000),
+  /** WAHA session health poll interval; 0 disables alerting. */
+  sessionCheckMs: envInt("RONBOT_SESSION_CHECK_MS", 2 * 60 * 1000),
+  sessionAlertThreshold: envInt("RONBOT_SESSION_ALERT_THRESHOLD", 3),
+  /** Property whose Gmail (mounted in ronbot-read-api) sends session alerts. */
+  alertProperty: env("RONBOT_ALERT_PROPERTY", "crh"),
+  /** Alert recipient; blank sends to the alert property's own inbox. */
+  alertEmailTo: env("RONBOT_ALERT_EMAIL_TO"),
   groups: loadGroupAllowlist(),
   repoRoot: env("REPO_ROOT", repoRootDefault),
   mcpEntry:
