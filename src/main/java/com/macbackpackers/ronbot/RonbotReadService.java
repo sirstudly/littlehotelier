@@ -21,6 +21,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import jakarta.annotation.PostConstruct;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringEscapeUtils;
 import org.htmlunit.WebClient;
@@ -52,9 +54,12 @@ import com.macbackpackers.ronbot.dto.OccupancyDto;
 import com.macbackpackers.ronbot.dto.ReservationSearchCriteria;
 import com.macbackpackers.ronbot.dto.ReservationSearchDto;
 import com.macbackpackers.ronbot.dto.RoomTypeAvailabilityDto;
+import com.macbackpackers.ronbot.dto.ShuffleSuggestionDto;
 import com.macbackpackers.ronbot.dto.StayContinuationDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
 import com.macbackpackers.scrapers.CloudbedsScraper;
+import com.macbackpackers.services.shuffle.BedShuffleService;
+import com.macbackpackers.services.shuffle.CpSatShuffleSolver;
 import com.macbackpackers.services.ChannelProductionReportService;
 import com.macbackpackers.services.ChannelProductionReportService.CommissionRate;
 import com.macbackpackers.services.ChannelProductionReportService.MonthReport;
@@ -80,6 +85,27 @@ public class RonbotReadService {
 
     public RonbotReadService( PropertyContextRegistry propertyContexts ) {
         this.propertyContexts = propertyContexts;
+    }
+
+    /** Extracting the OR-Tools natives can take close to a minute; do it before the first shuffle request. */
+    @PostConstruct
+    void loadShuffleSolverInBackground() {
+        Thread loader = new Thread( CpSatShuffleSolver::loadNatives, "ortools-loader" );
+        loader.setDaemon( true );
+        loader.start();
+    }
+
+    /**
+     * Suggested bed moves to give each unassigned bed of the reservation a single bed for its stay, and to bring its
+     * assigned beds back together when split across rooms or beds, from the local booking assignment calendar (see
+     * {@link BedShuffleService}).
+     */
+    public ShuffleSuggestionDto suggestBedShuffle( String property, String query ) throws IOException {
+        long reservationId = Long.parseLong( requireUniqueReservationId( property, query ) );
+        BedShuffleService shuffle = propertyContexts.require( property ).getBean( BedShuffleService.class );
+        LOGGER.info( "Suggesting bed shuffle for property={} reservation={}", property, reservationId );
+        return ShuffleSuggestionDto.of( property,
+                shuffle.suggestForReservation( reservationId, new BedShuffleService.Options().consolidate( true ) ) );
     }
 
     /**

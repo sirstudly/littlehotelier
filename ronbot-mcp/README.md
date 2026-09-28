@@ -23,6 +23,7 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `list_transactions` | Live folio lines (read-api; unique match required) |
 | `get_booking_timeline` | Live booking + transactions + job history (name queries: calendar first) |
 | `check_stay_continuation` | Cleaning / extension: staying on past checkout? (same reservation or linked follow-on in same beds) |
+| `suggest_bed_shuffle` | Ordered bed moves so every bed of a reservation gets one bed for its stay: places unassigned beds and brings split or bed-changing assigned beds back together (CP-SAT over the calendar DB); when impossible, the reason, fewest-bed-change split and rule-breaking alternatives |
 | `get_availability` | Live sellable beds/rooms by room type (read-api; single property, subset, or all hostels in one call) |
 | `get_channel_production` | Live Channel Production numbers by source for one month (read-api; single property, subset, or all hostels in one call) |
 | `get_occupancy` | Live % of beds occupied over a date range, with monthly breakdown (read-api; single property, subset, or all hostels) |

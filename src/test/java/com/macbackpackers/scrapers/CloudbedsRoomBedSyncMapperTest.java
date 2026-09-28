@@ -180,6 +180,39 @@ public class CloudbedsRoomBedSyncMapperTest {
         assertEquals( "397485-7", out.get( 7 ).getId() );
     }
 
+    @Test
+    public void preserveNonGuestRoomTypes_keepsStaffDormCodesByRoomTypeId() {
+        List<RoomBed> existing = List.of(
+                roomBed( "112620-0", "13", 112620, "LT_MIXED" ),
+                roomBed( "112619-0", "10", 112619, "LT_MALE" ),
+                roomBed( "112188-0", "25", 112188, "MX" ) );
+        List<RoomBed> fresh = List.of(
+                roomBed( "112620-0", "13", 112620, "MX" ),
+                roomBed( "112620-1", "13", 112620, "MX" ),
+                roomBed( "112619-0", "10", 112619, "MX" ),
+                roomBed( "112188-0", "25", 112188, "MX" ),
+                roomBed( "112562-0", "44", 112562, "F" ) );
+
+        int preserved = CloudbedsRoomBedSyncMapper.preserveNonGuestRoomTypes( fresh, existing );
+
+        assertEquals( 3, preserved );
+        assertEquals( "LT_MIXED", fresh.get( 0 ).getRoomType() );
+        assertEquals( "LT_MIXED", fresh.get( 1 ).getRoomType() );
+        assertEquals( "LT_MALE", fresh.get( 2 ).getRoomType() );
+        assertEquals( "MX", fresh.get( 3 ).getRoomType() );
+        assertEquals( "F", fresh.get( 4 ).getRoomType() );
+    }
+
+    private static RoomBed roomBed( String id, String room, int roomTypeId, String roomType ) {
+        RoomBed rb = new RoomBed();
+        rb.setId( id );
+        rb.setRoom( room );
+        rb.setRoomTypeId( roomTypeId );
+        rb.setRoomType( roomType );
+        rb.setActive( "Y" );
+        return rb;
+    }
+
     private static JsonObject loadFindOneData( String resource ) {
         try ( InputStreamReader r = new InputStreamReader(
                 Objects.requireNonNull( CloudbedsRoomBedSyncMapperTest.class.getResourceAsStream( resource ) ),

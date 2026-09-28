@@ -26,6 +26,7 @@ import com.macbackpackers.ronbot.dto.ChannelProductionDto;
 import com.macbackpackers.ronbot.dto.OccupancyDto;
 import com.macbackpackers.ronbot.dto.ReservationSearchCriteria;
 import com.macbackpackers.ronbot.dto.ReservationSearchDto;
+import com.macbackpackers.ronbot.dto.ShuffleSuggestionDto;
 import com.macbackpackers.ronbot.dto.StayContinuationDto;
 import com.macbackpackers.ronbot.dto.TransactionDto;
 
@@ -118,6 +119,18 @@ public class RonbotReadController {
             @PathVariable String query,
             @RequestParam( name = "asOf", required = false ) String asOf ) throws IOException {
         return readService.getStayContinuation( property, query, asOf );
+    }
+
+    /**
+     * Suggested bed moves so each bed of the reservation gets one bed for its whole stay (placing unassigned beds and
+     * bringing split ones back together); when that's impossible, the reason, the fewest-bed-change split
+     * and alternatives that break one rule each.
+     */
+    @GetMapping( "/{property}/reservations/{query}/shuffle" )
+    public ShuffleSuggestionDto shuffle(
+            @PathVariable String property,
+            @PathVariable String query ) throws IOException {
+        return readService.suggestBedShuffle( property, query );
     }
 
     /**

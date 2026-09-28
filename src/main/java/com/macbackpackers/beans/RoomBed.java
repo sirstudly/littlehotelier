@@ -1,6 +1,8 @@
 
 package com.macbackpackers.beans;
 
+import java.util.List;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -13,6 +15,17 @@ import jakarta.persistence.Table;
 @Entity
 @Table( name = "wp_lh_rooms" )
 public class RoomBed {
+
+    public static final String ROOM_TYPE_LT_MALE = "LT_MALE";
+    public static final String ROOM_TYPE_LT_FEMALE = "LT_FEMALE";
+    public static final String ROOM_TYPE_LT_MIXED = "LT_MIXED";
+
+    /** Staff dorms; set manually in wp_lh_rooms (Cloudbeds doesn't know about them). */
+    public static final List<String> STAFF_ROOM_TYPES = List.of( ROOM_TYPE_LT_MALE, ROOM_TYPE_LT_FEMALE, ROOM_TYPE_LT_MIXED );
+
+    /** Room types never offered to guests (housekeeping sheet, bed shuffling). */
+    public static final List<String> NON_GUEST_ROOM_TYPES = List.of(
+            ROOM_TYPE_LT_MALE, ROOM_TYPE_LT_FEMALE, ROOM_TYPE_LT_MIXED, "OVERFLOW", "PAID BEDS" );
 
     @Id
     @Column( name = "id", nullable = false )
@@ -90,6 +103,10 @@ public class RoomBed {
 
     public void setActive( String active ) {
         this.active = active;
+    }
+
+    public boolean isNonGuestRoomType() {
+        return NON_GUEST_ROOM_TYPES.contains( roomType );
     }
 
 }

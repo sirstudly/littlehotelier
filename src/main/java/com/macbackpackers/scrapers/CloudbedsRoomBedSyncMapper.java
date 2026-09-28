@@ -1,8 +1,11 @@
 package com.macbackpackers.scrapers;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -208,6 +211,33 @@ public final class CloudbedsRoomBedSyncMapper {
     }
 
     /**
+     * Carries manually-set non-guest room types (staff dorms {@code LT_*}, {@code OVERFLOW}, {@code PAID BEDS}) from
+     * the current {@code wp_lh_rooms} rows over to the Cloudbeds snapshot, matched by {@code room_type_id}; Cloudbeds
+     * only knows these as ordinary F/MX dorms.
+     *
+     * @param fresh    rows built from Cloudbeds (updated in place)
+     * @param existing current wp_lh_rooms rows
+     * @return number of rows whose room type was preserved
+     */
+    public static int preserveNonGuestRoomTypes( List<RoomBed> fresh, Collection<RoomBed> existing ) {
+        Map<Integer, String> preserved = new HashMap<>();
+        for ( RoomBed rb : existing ) {
+            if ( rb.isNonGuestRoomType() ) {
+                preserved.putIfAbsent( rb.getRoomTypeId(), rb.getRoomType() );
+            }
+        }
+        int count = 0;
+        for ( RoomBed rb : fresh ) {
+            String roomType = preserved.get( rb.getRoomTypeId() );
+            if ( roomType != null ) {
+                rb.setRoomType( roomType );
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
      * Expands {@code find} payload into beds by calling builder for each pre-fetched {@code find_one}.
      *
      * @param findResponse {@code fetchRoomTypesFind} root object
@@ -215,7 +245,7 @@ public final class CloudbedsRoomBedSyncMapper {
      * @param matcher      label parser
      */
     public static List<RoomBed> buildAllRoomBeds(
-            JsonObject findResponse, java.util.Map<String, JsonObject> findOneByRoomTypeId, RoomBedMatcher matcher ) {
+            JsonObject findResponse, Map<String, JsonObject> findOneByRoomTypeId, RoomBedMatcher matcher ) {
 
         JsonElement dataEl = findResponse.get( "data" );
         if ( dataEl == null || !dataEl.isJsonArray() ) {

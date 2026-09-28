@@ -3,7 +3,6 @@ package com.macbackpackers.services;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,8 +22,6 @@ import com.macbackpackers.dao.WordPressDAO;
  */
 @Service
 public class HousekeepingStatusService {
-
-    private static final List<String> EXCLUDED_ROOM_TYPES = Arrays.asList( "LT_MALE", "LT_FEMALE", "LT_MIXED", "OVERFLOW", "PAID BEDS" );
 
     @Autowired
     private WordPressDAO dao;
@@ -56,7 +53,7 @@ public class HousekeepingStatusService {
 
         List<HousekeepingBed> result = new ArrayList<>();
         for ( RoomBed roomBed : dao.fetchActiveHousekeepingRooms() ) {
-            if ( EXCLUDED_ROOM_TYPES.contains( roomBed.getRoomType() ) ) {
+            if ( roomBed.isNonGuestRoomType() ) {
                 continue;
             }
             List<OccupancyVersion> roomOccupancy = byRoom.getOrDefault( roomBed.getId(), List.of() );

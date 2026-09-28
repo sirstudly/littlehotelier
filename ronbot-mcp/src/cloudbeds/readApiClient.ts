@@ -117,6 +117,20 @@ export async function getStayContinuation(params: {
 }
 
 /**
+ * Suggested bed moves so the reservation's beds each get one bed for the whole stay: unassigned beds are
+ * placed and assigned beds split across rooms/beds are brought together (or why not, the
+ * fewest-bed-change split and rule-breaking alternatives). `query` must resolve uniquely.
+ * Can take up to a minute.
+ */
+export async function getBedShuffle(params: { property: string; query: string }): Promise<unknown> {
+  const { property, query } = params;
+  if (!query?.trim()) {
+    throw new Error("query is required");
+  }
+  return request(`/ronbot/${property}/reservations/${encodeURIComponent(query.trim())}/shuffle`);
+}
+
+/**
  * Live sellable availability by room type for an inclusive date range.
  * Omit from/to to use read-api defaults (today → tomorrow, Europe/London).
  */

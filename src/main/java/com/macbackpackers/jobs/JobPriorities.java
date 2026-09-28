@@ -30,6 +30,7 @@ public final class JobPriorities {
         map.put( HousekeepingJob.class.getName(), 99 );
         map.put( BookingAssignmentEnrichJob.class.getName(), 99 );
         map.put( ArchiveAllTransactionNotesJob.class.getName(), 99 );
+        map.put( BedShuffleHintJob.class.getName(), 99 );
         map.put( VoidAndResubmitLegacyEVLFolioJob.class.getName(), 999 );
 
         // One-off historical backfill; only run when nothing else is queued

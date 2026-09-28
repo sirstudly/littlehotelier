@@ -384,7 +384,9 @@ public class CloudbedsService {
         }
         List<RoomBed> beds = CloudbedsRoomBedSyncMapper.buildAllRoomBeds(
                 findResp, findOneByRoomTypeId, roomBedMatcher );
-        LOGGER.info( "Replacing wp_lh_rooms with {} Cloudbeds bed row(s).", beds.size() );
+        int preserved = CloudbedsRoomBedSyncMapper.preserveNonGuestRoomTypes( beds, dao.fetchAllRoomBeds().values() );
+        LOGGER.info( "Replacing wp_lh_rooms with {} Cloudbeds bed row(s) ({} kept their staff/non-guest room type).",
+                beds.size(), preserved );
         dao.replaceAllRoomBeds( beds );
     }
 

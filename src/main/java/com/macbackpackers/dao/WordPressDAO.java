@@ -425,6 +425,24 @@ public interface WordPressDAO {
     void runSplitRoomsReservationsReport( int allocationScraperJobId );
 
     /**
+     * Reservations on the split room report for {@code allocationScraperJobId} with a row checking in today or later.
+     * Deliberately no booking-level status filter: an in-house booking can still have beds that haven't arrived.
+     */
+    List<Long> fetchSplitRoomReservationIdsForShuffleHints( int allocationScraperJobId );
+
+    /**
+     * Stores a bed shuffle hint on every split room report row of the reservation.
+     *
+     * @return rows updated
+     */
+    int updateSplitRoomShuffleHint( int allocationScraperJobId, long reservationId, String status, String hint );
+
+    /**
+     * True unless the split room report holds rows for a later allocation scraper job.
+     */
+    boolean isLatestSplitRoomReport( int allocationScraperJobId );
+
+    /**
      * Creates a report with all bookings where no deposit had been paid yet.
      * 
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from

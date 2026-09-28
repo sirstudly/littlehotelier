@@ -187,6 +187,23 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <!-- CP-SAT solver for bed shuffling; natives only for linux-x86-64 (docker) and macOS (tests) -->
+        <dependency>
+            <groupId>com.google.ortools</groupId>
+            <artifactId>ortools-java</artifactId>
+            <version>9.15.6755</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.ortools</groupId>
+                    <artifactId>ortools-win32-x86-64</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.ortools</groupId>
+                    <artifactId>ortools-linux-aarch64</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- Test dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -210,6 +227,17 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- ortools-java is generated with protobuf 4.33 and refuses an older runtime -->
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>4.33.1</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java-util</artifactId>
+                <version>4.33.1</version>
+            </dependency>
             <dependency>
                 <groupId>com.google.cloud</groupId>
                 <artifactId>spring-cloud-gcp-dependencies</artifactId>

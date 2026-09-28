@@ -1163,6 +1163,41 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    @Transactional( readOnly = true )
+    @SuppressWarnings( "unchecked" )
+    public List<Long> fetchSplitRoomReservationIdsForShuffleHints( int allocationScraperJobId ) {
+        List<Number> ids = em.createNativeQuery(
+                "SELECT DISTINCT reservation_id FROM wp_lh_rpt_split_rooms "
+                        + " WHERE job_id = :jobId AND reservation_id > 0 AND checkin_date >= CURDATE() "
+                        + " ORDER BY reservation_id" )
+                .setParameter( "jobId", allocationScraperJobId )
+                .getResultList();
+        return ids.stream().map( Number::longValue ).collect( Collectors.toList() );
+    }
+
+    @Override
+    public int updateSplitRoomShuffleHint( int allocationScraperJobId, long reservationId, String status, String hint ) {
+        return em.createNativeQuery(
+                "UPDATE wp_lh_rpt_split_rooms SET shuffle_status = :status, shuffle_hint = :hint "
+                        + " WHERE job_id = :jobId AND reservation_id = :reservationId" )
+                .setParameter( "status", status )
+                .setParameter( "hint", hint )
+                .setParameter( "jobId", allocationScraperJobId )
+                .setParameter( "reservationId", reservationId )
+                .executeUpdate();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public boolean isLatestSplitRoomReport( int allocationScraperJobId ) {
+        Number later = (Number) em.createNativeQuery(
+                "SELECT COUNT(1) FROM wp_lh_rpt_split_rooms WHERE job_id > :jobId" )
+                .setParameter( "jobId", allocationScraperJobId )
+                .getSingleResult();
+        return later.intValue() == 0;
+    }
+
+    @Override
     public void runUnpaidDepositReport( int allocationScraperJobId ) {
         LOGGER.info( "Running report for job id: " + allocationScraperJobId );
 

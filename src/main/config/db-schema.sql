@@ -129,6 +129,8 @@ CREATE TABLE `wp_lh_rpt_split_rooms` (
   `booked_date` timestamp NULL DEFAULT NULL,
   `eta` varchar(50) DEFAULT NULL,
   `notes` text,
+  `shuffle_status` varchar(20) DEFAULT NULL,
+  `shuffle_hint` text,
   `viewed_yn` char(1) DEFAULT NULL,
   `created_date` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
