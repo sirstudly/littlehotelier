@@ -6,11 +6,11 @@ package com.macbackpackers.services.shuffle;
  */
 public enum Relaxation {
 
-    STAFF_LT_MIXED( "Staff dorm LT_MIXED", "staff dorms are off-limits" ),
+    STAFF_LT_MIXED( "Offline Room", "Offline rooms require staff approval" ),
 
-    LARGER_DORM( "Larger dorm of the same gender (price unchanged)", "stay in the booked room type" ),
+    LARGER_DORM( "Larger dorm of the same gender", "stay in the booked room type" ),
 
-    STAFF_OTHER( "Other staff dorm (LT_MALE / LT_FEMALE)", "staff dorms are off-limits" ),
+    STAFF_OTHER( "Other staff dorm (LT_MALE / LT_FEMALE)", "staff dorms require staff approval" ),
 
     GROUP_SPLIT( "Split a group across two rooms", "a group stays in one room" ),
 

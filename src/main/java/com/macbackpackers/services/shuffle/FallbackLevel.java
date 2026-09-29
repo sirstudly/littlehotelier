@@ -12,7 +12,7 @@ public enum FallbackLevel {
     QUAD_FOR_GROUPS( "up to 4 group members moved from a 4-bed dorm into a Quad" ),
 
     /** Guests may move to a smaller dorm of the same gender (never into a 4-bed dorm), keeping the booked price. */
-    SMALLER_DORM( "guests moved to a smaller dorm of the same gender (price unchanged)" );
+    SMALLER_DORM( "guests moved to a smaller dorm of the same gender (keep price unchanged)" );
 
     private final String description;
 

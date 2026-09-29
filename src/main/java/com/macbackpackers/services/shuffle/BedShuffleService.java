@@ -504,8 +504,7 @@ public class BedShuffleService {
                 continue;
             }
             notes.add( b.label() + " goes to " + bed.label() + ", a " + calendar.roomType( bed.roomTypeId() ).describe()
-                    + ", instead of the booked " + calendar.roomType( b.roomTypeId() ).describe()
-                    + ( calendar.roomType( bed.roomTypeId() ).isStaff() ? "" : " (price unchanged)" ) );
+                    + ", instead of the booked " + calendar.roomType( b.roomTypeId() ).describe() );
         }
         for ( ShuffleBooking b : r.calendar().bookings() ) {
             String before = r.calendar().currentAssignment().get( b.key() );
