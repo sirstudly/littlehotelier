@@ -1469,6 +1469,19 @@ public class WordPressDAOImpl implements WordPressDAO {
         return differences;
     }
 
+    @Override
+    @SuppressWarnings( "unchecked" )
+    public List<String> fetchUnmappedBookingAssignmentRoomIds( LocalDate fromDate, LocalDate toDate ) {
+        return (List<String>) em.createNativeQuery(
+                "SELECT DISTINCT a.room_id FROM wp_lh_booking_assignment a "
+                        + "LEFT JOIN wp_lh_rooms r ON r.id = a.room_id "
+                        + "WHERE a.valid_to IS NULL AND a.room_id IS NOT NULL AND r.id IS NULL "
+                        + "AND a.checkin_date <= :toDate AND a.checkout_date > :fromDate" )
+                .setParameter( "fromDate", fromDate )
+                .setParameter( "toDate", toDate )
+                .getResultList();
+    }
+
     /** num_empty, num_staff, num_paid, num_noshow from a bedcounts select row. */
     private static List<Object> bedCountValues( Object[] r ) {
         return Arrays.asList( toInt( r[3] ), toInt( r[4] ), toInt( r[5] ), toInt( r[6] ) );

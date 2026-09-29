@@ -556,6 +556,16 @@ public interface WordPressDAO {
     int compareBedCountsWithBookingAssignment( int bedCountJobId, LocalDate selectionDate );
 
     /**
+     * Returns the distinct {@code room_id}s of current booking assignments staying within the given
+     * window that have no {@code wp_lh_rooms} row (e.g. a room moved to a new Cloudbeds room type).
+     *
+     * @param fromDate first stay date (inclusive)
+     * @param toDate last stay date (inclusive)
+     * @return non-null list of unmapped room ids
+     */
+    List<String> fetchUnmappedBookingAssignmentRoomIds( LocalDate fromDate, LocalDate toDate );
+
+    /**
      * Returns the list of HW/HB reservation IDs for which the deposit amount has not yet been
      * deducted from the total.
      * 

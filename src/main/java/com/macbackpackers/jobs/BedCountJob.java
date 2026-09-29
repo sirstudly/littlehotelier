@@ -55,6 +55,8 @@ public class BedCountJob extends AbstractJob {
             LocalDate selectedDate = getSelectedLocalDate();
             bookingAssignmentEnrichService.heal( webClient,
                     selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ), null );
+            cloudbedsService.syncRoomsIfBookingAssignmentUnmapped( webClient,
+                    selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
             cloudbedsService.dumpAllocationsFrom( webClient,
                     getId(), selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
 

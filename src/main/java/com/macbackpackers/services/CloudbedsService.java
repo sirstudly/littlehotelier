@@ -344,6 +344,25 @@ public class CloudbedsService {
     }
 
     /**
+     * Re-syncs {@code wp_lh_rooms} if any current booking assignment in the window sits on a bed it
+     * doesn't know about. Staff-bed lookups match by label, so a room moved to a new Cloudbeds room type
+     * keeps resolving to its stale rows and never triggers a sync on its own.
+     *
+     * @param webClient client with logged-in cookies
+     * @param fromDate first stay date (inclusive)
+     * @param toDate last stay date (inclusive)
+     * @throws IOException on API/network errors
+     */
+    public void syncRoomsIfBookingAssignmentUnmapped( WebClient webClient, LocalDate fromDate, LocalDate toDate )
+            throws IOException {
+        List<String> unmapped = dao.fetchUnmappedBookingAssignmentRoomIds( fromDate, toDate );
+        if ( false == unmapped.isEmpty() ) {
+            LOGGER.warn( "Booking assignments on room id(s) {} have no wp_lh_rooms mapping.", unmapped );
+            syncRoomsFromCloudbeds( webClient );
+        }
+    }
+
+    /**
      * Replaces {@code wp_lh_rooms} (except {@code Unallocated}) with a snapshot from Cloudbeds.
      *
      * @param webClient client with logged-in cookies
