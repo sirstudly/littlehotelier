@@ -19,6 +19,7 @@ import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingSourceLookup;
 import com.macbackpackers.beans.BookingWithGuestComments;
+import com.macbackpackers.beans.ConsecutiveBookingPair;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.HousekeepingBed;
@@ -418,11 +419,26 @@ public interface WordPressDAO {
 
     /**
      * Creates a report that determines reservations which, for the same room type, are split
-     * amongst different rooms.
+     * amongst different rooms, and the consecutive bookings report (same guest, back-to-back
+     * bookings in different rooms of the same room type).
      * 
      * @param allocationScraperJobId job ID of the allocation scraper job to use data from
      */
     void runSplitRoomsReservationsReport( int allocationScraperJobId );
+
+    /**
+     * Pairs on the consecutive bookings report for {@code allocationScraperJobId} where the second booking checks in
+     * today or later.
+     */
+    List<ConsecutiveBookingPair> fetchConsecutiveBookingPairsForShuffleHints( int allocationScraperJobId );
+
+    /**
+     * Stores a bed shuffle hint on the consecutive bookings report row(s) of the pair.
+     *
+     * @return rows updated
+     */
+    int updateConsecutiveBookingShuffleHint( int allocationScraperJobId, long reservationId, long nextReservationId,
+            String status, String hint );
 
     /**
      * Reservations on the split room report for {@code allocationScraperJobId} with a row checking in today or later.
@@ -438,7 +454,7 @@ public interface WordPressDAO {
     int updateSplitRoomShuffleHint( int allocationScraperJobId, long reservationId, String status, String hint );
 
     /**
-     * True unless the split room report holds rows for a later allocation scraper job.
+     * True unless a split room report for a later allocation scraper job has completed.
      */
     boolean isLatestSplitRoomReport( int allocationScraperJobId );
 

@@ -9,6 +9,7 @@ import com.macbackpackers.beans.BookingSourceLookup;
 import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingWithGuestComments;
+import com.macbackpackers.beans.ConsecutiveBookingPair;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
 import com.macbackpackers.beans.HousekeepingBed;
@@ -31,6 +32,7 @@ import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob;
 import com.macbackpackers.jobs.JobPriorities;
 import com.macbackpackers.jobs.ResetCloudbedsSessionJob;
+import com.macbackpackers.jobs.SplitRoomReservationReportJob;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringEscapeUtils;
 import org.hibernate.Hibernate;
@@ -889,6 +891,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         // delete from associated tables
         deleteFromTablesByJobId( specifiedDate,
                 "wp_lh_rpt_split_rooms",
+                "wp_lh_rpt_consecutive_bookings",
                 "wp_lh_rpt_unpaid_deposit",
                 "wp_lh_group_bookings",
                 "wp_lh_rpt_mostly_full_dorms",
@@ -1160,6 +1163,48 @@ public class WordPressDAOImpl implements WordPressDAO {
         em.createNativeQuery( sql.getProperty( "reservations.split.rooms" ) )
             .setParameter( "jobId", allocationScraperJobId )
             .executeUpdate();
+
+        rowsDeleted = em
+                .createNativeQuery( "DELETE FROM wp_lh_rpt_consecutive_bookings WHERE job_id = :jobId" )
+                .setParameter( "jobId", allocationScraperJobId )
+                .executeUpdate();
+        LOGGER.info( "Deleted " + rowsDeleted + " previous records from wp_lh_rpt_consecutive_bookings" );
+
+        em.createNativeQuery( sql.getProperty( "reservations.consecutive.bookings" ) )
+            .setParameter( "jobId", allocationScraperJobId )
+            .executeUpdate();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    @SuppressWarnings( "unchecked" )
+    public List<ConsecutiveBookingPair> fetchConsecutiveBookingPairsForShuffleHints( int allocationScraperJobId ) {
+        List<Object[]> rows = em.createNativeQuery(
+                "SELECT DISTINCT reservation_id_left, reservation_id_right, room_type_id FROM wp_lh_rpt_consecutive_bookings "
+                        + " WHERE job_id = :jobId AND reservation_id_left > 0 AND reservation_id_right > 0 "
+                        + "   AND room_type_id IS NOT NULL AND checkin_date_right >= CURDATE() "
+                        + " ORDER BY reservation_id_left, reservation_id_right" )
+                .setParameter( "jobId", allocationScraperJobId )
+                .getResultList();
+        return rows.stream()
+                .map( r -> new ConsecutiveBookingPair( ( (Number) r[0] ).longValue(), ( (Number) r[1] ).longValue(),
+                        ( (Number) r[2] ).intValue() ) )
+                .collect( Collectors.toList() );
+    }
+
+    @Override
+    public int updateConsecutiveBookingShuffleHint( int allocationScraperJobId, long reservationId, long nextReservationId,
+            String status, String hint ) {
+        return em.createNativeQuery(
+                "UPDATE wp_lh_rpt_consecutive_bookings SET shuffle_status = :status, shuffle_hint = :hint "
+                        + " WHERE job_id = :jobId AND reservation_id_left = :reservationId "
+                        + "   AND reservation_id_right = :nextReservationId" )
+                .setParameter( "status", status )
+                .setParameter( "hint", hint )
+                .setParameter( "jobId", allocationScraperJobId )
+                .setParameter( "reservationId", reservationId )
+                .setParameter( "nextReservationId", nextReservationId )
+                .executeUpdate();
     }
 
     @Override
@@ -1190,8 +1235,13 @@ public class WordPressDAOImpl implements WordPressDAO {
     @Override
     @Transactional( readOnly = true )
     public boolean isLatestSplitRoomReport( int allocationScraperJobId ) {
+        // not "latest completed == mine": hint jobs can start before their own report job is marked completed
         Number later = (Number) em.createNativeQuery(
-                "SELECT COUNT(1) FROM wp_lh_rpt_split_rooms WHERE job_id > :jobId" )
+                "SELECT COUNT(1) FROM wp_lh_jobs j "
+                        + " JOIN wp_lh_job_param p ON p.job_id = j.job_id AND p.name = 'allocation_scraper_job_id' "
+                        + " WHERE j.classname = :classname AND j.status = 'completed' "
+                        + "   AND CAST(p.value AS UNSIGNED) > :jobId" )
+                .setParameter( "classname", SplitRoomReservationReportJob.class.getName() )
                 .setParameter( "jobId", allocationScraperJobId )
                 .getSingleResult();
         return later.intValue() == 0;

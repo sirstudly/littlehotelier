@@ -138,6 +138,35 @@ CREATE TABLE `wp_lh_rpt_split_rooms` (
   FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+-- same guest, back-to-back bookings in different rooms of the same room type
+-- Production migration: src/main/config/migrations/2026-09-29-consecutive-bookings-report.sql
+CREATE TABLE `wp_lh_rpt_consecutive_bookings` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `job_id` bigint(20) unsigned NOT NULL,
+  `guest_name` varchar(255) DEFAULT NULL,
+  `room_type_id` int(10) unsigned DEFAULT NULL,
+  `reservation_id_left` bigint(20) unsigned DEFAULT NULL,
+  `booking_ref_left` varchar(100) DEFAULT NULL,
+  `data_href_left` varchar(255) DEFAULT NULL,
+  `checkin_date_left` datetime NOT NULL,
+  `checkout_date_left` datetime NOT NULL,
+  `booked_date_left` datetime DEFAULT NULL,
+  `room_beds_left` text,
+  `reservation_id_right` bigint(20) unsigned DEFAULT NULL,
+  `booking_ref_right` varchar(100) DEFAULT NULL,
+  `data_href_right` varchar(255) DEFAULT NULL,
+  `checkin_date_right` datetime NOT NULL,
+  `checkout_date_right` datetime NOT NULL,
+  `booked_date_right` datetime DEFAULT NULL,
+  `room_beds_right` text,
+  `shuffle_status` varchar(20) DEFAULT NULL,
+  `shuffle_hint` text,
+  `created_date` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `job_pair_idx` (`job_id`, `reservation_id_left`, `reservation_id_right`),
+  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 -- bookings where no deposit had been paid yet
 CREATE TABLE `wp_lh_rpt_unpaid_deposit` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,

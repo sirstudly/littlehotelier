@@ -55,6 +55,7 @@ public class ShuffleSuggestion {
     private Option split;
     private final List<Option> alternatives = new ArrayList<>();
     private boolean consolidation;
+    private boolean splitApplicable = true;
 
     public ShuffleSuggestion( long reservationId, List<ShuffleBooking> targets ) {
         this.reservationId = reservationId;
@@ -88,6 +89,12 @@ public class ShuffleSuggestion {
 
     void setSplit( Option split ) {
         this.split = split;
+    }
+
+    /** No split was looked for, so none is reported as missing either. */
+    void withoutSplit() {
+        this.split = null;
+        this.splitApplicable = false;
     }
 
     void addAlternative( Option alternative ) {
@@ -162,7 +169,7 @@ public class ShuffleSuggestion {
             appendNotes( sb, split.notes(), "  " );
             appendMoves( sb, split.moves(), "  " );
         }
-        else if ( isImpossible() ) {
+        else if ( isImpossible() && splitApplicable ) {
             sb.append( "\nNo split within the rules fits either." );
         }
         if ( false == alternatives.isEmpty() ) {

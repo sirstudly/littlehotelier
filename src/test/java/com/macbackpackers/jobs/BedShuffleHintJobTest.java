@@ -64,6 +64,34 @@ public class BedShuffleHintJobTest {
     }
 
     @Test
+    public void consecutivePairHintIsStoredOnConsecutiveBookingRows() throws Exception {
+        when( dao.isLatestSplitRoomReport( 5 ) ).thenReturn( true );
+        when( service.suggestForConsecutive( eq( 1L ), eq( 2L ), eq( 7 ), any( BedShuffleService.Options.class ) ) )
+                .thenReturn( found() );
+        BedShuffleHintJob job = job();
+        job.setNextReservationId( 2L );
+        job.setRoomTypeId( 7 );
+        job.processJob();
+
+        verify( service, never() ).suggestForReservation( anyLong(), any( BedShuffleService.Options.class ) );
+        verify( dao, never() ).updateSplitRoomShuffleHint( anyInt(), anyLong(), anyString(), any() );
+        ArgumentCaptor<String> hint = ArgumentCaptor.forClass( String.class );
+        verify( dao ).updateConsecutiveBookingShuffleHint( eq( 5 ), eq( 1L ), eq( 2L ), eq( "FOUND" ), hint.capture() );
+        assertThat( hint.getValue(), containsString( "1. Assign 1 (Guest g) to A-1" ) );
+    }
+
+    @Test
+    public void supersededConsecutivePairIsSkipped() throws Exception {
+        when( dao.isLatestSplitRoomReport( 5 ) ).thenReturn( false );
+        BedShuffleHintJob job = job();
+        job.setNextReservationId( 2L );
+        job.setRoomTypeId( 7 );
+        job.processJob();
+        verifyNoInteractions( service );
+        verify( dao, never() ).updateConsecutiveBookingShuffleHint( anyInt(), anyLong(), anyLong(), anyString(), any() );
+    }
+
+    @Test
     public void hintDropsHeaderAndAddsTimestamp() {
         String hint = BedShuffleHintJob.hintText( found(), NOW );
         assertThat( hint, startsWith( "1. Assign" ) );

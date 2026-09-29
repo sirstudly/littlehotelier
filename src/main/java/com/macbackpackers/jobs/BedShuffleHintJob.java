@@ -16,8 +16,13 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Transient;
 
 /**
- * Runs the bed shuffle solver for one reservation on the split room report and stores the result as a hint on its
- * report rows. Already-assigned beds split across rooms are consolidated where possible.
+ * Runs the bed shuffle solver for one row of the split room report and stores the result as a hint on it:
+ * <ul>
+ * <li>without {@code next_reservation_id}: one reservation on the split room report; already-assigned beds split
+ * across rooms are consolidated where possible;</li>
+ * <li>with {@code next_reservation_id} and {@code room_type_id}: a pair on the consecutive bookings report, to be kept
+ * on one bed.</li>
+ * </ul>
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.BedShuffleHintJob" )
@@ -33,15 +38,27 @@ public class BedShuffleHintJob extends AbstractJob {
     public void processJob() throws Exception {
         int reportJobId = getAllocationScraperJobId();
         long reservationId = getReservationId();
+        Long nextReservationId = getNextReservationId();
+        String row = nextReservationId == null ? String.valueOf( reservationId ) : reservationId + " -> " + nextReservationId;
         if ( false == dao.isLatestSplitRoomReport( reportJobId ) ) {
-            LOGGER.info( "Split room report {} has been superseded; skipping hint for {}", reportJobId, reservationId );
+            LOGGER.info( "Split room report {} has been superseded; skipping hint for {}", reportJobId, row );
             return;
         }
-        ShuffleSuggestion suggestion = bedShuffleService.suggestForReservation( reservationId,
-                new BedShuffleService.Options().consolidate( true ) );
-        int rows = dao.updateSplitRoomShuffleHint( reportJobId, reservationId, suggestion.getStatus().name(),
-                hintText( suggestion, LocalDateTime.now() ) );
-        LOGGER.info( "Reservation {}: {} (updated {} report rows)", reservationId, suggestion.getStatus(), rows );
+        ShuffleSuggestion suggestion;
+        int rows;
+        if ( nextReservationId == null ) {
+            suggestion = bedShuffleService.suggestForReservation( reservationId,
+                    new BedShuffleService.Options().consolidate( true ) );
+            rows = dao.updateSplitRoomShuffleHint( reportJobId, reservationId, suggestion.getStatus().name(),
+                    hintText( suggestion, LocalDateTime.now() ) );
+        }
+        else {
+            suggestion = bedShuffleService.suggestForConsecutive( reservationId, nextReservationId, getRoomTypeId(),
+                    new BedShuffleService.Options() );
+            rows = dao.updateConsecutiveBookingShuffleHint( reportJobId, reservationId, nextReservationId,
+                    suggestion.getStatus().name(), hintText( suggestion, LocalDateTime.now() ) );
+        }
+        LOGGER.info( "Reservation {}: {} (updated {} report rows)", row, suggestion.getStatus(), rows );
     }
 
     /** The suggestion without its "Reservation X: STATUS" header; null when there's nothing to do. */
@@ -79,5 +96,23 @@ public class BedShuffleHintJob extends AbstractJob {
 
     public void setReservationId( long reservationId ) {
         setParameter( "reservation_id", String.valueOf( reservationId ) );
+    }
+
+    /** The reservation checking in as {@link #getReservationId()} checks out; null for a split room report row. */
+    public Long getNextReservationId() {
+        String value = getParameter( "next_reservation_id" );
+        return value == null ? null : Long.valueOf( value );
+    }
+
+    public void setNextReservationId( long nextReservationId ) {
+        setParameter( "next_reservation_id", String.valueOf( nextReservationId ) );
+    }
+
+    public int getRoomTypeId() {
+        return Integer.parseInt( getParameter( "room_type_id" ) );
+    }
+
+    public void setRoomTypeId( int roomTypeId ) {
+        setParameter( "room_type_id", String.valueOf( roomTypeId ) );
     }
 }

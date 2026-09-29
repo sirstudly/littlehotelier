@@ -148,6 +148,58 @@ public class BedShuffleService {
         return solve( calendar, reservationId, unassigned, options, null, true );
     }
 
+    /** From the local calendar as of today ({@code options.today} is overwritten). */
+    public ShuffleSuggestion suggestForConsecutive( long reservationId, long nextReservationId, int roomTypeId, Options options ) {
+        LocalDate today = LocalDate.now();
+        BedCalendar calendar = buildCalendar( dao.fetchActiveHousekeepingRooms(),
+                dao.fetchCurrentBookingAssignmentsCheckingOutAfter( today ), today );
+        return suggestConsecutive( calendar, reservationId, nextReservationId, roomTypeId, options.today( today ) );
+    }
+
+    /**
+     * Puts one guest's back-to-back reservations on one bed: each bed of {@code reservationId} in {@code roomTypeId}
+     * is chained to a bed of {@code nextReservationId} checking in the day it checks out. Either side may move to any
+     * bed (not necessarily one either is on now); only pinned (e.g. in-house) beds stay where they are. When found,
+     * the result is applied to {@code calendar}.
+     */
+    public static ShuffleSuggestion suggestConsecutive( BedCalendar calendar, long reservationId, long nextReservationId,
+            int roomTypeId, Options options ) {
+        List<ShuffleBooking> firsts = calendar.bookings().stream()
+                .filter( b -> b.reservationId() == reservationId && b.roomTypeId() == roomTypeId )
+                .collect( Collectors.toList() );
+        List<ShuffleBooking> seconds = calendar.bookings().stream()
+                .filter( b -> b.reservationId() == nextReservationId && b.roomTypeId() == roomTypeId )
+                .collect( Collectors.toList() );
+        List<BedCalendar.Chain> chains = pairChains( calendar, firsts, seconds );
+        Map<String, String> current = calendar.currentAssignment();
+        boolean together = chains.stream().allMatch( c -> current.get( c.first() ) != null
+                && current.get( c.first() ).equals( current.get( c.second() ) ) );
+        if ( together ) {
+            return new ShuffleSuggestion( nextReservationId, List.of() );
+        }
+        List<ShuffleBooking> targets = new ArrayList<>();
+        targets.addAll( firsts );
+        targets.addAll( seconds );
+        targets.removeIf( b -> b.pinned() || current.get( b.key() ) == null );
+        targets.sort( Comparator.comparing( ShuffleBooking::checkin ) );
+        Consolidation c = new Consolidation( Set.of(), chains, targets );
+        if ( targets.isEmpty() ) {
+            ShuffleSuggestion suggestion = new ShuffleSuggestion( nextReservationId, targets );
+            suggestion.consolidation();
+            suggestion.impossible( ShuffleSuggestion.Status.INFEASIBLE, new ShuffleSuggestion.Reason(
+                    "Could not keep " + describeConsolidation( calendar, c ) + " on one bed: both are already in-house",
+                    List.of(), List.of() ) );
+            return suggestion;
+        }
+        calendar.consolidate( Set.of(), chains );
+        try {
+            return solve( calendar, nextReservationId, targets, options, c, true );
+        }
+        finally {
+            calendar.clearConsolidation();
+        }
+    }
+
     /**
      * Groups of the reservation (one room type) split over more rooms than they need, or with back-to-back bookings on
      * different beds. Only their unpinned, assigned beds become targets; pinned (in-house) beds stay and anchor them.
@@ -189,17 +241,22 @@ public class BedShuffleService {
      * in the same room.
      */
     static List<BedCalendar.Chain> pairChains( BedCalendar calendar, List<ShuffleBooking> members ) {
-        List<ShuffleBooking> sorted = members.stream()
-                .sorted( Comparator.comparing( ShuffleBooking::checkin ).thenComparing( ShuffleBooking::key ) )
-                .collect( Collectors.toList() );
+        return pairChains( calendar, members, members );
+    }
+
+    /** As {@link #pairChains(BedCalendar, List)}, with each chain's first half from {@code firsts} and second from {@code seconds}. */
+    static List<BedCalendar.Chain> pairChains( BedCalendar calendar, List<ShuffleBooking> firsts, List<ShuffleBooking> seconds ) {
+        Comparator<ShuffleBooking> order = Comparator.comparing( ShuffleBooking::checkin ).thenComparing( ShuffleBooking::key );
+        List<ShuffleBooking> sortedFirsts = firsts.stream().sorted( order ).collect( Collectors.toList() );
+        List<ShuffleBooking> sortedSeconds = seconds.stream().sorted( order ).collect( Collectors.toList() );
         Map<String, String> current = calendar.currentAssignment();
         Set<String> continued = new LinkedHashSet<>();
         List<BedCalendar.Chain> chains = new ArrayList<>();
-        for ( ShuffleBooking a : sorted ) {
+        for ( ShuffleBooking a : sortedFirsts ) {
             ShuffleBed bedA = calendar.bed( current.get( a.key() ) );
             ShuffleBooking best = null;
             int bestScore = -1;
-            for ( ShuffleBooking b : sorted ) {
+            for ( ShuffleBooking b : sortedSeconds ) {
                 if ( continued.contains( b.key() ) || false == b.checkin().equals( a.checkout() ) ) {
                     continue;
                 }
@@ -226,6 +283,22 @@ public class BedShuffleService {
                 .map( g -> groups.get( g ) )
                 .map( members -> "group " + members.get( 0 ).label() + " in rooms "
                         + String.join( ", ", calendar.currentRooms( members ) ) )
+                .collect( Collectors.joining( "; " ) );
+    }
+
+    /** The groups being brought together or, with none, the back-to-back bookings being kept on one bed. */
+    private static String describeConsolidation( BedCalendar calendar, Consolidation c ) {
+        if ( false == c.groups().isEmpty() ) {
+            return describeGroups( calendar, c );
+        }
+        return c.chains().stream()
+                .map( chain -> {
+                    ShuffleBooking a = calendar.booking( chain.first() );
+                    ShuffleBooking b = calendar.booking( chain.second() );
+                    return a.label() + " " + DATE.format( a.checkin() ) + " to " + DATE.format( a.checkout() )
+                            + " and " + b.label() + " " + DATE.format( b.checkin() ) + " to " + DATE.format( b.checkout() );
+                } )
+                .distinct()
                 .collect( Collectors.joining( "; " ) );
     }
 
@@ -326,11 +399,20 @@ public class BedShuffleService {
         }
         else {
             boolean timedOut = outcomes.containsValue( CpSatShuffleSolver.Outcome.UNKNOWN );
+            boolean chainsOnly = c != null && c.groups().isEmpty();
+            String problem = c == null ? null
+                    : chainsOnly ? "Could not keep " + describeConsolidation( calendar, c ) + " on one bed without moving in-house guests or blocks"
+                    : "Could not bring " + describeGroups( calendar, c ) + " together without moving in-house guests or blocks";
             suggestion.impossible( timedOut ? ShuffleSuggestion.Status.UNKNOWN : ShuffleSuggestion.Status.INFEASIBLE,
-                    explain( calendar, targets, base, nearStart, nearEnd, options, outcomes, c == null ? null
-                            : "Could not bring " + describeGroups( calendar, c ) + " together without moving in-house guests or blocks" ) );
-            suggestion.setSplit( bestSplit( calendar, keys,
-                    solveNearThenFull( calendar, base.copy().splitTargets( true ), nearStart, nearEnd ) ) );
+                    explain( calendar, targets, base, nearStart, nearEnd, options, outcomes, problem ) );
+            if ( chainsOnly ) {
+                // splitting a chain's halves across beds is just where they are now
+                suggestion.withoutSplit();
+            }
+            else {
+                suggestion.setSplit( bestSplit( calendar, keys,
+                        solveNearThenFull( calendar, base.copy().splitTargets( true ), nearStart, nearEnd ) ) );
+            }
         }
         for ( Relaxation relaxation : Relaxation.values() ) {
             if ( suggestion.getAlternatives().size() >= options.maxAlternatives ) {

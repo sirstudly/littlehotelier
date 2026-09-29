@@ -42,6 +42,51 @@ SELECT :jobId, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
     )
  GROUP BY reservation_id, checkin_date, checkout_date, data_href, notes, bed_status, booking_reference, booking_source, booked_date, viewed_yn
     </entry>
+    <entry key="reservations.consecutive.bookings">
+-- Same guest, back-to-back bookings (left checks out as right checks in) in different rooms of the same room type
+INSERT INTO wp_lh_rpt_consecutive_bookings (job_id, guest_name, room_type_id,
+       reservation_id_left, booking_ref_left, data_href_left, checkin_date_left, checkout_date_left, booked_date_left, room_beds_left,
+       reservation_id_right, booking_ref_right, data_href_right, checkin_date_right, checkout_date_right, booked_date_right, room_beds_right,
+       created_date)
+SELECT :jobId, c1.guest_name, rm1.room_type_id,
+       c1.reservation_id, c1.booking_reference, c1.data_href, CAST(c1.checkin_date AS DATETIME), CAST(c1.checkout_date AS DATETIME), c1.booked_date,
+       GROUP_CONCAT(DISTINCT CONCAT(rm1.room, ' ', rm1.bed_name) ORDER BY rm1.room, rm1.bed_name SEPARATOR ', '),
+       c2.reservation_id, c2.booking_reference, c2.data_href, CAST(c2.checkin_date AS DATETIME), CAST(c2.checkout_date AS DATETIME), c2.booked_date,
+       GROUP_CONCAT(DISTINCT CONCAT(rm2.room, ' ', rm2.bed_name) ORDER BY rm2.room, rm2.bed_name SEPARATOR ', '),
+       NOW()
+  FROM (SELECT DISTINCT reservation_id, booking_reference, room_id, guest_name, data_href, checkin_date, checkout_date, booked_date
+          FROM wp_lh_booking_assignment
+         WHERE valid_to IS NULL AND source = 'guest' AND reservation_id > 0 AND bed_status &lt;&gt; 'pending_payment'
+           AND checkout_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)) c1
+  JOIN (SELECT DISTINCT reservation_id, booking_reference, room_id, guest_name, data_href, checkin_date, checkout_date, booked_date
+          FROM wp_lh_booking_assignment
+         WHERE valid_to IS NULL AND source = 'guest' AND reservation_id > 0 AND bed_status &lt;&gt; 'pending_payment'
+           AND checkout_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)) c2
+    ON c1.guest_name = c2.guest_name AND c1.checkout_date = c2.checkin_date
+  JOIN wp_lh_rooms rm1 ON c1.room_id = rm1.id
+  JOIN wp_lh_rooms rm2 ON c2.room_id = rm2.id
+ WHERE rm1.room_type NOT IN ('LT_MALE', 'LT_FEMALE')
+   AND rm2.room_type NOT IN ('LT_MALE', 'LT_FEMALE')
+   AND rm1.room_type_id = rm2.room_type_id AND rm1.id &lt;&gt; rm2.id -- different bookings, different room, same room type
+   -- unless the subsequent booking is already booked by that guest (eg 2 beds -> 1 bed)
+   AND NOT EXISTS(
+       SELECT 1 FROM wp_lh_booking_assignment c1a
+        WHERE c1a.valid_to IS NULL
+          AND c1a.source = 'guest'
+          AND c1a.guest_name = c1.guest_name
+          AND c1a.checkout_date = c1.checkout_date
+          AND c1a.room_id = c2.room_id)
+   -- unless the former booking is already booked by that guest (eg 1 bed -> 2 beds)
+   AND NOT EXISTS(
+       SELECT 1 FROM wp_lh_booking_assignment c1b
+        WHERE c1b.valid_to IS NULL
+          AND c1b.source = 'guest'
+          AND c1b.guest_name = c2.guest_name
+          AND c1b.checkin_date = c2.checkin_date
+          AND c1b.room_id = c1.room_id)
+ GROUP BY c1.guest_name, rm1.room_type_id, c1.reservation_id, c1.booking_reference, c1.data_href, c1.checkin_date, c1.checkout_date, c1.booked_date,
+          c2.reservation_id, c2.booking_reference, c2.data_href, c2.checkin_date, c2.checkout_date, c2.booked_date
+    </entry>
     <entry key="unpaid.deposit.report">
         INSERT INTO wp_lh_rpt_unpaid_deposit( job_id, guest_name, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn, created_date )
         SELECT :jobId, GROUP_CONCAT( DISTINCT f.guest_name ) `guest_name`, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn, MAX(f.valid_from) `created_date`
