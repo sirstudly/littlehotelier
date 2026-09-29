@@ -18,3 +18,9 @@ fi
 export GIT_COMMIT="$commit"
 echo "Building with GIT_COMMIT=$GIT_COMMIT"
 docker compose up -d --build "$@"
+
+# Each rebuild leaves the previous images dangling and grows the build cache; without
+# this the host disk fills up. Cache used in the last week is kept so rebuilds stay fast.
+echo "Pruning dangling images and build cache older than 7 days"
+docker image prune -f || true
+docker builder prune -af --filter until=168h || true
