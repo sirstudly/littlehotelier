@@ -45,7 +45,7 @@ public final class CloudbedsRoomBedSyncMapper {
                 return "SGL";
             }
             if ( capacity == 2 ) {
-                return "TWN";
+                return "TWIN";
             }
             if ( capacity == 3 ) {
                 return "TRIPLE";
@@ -75,7 +75,7 @@ public final class CloudbedsRoomBedSyncMapper {
             return "DBL";
         }
         if ( lower.contains( "twin" ) ) {
-            return "TWN";
+            return "TWIN";
         }
         if ( lower.contains( "triple" ) ) {
             return "TRIPLE";

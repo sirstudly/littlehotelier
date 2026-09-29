@@ -32,7 +32,7 @@ public class CloudbedsRoomBedSyncMapperTest {
 
     @Test
     public void deriveRoomTypeCode_twinPrivate() {
-        assertEquals( "TWN", CloudbedsRoomBedSyncMapper.deriveRoomTypeCode( "Y", "MI", 2 ) );
+        assertEquals( "TWIN", CloudbedsRoomBedSyncMapper.deriveRoomTypeCode( "Y", "MI", 2 ) );
     }
 
     @Test
@@ -53,7 +53,7 @@ public class CloudbedsRoomBedSyncMapperTest {
 
     @Test
     public void deriveRoomTypeCode_twinFromTitle() {
-        assertEquals( "TWN", CloudbedsRoomBedSyncMapper.deriveRoomTypeCode(
+        assertEquals( "TWIN", CloudbedsRoomBedSyncMapper.deriveRoomTypeCode(
                 "Y", "MI", 2, "Budget Twin Room (Bunk Bed)" ) );
     }
 
