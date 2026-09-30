@@ -13,6 +13,8 @@ import jakarta.persistence.NoResultException;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.BedLock;
+import com.macbackpackers.beans.BedLockViolation;
 import com.macbackpackers.beans.BlacklistEntry;
 import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.BookingByCheckinDate;
@@ -1003,4 +1005,18 @@ public interface WordPressDAO {
      * Booking sources with a commission divisor valid on {@code asOf}.
      */
     List<BookingSourceLookup> fetchCommissionRates( LocalDate asOf );
+
+    // --- Bed locks (set from the Cloudbeds calendar userscript) ---
+
+    /** Reservation ids with at least one active (not unlocked) bed lock. */
+    Set<Long> fetchActiveBedLockReservationIds();
+
+    /** Active bed locks for a reservation. */
+    List<BedLock> fetchActiveBedLocksForReservation( long reservationId );
+
+    /** The unresolved violation for a bed lock, or null. */
+    BedLockViolation fetchOpenBedLockViolation( long bedLockId );
+
+    /** Inserts (id 0) or updates a violation. */
+    void saveBedLockViolation( BedLockViolation violation );
 }

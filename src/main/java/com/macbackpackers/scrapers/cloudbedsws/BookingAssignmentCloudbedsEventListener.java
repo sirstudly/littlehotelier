@@ -5,6 +5,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.lang3.StringUtils;
@@ -38,6 +39,9 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
 
     @Autowired
     private CloudbedsCalendarEventRegistry eventRegistry;
+
+    @Autowired
+    private BedLockMonitor bedLockMonitor;
 
     /** calendar event id → assignment_key for delete / room_free resolution. */
     private final Map<String, String> eventIdToAssignmentKey = new ConcurrentHashMap<>();
@@ -84,6 +88,7 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
         }
         Map<String, RoomBed> roomsById = indexRoomsById();
         boolean needEnrich = false;
+        Set<Long> lockedReservationIds = bedLockMonitor.fetchLockedReservationIds();
 
         for ( CloudbedsCalendarEvent event : update.getAllReservationEvents() ) {
             BookingAssignment a = mapper.toAssignment( event, roomsById );
@@ -99,7 +104,12 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
                 }
                 continue;
             }
+            BookingAssignment previous = lockedReservationIds.contains( a.getReservationId() )
+                    ? dao.fetchCurrentBookingAssignmentByKey( a.getAssignmentKey() ) : null;
             boolean wrote = dao.upsertBookingAssignment( a );
+            if ( wrote && previous != null ) {
+                bedLockMonitor.onPlacementChange( previous, a );
+            }
             if ( StringUtils.isNotBlank( event.getId() ) ) {
                 eventIdToAssignmentKey.put( event.getId(), a.getAssignmentKey() );
             }

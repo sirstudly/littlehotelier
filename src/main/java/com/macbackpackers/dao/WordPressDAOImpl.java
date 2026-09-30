@@ -3,6 +3,8 @@ package com.macbackpackers.dao;
 
 import com.macbackpackers.beans.Allocation;
 import com.macbackpackers.beans.AllocationList;
+import com.macbackpackers.beans.BedLock;
+import com.macbackpackers.beans.BedLockViolation;
 import com.macbackpackers.beans.BlacklistEntry;
 import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.BookingSourceLookup;
@@ -135,7 +137,7 @@ public class WordPressDAOImpl implements WordPressDAO {
     public static final int ALLOCATION_INSERT_BATCH_SIZE = 100;
 
     /** Rows per multi-value UPSERT for guest comments. */
-    public static final int GUEST_COMMENT_UPSERT_BATCH_SIZE = 10;
+    public static final int GUEST_COMMENT_UPSERT_BATCH_SIZE = 100;
 
     /**
      * Per-chunk transaction timeout (seconds). Must stay above slow Tailscale batch times
@@ -2468,6 +2470,48 @@ public class WordPressDAOImpl implements WordPressDAO {
                 BookingSourceLookup.class )
                 .setParameter( "asOf", asOf )
                 .getResultList();
+    }
+
+    // --- Bed locks ---
+
+    @Override
+    @Transactional( readOnly = true )
+    public Set<Long> fetchActiveBedLockReservationIds() {
+        return new HashSet<>( em.createQuery(
+                "SELECT DISTINCT l.reservationId FROM BedLock l WHERE l.unlockedDate IS NULL", Long.class )
+                .getResultList() );
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public List<BedLock> fetchActiveBedLocksForReservation( long reservationId ) {
+        return em.createQuery(
+                "FROM BedLock l WHERE l.reservationId = :id AND l.unlockedDate IS NULL ORDER BY l.id", BedLock.class )
+                .setParameter( "id", reservationId )
+                .getResultList();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public BedLockViolation fetchOpenBedLockViolation( long bedLockId ) {
+        List<BedLockViolation> open = em.createQuery(
+                "FROM BedLockViolation v WHERE v.bedLockId = :id AND v.resolvedDate IS NULL ORDER BY v.id DESC",
+                BedLockViolation.class )
+                .setParameter( "id", bedLockId )
+                .setMaxResults( 1 )
+                .getResultList();
+        return open.isEmpty() ? null : open.get( 0 );
+    }
+
+    @Override
+    @Transactional
+    public void saveBedLockViolation( BedLockViolation violation ) {
+        if ( violation.getId() == 0 ) {
+            em.persist( violation );
+        }
+        else {
+            em.merge( violation );
+        }
     }
 
 }
