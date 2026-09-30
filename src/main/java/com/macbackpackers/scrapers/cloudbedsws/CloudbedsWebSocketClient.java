@@ -150,7 +150,9 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
         }
 
         if ( root.has( "guarantee" ) && root.has( "payload" ) ) {
+            // the server redelivers every guarantee frame until that exact token is echoed back
             lastGuaranteeToken = root.get( "guarantee" ).getAsString();
+            sendGuarantee( lastGuaranteeToken );
             handlePayload( root.get( "payload" ).getAsString() );
             return;
         }
@@ -190,13 +192,17 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
     }
 
     private void sendGuarantee() {
+        sendGuarantee( lastGuaranteeToken );
+    }
+
+    private void sendGuarantee( String token ) {
         try {
             if ( !isOpen() ) {
                 return;
             }
             JsonObject g = new JsonObject();
             g.addProperty( "action", "guarantee" );
-            g.addProperty( "guarantee", lastGuaranteeToken );
+            g.addProperty( "guarantee", token );
             g.addProperty( "property_id", propertyId );
             g.addProperty( "version", version );
             g.addProperty( "frontVersion", frontVersion );
