@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -108,6 +109,57 @@ public class BedLockMonitorTest {
         assertThat( saved.getValue().getToRoomId(), is( "111746-15" ) );
         assertThat( saved.getValue().getToBedName(), is( "Bed C" ) );
         assertThat( saved.getValue().getResolvedDate(), nullValue() );
+    }
+
+    @Test
+    public void snapshotBackOnLockedBedResolvesOpenViolation() throws Exception {
+        when( dao.fetchActiveBedLockReservationIds() ).thenReturn( Set.of( RES_ID ) );
+        when( dao.fetchActiveBedLocksForReservation( RES_ID ) ).thenReturn( List.of( lock( "111746-13" ) ) );
+        when( dao.fetchOpenBedLockViolation( 7L ) ).thenReturn( openViolation( "111746-14" ) );
+
+        monitor.reconcileSnapshot( List.of( assignment( "111746-13", "41", "Bed A" ) ) );
+
+        ArgumentCaptor<BedLockViolation> saved = ArgumentCaptor.forClass( BedLockViolation.class );
+        verify( dao ).saveBedLockViolation( saved.capture() );
+        assertThat( saved.getValue().getResolution(), is( BedLockViolation.RESOLUTION_MOVED_BACK ) );
+        assertThat( saved.getValue().getResolvedDate(), notNullValue() );
+        verify( gmail, never() ).sendEmailToSelf( anyString(), anyString() );
+    }
+
+    @Test
+    public void snapshotOnLockedBedWithoutViolationDoesNothing() {
+        when( dao.fetchActiveBedLockReservationIds() ).thenReturn( Set.of( RES_ID ) );
+        when( dao.fetchActiveBedLocksForReservation( RES_ID ) ).thenReturn( List.of( lock( "111746-13" ) ) );
+
+        monitor.reconcileSnapshot( List.of( assignment( "111746-13", "41", "Bed A" ) ) );
+
+        verify( dao, never() ).saveBedLockViolation( any() );
+    }
+
+    @Test
+    public void snapshotFlagsMoveMadeWhileDisconnected() throws Exception {
+        when( dao.fetchActiveBedLockReservationIds() ).thenReturn( Set.of( RES_ID ) );
+        when( dao.fetchActiveBedLocksForReservation( RES_ID ) ).thenReturn( List.of( lock( "111746-13" ) ) );
+
+        monitor.reconcileSnapshot( List.of( assignment( "111746-14", "41", "Bed B" ) ) );
+
+        ArgumentCaptor<BedLockViolation> saved = ArgumentCaptor.forClass( BedLockViolation.class );
+        verify( dao ).saveBedLockViolation( saved.capture() );
+        assertThat( saved.getValue().getFromRoomId(), is( "111746-13" ) );
+        assertThat( saved.getValue().getToRoomId(), is( "111746-14" ) );
+        verify( gmail ).sendEmailToSelf( ArgumentMatchers.contains( "41 - Bed A -> 41 - Bed B" ), anyString() );
+    }
+
+    @Test
+    public void snapshotWithoutLockedReservationLeavesViolationOpen() {
+        when( dao.fetchActiveBedLockReservationIds() ).thenReturn( Set.of( RES_ID ) );
+
+        BookingAssignment other = assignment( "111746-13", "41", "Bed A" );
+        other.setReservationId( 999L );
+        monitor.reconcileSnapshot( List.of( other ) );
+
+        verify( dao, never() ).fetchActiveBedLocksForReservation( RES_ID );
+        verify( dao, never() ).saveBedLockViolation( any() );
     }
 
     @Test

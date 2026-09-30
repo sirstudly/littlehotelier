@@ -1,9 +1,14 @@
 package com.macbackpackers.scrapers.cloudbedsws;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringEscapeUtils;
@@ -24,7 +29,8 @@ import com.macbackpackers.services.GmailService;
  * with the assignment version before and after each placement change.
  * <p>
  * Only placement changes on the same {@code assignment_key} are seen, so this relies on the event
- * carrying {@code booking_rooms_id}; moves made while the WebSocket was disconnected are missed.
+ * carrying {@code booking_rooms_id}. Moves made while the WebSocket was disconnected are picked up by
+ * {@link #reconcileSnapshot(List)} on the next {@code on_migrate}.
  */
 @Component
 public class BedLockMonitor {
@@ -73,6 +79,86 @@ public class BedLockMonitor {
         }
         catch ( RuntimeException e ) {
             LOGGER.error( "Bed lock check failed for reservation {}", next.getReservationId(), e );
+        }
+    }
+
+    /**
+     * Brings violations in line with a full calendar snapshot: resolves open violations whose
+     * reservation is back on the locked bed, and flags locked reservations found elsewhere (moves
+     * made while the WebSocket was disconnected). Reservations missing from the snapshot (outside its
+     * window, canceled) are left alone.
+     *
+     * @param snapshot assignments decoded from {@code on_migrate}
+     */
+    public void reconcileSnapshot( List<BookingAssignment> snapshot ) {
+        Set<Long> lockedReservationIds = fetchLockedReservationIds();
+        if ( lockedReservationIds.isEmpty() || snapshot == null ) {
+            return;
+        }
+        Map<Long, List<BookingAssignment>> byReservation = new HashMap<>();
+        for ( BookingAssignment a : snapshot ) {
+            if ( a.getReservationId() != null && lockedReservationIds.contains( a.getReservationId() ) ) {
+                byReservation.computeIfAbsent( a.getReservationId(), k -> new ArrayList<>() ).add( a );
+            }
+        }
+        for ( Map.Entry<Long, List<BookingAssignment>> e : byReservation.entrySet() ) {
+            try {
+                List<BedLock> locks = dao.fetchActiveBedLocksForReservation( e.getKey() );
+                for ( BedLock lock : locks ) {
+                    reconcileLock( lock, locks, e.getValue() );
+                }
+            }
+            catch ( RuntimeException ex ) {
+                LOGGER.error( "Bed lock snapshot reconcile failed for reservation {}", e.getKey(), ex );
+            }
+        }
+    }
+
+    private void reconcileLock( BedLock lock, List<BedLock> reservationLocks, List<BookingAssignment> assignments ) {
+        BedLockViolation open = dao.fetchOpenBedLockViolation( lock.getId() );
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+
+        if ( assignments.stream().anyMatch( a -> lock.getRoomId().equals( a.getRoomId() ) ) ) {
+            if ( open != null ) {
+                open.setResolvedDate( now );
+                open.setResolution( BedLockViolation.RESOLUTION_MOVED_BACK );
+                dao.saveBedLockViolation( open );
+                LOGGER.info( "Locked bed restored (snapshot): reservation {} back in {}", lock.getReservationId(),
+                        describe( lock.getRoom(), lock.getBedName(), lock.getRoomId() ) );
+            }
+            return;
+        }
+
+        // with several rooms on the reservation, skip the ones sitting on its other locked beds
+        Set<String> otherLockedRooms = reservationLocks.stream()
+                .map( BedLock::getRoomId )
+                .collect( Collectors.toSet() );
+        BookingAssignment moved = assignments.stream()
+                .filter( a -> false == otherLockedRooms.contains( a.getRoomId() ) )
+                .findFirst().orElse( null );
+        if ( moved == null ) {
+            return;
+        }
+
+        if ( open == null ) {
+            BedLockViolation v = new BedLockViolation();
+            v.setBedLockId( lock.getId() );
+            v.setReservationId( lock.getReservationId() );
+            v.setGuestName( StringUtils.defaultIfBlank( moved.getGuestName(), lock.getGuestName() ) );
+            v.setFromRoomId( lock.getRoomId() );
+            v.setFromRoom( lock.getRoom() );
+            v.setFromBedName( lock.getBedName() );
+            setDestination( v, moved );
+            v.setDetectedDate( now );
+            dao.saveBedLockViolation( v );
+            LOGGER.warn( "Locked bed moved (snapshot): reservation {} ({}) {} -> {}", v.getReservationId(),
+                    v.getGuestName(), describe( v.getFromRoom(), v.getFromBedName(), v.getFromRoomId() ),
+                    describe( v.getToRoom(), v.getToBedName(), v.getToRoomId() ) );
+            sendAlert( lock, v, moved );
+        }
+        else if ( false == Objects.equals( open.getToRoomId(), moved.getRoomId() ) ) {
+            setDestination( open, moved );
+            dao.saveBedLockViolation( open );
         }
     }
 

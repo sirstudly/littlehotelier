@@ -78,6 +78,7 @@ public class BookingAssignmentCloudbedsEventListener implements CloudbedsEventLi
             return;
         }
         dao.reconcileBookingAssignmentCurrents( desired, windowStart, windowEnd );
+        bedLockMonitor.reconcileSnapshot( desired );
         // REST enrich deferred to AllocationScraperJob heal / incremental updates (avoid reconnect storm)
     }
 
