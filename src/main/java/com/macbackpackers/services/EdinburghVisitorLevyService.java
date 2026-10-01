@@ -1,6 +1,8 @@
 
 package com.macbackpackers.services;
 
+import static com.macbackpackers.utils.MDCUtils.wrapWithMDC;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
@@ -10,12 +12,18 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
 
 import org.htmlunit.WebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +34,7 @@ import com.google.gson.Gson;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
+import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.CloudbedsScraper;
 import com.macbackpackers.scrapers.cloudbedsws.CloudbedsCalendarEvent;
@@ -48,6 +57,13 @@ public class EdinburghVisitorLevyService {
     @Autowired
     @Qualifier( "gsonForCloudbeds" )
     private Gson gson;
+
+    @Autowired
+    private WordPressDAO dao;
+
+    @Autowired
+    @Qualifier( "ioThreadPool" )
+    private ExecutorService ioThreadPool;
 
     @Value( "${evl.enabled:false}" )
     private boolean evlEnabled;
@@ -119,8 +135,7 @@ public class EdinburghVisitorLevyService {
      * potentially levy-eligible and whose folio EVL differs from the calculated amount
      * (outside tolerance). When both ranges are set, Cloudbeds applies both filters (AND).
      * <p>
-     * Assessments are performed lazily as the stream is consumed (one-shot; do not reuse).
-     * I/O failures during assessment are wrapped in {@link UncheckedIOException}.
+     * See {@link #assessReservationsInDateRange} for threading and failure semantics.
      */
     public Stream<CustomerLevyAssessment> findReservationsRequiringVisitorLevyAdjustment( WebClient webClient,
             LocalDate bookingDateStart, LocalDate bookingDateEnd,
@@ -135,27 +150,36 @@ public class EdinburghVisitorLevyService {
      * and/or checkin-date range (all reservation statuses, including canceled and no_show).
      * When both ranges are set, Cloudbeds applies both filters (AND).
      * <p>
-     * Assessments are performed lazily as the stream is consumed (one-shot; do not reuse).
-     * I/O failures during assessment are wrapped in {@link UncheckedIOException}.
+     * Assessments are submitted to the shared I/O thread pool up front; the returned stream
+     * yields them in reservation order as each completes (one-shot; do not reuse). A failed or
+     * timed-out assessment cancels the remainder and is thrown as {@link UncheckedIOException}.
      */
     public Stream<CustomerLevyAssessment> assessReservationsInDateRange( WebClient webClient,
             LocalDate bookingDateStart, LocalDate bookingDateEnd,
             LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
-        return cloudbedsScraper.getReservations( webClient,
+        var mdcContext = MDC.getCopyOfContextMap();
+        List<Future<CustomerLevyAssessment>> futures = cloudbedsScraper.getReservations( webClient,
                 null, null, checkinDateStart, checkinDateEnd, null, null,
                 bookingDateStart, bookingDateEnd, ALL_STATUSES )
                 .stream()
                 .filter( this::isPotentiallyEligible )
-                .map( customer -> {
-                    try {
-                        LevyAssessment assessment = assessVisitorLevyForBooking( webClient, customer.getId() );
-                        return new CustomerLevyAssessment( customer, assessment );
-                    }
-                    catch ( IOException e ) {
-                        throw new UncheckedIOException(
-                                "Failed assessing visitor levy for reservation " + customer.getId(), e );
-                    }
-                } );
+                .map( customer -> ioThreadPool.submit( wrapWithMDC( mdcContext, () -> new CustomerLevyAssessment(
+                        customer, assessVisitorLevyForBooking( webClient, customer.getId() ) ) ) ) )
+                .toList();
+
+        int requestTimeout = Integer.parseInt( dao.getDefaultOption( "hbo_cloudbeds_request_timeout", "900" ) );
+        return futures.stream().map( future -> {
+            try {
+                return future.get( requestTimeout, TimeUnit.SECONDS );
+            }
+            catch ( TimeoutException | InterruptedException | ExecutionException e ) {
+                futures.forEach( f -> f.cancel( true ) );
+                if ( e instanceof InterruptedException ) {
+                    Thread.currentThread().interrupt();
+                }
+                throw new UncheckedIOException( new IOException( "Failed assessing visitor levy", e ) );
+            }
+        } );
     }
 
     /**
