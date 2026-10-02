@@ -153,6 +153,10 @@ public class CloudbedsCalendarEvent {
         return isCanceled() || isNoShow();
     }
 
+    public boolean isCheckedOut() {
+        return "checked_out".equalsIgnoreCase( getType() ) || "checked_out".equalsIgnoreCase( getStatus() );
+    }
+
     public boolean isHotelCollectBooking() {
         return "1".equals( getIsHotelCollectPayment() );
     }

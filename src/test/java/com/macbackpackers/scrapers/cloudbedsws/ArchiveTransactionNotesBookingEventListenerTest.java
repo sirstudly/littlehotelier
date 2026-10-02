@@ -125,6 +125,17 @@ public class ArchiveTransactionNotesBookingEventListenerTest {
     }
 
     @Test
+    public void onUpdate_doesNotEnqueueCheckedOut() {
+        listener.onSnapshot( "17363", Collections.singletonList( event( "checked_in", "176704729", "100.00" ) ) );
+
+        CloudbedsCalendarUpdate update = updateWith( event( "checked_out", "176704729", "0.00" ) );
+        listener.onUpdate( "17363", update );
+
+        verify( dao, never() ).insertJob( any() );
+        assertEquals( 0, new BigDecimal( "0.00" ).compareTo( listener.getCachedBalanceDue( "176704729" ) ) );
+    }
+
+    @Test
     public void onUpdate_ignoresBlockedDates() {
         CloudbedsCalendarUpdate update = updateWith( event( "blocked_dates", "0", "0" ) );
         listener.onUpdate( "17363", update );

@@ -21,7 +21,7 @@ import com.macbackpackers.jobs.ArchiveAllTransactionNotesJob;
  * Reacts to incremental calendar WebSocket updates by enqueueing
  * {@link ArchiveAllTransactionNotesJob}s when a booking's {@code balance_due} drops (or becomes
  * paid). The job re-fetches the reservation and archives pending transaction notes only when
- * balance due excluding EVL is zero or less.
+ * balance due excluding EVL is zero or less. Checked-out bookings are not enqueued.
  * <p>
  * {@link #onSnapshot} seeds an in-memory balance cache only; jobs are not created on reconnect.
  */
@@ -75,7 +75,7 @@ public class ArchiveTransactionNotesBookingEventListener implements CloudbedsEve
             // Always refresh cache after comparison (including within-batch duplicates).
             balanceDueByBookingId.put( reservationId, newBalance );
 
-            if ( false == shouldEnqueue ) {
+            if ( false == shouldEnqueue || event.isCheckedOut() ) {
                 continue;
             }
             if ( false == reservationIdsSeenInBatch.add( reservationId ) ) {
@@ -115,7 +115,7 @@ public class ArchiveTransactionNotesBookingEventListener implements CloudbedsEve
 
     /**
      * Guest stay rows (not blocked dates / OOS). Includes checked-in/out because payments can post
-     * after check-in.
+     * after check-in; checked-out rows only refresh the balance cache.
      */
     static boolean isGuestReservationEvent( CloudbedsCalendarEvent event ) {
         if ( event == null || StringUtils.isBlank( event.getBookingId() )
