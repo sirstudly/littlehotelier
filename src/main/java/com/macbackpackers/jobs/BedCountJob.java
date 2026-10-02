@@ -53,8 +53,9 @@ public class BedCountJob extends AbstractJob {
     public void processJob() throws Exception {
         if ( dao.isCloudbeds() ) {
             LocalDate selectedDate = getSelectedLocalDate();
+            // refresh everything in the window: bed moves don't show in the reservation list
             bookingAssignmentEnrichService.heal( webClient,
-                    selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ), null );
+                    selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ), selectedDate.plusDays( 1 ) );
             cloudbedsService.syncRoomsIfBookingAssignmentUnmapped( webClient,
                     selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
             cloudbedsService.dumpAllocationsFrom( webClient,
