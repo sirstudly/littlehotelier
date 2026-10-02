@@ -1002,6 +1002,16 @@ public interface WordPressDAO {
     List<Long> fetchReservationIdsNeedingRestEnrich();
 
     /**
+     * Reservations shown in a report that displays notes (split rooms, unpaid deposit, group bookings
+     * and mostly full dorms stamped with {@code jobId}, plus the live guest comments and bottom bunks
+     * reports) whose current rows were last REST-fetched before {@code fetchedBefore}.
+     *
+     * @param jobId allocation scraper job id the report tables were populated for
+     * @param fetchedBefore reservations REST-fetched on or after this time are skipped
+     */
+    List<Long> fetchStaleNoteReportReservationIds( int jobId, Date fetchedBefore );
+
+    /**
      * Booking sources with a commission divisor valid on {@code asOf}.
      */
     List<BookingSourceLookup> fetchCommissionRates( LocalDate asOf );

@@ -9,6 +9,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.CardDetails;
+import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.cloudbeds.requests.ReservationListFilter;
 import com.macbackpackers.beans.cloudbeds.responses.ActivityLogEntry;
 import com.macbackpackers.beans.cloudbeds.responses.AddNoteResponse;
@@ -23,6 +24,7 @@ import com.macbackpackers.beans.cloudbeds.responses.ReservationListResponse;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.exceptions.IORuntimeException;
+import com.macbackpackers.jobs.BookingAssignmentEnrichJob;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.exceptions.PaymentPendingException;
@@ -1077,6 +1079,7 @@ public class CloudbedsScraper {
                 reservationId, note, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         LOGGER.info( "Adding note: " + note + " to reservation " + reservationId );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
+        queueBookingAssignmentEnrich( reservationId );
     }
 
     /**
@@ -1093,6 +1096,29 @@ public class CloudbedsScraper {
                 reservationId, note, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
         LOGGER.info( "Adding note: " + note + " to reservation " + reservationId );
         doRequestErrorOnFailure( webClient, requestSettings, AddNoteResponse.class, fnOnSuccess );
+        queueBookingAssignmentEnrich( reservationId );
+    }
+
+    /**
+     * Notes only reach {@code wp_lh_booking_assignment} via REST; heal won't re-fetch a booking
+     * just because a note was added.
+     */
+    private void queueBookingAssignmentEnrich( String reservationId ) {
+        if ( StringUtils.isBlank( reservationId ) ) {
+            return;
+        }
+        try {
+            if ( dao.hasBookingAssignmentEnrichJobForReservation( reservationId ) ) {
+                return;
+            }
+            BookingAssignmentEnrichJob job = new BookingAssignmentEnrichJob();
+            job.setStatus( JobStatus.submitted );
+            job.setReservationId( reservationId );
+            dao.insertJob( job );
+        }
+        catch ( RuntimeException e ) {
+            LOGGER.warn( "Failed to queue BookingAssignmentEnrichJob for reservation " + reservationId, e );
+        }
     }
 
     /**

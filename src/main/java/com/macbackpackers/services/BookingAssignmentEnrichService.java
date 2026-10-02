@@ -116,8 +116,29 @@ public class BookingAssignmentEnrichService {
             LocalDate endDate ) throws IOException {
         LocalDate refreshEnd = startDate.plusDays(
                 Integer.parseInt( dao.getDefaultOption( OPTION_HEAL_REFRESH_DAYS, "14" ) ) );
+        Timestamp healStartedAt = new Timestamp( System.currentTimeMillis() );
         heal( webClient, startDate, endDate, refreshEnd );
+        refreshNoteReportReservations( webClient, jobId, healStartedAt );
         dualWriteCalendar( jobId );
+    }
+
+    /**
+     * Heal doesn't re-fetch a reservation when only its notes change, so before the report jobs run,
+     * REST-fetches every reservation that appears in a report showing notes and wasn't fetched since
+     * {@code healStartedAt}. The report tables are populated here under {@code jobId} only to find
+     * those reservations; the report jobs regenerate them afterwards.
+     */
+    public void refreshNoteReportReservations( WebClient webClient, int jobId, Timestamp healStartedAt )
+            throws IOException {
+        dao.runSplitRoomsReservationsReport( jobId );
+        dao.runUnpaidDepositReport( jobId );
+        dao.runGroupBookingsReport( jobId );
+        dao.runMostlyFullDormReport( jobId );
+        List<Long> reservationIds = dao.fetchStaleNoteReportReservationIds( jobId, healStartedAt );
+        LOGGER.info( "BookingAssignment note report refresh: fetching {} reservations", reservationIds.size() );
+        if ( false == reservationIds.isEmpty() ) {
+            fetchAndApply( webClient, reservationIds );
+        }
     }
 
     /**

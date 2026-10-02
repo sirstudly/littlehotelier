@@ -18,8 +18,9 @@ import com.macbackpackers.config.LittleHotelierConfig;
 import com.macbackpackers.services.BookingAssignmentEnrichService;
 
 /**
- * Heals {@code wp_lh_booking_assignment} via selective REST, dual-writes currents into
- * {@code wp_lh_calendar} under this job id, then queues allocation reports.
+ * Heals {@code wp_lh_booking_assignment} via selective REST, re-fetches the reservations shown in
+ * reports displaying notes, dual-writes currents into {@code wp_lh_calendar} under this job id,
+ * then queues allocation reports.
  * <p>
  * Replaces the former full ~140-day {@code get_reservation} dump via worker jobs.
  */

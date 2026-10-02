@@ -171,6 +171,7 @@ CREATE TABLE `wp_lh_rpt_consecutive_bookings` (
 CREATE TABLE `wp_lh_rpt_unpaid_deposit` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `job_id` bigint(20) unsigned NOT NULL,
+  `reservation_id` bigint(20) unsigned DEFAULT NULL,
   `guest_name` TEXT,
   `checkin_date` datetime NOT NULL,
   `checkout_date` datetime NOT NULL,

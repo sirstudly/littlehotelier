@@ -88,8 +88,8 @@ SELECT :jobId, c1.guest_name, rm1.room_type_id,
           c2.reservation_id, c2.booking_reference, c2.data_href, c2.checkin_date, c2.checkout_date, c2.booked_date
     </entry>
     <entry key="unpaid.deposit.report">
-        INSERT INTO wp_lh_rpt_unpaid_deposit( job_id, guest_name, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn, created_date )
-        SELECT :jobId, GROUP_CONCAT( DISTINCT f.guest_name ) `guest_name`, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn, MAX(f.valid_from) `created_date`
+        INSERT INTO wp_lh_rpt_unpaid_deposit( job_id, reservation_id, guest_name, checkin_date, checkout_date, payment_total, data_href, booking_reference, booking_source, booked_date, notes, viewed_yn, created_date )
+        SELECT :jobId, f.reservation_id, GROUP_CONCAT( DISTINCT f.guest_name ) `guest_name`, f.checkin_date, f.checkout_date, f.payment_total, f.data_href, f.booking_reference, f.booking_source, f.booked_date, f.notes, f.viewed_yn, MAX(f.valid_from) `created_date`
           FROM wp_lh_booking_assignment f
          WHERE f.valid_to IS NULL
            AND f.checkout_date >= CURDATE()
