@@ -20,12 +20,15 @@ public class RoomBed {
     public static final String ROOM_TYPE_LT_FEMALE = "LT_FEMALE";
     public static final String ROOM_TYPE_LT_MIXED = "LT_MIXED";
 
+    /** Placeholder room type holding the gap nights of a non-contiguous reservation; the guest isn't in-house then. */
+    public static final String ROOM_TYPE_SPLITS = "SPLITS";
+
     /** Staff dorms; set manually in wp_lh_rooms (Cloudbeds doesn't know about them). */
     public static final List<String> STAFF_ROOM_TYPES = List.of( ROOM_TYPE_LT_MALE, ROOM_TYPE_LT_FEMALE, ROOM_TYPE_LT_MIXED );
 
     /** Room types never offered to guests (housekeeping sheet, bed shuffling). */
     public static final List<String> NON_GUEST_ROOM_TYPES = List.of(
-            ROOM_TYPE_LT_MALE, ROOM_TYPE_LT_FEMALE, ROOM_TYPE_LT_MIXED, "OVERFLOW", "PAID BEDS" );
+            ROOM_TYPE_LT_MALE, ROOM_TYPE_LT_FEMALE, ROOM_TYPE_LT_MIXED, "OVERFLOW", "PAID BEDS", ROOM_TYPE_SPLITS );
 
     @Id
     @Column( name = "id", nullable = false )

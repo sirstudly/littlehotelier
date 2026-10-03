@@ -18,9 +18,22 @@ SELECT :jobId, reservation_id, GROUP_CONCAT(distinct guest_name SEPARATOR ', ' )
            SELECT t.reservation_id, t.room_type_id, MAX(t.capacity) AS capacity, SUM(t.num_beds) AS total_beds, COUNT(1) AS num_rooms
              FROM ( -- for each reservation, determine which rooms are they assigned to
                   SELECT c.reservation_id, rm.room, rm.room_type_id, rm.capacity, count(1) AS num_beds
-                    FROM (SELECT DISTINCT reservation_id, room_id FROM wp_lh_booking_assignment WHERE valid_to IS NULL AND checkout_date >= CURDATE() AND bed_status = 'confirmed') c
+                    FROM ( -- only rooms whose stay overlaps/abuts the reservation's stay in another room of the same type
+                           -- (stays separated by a SPLITS night don't count)
+                           SELECT DISTINCT a.reservation_id, a.room_id
+                             FROM wp_lh_booking_assignment a
+                             JOIN wp_lh_rooms ra ON ra.id = a.room_id
+                            WHERE a.valid_to IS NULL AND a.checkout_date >= CURDATE() AND a.bed_status = 'confirmed'
+                              AND EXISTS (
+                                  SELECT 1 FROM wp_lh_booking_assignment a2
+                                    JOIN wp_lh_rooms r2 ON r2.id = a2.room_id
+                                   WHERE a2.reservation_id = a.reservation_id
+                                     AND a2.valid_to IS NULL AND a2.checkout_date >= CURDATE() AND a2.bed_status = 'confirmed'
+                                     AND r2.room_type_id = ra.room_type_id AND r2.room &lt;&gt; ra.room
+                                     AND a2.checkin_date &lt;= a.checkout_date AND a.checkin_date &lt;= a2.checkout_date)
+                         ) c
                     JOIN wp_lh_rooms rm ON c.room_id = rm.id 
-                   WHERE rm.room_type NOT IN ('LT_MALE', 'LT_FEMALE', 'DBL', 'TRIPLE', 'QUAD', 'TWIN')
+                   WHERE rm.room_type NOT IN ('LT_MALE', 'LT_FEMALE', 'DBL', 'TRIPLE', 'QUAD', 'TWIN', 'SPLITS')
                      AND c.reservation_id > 0 -- do not include room closures
                    GROUP BY c.reservation_id, rm.room, rm.room_type_id, rm.capacity
               ) t
@@ -65,8 +78,8 @@ SELECT :jobId, c1.guest_name, rm1.room_type_id,
     ON c1.guest_name = c2.guest_name AND c1.checkout_date = c2.checkin_date
   JOIN wp_lh_rooms rm1 ON c1.room_id = rm1.id
   JOIN wp_lh_rooms rm2 ON c2.room_id = rm2.id
- WHERE rm1.room_type NOT IN ('LT_MALE', 'LT_FEMALE')
-   AND rm2.room_type NOT IN ('LT_MALE', 'LT_FEMALE')
+ WHERE rm1.room_type NOT IN ('LT_MALE', 'LT_FEMALE', 'SPLITS')
+   AND rm2.room_type NOT IN ('LT_MALE', 'LT_FEMALE', 'SPLITS')
    AND rm1.room_type_id = rm2.room_type_id AND rm1.id &lt;&gt; rm2.id -- different bookings, different room, same room type
    -- unless the subsequent booking is already booked by that guest (eg 2 beds -> 1 bed)
    AND NOT EXISTS(

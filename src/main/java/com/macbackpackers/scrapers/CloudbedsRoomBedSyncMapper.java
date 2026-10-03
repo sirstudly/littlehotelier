@@ -35,6 +35,9 @@ public final class CloudbedsRoomBedSyncMapper {
      * @param title     Cloudbeds room type {@code title} (used to distinguish double vs twin, etc.)
      */
     public static String deriveRoomTypeCode( String isPrivate, String gender, int capacity, String title ) {
+        if ( title != null && RoomBed.ROOM_TYPE_SPLITS.equalsIgnoreCase( title.trim() ) ) {
+            return RoomBed.ROOM_TYPE_SPLITS;
+        }
         boolean priv = "Y".equals( isPrivate );
         if ( priv ) {
             String fromTitle = derivePrivateRoomTypeFromTitle( title );
