@@ -19,8 +19,7 @@ import com.macbackpackers.services.BookingAssignmentEnrichService;
 import com.macbackpackers.services.CloudbedsService;
 
 /**
- * Job that updates the data required for the bedcount report for the given date
- *
+ * Job that refreshes the booking assignments around the given date, then queues the bedcount report.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.BedCountJob" )
@@ -40,11 +39,6 @@ public class BedCountJob extends AbstractJob {
     private WebClient webClient;
 
     @Override
-    public void resetJob() throws Exception {
-        dao.deleteAllocations( getId() );
-    }
-
-    @Override
     public void finalizeJob() {
         webClient.close(); // cleans up JS threads
     }
@@ -58,8 +52,6 @@ public class BedCountJob extends AbstractJob {
                     selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ), selectedDate.plusDays( 1 ) );
             cloudbedsService.syncRoomsIfBookingAssignmentUnmapped( webClient,
                     selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
-            cloudbedsService.dumpAllocationsFrom( webClient,
-                    getId(), selectedDate.minusDays( 1 ), selectedDate.plusDays( 1 ) );
 
             // aggregates data from above
             BedCountReportJob j = new BedCountReportJob();

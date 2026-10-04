@@ -1,4 +1,5 @@
 
+-- Legacy: no longer written (superseded by wp_lh_booking_assignment); to be dropped
 CREATE TABLE `wp_lh_calendar` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `job_id` bigint(20) unsigned DEFAULT NULL,

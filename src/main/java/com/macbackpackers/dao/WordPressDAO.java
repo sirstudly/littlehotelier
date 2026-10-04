@@ -11,16 +11,12 @@ import java.util.Set;
 
 import jakarta.persistence.NoResultException;
 
-import com.macbackpackers.beans.Allocation;
-import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BedLock;
 import com.macbackpackers.beans.BedLockViolation;
 import com.macbackpackers.beans.BlacklistEntry;
 import com.macbackpackers.beans.BookingAssignment;
-import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
 import com.macbackpackers.beans.BookingSourceLookup;
-import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.ConsecutiveBookingPair;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
@@ -61,20 +57,6 @@ public interface WordPressDAO {
     FastDateFormat DATE_FORMAT_YYYY_MM_DD = FastDateFormat.getInstance( "yyyy-MM-dd 00:00:00" );
 
     /**
-     * Inserts a new allocation. The assigned id will be set on the given allocation object.
-     * 
-     * @param alloc the new allocation to insert
-     */
-    void insertAllocation( Allocation alloc );
-    
-    /**
-     * Bulk insert a bunch of allocations.
-     * 
-     * @param allocations new allocations to create
-     */
-    void insertAllocations( AllocationList allocations );
-
-    /**
      * Insert booking report records.
      * 
      * @param bookingReport records to insert
@@ -87,71 +69,6 @@ public interface WordPressDAO {
      * @param jobId job id
      */
     void deleteBookingReport( int jobId );
-
-    /**
-     * Updates attributes on an existing allocation.
-     * 
-     * @param alloc allocation to update in DB
-     */
-    void updateAllocation( Allocation alloc );
-
-    /**
-     * Updates attributes to a list of existing allocations.
-     * 
-     * @param allocList allocations to update in DB
-     */
-    void updateAllocationList( AllocationList allocList );
-
-    /**
-     * Returns an allocation by primary key.
-     * 
-     * @param id primary key
-     * @return non-null allocation
-     * @throws EmptyResultDataAccessException if allocation does not exist
-     */
-    Allocation fetchAllocation( int id ) throws EmptyResultDataAccessException;
-
-    /**
-     * Returns all booking references with the given checkin date for the AllocationScraperJob.
-     * 
-     * @param allocationScraperJobId job id
-     * @param checkinDate checkin date
-     * @return non-null booking reference list
-     */
-    List<String> fetchDistinctBookingsByCheckinDate( int allocationScraperJobId, Date checkinDate );
-
-    /**
-     * Deletes all Allocations for the given jobId.
-     * 
-     * @param jobId the records for the job to delete.
-     */
-    void deleteAllocations( int jobId );
-    
-    /**
-     * Deletes all cancelled Allocations for the given jobId.
-     * 
-     * @param jobId the records for the job to delete.
-     * @param checkinDateStart checkin date start (inclusive)
-     * @param checkinDateEnd checkin date end (inclusive)
-     */
-    void deleteCancelledAllocations( int jobId, Date checkinDateStart, Date checkinDateEnd );
-    
-    /**
-     * Updates the jobId associated with the matching Allocation records.
-     * 
-     * @param oldAllocationJobId the *matching* jobId (on Allocation) to update
-     * @param newAllocationJobId the updated jobId to set
-     */
-    void updateAllocationJobId( int oldAllocationJobId, int newAllocationJobId );
-
-    /**
-     * Queries all existing allocations by job id and reservation id.
-     * 
-     * @param jobId ID of job that scraped the original allocation
-     * @param reservationId the reservationId to match
-     * @return non-null list of matched allocations
-     */
-    AllocationList queryAllocationsByJobIdAndReservationId( int jobId, int reservationId );
 
     /**
      * Inserts a job and associated parameters
@@ -492,14 +409,6 @@ public interface WordPressDAO {
     List<MostlyFullDormReportEntry> fetchMostlyFullDormReport( int allocationScraperJobId );
 
     /**
-     * Returns a List of all BDC bookings which use a prepaid "virtual" CC and where there is still a balance
-     * outstanding. The data is retrieved from the last successful AllocationScraperJob.
-     * 
-     * @return non-null list of booking references
-     */
-    List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithOutstandingBalance();
-
-    /**
      * Fetch reservation ids of current guest booking assignments (checking out on or after
      * yesterday) matching any entries in the given blacklist by name or email.
      *
@@ -507,14 +416,6 @@ public interface WordPressDAO {
      * @return non-null list of distinct matching reservation ids
      */
     List<Long> fetchReservationIdsMatchingBlacklist( List<BlacklistEntry> blacklistEntries );
-
-    /**
-     * Retrieves all Agoda bookings that don't have a no charge note in either the user comments nor
-     * notes sections.
-     * 
-     * @return non-null list
-     */
-    List<BookingWithGuestComments> fetchAgodaBookingsMissingNoChargeNote();
 
     /**
      * Returns a single guest comment by reservation ID.
@@ -540,22 +441,11 @@ public interface WordPressDAO {
     void runMostlyFullDormReport( int allocationScraperJobId );
 
     /**
-     * Updates the bed count report table for the given job ID.
-     * @param bedCountJobId job ID of the bed count job to use data from
+     * Replaces the bed count report rows for the given date from the current booking assignments.
+     * @param bedCountJobId job ID of the bed count job that refreshed the booking assignments (for logging)
      * @param selectionDate the report date in which to run for
      */
     void runBedCountsReport( int bedCountJobId, LocalDate selectionDate );
-
-    /**
-     * Shadow check while bedcounts move off {@code wp_lh_calendar}: runs the legacy calendar select
-     * and the booking-assignment select for the same date and logs any per-room differences.
-     * Does not write anything.
-     *
-     * @param bedCountJobId job ID of the bed count job whose calendar rows the legacy select uses
-     * @param selectionDate the report date
-     * @return number of rooms whose counts differ
-     */
-    int compareBedCountsWithBookingAssignment( int bedCountJobId, LocalDate selectionDate );
 
     /**
      * Returns the distinct {@code room_id}s of current booking assignments staying within the given
@@ -566,23 +456,6 @@ public interface WordPressDAO {
      * @return non-null list of unmapped room ids
      */
     List<String> fetchUnmappedBookingAssignmentRoomIds( LocalDate fromDate, LocalDate toDate );
-
-    /**
-     * Returns the list of HW/HB reservation IDs for which the deposit amount has not yet been
-     * deducted from the total.
-     * 
-     * @param allocationScraperJobId job ID of the allocation scraper job to use data from
-     * @return non-null list of reservations
-     */
-    List<BookingByCheckinDate> getHostelworldHostelBookersUnpaidDepositReservations( int allocationScraperJobId );
-
-    /**
-     * Returns the checkin dates for all allocations found by the given AllocationScraper job ID.
-     * 
-     * @param jobId allocation scraper job ID
-     * @return list of checkin dates
-     */
-    List<Date> getCheckinDatesForAllocationScraperJobId( int jobId );
 
     /**
      * Inserts a new HW booking.

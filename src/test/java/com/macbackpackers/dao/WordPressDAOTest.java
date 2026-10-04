@@ -1,7 +1,6 @@
 package com.macbackpackers.dao;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -9,16 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.text.ParseException;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.time.FastDateFormat;
@@ -33,9 +27,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-import com.macbackpackers.beans.Allocation;
-import com.macbackpackers.beans.AllocationList;
-import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.Job;
 import com.macbackpackers.beans.JobStatus;
@@ -75,81 +66,6 @@ public class WordPressDAOTest {
     @BeforeEach
     public void setUp() throws Exception {
         //testDAO.deleteAllTransactionalData(); // clear out data
-    }
-
-    @Test
-    public void testInsertAllocation() throws Exception {
-
-        Allocation alloc = createNewAllocation();
-
-        dao.insertAllocation( alloc );
-        assertTrue( alloc.getId() > 0, "ID not assigned" );
-
-        Allocation allocView = dao.fetchAllocation( alloc.getId() );
-        assertEquals( alloc.getEta(), allocView.getEta(), "ETA" );
-        assertEquals( alloc.isViewed(), allocView.isViewed(), "viewed" );
-    }
-
-    @Test
-    public void testInsertAllocationList() throws Exception {
-
-        AllocationList al = new AllocationList();
-        al.add( createNewAllocation() );
-        Allocation alloc = createNewAllocation();
-        alloc.setJobId( 2 );
-        alloc.setRoom( "new room2" );
-        al.add( alloc );
-
-        dao.insertAllocations( al );
-    }
-
-    private Allocation createNewAllocation() throws ParseException {
-        Allocation alloc = new Allocation();
-        alloc.setJobId( 3 );
-        alloc.setRoomId( "15" );
-        alloc.setRoom( "the room" );
-        alloc.setBedName( "the bed" );
-        alloc.setReservationId( 92415 );
-        alloc.setGuestName( "elizabeth" );
-        alloc.setCheckinDate( LocalDate.parse( "2014-04-21" ) );
-        alloc.setCheckoutDate( LocalDate.parse( "2014-05-03" ) );
-        alloc.setPaymentTotal( "14.93" );
-        alloc.setPaymentOutstanding( "3.99" );
-        alloc.setRatePlanName( "super discounted" );
-        alloc.setPaymentStatus( "deposit paid" );
-        alloc.setNumberGuests( 4 );
-        alloc.setDataHref( "http://www.google.com" );
-        alloc.setStatus( "confirmed" );
-        alloc.setBookingReference( "LH-853213853" );
-        alloc.setBookingSource( "hostelworld" );
-        alloc.setBookedDate( DATE_FORMAT_YYYY_MM_DD.parse( "2014-04-20" ) );
-        alloc.setEta( "10:00" );
-        alloc.setNotes( "Multi-line\nnotes" );
-        alloc.setViewed( true );
-        alloc.setCreatedDate( new Timestamp( System.currentTimeMillis() ) );
-        return alloc;
-    }
-
-    @Test
-    public void testUpdateAllocation() throws Exception {
-
-        // first we need an allocation to load
-        Allocation alloc = insertTestAllocation( 3, DATE_FORMAT_YYYY_MM_DD.parse( "2014-05-03" ), "HW" );
-
-        // load it
-        Allocation allocView = dao.fetchAllocation( alloc.getId() );
-
-        // update it
-        allocView.setCheckinDate( DATE_FORMAT_YYYY_MM_DD.parse( "2014-04-26" ) );
-        allocView.setBedName( "Updated bed name" );
-        allocView.setNotes( "Updated notes" );
-        dao.updateAllocation( allocView );
-
-        // view it again
-        allocView = dao.fetchAllocation( alloc.getId() );
-        assertEquals( "2014-04-26", DATE_FORMAT_YYYY_MM_DD.format( allocView.getCheckinDate() ), "checkin date" );
-        assertEquals( "Updated bed name", allocView.getBedName(), "bed name" );
-        assertEquals( "Updated notes", allocView.getNotes(), "notes" );
     }
 
     @Test
@@ -345,63 +261,6 @@ public class WordPressDAOTest {
     }
 
     @Test
-    public void testGetHostelworldHostelBookersUnpaidDepositReservations() throws Exception {
-
-        // setup
-        insertTestAllocation( 3, 10, "Hostelworld", "12.01", "12.01" );
-        insertTestAllocation( 2, 11, "Hostleworld", "12.01", "12.01" );
-        insertTestAllocation( 3, 12, "Hostleworld", "12.01", "4.99" );
-        insertTestAllocation( 1, 13, "Hostelbookers", "12.02", "12.02" );
-        insertTestAllocation( 3, 14, "Hostelbookers", "10.00", "10.00" );
-        insertTestAllocation( 3, 15, "Hostelbookers", "10.00", "5.00" );
-        insertTestAllocation( 3, 16, "Expedia", "22.22", "22.22" );
-
-        // execute
-        List<BookingByCheckinDate> reservations = dao.getHostelworldHostelBookersUnpaidDepositReservations( 3 );
-        reservations.stream().forEach( p ->
-                LOGGER.info( ToStringBuilder.reflectionToString( p ) ) );
-
-        assertEquals( 2, reservations.size(), "size" );
-    }
-
-    @Test
-    public void testQueryAllocationsByJobIdAndReservationId() throws Exception {
-
-        // setup
-        insertTestAllocation( 3, 10, "guest A" );
-        insertTestAllocation( 2, 11, "guest B" );
-        insertTestAllocation( 3, 10, "guest C" );
-        insertTestAllocation( 3, 14, "guest D" );
-        insertTestAllocation( 3, 10, "guest E" );
-        insertTestAllocation( 3, 16, "guest F" );
-
-        // execute
-        assertEquals( 0, dao.queryAllocationsByJobIdAndReservationId( 2, 10 ).size(), "empty list" );
-        assertEquals( 0, dao.queryAllocationsByJobIdAndReservationId( 3, 19 ).size(), "empty list" );
-
-        // execute returned list of size 1
-        List<Allocation> allocs = dao.queryAllocationsByJobIdAndReservationId( 2, 11 );
-        assertEquals( 1, allocs.size(), "size" );
-        assertEquals( "guest B", allocs.get( 0 ).getGuestName(), "allocation name" );
-        assertEquals( 11, allocs.get( 0 ).getReservationId(), "reservation ID" );
-        assertEquals( 2, allocs.get( 0 ).getJobId(), "job ID" );
-
-        // execute returned list of size 3
-        allocs = dao.queryAllocationsByJobIdAndReservationId( 3, 10 );
-        assertEquals( 3, allocs.size(), "size" );
-        for ( Allocation alloc : allocs ) {
-            assertEquals( 10, alloc.getReservationId(), "reservation ID" );
-            assertEquals( 3, alloc.getJobId(), "job ID" );
-        }
-        assertEquals(
-                new HashSet<String>( Arrays.asList( "guest A", "guest C", "guest E" ) ),
-                new HashSet<String>( Arrays.asList(
-                        allocs.get( 0 ).getGuestName(),
-                        allocs.get( 1 ).getGuestName(),
-                        allocs.get( 2 ).getGuestName() ) ), "allocation names" );
-    }
-
-    @Test
     public void testGetLastCompletedJobOfType() {
         HousekeepingJob job = new HousekeepingJob();
         job.setStatus( JobStatus.completed );
@@ -409,21 +268,6 @@ public class WordPressDAOTest {
 
         job = dao.getLastCompletedJobOfType( HousekeepingJob.class );
         assertEquals( jobId, job.getId(), "job id" );
-    }
-
-    @Test
-    public void testGetCheckinDatesForAllocationScraperJobId() throws Exception {
-
-        // first we some test allocations
-        insertTestAllocation( 3, DATE_FORMAT_YYYY_MM_DD.parse( "2014-05-03" ), "HW" );
-        insertTestAllocation( 2, DATE_FORMAT_YYYY_MM_DD.parse( "2014-04-21" ), "HW" ); // different job id
-        insertTestAllocation( 3, DATE_FORMAT_YYYY_MM_DD.parse( "2014-04-20" ), "HW" );
-
-        // execute and verify
-        List<Date> dates = dao.getCheckinDatesForAllocationScraperJobId( 3 );
-        assertEquals( 2, dates.size(), "number of dates" );
-        assertEquals( "2014-04-20", DATE_FORMAT_YYYY_MM_DD.format( dates.get( 0 ) ), "first date" );
-        assertEquals( "2014-05-03", DATE_FORMAT_YYYY_MM_DD.format( dates.get( 1 ) ), "second date" );
     }
 
     @Test
@@ -479,8 +323,6 @@ public class WordPressDAOTest {
         j.setJobEndDate( new Timestamp( now.getTimeInMillis() ) );
         int jobId = dao.insertJob( j );
 
-        insertTestAllocation( jobId, 10, "Hostelworld", "12.01", "12.01" );
-
         now.add( Calendar.DATE, 1 ); // move up a day
         dao.purgeRecordsOlderThan( now.getTime() );
     }
@@ -517,54 +359,10 @@ public class WordPressDAOTest {
         dao.deleteHostelworldBookingsWithArrivalDate( c.getTime() );
     }
 
-    private Allocation createTestAllocation( int jobId, Date checkinDate, String bookingSource ) throws Exception {
-        Allocation alloc = new Allocation();
-        alloc.setJobId( jobId );
-        alloc.setRoomId( "15" );
-        alloc.setRoom( "the room" );
-        alloc.setBedName( "the bed" );
-        alloc.setReservationId( 4 );
-        alloc.setCheckinDate( checkinDate );
-        alloc.setCheckoutDate( DATE_FORMAT_YYYY_MM_DD.parse( "2014-05-03" ) );
-        alloc.setBookingSource( bookingSource );
-        return alloc;
-    }
-
-    private Allocation insertTestAllocation( int jobId, Date checkinDate, String bookingSource ) throws Exception {
-        Allocation alloc = createTestAllocation( jobId, checkinDate, bookingSource );
-        dao.insertAllocation( alloc );
-        assertTrue( alloc.getId() > 0, "ID not assigned" );
-        return alloc;
-    }
-
-    private Allocation insertTestAllocation( int jobId, int reservationId, String guestName ) throws Exception {
-        Allocation alloc = createTestAllocation( jobId, DATE_FORMAT_YYYY_MM_DD.parse( "2014-05-03" ), "HW" );
-        alloc.setReservationId( reservationId );
-        alloc.setGuestName( guestName );
-        dao.insertAllocation( alloc );
-        assertTrue( alloc.getId() > 0, "ID not assigned" );
-        return alloc;
-    }
-
-    private Allocation insertTestAllocation( int jobId, int reservationId, String bookingSource, String paymentTotal, String paymentOutstanding ) throws Exception {
-        Allocation alloc = createTestAllocation( jobId, DATE_FORMAT_YYYY_MM_DD.parse( "2014-05-03" ), bookingSource );
-        alloc.setReservationId( reservationId );
-        alloc.setPaymentTotal( paymentTotal );
-        alloc.setPaymentOutstanding( paymentOutstanding );
-        dao.insertAllocation( alloc );
-        assertTrue( alloc.getId() > 0, "ID not assigned" );
-        return alloc;
-    }
-
     @Test
     public void testGetOption() {
         assertEquals( "Just another WordPress site", dao.getOption( "blogdescription" ) );
         assertEquals( null, dao.getOption( "non.existent.key" ) );
-    }
-
-    @Test
-    public void testDeleteAllocations() {
-        dao.deleteAllocations( 109 );
     }
 
     @Test
@@ -586,21 +384,6 @@ public class WordPressDAOTest {
     }
 
     @Test
-    public void testFetchPrepaidBDCBookingsWithOutstandingBalance() {
-        // find all BDC bookings with unpaid deposits that use a virtual CC
-        // and create a job for each of them
-        dao.fetchPrepaidBDCBookingsWithOutstandingBalance()
-                .stream()
-                // include bookings that are about to arrive (in case we couldn't charge them yet)
-                .filter( p -> p.isChargeableDateInPast() || p.isCheckinDateTodayOrTomorrow() )
-                .forEach( a -> {
-                    LOGGER.info( "Booking " + a.getBookingReference()
-                            + " is chargeable on " + a.getEarliestChargeDate() );
-                    LOGGER.info( ToStringBuilder.reflectionToString( a ) );
-                } );
-    }
-
-    @Test
     public void testFetchGuestComments() throws Exception {
         LOGGER.info( ToStringBuilder.reflectionToString( dao.fetchGuestComments( 10372722 ) ) );
     }
@@ -613,11 +396,6 @@ public class WordPressDAOTest {
     @Test
     public void testRunBedCountsReport() {
         dao.runBedCountsReport( 557130, LocalDate.of( 2023, 8, 26 ) );
-    }
-
-    @Test
-    public void testCompareBedCountsWithBookingAssignment() {
-        dao.compareBedCountsWithBookingAssignment( 557130, LocalDate.of( 2023, 8, 26 ) );
     }
 
     @Test
@@ -637,18 +415,6 @@ public class WordPressDAOTest {
     @Test
     public void testGetOutstandingJobCount() {
         LOGGER.info( dao.getOutstandingJobCount() + " outstanding jobs" );
-    }
-
-    @Test
-    public void testFetchAgodaBookingsMissingNoChargeNote() {
-        final AtomicInteger counter = new AtomicInteger( 0 );
-        dao.fetchAgodaBookingsMissingNoChargeNote()
-                .stream()
-                .forEach( p -> {
-                    LOGGER.info( p.getBookingReference() + " " + p.getGuestComment() );
-                    counter.incrementAndGet();
-                } );
-        LOGGER.info( "Found " + counter + " records" );
     }
 
     @Test

@@ -36,7 +36,7 @@ export const KEY_TABLES = [
   "wp_options",
 ] as const;
 
-/** Still written, but superseded; use the replacement noted in TABLE_NOTES. */
+/** No longer written; use the replacement noted in TABLE_NOTES. */
 export const LEGACY_TABLES = ["wp_lh_calendar"] as const;
 
 const BOOKING_ASSIGNMENT_NOTES =
@@ -60,7 +60,7 @@ export const TABLE_NOTES: Record<string, string> = {
   v_wp_lh_booking_removed:
     "Latest closed version of each guest assignment that no longer has a current row: cancellations, deletions and beds removed from a reservation (reservation_current_yn='Y' means the reservation still has other beds). removed_at is when it was closed. Backfilled cancellations show bed_status canceled/no_show; live cancellations keep their previous status.",
   wp_lh_calendar:
-    "Legacy: per-job allocation snapshots, recent jobs only (no history). Still dual-written by AllocationScraperJob but superseded — use wp_lh_booking_assignment / v_wp_lh_booking_* instead.",
+    "Legacy: per-job allocation snapshots, no longer written (stale, due to be dropped) — use wp_lh_booking_assignment / v_wp_lh_booking_* instead.",
 };
 
 /** One-line pointer for tool descriptions. */

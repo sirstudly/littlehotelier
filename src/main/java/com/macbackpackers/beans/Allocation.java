@@ -1,129 +1,82 @@
 
 package com.macbackpackers.beans;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.List;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.time.FastDateFormat;
-import org.hibernate.type.YesNoConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.macbackpackers.exceptions.UnrecoverableFault;
-
-@Entity
-@Table( name = "wp_lh_calendar" )
+/**
+ * A bed allocation for a stay date range; used for staff (closed) beds read from the room assignments report.
+ */
 public class Allocation {
 
     private final static Logger LOGGER = LoggerFactory.getLogger( Allocation.class );
 
     public static final FastDateFormat DATE_FORMAT_BOOKED_DATE = FastDateFormat.getInstance( "dd-MM-yy" );
 
-    @Id
-    @GeneratedValue( strategy = GenerationType.IDENTITY )
-    @Column( name = "id", nullable = false )
     private int id;
 
-    @Column( name = "job_id", nullable = false )
     private int jobId;
 
-    @Column( name = "room_id" )
     private String roomId;
 
-    @Column( name = "room_type_id", nullable = false )
     private int roomTypeId;
 
-    @Column( name = "room", nullable = false )
     private String room;
 
-    @Column( name = "bed_name" )
     private String bedName;
 
-    @Column( name = "reservation_id" )
     private int reservationId;
 
-    @Column( name = "guest_name" )
     private String guestName;
 
-    @Column( name = "email" )
     private String email;
 
-    @Column( name = "checkin_date" )
     private Date checkinDate;
 
-    @Column( name = "checkout_date" )
     private Date checkoutDate;
 
-    @Column( name = "payment_total" )
     private BigDecimal paymentTotal;
 
-    @Column( name = "payment_outstanding" )
     private BigDecimal paymentOutstanding;
 
-    @Column( name = "visitor_levy_total" )
     private BigDecimal visitorLevyTotal;
 
-    @Column( name = "rate_plan_name" )
     private String ratePlanName;
 
-    @Column( name = "payment_status" )
     private String paymentStatus;
 
-    @Column( name = "num_guests" )
     private int numberGuests;
 
-    @Column( name = "data_href" )
     private String dataHref;
 
-    @Column( name = "lh_status" )
     private String status;
 
-    @Column( name = "booking_reference" )
     private String bookingReference;
 
-    @Column( name = "booking_source" )
     private String bookingSource;
 
-    @Column( name = "hotel_collect_yn" )
-    @Convert(converter = YesNoConverter.class)
     private Boolean hotelCollect;
 
-    @Column( name = "booked_date" )
     private java.util.Date bookedDate;
 
-    @Column( name = "eta" )
     private String eta;
 
-    @Column( name = "notes" )
     private String notes;
 
-    @Column( name = "comments" )
     private String comments;
 
-    @Column( name = "viewed_yn" )
-    @Convert(converter = YesNoConverter.class)
     private Boolean viewed;
 
-    @Column( name = "created_date" )
     private Timestamp createdDate;
 
     public int getId() {
@@ -393,63 +346,6 @@ public class Allocation {
 
     public void setCreatedDate( Timestamp createdDate ) {
         this.createdDate = createdDate;
-    }
-
-    /**
-     * Retrieves the corresponding DB table name for this class based on its annotation.
-     * 
-     * @return table name
-     */
-    public static String getTableName() {
-        for ( Annotation ann : Allocation.class.getAnnotations() ) {
-            if ( ann instanceof Table ) {
-                Table tableAnnotation = (Table) ann;
-                return tableAnnotation.name();
-            }
-        }
-        throw new UnrecoverableFault( "Table annotation not found" );
-    }
-    
-    /**
-     * Returns a comma-delimited list of column names for this object from its annotations.
-     * 
-     * @return column names
-     */
-    public static String getColumnNames() {
-        ArrayList<String> columns = new ArrayList<>();
-        for ( Field field : Allocation.class.getDeclaredFields() ) {
-            for ( Annotation annotation : field.getDeclaredAnnotations() ) {
-                if ( annotation instanceof Column && field.getDeclaredAnnotation( Id.class ) == null ) {
-                    Column columnAnnotation = (Column) annotation;
-                    columns.add( columnAnnotation.name() );
-                }
-            }
-        }
-        return StringUtils.join( columns, "," );
-    }
-
-    /**
-     * Retrieves all fields on this object as a single array in the order specified by its
-     * persistence annotations.
-     * 
-     * @return non-null array
-     */
-    public Object[] getAsParameters() {
-        List<Object> params = new ArrayList<>();
-        for ( Field field : getClass().getDeclaredFields() ) {
-            for ( Annotation annotation : field.getDeclaredAnnotations() ) {
-                // include only those with column annotations which are not the Id
-                if ( annotation instanceof Column && field.getDeclaredAnnotation( Id.class ) == null ) {
-                    try {
-                        params.add( field.get( this ) );
-                    }
-                    catch ( IllegalArgumentException | IllegalAccessException e ) {
-                        throw new UnrecoverableFault( e );
-                    }
-                }
-            }
-        }
-        return params.toArray();
     }
 
     @Override

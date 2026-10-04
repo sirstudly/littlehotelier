@@ -27,8 +27,8 @@ import org.mockito.InOrder;
 
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.jobs.AbstractJob;
+import com.macbackpackers.jobs.AllocationScraperJob;
 import com.macbackpackers.jobs.CalculateEdinburghVisitorLevyForBookingJob;
-import com.macbackpackers.jobs.CloudbedsAllocationScraperWorkerJob;
 import com.macbackpackers.jobs.CreateAllocationScraperReportsJob;
 import com.macbackpackers.jobs.HousekeepingJob;
 import com.macbackpackers.jobs.JobPriorities;
@@ -69,16 +69,16 @@ public class WordPressDAOGetNextJobToProcessTest {
     public void prioritySqlCaseMatchesJavaPriorityOverrides() {
         String sqlCase = JobPriorities.sqlCaseExpression( "j.`classname`" );
         assertTrue( sqlCase.contains( CalculateEdinburghVisitorLevyForBookingJob.class.getName() ) );
-        assertTrue( sqlCase.contains( CloudbedsAllocationScraperWorkerJob.class.getName() ) );
+        assertTrue( sqlCase.contains( AllocationScraperJob.class.getName() ) );
         assertTrue( sqlCase.contains( CreateAllocationScraperReportsJob.class.getName() ) );
         assertEquals( JobPriorities.forClass( CalculateEdinburghVisitorLevyForBookingJob.class ),
                 new CalculateEdinburghVisitorLevyForBookingJob().getPriority() );
-        assertEquals( JobPriorities.forClass( CloudbedsAllocationScraperWorkerJob.class ),
-                new CloudbedsAllocationScraperWorkerJob().getPriority() );
+        assertEquals( JobPriorities.forClass( AllocationScraperJob.class ),
+                new AllocationScraperJob().getPriority() );
         assertEquals( JobPriorities.forClass( CreateAllocationScraperReportsJob.class ),
                 new CreateAllocationScraperReportsJob().getPriority() );
         assertEquals( -1, new CalculateEdinburghVisitorLevyForBookingJob().getPriority() );
-        assertEquals( 99, new CloudbedsAllocationScraperWorkerJob().getPriority() );
+        assertEquals( 99, new AllocationScraperJob().getPriority() );
         assertEquals( 99, new CreateAllocationScraperReportsJob().getPriority() );
         assertEquals( 99, new HousekeepingJob().getPriority() );
         assertEquals( JobPriorities.DEFAULT_PRIORITY,

@@ -1,16 +1,12 @@
 
 package com.macbackpackers.dao;
 
-import com.macbackpackers.beans.Allocation;
-import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BedLock;
 import com.macbackpackers.beans.BedLockViolation;
 import com.macbackpackers.beans.BlacklistEntry;
 import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.BookingSourceLookup;
-import com.macbackpackers.beans.BookingByCheckinDate;
 import com.macbackpackers.beans.BookingReport;
-import com.macbackpackers.beans.BookingWithGuestComments;
 import com.macbackpackers.beans.ConsecutiveBookingPair;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.HostelworldBooking;
@@ -63,7 +59,6 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -72,11 +67,8 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -128,12 +120,7 @@ public class WordPressDAOImpl implements WordPressDAO {
         return "cloudbeds".equalsIgnoreCase( getOption( "hbo_property_manager" ) );
     }
 
-    @Override
-    public void insertAllocation( Allocation alloc ) {
-        em.persist( alloc );
-    }
-
-    /** Rows per multi-value INSERT for allocations (keeps each Tailscale round-trip short). */
+    /** Rows per multi-value write (keeps each Tailscale round-trip short). */
     public static final int ALLOCATION_INSERT_BATCH_SIZE = 100;
 
     /** Rows per multi-value UPSERT for guest comments. */
@@ -151,46 +138,6 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     /** Timeout for other large bulk writes (occupancy / housekeeping). */
     private static final int BULK_PERSIST_TX_TIMEOUT_SECONDS = 300;
-
-    @Override
-    @Transactional( propagation = Propagation.NOT_SUPPORTED )
-    public void insertAllocations( AllocationList allocations ) {
-        if ( allocations == null || allocations.isEmpty() ) {
-            LOGGER.info( "Nothing to update." );
-            return;
-        }
-        TransactionTemplate tt = new TransactionTemplate( transactionManager );
-        tt.setPropagationBehavior( TransactionDefinition.PROPAGATION_REQUIRES_NEW );
-        tt.setTimeout( CHUNK_TX_TIMEOUT_SECONDS );
-        int totalInserted = 0;
-        for ( int from = 0 ; from < allocations.size() ; from += ALLOCATION_INSERT_BATCH_SIZE ) {
-            int to = Math.min( from + ALLOCATION_INSERT_BATCH_SIZE, allocations.size() );
-            AllocationList batch = new AllocationList( allocations.subList( from, to ) );
-            long started = System.currentTimeMillis();
-            try {
-                Integer inserted = tt.execute( status -> {
-                    Query q = em.createNativeQuery( batch.getBulkInsertStatement() );
-                    // Override global jakarta.persistence.query.timeout=60000 for slow Tailscale links
-                    q.setHint( "jakarta.persistence.query.timeout", CHUNK_TX_TIMEOUT_SECONDS * 1000 );
-                    for ( int i = 0 ; i < batch.size() ; i++ ) {
-                        Object[] params = batch.get( i ).getAsParameters();
-                        for ( int j = 0 ; j < params.length ; j++ ) {
-                            q.setParameter( i * params.length + j + 1, params[j] );
-                        }
-                    }
-                    return q.executeUpdate();
-                } );
-                totalInserted += inserted == null ? 0 : inserted;
-                LOGGER.info( "Inserted {}/{} allocation rows ({} ms for batch of {}).",
-                        totalInserted, allocations.size(), System.currentTimeMillis() - started, batch.size() );
-            }
-            catch ( RuntimeException ex ) {
-                LOGGER.error( "Allocation insert failed after {}/{} rows (batch {}-{}, {} ms): {}",
-                        totalInserted, allocations.size(), from, to, System.currentTimeMillis() - started, ex.toString() );
-                throw ex;
-            }
-        }
-    }
 
     @Override
     public void insertBookingReport( List<BookingReport> bookingReport ) {
@@ -235,82 +182,6 @@ public class WordPressDAOImpl implements WordPressDAO {
         return "INSERT INTO " + BookingReport.getTableName() + "(" + columnNames + ") VALUES " +
                 StringUtils.repeat(
                         "(" + StringUtils.repeat( "?", ",", paramCount ) + ")", ",", bookingReport.size() );
-    }
-
-    @Override
-    public Allocation fetchAllocation( int id ) {
-        Allocation alloc = em.find( Allocation.class, id );
-        if ( alloc == null ) {
-            throw new EmptyResultDataAccessException( 1 );
-        }
-        return alloc;
-    }
-
-    @Override
-    public List<String> fetchDistinctBookingsByCheckinDate( int allocationScraperJobId, Date checkinDate ) {
-        return em.createQuery( "SELECT DISTINCT bookingReference FROM Allocation "
-                + "WHERE jobId = :jobId AND reservationId > 0 "
-                + "AND checkinDate = :checkinDate", String.class )
-                .setParameter( "jobId", allocationScraperJobId )
-                .setParameter( "checkinDate", checkinDate )
-                .getResultList();
-    }
-
-    @Override
-    public void updateAllocation( Allocation alloc ) {
-        alloc.setCreatedDate( new Timestamp( System.currentTimeMillis() ) );
-        em.merge( alloc );
-    }
-
-    @Override
-    public void updateAllocationList( AllocationList allocList ) {
-        allocList.setCreatedDate( new Timestamp( System.currentTimeMillis() ) );
-        for ( Allocation a : allocList ) {
-            em.merge( a );
-        }
-    }
-
-    @Override
-    public void deleteAllocations( int jobId ) {
-        int rowsDeleted = em
-            .createQuery( "DELETE Allocation WHERE jobId = :jobId" )
-            .setParameter( "jobId", jobId )
-            .executeUpdate();
-        LOGGER.info( rowsDeleted + " allocation rows deleted." );
-    }
-
-    @Override
-    public void deleteCancelledAllocations( int jobId, Date checkinDateStart, Date checkinDateEnd ) {
-        int rowsDeleted = em
-            .createQuery( "DELETE Allocation "
-                    + "     WHERE jobId = :jobId "
-                    + "       AND status = 'cancelled' "
-                    + "       AND checkinDate >= :checkinDateStart "
-                    + "       AND checkinDate <= :checkinDateEnd" )
-            .setParameter( "jobId", jobId )
-            .setParameter( "checkinDateStart", checkinDateStart )
-            .setParameter( "checkinDateEnd", checkinDateEnd )
-            .executeUpdate();
-        LOGGER.info( rowsDeleted + " allocation rows deleted." );
-    }
-
-    @Override
-    public void updateAllocationJobId( int oldAllocationJobId, int newAllocationJobId ) {
-        int rowsUpdated = em
-                .createQuery( "UPDATE Allocation SET jobId = :newJobId WHERE jobId = :oldJobId" )
-                .setParameter( "oldJobId", oldAllocationJobId )
-                .setParameter( "newJobId", newAllocationJobId )
-                .executeUpdate();
-            LOGGER.info( rowsUpdated + " allocation rows updated." );
-    }
-
-    @Override
-    public AllocationList queryAllocationsByJobIdAndReservationId( int jobId, int reservationId ) {
-        return new AllocationList( em
-                .createQuery( "FROM Allocation WHERE jobId = :jobId AND reservationId = :reservationId", Allocation.class )
-                .setParameter( "jobId", jobId )
-                .setParameter( "reservationId", reservationId )
-                .getResultList() );
     }
 
     @Override
@@ -810,35 +681,6 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @SuppressWarnings( "unchecked" )
     @Override
-    public List<Date> getCheckinDatesForAllocationScraperJobId( int jobId ) {
-        // dates from calendar for a given (allocation scraper) job id
-        // do not include room closures
-        return em.createQuery(
-                "SELECT DISTINCT checkinDate"
-                        + "     FROM Allocation "
-                        + "    WHERE jobId = :jobId"
-                        + "      AND reservationId > 0"
-                        + "    ORDER BY checkinDate" )
-                .setParameter( "jobId", jobId )
-                .getResultList();
-    }
-
-    @Override
-    public List<BookingByCheckinDate> getHostelworldHostelBookersUnpaidDepositReservations( int allocationScraperJobId ) {
-        LOGGER.info( "Querying unpaid reservations for allocation job : " + allocationScraperJobId );
-        return em.createQuery(
-                "SELECT new com.macbackpackers.beans.BookingByCheckinDate(bookingReference, reservationId, checkinDate) " +
-                        "  FROM Allocation " +
-                        "WHERE jobId = :jobId " +
-                        "  AND paymentTotal = paymentOutstanding " +
-                        "  AND bookingSource IN ( 'Hostelworld', 'Hostelbookers', 'Hostelworld Group' ) " +
-                        "GROUP BY reservationId", BookingByCheckinDate.class )
-                .setParameter( "jobId", allocationScraperJobId )
-                .getResultList();
-    }
-
-    @SuppressWarnings( "unchecked" )
-    @Override
     public List<ScheduledJob> fetchActiveScheduledJobs() {
         return em.createQuery(
                 "FROM ScheduledJob WHERE active = true" )
@@ -896,8 +738,7 @@ public class WordPressDAOImpl implements WordPressDAO {
                 "wp_lh_rpt_consecutive_bookings",
                 "wp_lh_rpt_unpaid_deposit",
                 "wp_lh_group_bookings",
-                "wp_lh_rpt_mostly_full_dorms",
-                "wp_lh_calendar" );
+                "wp_lh_rpt_mostly_full_dorms" );
 
         // now delete from jobs
         deleteFromTablesByJobId( specifiedDate, "wp_lh_job_param" );
@@ -1293,31 +1134,6 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
     
     @Override
-    public List<BookingWithGuestComments> fetchPrepaidBDCBookingsWithOutstandingBalance() {
-        Integer allocationScraperJobId = getLastCompletedAllocationScraperJobId();
-        if ( allocationScraperJobId != null ) {
-            return em.createQuery( 
-                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( "
-                    + "           c.reservationId, c.bookingReference, c.checkinDate, c.bookedDate, "
-                    // consolidate notes/comments into the comments field for efficiency
-                    + "           CONCAT( COALESCE( c.notes, '' ), COALESCE( r.comments, '' ) ) ) "
-                    + "  FROM Allocation c "
-                    + "  LEFT OUTER JOIN GuestCommentReportEntry r "
-                    + "    ON c.reservationId = r.reservationId "
-                    + " WHERE c.jobId = :allocationScraperJobId "
-                    + "   AND c.paymentOutstanding > 0"
-                    + "   AND (r.comments LIKE '%You have received a virtual credit card for this reservation%' "
-                    + "     OR c.notes LIKE '%You have received a virtual credit card for this reservation%' "
-                    + "     OR r.comments LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%' "
-                    + "     OR c.notes LIKE '%THIS RESERVATION HAS BEEN PRE-PAID%') "
-                    + "   AND c.bookingSource = 'Booking.com'", BookingWithGuestComments.class )
-                    .setParameter( "allocationScraperJobId", allocationScraperJobId )
-                    .getResultList();
-        }
-        return Collections.emptyList();
-    }
-
-    @Override
     public List<Long> fetchReservationIdsMatchingBlacklist( List<BlacklistEntry> blacklistEntries ) {
         List<String> sqlClauses = new ArrayList<>();
         List<Object> params = new ArrayList<>();
@@ -1347,27 +1163,6 @@ public class WordPressDAOImpl implements WordPressDAO {
             query.setParameter(i + 1, params.get( i ));
         }
         return query.getResultList();
-    }
-
-    @Override
-    public List<BookingWithGuestComments> fetchAgodaBookingsMissingNoChargeNote() {
-        Integer allocationScraperJobId = getLastCompletedAllocationScraperJobId();
-        if ( allocationScraperJobId != null ) {
-            return em.createQuery(
-                    "  SELECT DISTINCT new com.macbackpackers.beans.BookingWithGuestComments( c.reservationId, c.bookingReference, c.checkinDate, c.bookedDate, r.comments ) "
-                            + "  FROM Allocation c "
-                            + " INNER JOIN GuestCommentReportEntry r "
-                            + "    ON c.reservationId = r.reservationId "
-                            + " WHERE c.jobId = :allocationScraperJobId "
-                            + "   AND (IFNULL(r.comments, '') NOT LIKE '%- RONBOT%' "
-                                    + "OR IFNULL(c.notes, '') NOT LIKE '%- RONBOT%')"
-                            + "   AND c.bookingSource = 'Agoda'"
-                            + "   AND c.status = 'confirmed'",
-                    BookingWithGuestComments.class )
-                    .setParameter( "allocationScraperJobId", allocationScraperJobId )
-                    .getResultList();
-        }
-        return Collections.emptyList();
     }
 
     @Override
@@ -1425,50 +1220,10 @@ public class WordPressDAOImpl implements WordPressDAO {
 
         int rowsAdded = em.createNativeQuery( sql.getProperty( getOption( "siteurl" ).contains( "highstreet" )
                                 ? "bedcounts.report.insert.hsh" : "bedcounts.report.insert" )
-                        .replaceAll( "__SQL_SELECT__", sql.getProperty( "bedcounts.report.select" ) ) )
-                .setParameter( "jobId", bedCountJobId )
+                        .replaceAll( "__SQL_SELECT__", sql.getProperty( "bedcounts.report.select.booking.assignment" ) ) )
                 .setParameter( "selectionDate", selectionDate )
                 .executeUpdate();
         LOGGER.info( "Added " + rowsAdded + " records to wp_lh_bedcounts" );
-    }
-
-    @Override
-    @SuppressWarnings( "unchecked" )
-    public int compareBedCountsWithBookingAssignment( int bedCountJobId, LocalDate selectionDate ) {
-        Map<String, List<Object>> legacy = new TreeMap<>();
-        for ( Object[] r : (List<Object[]>) em.createNativeQuery( sql.getProperty( "bedcounts.report.select" ) )
-                .setParameter( "jobId", bedCountJobId )
-                .setParameter( "selectionDate", selectionDate )
-                .getResultList() ) {
-            legacy.put( String.valueOf( r[0] ), bedCountValues( r ) );
-        }
-        Map<String, List<Object>> assignment = new TreeMap<>();
-        for ( Object[] r : (List<Object[]>) em.createNativeQuery( sql.getProperty( "bedcounts.report.select.booking.assignment" ) )
-                .setParameter( "selectionDate", selectionDate )
-                .getResultList() ) {
-            assignment.put( String.valueOf( r[0] ), bedCountValues( r ) );
-        }
-
-        Set<String> rooms = new TreeSet<>( legacy.keySet() );
-        rooms.addAll( assignment.keySet() );
-        int[] legacyTotals = new int[4];
-        int[] assignmentTotals = new int[4];
-        int differences = 0;
-        for ( String room : rooms ) {
-            List<Object> l = legacy.get( room );
-            List<Object> a = assignment.get( room );
-            addBedCountTotals( legacyTotals, l );
-            addBedCountTotals( assignmentTotals, a );
-            if ( false == Objects.equals( l, a ) ) {
-                differences++;
-                LOGGER.warn( "Bedcount shadow diff for {} room {} [empty, staff, paid, noshow]: calendar={} booking_assignment={}",
-                        selectionDate, room, l, a );
-            }
-        }
-        LOGGER.info( "Bedcount shadow compare for {}: {} of {} rooms differ; totals [empty, staff, paid, noshow] "
-                + "calendar={} booking_assignment={}", selectionDate, differences, rooms.size(),
-                Arrays.toString( legacyTotals ), Arrays.toString( assignmentTotals ) );
-        return differences;
     }
 
     @Override
@@ -1482,23 +1237,6 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .setParameter( "fromDate", fromDate )
                 .setParameter( "toDate", toDate )
                 .getResultList();
-    }
-
-    /** num_empty, num_staff, num_paid, num_noshow from a bedcounts select row. */
-    private static List<Object> bedCountValues( Object[] r ) {
-        return Arrays.asList( toInt( r[3] ), toInt( r[4] ), toInt( r[5] ), toInt( r[6] ) );
-    }
-
-    private static int toInt( Object value ) {
-        return value == null ? 0 : ( (Number) value ).intValue();
-    }
-
-    private static void addBedCountTotals( int[] totals, List<Object> values ) {
-        if ( values != null ) {
-            for ( int i = 0; i < totals.length; i++ ) {
-                totals[i] += (Integer) values.get( i );
-            }
-        }
     }
 
     @Override

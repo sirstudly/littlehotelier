@@ -5,9 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.Allocation;
-import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BookingReport;
-import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.beans.MostlyFullDormReportEntry;
 import com.macbackpackers.beans.RoomBed;
@@ -62,7 +60,6 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -86,23 +83,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.TimeUnit;
 
 import static com.macbackpackers.jobs.HostelworldReportPaymentIssueJob.REPORTED_CARD_PAYMENT_ISSUE_NOTE;
 import static com.macbackpackers.scrapers.CloudbedsScraper.NOTE_WILL_POST_AUTOMATICALLY;
@@ -113,7 +104,6 @@ import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_NON_REFUNDAB
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_DECLINED;
 import static com.macbackpackers.scrapers.CloudbedsScraper.TEMPLATE_PAYMENT_LINK;
 import static com.macbackpackers.services.PaymentProcessorService.CHARGE_REMAINING_BALANCE_NOTE;
-import static com.macbackpackers.utils.MDCUtils.wrapWithMDC;
 
 @Service
 public class CloudbedsService {
@@ -180,73 +170,6 @@ public class CloudbedsService {
     private static int LOOKUPKEY_LENGTH = 7;
 
     /**
-     * Dumps the allocations starting on the given date (inclusive).
-     * 
-     * @param webClient web client instance to use
-     * @param jobId the job ID to associate with this dump
-     * @param startDate the start date to check allocations for (inclusive)
-     * @param endDate the end date to check allocations for (exclusive)
-     * @throws IOException on read/write error
-     */
-    public void dumpAllocationsFrom( WebClient webClient, int jobId, LocalDate startDate, LocalDate endDate ) throws IOException {
-        var mdcContext = MDC.getCopyOfContextMap();
-        try {
-            List<Allocation> allocations = Collections.synchronizedList( new ArrayList<>() );
-            List<GuestCommentReportEntry> guestComments = Collections.synchronizedList( new ArrayList<>() );
-
-            // Get reservations list for parallel processing
-            List<Future<List<Allocation>>> futures = scraper.getReservations( webClient, startDate, endDate ).stream()
-                    .map( customer -> ioThreadPool.submit( wrapWithMDC( mdcContext, () -> {
-                        Reservation reservation = scraper.getReservationRetry( webClient, customer.getId() );
-                        return reservationToAllocation( jobId, reservation );
-                    } ) ) )
-                    .toList();
-
-            // Collect results - if ANY fail, the entire operation fails
-            boolean hasError = false;
-            for ( Future<List<Allocation>> future : futures ) {
-                try {
-                    // we need a fairly long timeout; cloudbeds could take a while when multiple requests are sent off at the same time
-                    int requestTimeout = Integer.parseInt( dao.getDefaultOption( "hbo_cloudbeds_request_timeout", "900" ) );
-                    List<Allocation> result = future.get( requestTimeout, TimeUnit.SECONDS ); // Configurable timeout per request
-                    allocations.addAll( result );
-                    result.stream()
-                            .filter( a -> StringUtils.isNotBlank( a.getComments() ) )
-                            .forEach( a -> guestComments.add( new GuestCommentReportEntry( a.getReservationId(), a.getComments() ) ) );
-                }
-                catch ( TimeoutException | InterruptedException | ExecutionException e ) {
-                    LOGGER.error( "Error retrieving reservation", e );
-                    hasError = true;
-                    break; // Exit the loop on first error
-                }
-            }
-
-            // If there was an error, cancel all remaining futures and throw exception
-            if ( hasError ) {
-                for ( Future<List<Allocation>> future : futures ) {
-                    if ( !future.isDone() ) {
-                        future.cancel( true ); // Cancel running tasks
-                    }
-                }
-                throw new IOException( "Error retrieving reservation - operation rolled back" );
-            }
-
-            dao.insertAllocations( new AllocationList( allocations ) );
-            dao.updateGuestCommentsForReservations( guestComments );
-        }
-        finally {
-            // MDC lost as side-effect of calling MDCUtils.wrapWithMDC
-            MDC.setContextMap( mdcContext );
-        }
-
-        // finally, add any staff allocations
-        AllocationList staffAllocations = new AllocationList( getAllStaffAllocations( webClient, startDate ) );
-        staffAllocations.forEach( a -> a.setJobId( jobId ) );
-        LOGGER.info( "Inserting {} staff allocations.", staffAllocations.size() );
-        dao.insertAllocations( staffAllocations );
-    }
-
-    /**
      * Dumps the reservations starting on the given date (inclusive).
      * 
      * @param webClient web client instance to use
@@ -300,29 +223,6 @@ public class CloudbedsService {
         return buildStaffAllocationListTwoDaySpan(
                 retainKnownBeds( staffBedsBefore, roomBedMap ), retainKnownBeds( staffBedsAfter, roomBedMap ),
                 roomBedMap, stayDate, stayDatePlus1, stayDatePlus2 );
-    }
-
-    /**
-     * Finds all staff allocations for the given date. Use this to dump raw "staff" data.
-     * 
-     * @param webClient web client instance to use
-     * @param stayDate the date we're searching on
-     * @return non-null List of all Allocations (blocked/out of service)
-     * @throws IOException on failure
-     */
-    public List<Allocation> getAllStaffAllocationsDaily( WebClient webClient, LocalDate stayDate ) throws IOException {
-
-        List<RoomAssignmentsReportRow> rpt = scraper.getRoomAssignmentsReport( webClient, stayDate );
-        List<String> staffBeds = extractStaffBedsFromRoomAssignmentReport( rpt, stayDate );
-        Map<RoomBedLookup, RoomBed> roomBedMap = dao.fetchAllRoomBeds();
-
-        Optional<RoomBedLookup> missing = findFirstMissingRoomBedLookup( staffBeds, roomBedMap );
-        if ( missing.isPresent() ) {
-            LOGGER.warn( "Missing wp_lh_rooms mapping for '{}'.", missing.get() );
-            syncRoomsFromCloudbeds( webClient );
-            roomBedMap = dao.fetchAllRoomBeds();
-        }
-        return buildStaffAllocationListDaily( retainKnownBeds( staffBeds, roomBedMap ), roomBedMap, stayDate );
     }
 
     /**
@@ -459,23 +359,6 @@ public class CloudbedsService {
                 } );
 
         return bedNameAllocations.values().stream().collect( Collectors.toList() );
-    }
-
-    private List<Allocation> buildStaffAllocationListDaily(
-            List<String> staffBeds, Map<RoomBedLookup, RoomBed> roomBedMap, LocalDate stayDate ) {
-
-        Map<RoomBedLookup, Allocation> bedNameAllocations = new HashMap<>();
-        staffBeds.forEach( bedname -> {
-            BedAssignment bedAssign = roomBedMatcher.parse( bedname );
-            RoomBedLookup lookupKey = new RoomBedLookup( bedAssign.getRoom(), bedAssign.getBedName() );
-            RoomBed rb = roomBedMap.get( lookupKey );
-            Allocation a = createAllocationFromRoomBed( rb );
-            a.setCheckinDate( stayDate );
-            a.setCheckoutDate( stayDate.plusDays( 1 ) );
-            bedNameAllocations.put( lookupKey, a );
-        } );
-
-        return new ArrayList<>( bedNameAllocations.values() );
     }
 
     /**
@@ -1291,51 +1174,6 @@ public class CloudbedsService {
         a.setReservationId( 0 );
         a.setDataHref( "room_closures" ); // for housekeeping page
         return a;
-    }
-
-    /**
-     * Converts a Reservation object (which contains multiple bed assignments) into a List of
-     * Allocation.
-     * 
-     * @param jobId job ID to populate allocation
-     * @param r reservation to be converted
-     * @return non-null list of allocation
-     */
-    private List<Allocation> reservationToAllocation( int jobId, Reservation r ) {
-        
-        // we create one record for each "booking room"
-        return r.getBookingRooms().stream()
-            .map( br -> { 
-                BedAssignment bed = roomBedMatcher.parse( br.getRoomNumber() );
-                Allocation a = new Allocation();
-                a.setBedName( bed.getBedName() );
-                a.setBookedDate( LocalDate.parse( r.getBookingDateHotelTime().substring( 0, 10 ) ) );
-                a.setBookingReference( 
-                        StringUtils.defaultIfBlank( r.getThirdPartyIdentifier(), r.getIdentifier() ) );
-                a.setBookingSource( r.getSourceName() );
-                a.setHotelCollect( r.isHotelCollectBooking() );
-                a.setCheckinDate( LocalDate.parse( br.getStartDate() ) );
-                a.setCheckoutDate( LocalDate.parse( br.getEndDate() ) );
-                a.setDataHref( "/connect/" + scraper.getPropertyId() + "#/reservations/" + r.getReservationId());
-                a.setGuestName( r.getFirstName() + " " + r.getLastName() );
-                a.setEmail( r.getEmail() );
-                a.setJobId( jobId );
-                a.setNumberGuests( r.getAdultsNumber() + r.getKidsNumber() );
-                a.setPaymentOutstanding( r.getBalanceDue() );
-                a.setPaymentTotal( r.getGrandTotal() );
-                a.setVisitorLevyTotal( EdinburghVisitorLevyCalculator.getVisitorLevyTotal( r ) );
-                a.setReservationId( Integer.parseInt( r.getReservationId() ) );
-                a.setRoom( bed.getRoom() );
-                a.setRoomId( br.getRoomId() );
-                a.setRoomTypeId( Integer.parseInt( br.getRoomTypeId() ) );
-                a.setStatus( derivePerBedStatus( r.getStatus(), br ) );
-                a.setViewed( StringUtils.isNotBlank( r.getDocumentNumber() ) ); // hijacking this field to flag whether PII is visible
-                a.setNotes( r.getNotesAsString() );
-                a.setComments( r.getSpecialRequests() );
-                a.setRatePlanName( r.getUsedRoomTypes() );
-                return a;
-            } )
-            .collect( Collectors.toList() );
     }
 
     /**

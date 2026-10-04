@@ -19,8 +19,7 @@ import com.macbackpackers.services.BookingAssignmentEnrichService;
 
 /**
  * Heals {@code wp_lh_booking_assignment} via selective REST, re-fetches the reservations shown in
- * reports displaying notes, dual-writes currents into {@code wp_lh_calendar} under this job id,
- * then queues allocation reports.
+ * reports displaying notes, upserts guest comments, then queues allocation reports.
  * <p>
  * Replaces the former full ~140-day {@code get_reservation} dump via worker jobs.
  */
@@ -41,18 +40,13 @@ public class AllocationScraperJob extends AbstractJob {
     public void processJob() throws Exception {
         LocalDate start = LocalDate.now();
         LocalDate end = getEndLocalDate();
-        enrichService.healAndDualWrite( webClient, getId(), start, end );
+        enrichService.healAndRefreshGuestComments( webClient, getId(), start, end );
         insertCreateReportsJob();
     }
 
     @Override
     public void finalizeJob() {
         webClient.close();
-    }
-
-    @Override
-    public void resetJob() throws Exception {
-        dao.deleteAllocations( getId() );
     }
 
     private void insertCreateReportsJob() {

@@ -25,7 +25,6 @@ public final class JobPriorities {
 
         // Demote; allocation scrapes can wait behind transactional work
         map.put( AllocationScraperJob.class.getName(), 99 );
-        map.put( CloudbedsAllocationScraperWorkerJob.class.getName(), 99 );
         map.put( CreateAllocationScraperReportsJob.class.getName(), 99 );
         map.put( HousekeepingJob.class.getName(), 99 );
         map.put( BookingAssignmentEnrichJob.class.getName(), 99 );

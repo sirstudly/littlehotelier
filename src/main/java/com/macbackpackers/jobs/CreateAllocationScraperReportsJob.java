@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.macbackpackers.beans.JobStatus;
 
 /**
- * Creates report jobs from current {@code wp_lh_booking_assignment} / dual-written calendar
+ * Creates report jobs from current {@code wp_lh_booking_assignment}
  * for a completed {@link AllocationScraperJob} heal.
  */
 @Entity
@@ -18,7 +18,6 @@ public class CreateAllocationScraperReportsJob extends AbstractJob {
     @Override
     @Transactional
     public void processJob() throws Exception {
-        // Worker remapping retired — AllocationScraperJob dual-writes calendar under its own job id.
         insertSplitRoomReportJob();
         insertUnpaidDepositReportJob();
         insertGroupBookingsReportJob();

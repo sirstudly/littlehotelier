@@ -26,8 +26,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import com.macbackpackers.beans.Allocation;
-import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.GuestCommentReportEntry;
 import com.macbackpackers.beans.RoomBed;
@@ -41,7 +39,7 @@ import com.macbackpackers.scrapers.matchers.RoomBedMatcher;
 
 /**
  * REST enrichment and heal for {@link BookingAssignment}: folio fields WS cannot supply,
- * plus dual-write into {@code wp_lh_calendar} for legacy Allocation consumers.
+ * plus the guest comments upsert for the guest comments report.
  */
 @Service
 public class BookingAssignmentEnrichService {
@@ -109,17 +107,17 @@ public class BookingAssignmentEnrichService {
      * REST-fetches only reservations that are missing, never enriched, changed in the list
      * (status / dates / balance / total), starting within the near-term refresh window, or that
      * have in-window currents but are absent from the list (REST decides whether they are gone).
-     * Reservations the list reports as canceled are closed directly. Finally projects all
-     * currents into {@code wp_lh_calendar} under {@code jobId}.
+     * Reservations the list reports as canceled are closed directly. Then refreshes the reservations
+     * shown in the note reports (under {@code jobId}) and upserts current guest comments.
      */
-    public void healAndDualWrite( WebClient webClient, int jobId, LocalDate startDate,
+    public void healAndRefreshGuestComments( WebClient webClient, int jobId, LocalDate startDate,
             LocalDate endDate ) throws IOException {
         LocalDate refreshEnd = startDate.plusDays(
                 Integer.parseInt( dao.getDefaultOption( OPTION_HEAL_REFRESH_DAYS, "14" ) ) );
         Timestamp healStartedAt = new Timestamp( System.currentTimeMillis() );
         heal( webClient, startDate, endDate, refreshEnd );
         refreshNoteReportReservations( webClient, jobId, healStartedAt );
-        dualWriteCalendar( jobId );
+        refreshGuestComments();
     }
 
     /**
@@ -142,7 +140,7 @@ public class BookingAssignmentEnrichService {
     }
 
     /**
-     * Heal as in {@link #healAndDualWrite} without the calendar projection.
+     * Heal as in {@link #healAndRefreshGuestComments} without the note report refresh or comments upsert.
      *
      * @param refreshEnd stays starting on or before this date are always REST-refreshed; null to only
      *            fetch reservations that are missing, never enriched, changed or absent from the list
@@ -337,30 +335,18 @@ public class BookingAssignmentEnrichService {
     }
 
     /**
-     * Projects current booking assignments into {@code wp_lh_calendar} for the given job id
-     * (bridge for blacklist / prepaid queries during migration).
-     * Departed stays are excluded to match the old scraper window (checkout on or after today).
+     * Upserts the comments of current guest assignments checking out today or later into the
+     * guest comments report table.
      */
-    public void dualWriteCalendar( int jobId ) {
-        dao.deleteAllocations( jobId );
-        LocalDate today = LocalDate.now();
-        List<Allocation> rows = new ArrayList<>();
+    public void refreshGuestComments() {
         List<GuestCommentReportEntry> comments = new ArrayList<>();
-        for ( BookingAssignment a : dao.fetchCurrentBookingAssignmentsCheckingOutAfter( today.minusDays( 1 ) ) ) {
-            Allocation alloc = toAllocation( jobId, a );
-            if ( alloc != null ) {
-                rows.add( alloc );
-                if ( StringUtils.isNotBlank( a.getComments() ) && a.getReservationId() != null
-                        && a.getReservationId() > 0 ) {
-                    comments.add( new GuestCommentReportEntry(
-                            a.getReservationId().intValue(), a.getComments() ) );
-                }
+        for ( BookingAssignment a : dao.fetchCurrentBookingAssignmentsCheckingOutAfter( LocalDate.now().minusDays( 1 ) ) ) {
+            if ( StringUtils.isNotBlank( a.getComments() ) && a.getReservationId() != null
+                    && a.getReservationId() > 0 ) {
+                comments.add( new GuestCommentReportEntry( a.getReservationId().intValue(), a.getComments() ) );
             }
         }
-        LOGGER.info( "BookingAssignment dual-write: {} calendar rows for job {}", rows.size(), jobId );
-        if ( false == rows.isEmpty() ) {
-            dao.insertAllocations( new AllocationList( rows ) );
-        }
+        LOGGER.info( "BookingAssignment guest comments: {} reservation(s)", comments.size() );
         if ( false == comments.isEmpty() ) {
             dao.updateGuestCommentsForReservations( comments );
         }
@@ -554,40 +540,6 @@ public class BookingAssignmentEnrichService {
         a.setDataHref( "/connect/" + scraper.getPropertyId() + "#/reservations/" + r.getReservationId() );
         a.setRatePlanName( r.getUsedRoomTypes() );
         return a;
-    }
-
-    private Allocation toAllocation( int jobId, BookingAssignment a ) {
-        if ( a == null ) {
-            return null;
-        }
-        Allocation alloc = new Allocation();
-        alloc.setJobId( jobId );
-        alloc.setRoomId( a.getRoomId() );
-        alloc.setRoom( StringUtils.defaultIfBlank( a.getRoom(), "Unallocated" ) );
-        alloc.setBedName( a.getBedName() );
-        alloc.setRoomTypeId( a.getRoomTypeId() == null ? 0 : a.getRoomTypeId() );
-        if ( a.getReservationId() != null ) {
-            alloc.setReservationId( a.getReservationId().intValue() );
-        }
-        alloc.setGuestName( a.getGuestName() );
-        alloc.setEmail( a.getEmail() );
-        alloc.setCheckinDate( a.getCheckinDate() );
-        alloc.setCheckoutDate( a.getCheckoutDate() );
-        alloc.setPaymentTotal( a.getPaymentTotal() );
-        alloc.setPaymentOutstanding( a.getPaymentOutstanding() );
-        alloc.setVisitorLevyTotal( a.getVisitorLevyTotal() );
-        alloc.setRatePlanName( a.getRatePlanName() );
-        alloc.setNumberGuests( a.getNumberGuests() == null ? 0 : a.getNumberGuests() );
-        alloc.setDataHref( a.getDataHref() );
-        alloc.setStatus( a.getBedStatus() );
-        alloc.setBookingReference( a.getBookingReference() );
-        alloc.setBookingSource( a.getBookingSource() );
-        alloc.setHotelCollect( a.isHotelCollect() );
-        alloc.setBookedDate( a.getBookedDate() );
-        alloc.setNotes( a.getNotes() );
-        alloc.setComments( a.getComments() );
-        alloc.setViewed( a.isViewed() );
-        return alloc;
     }
 
     private void fetchAndApply( WebClient webClient, List<Long> reservationIds ) throws IOException {

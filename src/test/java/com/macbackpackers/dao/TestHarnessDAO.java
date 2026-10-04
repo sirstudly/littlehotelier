@@ -22,7 +22,6 @@ public class TestHarnessDAO {
     @Transactional
     public void deleteAllTransactionalData() {
         em.createNativeQuery( "DELETE FROM wp_lh_rpt_split_rooms" ).executeUpdate();
-        em.createNativeQuery( "DELETE FROM wp_lh_calendar" ).executeUpdate();
         em.createNativeQuery( "DELETE FROM wp_lh_rpt_unpaid_deposit" ).executeUpdate();
 
         // job data

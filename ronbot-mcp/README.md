@@ -119,7 +119,7 @@ RONBOT_SQL_RO_PASSWORD=...
 - `describe_sql_tables`: `property`, optional `table`. Without `table` lists tables and views; with `table` lists its columns. Key and legacy tables carry `notes` (`TABLE_NOTES` in `src/db/adhocSql.ts`) explaining how to query them
 - Booking/stay SQL defaults to the `wp_lh_booking_assignment` views (`src/main/config/migrations/2026-09-26-booking-assignment-views.sql`): `v_wp_lh_booking_reservation` (one row per current reservation, money safe to sum), `v_wp_lh_booking_current` (one row per bed), `v_wp_lh_booking_removed` (cancelled/removed assignments), then `wp_lh_booking_assignment` itself for history and point-in-time queries
 - Key tables (hinted to the agent): `v_wp_lh_booking_reservation`, `v_wp_lh_booking_current`, `v_wp_lh_booking_removed`, `wp_lh_booking_assignment`, `wp_lh_rooms`, `wp_lh_jobs`, `wp_lh_job_param`, `job_scheduler`, `job_scheduler_param`, `wp_booking_lookup_key`, `wp_invoice`, `wp_invoice_notes`, `wp_lh_bedcounts`, `wp_lh_group_bookings`, `wp_lh_housekeeping_bed`, `wp_lh_occupancy`, `wp_lh_rpt_guest_comments`, `wp_lh_rpt_mostly_full_dorms`, `wp_lh_rpt_split_rooms`, `wp_lh_rpt_unpaid_deposit`, `wp_stripe_transaction`, `wp_stripe_tx_refund`, `wp_tx_refund`, `wp_hwl_cancel_booking_exempt`, `wp_options`
-- Legacy tables (still written, superseded): `wp_lh_calendar` (recent allocation snapshots only; use `wp_lh_booking_assignment`)
+- Legacy tables (no longer written, due to be dropped): `wp_lh_calendar` (stale allocation snapshots; use `wp_lh_booking_assignment`)
 - Defunct tables (not for current data): `wp_hw_booking`, `wp_hw_booking_dates`, `wp_pxpost_transaction`, `wp_sagepay_transaction`, `wp_sagepay_tx_auth`, `wp_sagepay_tx_refund`
 
 ## Local development

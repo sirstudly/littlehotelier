@@ -15,12 +15,6 @@ public class BedCountReportJob extends AbstractJob {
 
     public void processJob() throws Exception {
         dao.runBedCountsReport( getBedCountJobId(), getSelectedDate() );
-        try {
-            dao.compareBedCountsWithBookingAssignment( getBedCountJobId(), getSelectedDate() );
-        }
-        catch ( RuntimeException ex ) {
-            LOGGER.error( "Bedcount shadow compare failed; wp_lh_bedcounts is unaffected", ex );
-        }
     }
 
     public int getBedCountJobId() {

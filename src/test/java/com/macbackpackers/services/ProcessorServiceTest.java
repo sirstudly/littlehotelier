@@ -41,7 +41,6 @@ import com.macbackpackers.jobs.BedCountJob;
 import com.macbackpackers.jobs.BookingReportJob;
 import com.macbackpackers.jobs.CancelBookingJob;
 import com.macbackpackers.jobs.ChargeNonRefundableBookingJob;
-import com.macbackpackers.jobs.CloudbedsAllocationScraperWorkerJob;
 import com.macbackpackers.jobs.CopyCardDetailsToCloudbedsJob;
 import com.macbackpackers.jobs.CreateChargeNonRefundableBookingJob;
 import com.macbackpackers.jobs.CreateCopyCardDetailsToCloudbedsJob;
@@ -421,22 +420,6 @@ public class ProcessorServiceTest {
         j.processJob();
     }
     
-    @Test
-    public void testCreateAllocationScraperWorkerJob() throws Exception {
-        // dumps all bookings between date range
-        LocalDate currentDate = LocalDate.parse( "2018-05-25" );
-        LocalDate endDate = LocalDate.parse( "2018-10-06" );
-        while ( currentDate.isBefore( endDate ) ) {
-            CloudbedsAllocationScraperWorkerJob workerJob = new CloudbedsAllocationScraperWorkerJob();
-            workerJob.setStatus( JobStatus.submitted );
-            workerJob.setAllocationScraperJobId( 440052 ); // dbpurge job (no recs)
-            workerJob.setStartDate( currentDate );
-            workerJob.setEndDate( currentDate.plusDays( 7 ) );
-            dao.insertJob( workerJob );
-            currentDate = currentDate.plusDays( 7 ); // calendar page shows 2 weeks at a time
-        }
-    }
-
     @Test
     public void testCreateBookingReportJob() throws Exception {
         // dumps all bookings between date range

@@ -45,7 +45,7 @@ Rules:
   - The backoffice DB is a snapshot scraped from Cloudbeds by jobs; for live booking/folio/availability data use the Cloudbeds tools instead.
   - Booking/stay SQL (counts, stays, nights, channels, money over a date range, history back to 2024):
     - Start from v_wp_lh_booking_reservation (one row per reservation; money safe to sum) or v_wp_lh_booking_current (one row per bed, with room_type). Use wp_lh_booking_assignment for history or "as of" questions, and v_wp_lh_booking_removed for cancellations.
-    - Read describe_sql_tables(table=wp_lh_booking_assignment) notes before writing booking SQL. Never use wp_lh_calendar (legacy, recent snapshots only).
+    - Read describe_sql_tables(table=wp_lh_booking_assignment) notes before writing booking SQL. Never use wp_lh_calendar (legacy, no longer written).
     - Never SUM payment_total / payment_outstanding / visitor_levy_total / num_guests over bed rows — they repeat per bed.
     - "Departed" means checkout_date < CURDATE(), not a bed_status.
     - guest_name, email, notes and comments are NULL for stays checked out more than 2 weeks ago (purged daily for privacy, including history rows); use the Cloudbeds tools for those (search_reservations → reservation ids → reservation_id IN (...) for name-based filters).

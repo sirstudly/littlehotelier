@@ -30,7 +30,6 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import com.macbackpackers.SecretsManagerTestApp;
 import com.macbackpackers.beans.Allocation;
-import com.macbackpackers.beans.AllocationList;
 import com.macbackpackers.dao.WordPressDAO;
 
 /**
@@ -78,26 +77,6 @@ public class CloudbedsServiceTest {
     @Autowired
     @Qualifier( "webClientForCloudbeds" )
     WebClient webClient;
-
-    @Test
-    public void testDumpAllocations() throws Exception {
-        cloudbedsService.dumpAllocationsFrom( webClient, 9042,
-                LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 30 ) );
-    }
-
-    @Test
-    public void testGetAllStaffAllocationsDaily() throws Exception {
-        LocalDate currentDate = LocalDate.parse( "2018-05-25" );
-        LocalDate endDate = LocalDate.parse( "2018-10-13" );
-        while ( currentDate.isBefore( endDate ) ) {
-            AllocationList staffAllocations = new AllocationList(
-                    cloudbedsService.getAllStaffAllocationsDaily( webClient, currentDate ) );
-            staffAllocations.forEach( a -> a.setJobId( 440052 ) );
-            LOGGER.info( "Inserting {} staff allocations.", staffAllocations.size() );
-            dao.insertAllocations( staffAllocations );
-            currentDate = currentDate.plusDays( 1 );
-        }
-    }
 
     @Test
     public void testGetAllStaffAllocations() throws Exception {
