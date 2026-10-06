@@ -70,6 +70,8 @@ public class HostelworldScraper {
 
     private static final String HOSTELWORLD_LOGIN_EXPIRED_SUBJECT = "Hostelworld Login has expired";
 
+    private static final String HOSTELWORLD_INCORRECT_PASSWORD_SUBJECT = "Hostelworld login failed - incorrect password?";
+
     private static final String INBOX_ORIGIN = "https://inbox.hostelworld.com";
 
     private static final Pattern CONTINUE_LOGIN_PATH = Pattern.compile(
@@ -143,6 +145,10 @@ public class HostelworldScraper {
 
         if ( isLoginPage( nextPage ) ) {
             LOGGER.error( nextPage.asXml() );
+            enqueueHostelworldNotificationEmail( HOSTELWORLD_INCORRECT_PASSWORD_SUBJECT,
+                    "Hostelworld rejected the stored login credentials (incorrect username/password?). "
+                    + "Please log in to Hostelworld to confirm the current password, then update it in the backoffice "
+                    + "under Admin > Report Settings  --RONBOT" );
             throw new UnrecoverableFault( "Unable to login to Hostelworld. Incorrect password?" );
         }
 
@@ -172,19 +178,23 @@ public class HostelworldScraper {
     }
 
     private void enqueueHostelworldLoginExpiredEmail() {
-        if ( wordPressDAO.hasRecentSendGmailJobWithSubject( HOSTELWORLD_LOGIN_EXPIRED_SUBJECT, 24 ) ) {
-            LOGGER.info( "Skipping SendGmailJob for expired Hostelworld login; already notified within last 24 hours" );
+        enqueueHostelworldNotificationEmail( HOSTELWORLD_LOGIN_EXPIRED_SUBJECT,
+                "It appears that the Hostelworld credentials have expired. "
+                + "Login to Hostelworld and update the backoffice site under Admin > Report Settings  --RONBOT" );
+    }
+
+    private void enqueueHostelworldNotificationEmail( String subject, String body ) {
+        if ( wordPressDAO.hasRecentSendGmailJobWithSubject( subject, 24 ) ) {
+            LOGGER.info( "Skipping SendGmailJob '{}'; already notified within last 24 hours", subject );
             return;
         }
         SendGmailJob job = new SendGmailJob();
         job.setStatus( JobStatus.submitted );
         job.setToAddress( "me" );
-        job.setSubject( HOSTELWORLD_LOGIN_EXPIRED_SUBJECT );
-        job.setEmailBody( "It appears that the Hostelworld credentials have expired. "
-                + "Login to Hostelworld and update the backoffice site with the new password: "
-                + wordPressDAO.getMandatoryOption( "hbo_backoffice_url" ) + "/admin/report-settings/" );
+        job.setSubject( subject );
+        job.setEmailBody( body );
         wordPressDAO.insertJob( job );
-        LOGGER.info( "Queued SendGmailJob {} for expired Hostelworld login", job.getId() );
+        LOGGER.info( "Queued SendGmailJob {} '{}'", job.getId(), subject );
     }
 
     /**
