@@ -1,0 +1,282 @@
+{
+ "sEcho": "1",
+ "iTotalRecords": 55,
+ "iTotalDisplayRecords": 55,
+ "aaData": [
+  [
+   "05/10/2026 10:06 PM",
+   "System",
+   "<div class=\"activityLog_modify\"></div>Reservation updated via the Cloudbeds Channel Manager <br /><div class=\"activityLogDetails\">Reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r8837578952568\">#8837578952568</a> has been updated via a channel</div>"
+  ],
+  [
+   "05/10/2026 10:06 PM",
+   "System",
+   "<div class=\"activityLog_modify\"></div>Reservation updated via the Cloudbeds Channel Manager <br /><div class=\"activityLogDetails\">Reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r8837578952568\">#8837578952568</a> has been updated via a channel</div>"
+  ],
+  [
+   "05/10/2026 10:06 PM",
+   "System",
+   "<div class=\"activityLog_modify\"></div>Reservation status modified<br /><div class=\"activityLogDetails\">Reservation status modified from Confirmed to Canceled for reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r8837578952568\">#8837578952568</a></div>"
+  ],
+  [
+   "05/10/2026 10:06 PM",
+   "System",
+   "<div class=\"activityLog_delete\"></div>Room assignment removed<br /><div class=\"activityLogDetails\">Room LM 03 Giggles B assignment removed from 20/11/2026 to 22/11/2026 on reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r8837578952568\">#8837578952568</a></div>"
+  ],
+  [
+   "05/10/2026 10:00 PM",
+   "Reception<br />reception@example.com",
+   "<div class=\"activityLog_modify\"></div>Room status modified<br /><div class=\"activityLogDetails\">Room LM 02 Chatterbox T status changed to In-House for reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r7905331903375\">7905331903375</a></div>"
+  ],
+  [
+   "05/10/2026 10:00 PM",
+   "Reception<br />reception@example.com",
+   "<div class=\"activityLog_modify\"></div>Guest Info modified<br /><div class=\"activityLogDetails\"><a href=\"https://hotels.cloudbeds.com/connect/18265#/reservation_record/190133010\">#190133010</a> was modified from a reservation<br />Guest email guest.123456@guest.booking.com<br />Document type changed from \"-\" to \"Driver's License\"<br />Document number was modified.<br />Document country changed from \"\" to \"GB\"</div>"
+  ],
+  [
+   "05/10/2026 08:43 PM",
+   "Manager One<br />manager1@example.com",
+   "<div class=\"activityLog_create\"></div>Daily rate interval added (via calendar)<br /><div class=\"activityLogDetails\">Room types: Bed in 8 Bed Mixed Dorm<br>Interval name: October 2026<br>Start date: 25/10/2026<br>End date: 31/10/2026<br>Min LOS: 1<br>Max LOS: 7<br>Days of week: Sunday (GBP 25.00), Monday (GBP 29.00), Tuesday (GBP 29.00), Wednesday (GBP 29.00), Thursday (GBP 29.00), Friday (GBP 45.00), Saturday (GBP 45.00) <br>Closed to arrival: No<br>Closed to departure: No</div>"
+  ],
+  [
+   "05/10/2026 08:43 PM",
+   "Manager One<br />manager1@example.com",
+   "<div class=\"activityLog_delete\"></div>Daily rate interval removed (via calendar)<br /><div class=\"activityLogDetails\">Room types: Bed in 8 Bed Mixed Dorm<br>Interval name: October 2026<br>Start date: 25/10/2026<br>End date: 31/10/2026<br>Min LOS: 1<br>Max LOS: 7<br>Days of week: Sunday (GBP 29.00), Monday (GBP 29.00), Tuesday (GBP 29.00), Wednesday (GBP 29.00), Thursday (GBP 29.00), Friday (GBP 45.00), Saturday (GBP 45.00) <br>Closed to arrival: No<br>Closed to departure: No</div>"
+  ],
+  [
+   "05/10/2026 08:40 PM",
+   "System",
+   "<div class=\"activityLog_create\"></div>Invoice Created<br /><div class=\"activityLogDetails\">Invoice RMB - 41697 created. Reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r1535393630573\">#1535393630573</a>.</div>"
+  ],
+  [
+   "05/10/2026 08:40 PM",
+   "System",
+   "<div class=\"activityLog_create\"></div>Reservation received via the Cloudbeds Channel Manager <br /><div class=\"activityLogDetails\">Reservation received from Hostelworld for Bed in 10 Bed Female Dorm on 09/11/2026 through 12/11/2026. Reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r1535393630573\"#>1535393630573</a>.</div>"
+  ],
+  [
+   "05/10/2026 08:40 PM",
+   "System",
+   "<div class=\"activityLog_create\"></div>Reservation Created<br /><div class=\"activityLogDetails\">Reservation created via the Cloudbeds Channel Manager with status Confirmed for Bed in 10 Bed Female Dorm on 09/11/2026 through 12/11/2026. Reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r1535393630573\">#1535393630573</a>.</div>"
+  ],
+  [
+   "05/10/2026 08:40 PM",
+   "System",
+   "<div class=\"activityLog_create\"></div>Room assigned<br /><div class=\"activityLogDetails\">Room LM 04 Fun T assigned from 09/11/2026 to 12/11/2026 on reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r1535393630573\">#1535393630573</a></div>"
+  ],
+  [
+   "05/10/2026 08:40 PM",
+   "System",
+   "<div class=\"activityLog_create\"></div>Credit card added<br /><div class=\"activityLogDetails\">Credit card (Visa x1347) added for reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r1535393630573\">#1535393630573</a> from source: OTA</div>"
+  ],
+  [
+   "05/10/2026 08:40 PM",
+   "System",
+   "<div class=\"activityLog_create\"></div>Guest assigned to room<br /><div class=\"activityLogDetails\">Guest <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservation_record/190180480\">#190180480</a> assigned to room 'N/A' on reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/188230061\">#1535393630573</a></div>"
+  ],
+  [
+   "05/10/2026 08:40 PM",
+   "System",
+   "<div class=\"activityLog_create\"></div>Room added<br /><div class=\"activityLogDetails\">Room 1535393630573 (Bed in 10 Bed Female Dorm) from 09/11/2026 to 12/11/2026 was added to reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r1535393630573\">#1535393630573</a></div>"
+  ],
+  [
+   "05/10/2026 08:40 PM",
+   "System",
+   "<div class=\"activityLog_create\"></div>Guest was created<br /><div class=\"activityLogDetails\">Guest <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservation_record/190180480\">#190180480</a> was created</div>"
+  ],
+  [
+   "05/10/2026 08:23 PM",
+   "Manager One<br />manager1@example.com",
+   "<div class=\"activityLog_modify\"></div>Out-of-service block modified<br /><div class=\"activityLogDetails\">Out-of-service block for * 04 Legolas T was modified from 23/10/2026 - 16/11/2026 (Volunteer) to * 06 Bilbo T 23/10/2026 - 16/11/2026 (Volunteer)</div>"
+  ],
+  [
+   "05/10/2026 08:09 PM",
+   "Manager One<br />manager1@example.com",
+   "<div class=\"activityLog_modify\"></div>Credit card edited<br /><div class=\"activityLogDetails\">Credit card edited for reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r9211648941194\">#9211648941194</a></div>"
+  ],
+  [
+   "05/10/2026 08:09 PM",
+   "Manager One<br />manager1@example.com",
+   "<div class=\"activityLog_create\"></div>Payment Added to a Reservation<br /><div class=\"activityLogDetails\">Stripe Processed Payment of GBP 27.54 added to Reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r9211648941194\">#9211648941194</a></div>"
+  ],
+  [
+   "05/10/2026 07:44 PM",
+   "Manager One<br />manager1@example.com",
+   "<div class=\"activityLog_modify\"></div>Room assignment modified<br /><div class=\"activityLogDetails\">Reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r4391399124002\">#4391399124002</a> reassigned from accomodation HW 02 Dobby T to HW 06 Snape T for 06/10/2026 through 08/10/2026</div>"
+  ],
+  [
+   "05/10/2026 07:36 PM",
+   "Manager One<br />manager1@example.com",
+   "<div class=\"activityLog_create\"></div>User switched property<br /><div class=\"activityLogDetails\">User manager1@example.com, \"Manager One\" switched from Royal Mile Backpackers to High Street Hostel</div>"
+  ],
+  [
+   "05/10/2026 07:03 PM",
+   "Reception<br />reception@example.com",
+   "<div class=\"activityLog_view\"></div>Guest sensitive data viewed<br /><div class=\"activityLogDetails\">Guest <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservation_record/188782827\">Guest Name</a> document number viewed</div>"
+  ],
+  [
+   "10/09/2026 09:23 PM",
+   "Reception<br />reception@example.com",
+   "<div class=\"activityLog_create\"></div>Reservation note was created<br /><div class=\"activityLogDetails\">Reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r7256854468260\">#7256854468260</a>.</div>"
+  ],
+  [
+   "10/09/2026 07:46 PM",
+   "Reception<br />reception@example.com",
+   "<div class=\"activityLog_delete\"></div>Out-of-service block removed<br /><div class=\"activityLogDetails\">Out-of-service block for GC 04 Alfred T was removed for 17/09/2026 through 20/09/2026 (Block - do not move)</div>"
+  ],
+  [
+   "10/09/2026 07:26 PM",
+   "Reception<br />reception@example.com",
+   "<div class=\"activityLog_delete\"></div>Payment Attempt Failed<br /><div class=\"activityLogDetails\">Attempted Payment Failed: GBP 144.90 on Reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r1437780580125\">#1437780580125</a></div>"
+  ],
+  [
+   "10/09/2026 07:25 PM",
+   "Reception<br />reception@example.com",
+   "<div class=\"activityLog_modify\"></div>Credit card status changed<br /><div class=\"activityLogDetails\">Credit card (Visa x6825) status changed to active for reservation <a href=\"https://hotels.cloudbeds.com/connect/18265#/reservations/r1437780580125\">1437780580125</a></div>"
+  ],
+  [
+   "05/10/2026 11:58 PM",
+   "Bot User<br />bot@example.com",
+   "<div class=\"activityLog_delete\"></div>Reservation note was archived<br /><div class=\"activityLogDetails\">Reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r1263212398182\">#1263212398182</a>. Original note: \"Non-Refundable Charge Successful email sent.\"</div>"
+  ],
+  [
+   "05/10/2026 11:57 PM",
+   "Bot User<br />bot@example.com",
+   "<div class=\"activityLog_create\"></div>Tax added to a reservation<br /><div class=\"activityLogDetails\">Tax Edinburgh Visitor Levy GBP 0.30 was added to reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r1263212398182\">#1263212398182</a> </div>"
+  ],
+  [
+   "05/10/2026 11:57 PM",
+   "System",
+   "<div class=\"activityLog_accept\"></div>Guest accepted the terms & conditions<br /><div class=\"activityLogDetails\">Guest Jane Doe (jane.doe@example.com) accepted the terms and conditions at booking. Policy: custom policy. Accepted at 2026-10-05T22:57:05+00:00 (UTC) / 2026-10-05T23:57:05+01:00 (property time).</div>"
+  ],
+  [
+   "05/10/2026 11:57 PM",
+   "System",
+   "<div class=\"activityLog_create\"></div>Payment Pending Approval added to folio.<br /><div class=\"activityLogDetails\">Payment pending guest's approval was added to <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r8689445922276\">8689445922276</a>. Payment will be processed and posted when guest approves.</div>"
+  ],
+  [
+   "05/10/2026 11:46 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_create\"></div>Out-of-service block created<br /><div class=\"activityLogDetails\">Out-of-service block for 13-08- Pecan was created for 02/10/2026 through 06/10/2026 (Staff)</div>"
+  ],
+  [
+   "05/10/2026 11:31 PM",
+   "Bot User<br />bot@example.com",
+   "<div class=\"activityLog_delete\"></div>Tax removed from a reservation<br /><div class=\"activityLogDetails\">Tax Edinburgh Visitor Levy  was removed from reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r4518970584700\">#4518970584700</a></div>"
+  ],
+  [
+   "04/10/2026 10:45 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_modify\"></div>Reservation note was edited<br /><div class=\"activityLogDetails\">Reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r5698844246515\">#5698844246515</a>. Original note: \"Cancelled.\"</div>"
+  ],
+  [
+   "04/10/2026 10:44 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_modify\"></div>Reservation Reassigned to new room type<br /><div class=\"activityLogDetails\">Room reassigned from 12 Bed Mixed Dormitory to PAID BED for <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r5698844246515\">5698844246515</a>.<br />Room rate changed from GBP 24.03 to GBP 24.03.</div>"
+  ],
+  [
+   "04/10/2026 10:44 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_delete\"></div>Room removed from reservation<br /><div class=\"activityLogDetails\">Room 5698844246515 (12 Bed Mixed Dormitory) from 04/10/2026 to 05/10/2026 was removed from reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r5698844246515\">#5698844246515</a></div>"
+  ],
+  [
+   "04/10/2026 10:27 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_modify\"></div>Reservation dates modified<br /><div class=\"activityLogDetails\">End date for reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r6729504969835\">#6729504969835</a> modified from 05/10/2026 to 07/10/2026</div>"
+  ],
+  [
+   "04/10/2026 10:26 PM",
+   "System",
+   "<div class=\"activityLog_failed\"></div>Auto-assign failed<br /><div class=\"activityLogDetails\">Auto-assign failed because there was no continuous availability for N/A type during these dates (2026-11-19 - 2026-11-21).</div>"
+  ],
+  [
+   "04/10/2026 10:25 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_linking\"></div>Guest Linked to Person Profile<br /><div class=\"activityLogDetails\">Guest <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservation_record/190092356\">#190092356</a> was linked to person profile 277701749723281</div>"
+  ],
+  [
+   "04/10/2026 07:30 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_modify\"></div>Room modified<br /><div class=\"activityLogDetails\">Room 6400725012111 (10 Bed Mixed Dormitory) was modified on reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r6400725012111\">#6400725012111</a>:<br />End date: from 16/10/2026 to 15/10/2026<br/></div>"
+  ],
+  [
+   "04/10/2026 06:58 PM",
+   "Bot User<br />bot@example.com",
+   "<div class=\"activityLog_create\"></div>Adjustment added to a reservation<br /><div class=\"activityLogDetails\">Adjustment of GBP 2.80 added to reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r9291757150780\">#9291757150780</a></div>"
+  ],
+  [
+   "04/10/2026 06:17 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_create\"></div>Single room block created<br /><div class=\"activityLogDetails\">Single room block for 11-03-Up & Down was created for 05/10/2026 through 06/10/2026 (Guest leaving on 05/10)</div>"
+  ],
+  [
+   "04/10/2026 06:17 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_delete\"></div>Single room block removed<br /><div class=\"activityLogDetails\">Single room block for 11-03-Up & Down was removed for 05/10/2026 through 06/10/2026 (Guest leaving on 07/10)</div>"
+  ],
+  [
+   "04/10/2026 06:16 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_modify\"></div>Single room block modified<br /><div class=\"activityLogDetails\">Single room block for 11-03-Up & Down was modified from 06/10/2026 - 07/10/2026 (Guest leaving on 07/10) to 11-03-Up & Down 05/10/2026 - 06/10/2026 (Guest leaving on 07/10)</div>"
+  ],
+  [
+   "04/10/2026 12:33 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_view\"></div>Reservation sensitive data viewed<br /><div class=\"activityLogDetails\">Opened invoice containing sensitive data. Invoice 130400, reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r1568513150270\">#1568513150270</a>.</div>"
+  ],
+  [
+   "04/10/2026 11:59 AM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_send\"></div>Email Manually Sent<br /><div class=\"activityLogDetails\">Email composed for reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r8889407785921\">#8889407785921</a> was manually sent using email template <a href='https://macbackpackers.cloudbeds.com/connect/17363#/email_templates/103870'>Reservation Confirmed</a></div>"
+  ],
+  [
+   "04/10/2026 09:56 AM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_delete\"></div>Payment Removed from a Reservation<br /><div class=\"activityLogDetails\">Void Payment of GBP 120.00 removed from Reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r4809006551852\">#4809006551852</a></div>"
+  ],
+  [
+   "04/10/2026 07:46 AM",
+   "Bot User<br />bot@example.com",
+   "<div class=\"activityLog_create\"></div>Refund Added to a Reservation<br /><div class=\"activityLogDetails\"> Credit Card Refund of GBP 23.63 added to Reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r7024618162442\">#7024618162442</a></div>"
+  ],
+  [
+   "04/10/2026 05:16 AM",
+   "System",
+   "<div class=\"activityLog_delete_details\"></div>Credit card details deleted<br /><div class=\"activityLogDetails\">Credit card details removed from system on 2026-10-04 05:16:52 due to a 14 days after checkout on 2026-09-20 01:00:00. See <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r7775841864214\">7775841864214</a>.</div>"
+  ],
+  [
+   "03/10/2026 08:19 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_modify\"></div>Reservation reassigned to new room type<br /><div class=\"activityLogDetails\">Room reassigned from 4 Bed Female Dormitory to Splits for <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r1176176932510\">1176176932510</a>.<br />Rate change compensated</div>"
+  ],
+  [
+   "03/10/2026 11:32 AM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_send\"></div>Invoice sent<br /><div class=\"activityLogDetails\">The following documents:<br>Invoice 130869<br><br>were sent to:<br>invoices@example.com<br><br>Reservation: <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r8042541343158\">8042541343158</a></div>"
+  ],
+  [
+   "03/10/2026 11:32 AM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_create\"></div>Guest added to a reservation<br /><div class=\"activityLogDetails\">Guest <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservation_record/189962845\">#189962845</a> to a Reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r8042541343158\">#8042541343158</a></div>"
+  ],
+  [
+   "02/10/2026 09:49 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_create\"></div>User is logged in<br /><div class=\"activityLogDetails\">User manager2@example.com, \"Manager Two\" is logged in</div>"
+  ],
+  [
+   "02/10/2026 09:49 PM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_create\"></div>User is logged out<br /><div class=\"activityLogDetails\">User manager2@example.com, \"Manager Two\" is logged out</div>"
+  ],
+  [
+   "02/10/2026 05:29 PM",
+   "Bot User<br />bot@example.com",
+   "<div class=\"activityLog_delete\"></div>Adjustment removed from a reservation<br /><div class=\"activityLogDetails\">Adjustment of -GBP 0.03 removed from reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r5408363494961\">#5408363494961</a></div>"
+  ],
+  [
+   "02/10/2026 10:03 AM",
+   "Manager Two<br />manager2@example.com",
+   "<div class=\"activityLog_modify\"></div>Payment Refund from a Reservation<br /><div class=\"activityLogDetails\">Stripe Processed Refund of GBP 63.00 added to Reservation <a href=\"https://macbackpackers.cloudbeds.com/connect/17363#/reservations/r8046211518515\">#8046211518515</a></div>"
+  ]
+ ]
+}

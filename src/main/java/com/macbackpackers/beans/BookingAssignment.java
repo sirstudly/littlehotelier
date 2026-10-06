@@ -105,6 +105,10 @@ public class BookingAssignment {
     @Column( name = "booking_reference" )
     private String bookingReference;
 
+    /** REST-enriched Cloudbeds reservation identifier (booking_reference holds the channel ref when present). */
+    @Column( name = "reservation_identifier" )
+    private String reservationIdentifier;
+
     @Column( name = "booking_source" )
     private String bookingSource;
 
@@ -333,6 +337,14 @@ public class BookingAssignment {
         this.bookingReference = bookingReference;
     }
 
+    public String getReservationIdentifier() {
+        return reservationIdentifier;
+    }
+
+    public void setReservationIdentifier( String reservationIdentifier ) {
+        this.reservationIdentifier = reservationIdentifier;
+    }
+
     public String getBookingSource() {
         return bookingSource;
     }
@@ -476,6 +488,9 @@ public class BookingAssignment {
         if ( bookingReference == null ) {
             bookingReference = previous.bookingReference;
         }
+        if ( reservationIdentifier == null ) {
+            reservationIdentifier = previous.reservationIdentifier;
+        }
         if ( visitorLevyTotal == null ) {
             visitorLevyTotal = previous.visitorLevyTotal;
         }
@@ -509,6 +524,9 @@ public class BookingAssignment {
         bookedDate = rest.bookedDate;
         setRatePlanName( rest.ratePlanName );
         bookingReference = rest.bookingReference;
+        if ( rest.reservationIdentifier != null ) {
+            reservationIdentifier = rest.reservationIdentifier;
+        }
         visitorLevyTotal = rest.visitorLevyTotal;
         comments = rest.comments;
         if ( rest.viewed != null ) {
@@ -563,7 +581,7 @@ public class BookingAssignment {
             "reservation_id", "room_id", "room", "bed_name", "room_type_id", "guest_name", "email",
             "checkin_date", "checkout_date", "bed_status", "in_house_yn", "source", "payment_total",
             "payment_outstanding", "visitor_levy_total", "rate_plan_name", "num_guests", "booking_reference",
-            "booking_source", "hotel_collect_yn", "booked_date", "notes", "comments", "data_href", "viewed_yn",
+            "reservation_identifier", "booking_source", "hotel_collect_yn", "booked_date", "notes", "comments", "data_href", "viewed_yn",
             "last_rest_fetched_at", "valid_from", "valid_to" };
 
     /**
@@ -581,7 +599,7 @@ public class BookingAssignment {
     public Object[] getInsertParameters() {
         return new Object[] { assignmentKey, calendarEventId, bookingRoomsId, reservationId, roomId, room, bedName,
                 roomTypeId, guestName, email, checkinDate, checkoutDate, bedStatus, inHouseYn, source, paymentTotal,
-                paymentOutstanding, visitorLevyTotal, ratePlanName, numberGuests, bookingReference, bookingSource,
+                paymentOutstanding, visitorLevyTotal, ratePlanName, numberGuests, bookingReference, reservationIdentifier, bookingSource,
                 toYesNo( hotelCollect ), bookedDate, notes, comments, dataHref, toYesNo( viewed ), lastRestFetchedAt,
                 validFrom, validTo };
     }

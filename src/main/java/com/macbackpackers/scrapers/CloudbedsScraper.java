@@ -51,6 +51,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -273,9 +274,27 @@ public class CloudbedsScraper {
      * @throws MissingUserDataException if reservation not found
      */
     public Reservation getReservation( WebClient webClient, String reservationId ) throws IOException {
+        return getReservation( webClient, reservationId, false );
+    }
+
+    /**
+     * Loads the given reservation by identifier (the number shown under the guest name,
+     * as referenced in the activity log).
+     * 
+     * @param webClient web client instance to use
+     * @param identifier reservation identifier
+     * @return the loaded reservation (not-null)
+     * @throws IOException on load failure
+     * @throws MissingUserDataException if reservation not found
+     */
+    public Reservation getReservationByIdentifier( WebClient webClient, String identifier ) throws IOException {
+        return getReservation( webClient, identifier, true );
+    }
+
+    private Reservation getReservation( WebClient webClient, String id, boolean isIdentifier ) throws IOException {
 
         Reservation r = doRequestErrorOnFailure( webClient, jsonRequestFactory.createGetReservationRequest(
-                reservationId, getBillingPortalId( webClient ), getFrontVersion( webClient ) ), Reservation.class,
+                id, isIdentifier, getBillingPortalId( webClient ), getFrontVersion( webClient ) ), Reservation.class,
                 ( resv, jsonResponse ) -> {
                     // need to parse the credit_cards object manually to check for presence
                     JsonObject rootElem = fromJson( jsonResponse, JsonObject.class );
@@ -324,20 +343,6 @@ public class CloudbedsScraper {
             }
         }
         throw new IORuntimeException( "Max attempts made to retrieve reservation " + reservationId );
-    }
-
-    /**
-     * Retrieve all customers between the given checkin dates (inclusive).
-     * 
-     * @param webClient web client instance to use
-     * @param checkinDateStart checkin date start
-     * @param checkinDateEnd checkin date end (inclusive)
-     * @return non-null customer list
-     * @throws IOException on page load failure
-     */
-    public List<Customer> getCustomers( WebClient webClient, LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetCustomersRequest(
-                checkinDateStart, checkinDateEnd ) );
     }
 
     /**
@@ -500,20 +505,26 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Get all customers/reservations using the given request.
+     * Get all customers/reservations, paging through the results.
      * 
      * @param webClient web client instance to use
-     * @param requestSettings request details
-     * @return non-null list of customer reservations
+     * @param requestForStart creates the request for the page starting at the given row offset
+     * @return non-null list of customer reservations (unique by id)
      * @throws IOException
      */
-    private List<Customer> getCustomers( WebClient webClient, WebRequest requestSettings ) throws IOException {
-        JsonObject jobject = doRequest( webClient, requestSettings );
-        JsonArray jarray = jobject.getAsJsonArray( "aaData" );
-        if ( null == jarray ) {
-            throw new MissingUserDataException( "Failed to retrieve reservations." );
+    private List<Customer> getCustomers( WebClient webClient, DataTablesRequestFactory requestForStart ) throws IOException {
+        Map<String, Customer> results = new LinkedHashMap<>();
+        for ( JsonElement row : DataTablesPaging.fetchAllRows( start -> doRequest( webClient, requestForStart.create( start ) ) ) ) {
+            Customer c = gson.fromJson( row, Customer.class );
+            results.putIfAbsent( c.getId(), c );
         }
-        return Arrays.asList( gson.fromJson( jarray, Customer[].class ) );
+        return new ArrayList<>( results.values() );
+    }
+
+    /** Creates a DataTables request for the page starting at the given row offset. */
+    @FunctionalInterface
+    private interface DataTablesRequestFactory {
+        WebRequest create( int displayStart ) throws IOException;
     }
 
     /**
@@ -1483,10 +1494,12 @@ public class CloudbedsScraper {
     public List<Reservation> getCancelledReservationsForBookingSources( WebClient webClient,
             LocalDate checkinDateStart, LocalDate checkinDateEnd, LocalDate cancelDateStart, 
             LocalDate cancelDateEnd, String ... sourceNames ) throws IOException {
-        return getCustomers( webClient, jsonRequestFactory.createGetCancelledReservationsRequestByBookingSource(
+        String bookingSourceIds = lookupBookingSourceIds( webClient, sourceNames );
+        String billingPortalId = getBillingPortalId( webClient );
+        String frontVersion = getFrontVersion( webClient );
+        return getCustomers( webClient, start -> jsonRequestFactory.createGetCancelledReservationsRequestByBookingSource(
                 checkinDateStart, checkinDateEnd, cancelDateStart, cancelDateEnd,
-                lookupBookingSourceIds( webClient, sourceNames ),
-                getBillingPortalId( webClient ), getFrontVersion( webClient ) ) )
+                bookingSourceIds, start, billingPortalId, frontVersion ) )
                         .stream()
                         .map( c -> getReservationRetry( webClient, c.getId() ) )
                         .collect( Collectors.toList() );
@@ -1631,7 +1644,7 @@ public class CloudbedsScraper {
     }
 
     /**
-     * Returns the activity log for the given reservation.
+     * Returns the activity log for the given reservation (newest first).
      * 
      * @param webClient web client instance to use
      * @param identifier the cloudbeds unique id (under the reservation name)
@@ -1639,24 +1652,27 @@ public class CloudbedsScraper {
      * @throws IOException
      */
     public List<ActivityLogEntry> getActivityLog( WebClient webClient, String identifier ) throws IOException {
-        WebRequest requestSettings = jsonRequestFactory.createGetActivityLog( identifier, getBillingPortalId( webClient ), getFrontVersion( webClient ) );
-        JsonObject jobject = doRequest( webClient, requestSettings );
+        String billingPortalId = getBillingPortalId( webClient );
+        String frontVersion = getFrontVersion( webClient );
+        return ActivityLogParser.parse( DataTablesPaging.fetchAllRows( start -> doRequest( webClient,
+                jsonRequestFactory.createGetActivityLog( identifier, start, billingPortalId, frontVersion ) ) ) );
+    }
 
-        final DateTimeFormatter DD_MM_YYYY_HH_MM = DateTimeFormatter.ofPattern( "dd/MM/yyyy hh:mm a", new Locale( "en" ) );
-        List<ActivityLogEntry> logEntries = new ArrayList<ActivityLogEntry>();
-        jobject.get( "aaData" ).getAsJsonArray().forEach( e -> {
-            ActivityLogEntry ent = new ActivityLogEntry();
-            try {
-                ent.setCreatedDate( LocalDateTime.parse( e.getAsJsonArray().get( 0 ).getAsString(), DD_MM_YYYY_HH_MM ) );
-                ent.setCreatedBy( e.getAsJsonArray().get( 1 ).getAsString() );
-            }
-            catch ( DateTimeParseException ex ) {
-                throw new RuntimeException( "Failed to parse activity log entry: " + e.getAsJsonArray().get( 0 ).getAsString() );
-            }
-            ent.setContents( e.getAsJsonArray().get( 2 ).getAsString() );
-            logEntries.add( ent );
-        } );
-        return logEntries;
+    /**
+     * Returns the property-wide activity log between the given times. Entry timestamps are UTC.
+     * 
+     * @param webClient web client instance to use
+     * @param from start of window (inclusive, on a half-hour boundary)
+     * @param to end of window (on a half-hour boundary)
+     * @return list of activity log entries (an entry logged exactly on a half-hour boundary may appear twice)
+     * @throws IOException
+     * @throws IllegalArgumentException if from/to are not on a half-hour boundary
+     */
+    public List<ActivityLogEntry> getActivityLog( WebClient webClient, Instant from, Instant to ) throws IOException {
+        String billingPortalId = getBillingPortalId( webClient );
+        String frontVersion = getFrontVersion( webClient );
+        return ActivityLogParser.parse( DataTablesPaging.fetchActivityLogRows( ( f, t, start ) -> doRequest( webClient,
+                jsonRequestFactory.createGetPropertyActivityLog( f, t, start, billingPortalId, frontVersion ) ), from, to ) );
     }
     
     /**

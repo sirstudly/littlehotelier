@@ -848,6 +848,13 @@ public interface WordPressDAO {
     int closeBookingAssignmentsForReservation( long reservationId );
 
     /**
+     * Closes all current guest versions for a Cloudbeds reservation identifier.
+     *
+     * @return number of rows closed
+     */
+    int closeBookingAssignmentsForReservationIdentifier( String reservationIdentifier );
+
+    /**
      * Reconcile: desired currents replace existing currents within the snapshot window.
      * Currents missing from {@code desiredCurrents} are only closed when their stay overlaps
      * {@code [windowStart, windowEnd]} (rows outside the WS snapshot horizon are maintained by
@@ -873,16 +880,6 @@ public interface WordPressDAO {
      * Distinct reservation ids among current guest assignments with null {@code last_rest_fetched_at}.
      */
     List<Long> fetchReservationIdsNeedingRestEnrich();
-
-    /**
-     * Reservations shown in a report that displays notes (split rooms, unpaid deposit, group bookings
-     * and mostly full dorms stamped with {@code jobId}, plus the live guest comments and bottom bunks
-     * reports) whose current rows were last REST-fetched before {@code fetchedBefore}.
-     *
-     * @param jobId allocation scraper job id the report tables were populated for
-     * @param fetchedBefore reservations REST-fetched on or after this time are skipped
-     */
-    List<Long> fetchStaleNoteReportReservationIds( int jobId, Date fetchedBefore );
 
     /**
      * Booking sources with a commission divisor valid on {@code asOf}.

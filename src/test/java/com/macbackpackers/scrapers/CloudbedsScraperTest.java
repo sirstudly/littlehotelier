@@ -125,13 +125,6 @@ public class CloudbedsScraperTest {
     }
 
     @Test
-    public void testGetCustomers() throws Exception {
-        List<Customer> results = cloudbedsScraper.getCustomers( webClient, 
-                LocalDate.now().withDayOfMonth( 4 ), LocalDate.now().withDayOfMonth( 5 ) );
-        results.forEach( t -> LOGGER.info( t.toString() ) );
-    }
-
-    @Test
     public void testGetReservations() throws Exception {
         List<Customer> results = cloudbedsScraper.getReservations( webClient, 
                 LocalDate.now().withDayOfMonth( 1 ), LocalDate.now().withDayOfMonth( 2 ) );

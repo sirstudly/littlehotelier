@@ -56,9 +56,6 @@ public class BookingAssignmentEnrichService {
 
     private static final String STATUS_CHECKED_OUT = "checked_out";
 
-    /** Stays starting within this many days are REST-refreshed every heal (catches room moves). */
-    static final String OPTION_HEAL_REFRESH_DAYS = "hbo_booking_assignment_heal_refresh_days";
-
     private static final long ROOMS_CACHE_MILLIS = TimeUnit.MINUTES.toMillis( 10 );
 
     private volatile Map<String, RoomBed> roomsByIdCache;
@@ -105,42 +102,9 @@ public class BookingAssignmentEnrichService {
     /**
      * Heal: one light reservation list for [start, end], compared against current assignments.
      * REST-fetches only reservations that are missing, never enriched, changed in the list
-     * (status / dates / balance / total), starting within the near-term refresh window, or that
+     * (status / dates / balance / total), starting on or before {@code refreshEnd}, or that
      * have in-window currents but are absent from the list (REST decides whether they are gone).
-     * Reservations the list reports as canceled are closed directly. Then refreshes the reservations
-     * shown in the note reports (under {@code jobId}) and upserts current guest comments.
-     */
-    public void healAndRefreshGuestComments( WebClient webClient, int jobId, LocalDate startDate,
-            LocalDate endDate ) throws IOException {
-        LocalDate refreshEnd = startDate.plusDays(
-                Integer.parseInt( dao.getDefaultOption( OPTION_HEAL_REFRESH_DAYS, "14" ) ) );
-        Timestamp healStartedAt = new Timestamp( System.currentTimeMillis() );
-        heal( webClient, startDate, endDate, refreshEnd );
-        refreshNoteReportReservations( webClient, jobId, healStartedAt );
-        refreshGuestComments();
-    }
-
-    /**
-     * Heal doesn't re-fetch a reservation when only its notes change, so before the report jobs run,
-     * REST-fetches every reservation that appears in a report showing notes and wasn't fetched since
-     * {@code healStartedAt}. The report tables are populated here under {@code jobId} only to find
-     * those reservations; the report jobs regenerate them afterwards.
-     */
-    public void refreshNoteReportReservations( WebClient webClient, int jobId, Timestamp healStartedAt )
-            throws IOException {
-        dao.runSplitRoomsReservationsReport( jobId );
-        dao.runUnpaidDepositReport( jobId );
-        dao.runGroupBookingsReport( jobId );
-        dao.runMostlyFullDormReport( jobId );
-        List<Long> reservationIds = dao.fetchStaleNoteReportReservationIds( jobId, healStartedAt );
-        LOGGER.info( "BookingAssignment note report refresh: fetching {} reservations", reservationIds.size() );
-        if ( false == reservationIds.isEmpty() ) {
-            fetchAndApply( webClient, reservationIds );
-        }
-    }
-
-    /**
-     * Heal as in {@link #healAndRefreshGuestComments} without the note report refresh or comments upsert.
+     * Reservations the list reports as canceled are closed directly.
      *
      * @param refreshEnd stays starting on or before this date are always REST-refreshed; null to only
      *            fetch reservations that are missing, never enriched, changed or absent from the list
@@ -508,6 +472,7 @@ public class BookingAssignmentEnrichService {
                 + ( r.getKidsNumber() == null ? 0 : r.getKidsNumber() ) );
         a.setNotes( r.getNotesAsString() );
         a.setBookingReference( StringUtils.defaultIfBlank( r.getThirdPartyIdentifier(), r.getIdentifier() ) );
+        a.setReservationIdentifier( StringUtils.trimToNull( r.getIdentifier() ) );
         a.setBedStatus( CloudbedsService.derivePerBedStatus( r.getStatus(), br ) );
         a.setInHouse( br.isInHouse() );
         a.setCheckinDate( java.time.LocalDate.parse( br.getStartDate() ) );

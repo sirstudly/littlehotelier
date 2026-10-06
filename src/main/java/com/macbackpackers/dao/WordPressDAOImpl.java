@@ -2008,6 +2008,20 @@ public class WordPressDAOImpl implements WordPressDAO {
                 .executeUpdate();
     }
 
+    @Override
+    @Transactional
+    public int closeBookingAssignmentsForReservationIdentifier( String reservationIdentifier ) {
+        if ( StringUtils.isBlank( reservationIdentifier ) ) {
+            return 0;
+        }
+        return em.createQuery( "UPDATE BookingAssignment a SET a.validTo = :now "
+                + "WHERE a.reservationIdentifier = :identifier AND a.source = :guest AND a.validTo IS NULL" )
+                .setParameter( "now", new Timestamp( System.currentTimeMillis() ) )
+                .setParameter( "identifier", reservationIdentifier )
+                .setParameter( "guest", BookingAssignment.SOURCE_GUEST )
+                .executeUpdate();
+    }
+
     /** True when the assignment stay overlaps {@code [windowStart, windowEnd]} (null bounds = open). */
     static boolean overlapsWindow( BookingAssignment a, LocalDate windowStart, LocalDate windowEnd ) {
         LocalDate checkin = a.getCheckinLocalDate();
@@ -2197,44 +2211,6 @@ public class WordPressDAOImpl implements WordPressDAO {
                 Long.class )
                 .setParameter( "guest", BookingAssignment.SOURCE_GUEST )
                 .getResultList();
-    }
-
-    @Override
-    @Transactional( readOnly = true )
-    @SuppressWarnings( "unchecked" )
-    public List<Long> fetchStaleNoteReportReservationIds( int jobId, Date fetchedBefore ) {
-        // guest comments / bottom bunks mirror getGuestCommentsReport / getBottomBunksReport in lil_hotelier_dbo.class.php
-        List<Number> ids = em.createNativeQuery(
-                "SELECT DISTINCT r.reservation_id "
-                        + "  FROM ( SELECT reservation_id FROM wp_lh_rpt_split_rooms WHERE job_id = :jobId "
-                        + "         UNION SELECT reservation_id FROM wp_lh_rpt_unpaid_deposit WHERE job_id = :jobId "
-                        + "         UNION SELECT reservation_id FROM wp_lh_group_bookings WHERE job_id = :jobId "
-                        + "         UNION SELECT reservation_id FROM wp_lh_rpt_mostly_full_dorms WHERE job_id = :jobId "
-                        + "         UNION SELECT c.reservation_id FROM wp_lh_booking_assignment c "
-                        + "                 JOIN wp_lh_rpt_guest_comments g ON g.reservation_id = c.reservation_id "
-                        + "                WHERE c.valid_to IS NULL AND c.source = 'guest' "
-                        + "                  AND c.bed_status <> 'pending_payment' "
-                        + "                  AND c.checkout_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) "
-                        + "                  AND g.guest_request IS NOT NULL "
-                        + "         UNION SELECT c.reservation_id FROM wp_lh_booking_assignment c "
-                        + "                WHERE c.valid_to IS NULL AND c.source = 'guest' "
-                        + "                  AND c.checkout_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) "
-                        + "                  AND (LOWER(c.notes) LIKE '%bottom bunk%' OR LOWER(c.notes) LIKE '%lower bunk%' "
-                        + "                       OR LOWER(c.notes) LIKE '%bottom bed%' OR LOWER(c.notes) LIKE '%lower bed%' "
-                        + "                       OR LOWER(c.comments) LIKE '%bottom bunk%' OR LOWER(c.comments) LIKE '%lower bunk%' "
-                        + "                       OR LOWER(c.comments) LIKE '%bottom bed%' OR LOWER(c.comments) LIKE '%lower bed%') "
-                        + "                  AND MOD(CAST(SUBSTR(c.bed_name, 1, 2) AS UNSIGNED), 2) > 0 "
-                        + "       ) r "
-                        + " WHERE r.reservation_id > 0 "
-                        + "   AND EXISTS ( SELECT 1 FROM wp_lh_booking_assignment a "
-                        + "                 WHERE a.reservation_id = r.reservation_id AND a.valid_to IS NULL "
-                        + "                   AND a.source = 'guest' "
-                        + "                   AND ( a.last_rest_fetched_at IS NULL OR a.last_rest_fetched_at < :fetchedBefore ) ) "
-                        + " ORDER BY r.reservation_id" )
-                .setParameter( "jobId", jobId )
-                .setParameter( "fetchedBefore", new Timestamp( fetchedBefore.getTime() ) )
-                .getResultList();
-        return ids.stream().map( Number::longValue ).collect( Collectors.toList() );
     }
 
     @Override

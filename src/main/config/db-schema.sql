@@ -695,6 +695,7 @@ CREATE TABLE `wp_lh_booking_assignment` (
   `rate_plan_name` varchar(512) DEFAULT NULL,
   `num_guests` int(10) unsigned DEFAULT NULL,
   `booking_reference` varchar(100) DEFAULT NULL,
+  `reservation_identifier` varchar(20) DEFAULT NULL,
   `booking_source` varchar(100) DEFAULT NULL,
   `hotel_collect_yn` char(1) DEFAULT NULL,
   `booked_date` datetime DEFAULT NULL,
@@ -710,6 +711,7 @@ CREATE TABLE `wp_lh_booking_assignment` (
   KEY `lh_ba_booking_rooms` (`booking_rooms_id`, `valid_to`),
   KEY `lh_ba_assignment` (`assignment_key`, `valid_to`),
   KEY `lh_ba_reservation` (`reservation_id`, `valid_to`),
+  KEY `lh_ba_reservation_identifier` (`reservation_identifier`, `valid_to`),
   KEY `lh_ba_event` (`calendar_event_id`, `valid_to`),
   KEY `lh_ba_rest_stale` (`valid_to`, `last_rest_fetched_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

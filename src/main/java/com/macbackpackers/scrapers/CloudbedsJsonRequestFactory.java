@@ -6,13 +6,17 @@ import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -54,6 +58,11 @@ public class CloudbedsJsonRequestFactory {
 
     /** maximum page size accepted by {@code mapi/reservation/list} */
     public static final int RESERVATION_LIST_PAGE_SIZE = 250;
+
+    /** largest page size (iDisplayLength) offered by the front-end for DataTables requests */
+    public static final int DATATABLES_PAGE_SIZE = 250;
+
+    private static final DateTimeFormatter ACTIVITY_LOG_TIME = DateTimeFormatter.ofPattern( "hh:mm a", Locale.ENGLISH );
 
     private static final Gson GSON = new Gson();
 
@@ -282,10 +291,24 @@ public class CloudbedsJsonRequestFactory {
      * @throws IOException on i/o error
      */
     public WebRequest createGetReservationRequest( String reservationId, String billingPortalId, String frontVersion ) throws IOException {
+        return createGetReservationRequest( reservationId, false, billingPortalId, frontVersion );
+    }
+
+    /**
+     * Returns a get reservation request by reservation id or by identifier.
+     * 
+     * @param id unique ID of reservation, or the reservation identifier if {@code isIdentifier}
+     * @param isIdentifier true if {@code id} is the reservation identifier (number shown under the guest name)
+     * @param billingPortalId
+     * @param frontVersion
+     * @return web request
+     * @throws IOException on i/o error
+     */
+    public WebRequest createGetReservationRequest( String id, boolean isIdentifier, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservation" );
         webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "id", reservationId ),
-                new NameValuePair( "is_identifier", "0" ),
+                new NameValuePair( "id", id ),
+                new NameValuePair( "is_identifier", isIdentifier ? "1" : "0" ),
                 new NameValuePair( "suppress_client_errors", "true" ),
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
@@ -325,50 +348,6 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
-     * Get info on all customers checking in on the given date range.
-     * 
-     * @param checkinDateStart checkin date (inclusive)
-     * @param checkinDateEnd checkin date (inclusive)
-     * @return web request
-     * @throws IOException on i/o error
-     */
-    public WebRequest createGetCustomersRequest( LocalDate checkinDateStart, LocalDate checkinDateEnd ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/get_customers" );
-        webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "sEcho", "2" ),
-                new NameValuePair( "iColumns", "3" ),
-                new NameValuePair( "sColumns", ",," ),
-                new NameValuePair( "iDisplayStart", "0" ),
-                new NameValuePair( "iDisplayLength", "10000" ),
-                new NameValuePair( "mDataProp_0", "first_name" ),
-                new NameValuePair( "bRegex_0", "false" ),
-                new NameValuePair( "bSearchable_0", "true" ),
-                new NameValuePair( "bSortable_0", "true" ),
-                new NameValuePair( "mDataProp_1", "last_name" ),
-                new NameValuePair( "bRegex_1", "false" ),
-                new NameValuePair( "bSearchable_1", "true" ),
-                new NameValuePair( "bSortable_1", "true" ),
-                new NameValuePair( "mDataProp_2", "email" ),
-                new NameValuePair( "bRegex_2", "false" ),
-                new NameValuePair( "bSearchable_2", "true" ),
-                new NameValuePair( "bSortable_2", "true" ),
-                new NameValuePair( "iSortCol_0", "1" ),
-                new NameValuePair( "sSortDir_0", "asc" ),
-                new NameValuePair( "iSortingCols", "1" ),
-                new NameValuePair( "date_start[0]", checkinDateStart.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_start[1]", checkinDateEnd.format( YYYY_MM_DD ) ),
-                new NameValuePair( "date_end[0]", "" ),
-                new NameValuePair( "date_end[1]", "" ),
-                new NameValuePair( "repeating_and_new_guests", "all" ),
-                new NameValuePair( "country_code", "all" ),
-                new NameValuePair( "guest_status", "all" ),
-                new NameValuePair( "property_id", getPropertyId() ),
-                new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
-        return webRequest;
-    }
-
-    /**
      * Returns a single page of reservations from the {@code mapi/reservation/list} endpoint
      * matching the given filter, ordered by booking date descending.
      * 
@@ -404,6 +383,7 @@ public class CloudbedsJsonRequestFactory {
      * @param cancelDateStart cancellation date (inclusive)
      * @param cancelDateEnd cancellation date (inclusive)
      * @param bookingSourceIds comma-delimited list of booking source Id(s)
+     * @param displayStart offset of the first row of the page (page size {@link #DATATABLES_PAGE_SIZE})
      * @param billingPortalId
      * @param frontVersion
      * @return web request
@@ -411,9 +391,10 @@ public class CloudbedsJsonRequestFactory {
      */
     public WebRequest createGetCancelledReservationsRequestByBookingSource( LocalDate checkinDateStart,
             LocalDate checkinDateEnd, LocalDate cancelDateStart, LocalDate cancelDateEnd,
-            String bookingSourceIds, String billingPortalId, String frontVersion ) throws IOException {
+            String bookingSourceIds, int displayStart, String billingPortalId, String frontVersion ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/reservations/get_reservations" );
         setCommonReservationsQueryParameters( webRequest,
+                new NameValuePair( "iDisplayStart", String.valueOf( displayStart ) ),
                 new NameValuePair( "date_start[0]", checkinDateStart.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_start[1]", checkinDateEnd.format( YYYY_MM_DD ) ),
                 new NameValuePair( "date_end[0]", "" ),
@@ -430,22 +411,72 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
-     * Retrieves all activity for a reservation.
+     * Retrieves one page of activity for a reservation (newest first).
      * 
      * @param reservationId the cloudbeds reservation id
+     * @param displayStart offset of the first row of the page (page size {@link #DATATABLES_PAGE_SIZE})
      * @param billingPortalId
      * @param frontVersion
      * @return web request
      * @throws IOException on i/o error
      */
-    public WebRequest createGetActivityLog( String reservationId, String billingPortalId, String frontVersion ) throws IOException {
+    public WebRequest createGetActivityLog( String reservationId, int displayStart, String billingPortalId, String frontVersion ) throws IOException {
+        return createActivityLogRequest( displayStart, billingPortalId, frontVersion,
+                new NameValuePair( "from_date", "" ),
+                new NameValuePair( "from_time", "" ),
+                new NameValuePair( "to_date", "" ),
+                new NameValuePair( "to_time", "" ),
+                new NameValuePair( "filter", reservationId ),
+                new NameValuePair( "type", "reservation_with_guests" ) );
+    }
+
+    /**
+     * Retrieves one page of the property-wide activity log between the given times (newest first).
+     * Timestamps in the response are UTC. The front-end only allows times on the hour or half hour,
+     * so both {@code from} and {@code to} must lie on a half-hour boundary.
+     * 
+     * @param from start of window (inclusive, on a half-hour boundary)
+     * @param to end of window (on a half-hour boundary)
+     * @param displayStart offset of the first row of the page (page size {@link #DATATABLES_PAGE_SIZE})
+     * @param billingPortalId
+     * @param frontVersion
+     * @return web request
+     * @throws IOException on i/o error
+     * @throws IllegalArgumentException if from/to are not on a half-hour boundary
+     */
+    public WebRequest createGetPropertyActivityLog( Instant from, Instant to, int displayStart,
+            String billingPortalId, String frontVersion ) throws IOException {
+        if ( false == isHalfHourBoundary( from ) || false == isHalfHourBoundary( to ) ) {
+            throw new IllegalArgumentException( "Activity log window must lie on the hour or half hour: " + from + " - " + to );
+        }
+        LocalDateTime fromUtc = LocalDateTime.ofInstant( from, ZoneOffset.UTC );
+        LocalDateTime toUtc = LocalDateTime.ofInstant( to, ZoneOffset.UTC );
+        return createActivityLogRequest( displayStart, billingPortalId, frontVersion,
+                new NameValuePair( "from_date", fromUtc.format( YYYY_MM_DD ) ),
+                new NameValuePair( "from_time", fromUtc.format( ACTIVITY_LOG_TIME ) ),
+                new NameValuePair( "to_date", toUtc.format( YYYY_MM_DD ) ),
+                new NameValuePair( "to_time", toUtc.format( ACTIVITY_LOG_TIME ) ),
+                new NameValuePair( "filter", "" ),
+                new NameValuePair( "room_type", "" ),
+                new NameValuePair( "use_utc", "true" ) );
+    }
+
+    /**
+     * True iff the given instant lies exactly on the hour or half hour.
+     */
+    public static boolean isHalfHourBoundary( Instant instant ) {
+        return instant.getNano() == 0 && instant.getEpochSecond() % 1800 == 0;
+    }
+
+    private WebRequest createActivityLogRequest( int displayStart, String billingPortalId, String frontVersion,
+            NameValuePair... filterParams ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/get_activity_log" );
-        webRequest.setRequestParameters( Arrays.asList(
+        List<NameValuePair> params = new ArrayList<>( Arrays.asList(
                 new NameValuePair( "sEcho", "1" ),
                 new NameValuePair( "iColumns", "4" ),
                 new NameValuePair( "sColumns", ",,," ),
-                new NameValuePair( "iDisplayStart", "0" ),
-                new NameValuePair( "iDisplayLength", "10000" ),
+                new NameValuePair( "iDisplayStart", String.valueOf( displayStart ) ),
+                new NameValuePair( "iDisplayLength", String.valueOf( DATATABLES_PAGE_SIZE ) ),
                 new NameValuePair( "mDataProp_0", "0" ),
                 new NameValuePair( "sSearch_0", "" ),
                 new NameValuePair( "bRegex_0", "false" ),
@@ -471,14 +502,8 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "iSortCol_0", "1" ),
                 new NameValuePair( "sSortDir_0", "desc" ),
                 new NameValuePair( "iSortingCols", "1" ),
-                new NameValuePair( "from_date", "" ),
-                new NameValuePair( "from_time", "" ),
-                new NameValuePair( "to_date", "" ),
-                new NameValuePair( "to_time", "" ),
                 new NameValuePair( "user", "" ),
                 new NameValuePair( "change", "" ),
-                new NameValuePair( "filter", reservationId ),
-                new NameValuePair( "type", "reservation_with_guests" ),
                 new NameValuePair( "forceLang", "en" ),
                 new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
                 new NameValuePair( "billing_portal_id", billingPortalId ),
@@ -487,6 +512,8 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "property_id", getPropertyId() ),
                 new NameValuePair( "group_id", getPropertyId() ),
                 new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        params.addAll( Arrays.asList( filterParams ) );
+        webRequest.setRequestParameters( params );
         return webRequest;
     }
 
@@ -582,7 +609,7 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "iColumns", "8" ),
                 new NameValuePair( "sColumns", ",,,,,,," ),
                 new NameValuePair( "iDisplayStart", "0" ),
-                new NameValuePair( "iDisplayLength", "10000" ),
+                new NameValuePair( "iDisplayLength", String.valueOf( DATATABLES_PAGE_SIZE ) ),
                 new NameValuePair( "mDataProp_0", "id" ),
                 new NameValuePair( "bRegex_0", "false" ),
                 new NameValuePair( "bSearchable_0", "true" ),
@@ -615,7 +642,8 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "bRegex_7", "false" ),
                 new NameValuePair( "bSearchable_7", "true" ),
                 new NameValuePair( "bSortable_7", "true" ),
-                new NameValuePair( "iSortCol_0", "3" ),
+                // sort on identifier (unique) so rows don't shift between pages
+                new NameValuePair( "iSortCol_0", "1" ),
                 new NameValuePair( "sSortDir_0", "asc" ),
                 new NameValuePair( "iSortingCols", "1" ),
                 new NameValuePair( "status", "confirmed,not_confirmed,checked_in,checked_out,no_show" ),

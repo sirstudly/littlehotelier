@@ -15,13 +15,13 @@ import org.springframework.beans.factory.annotation.Qualifier;
 
 import com.macbackpackers.beans.JobStatus;
 import com.macbackpackers.config.LittleHotelierConfig;
+import com.macbackpackers.services.ActivityLogSyncService;
 import com.macbackpackers.services.BookingAssignmentEnrichService;
 
 /**
- * Heals {@code wp_lh_booking_assignment} via selective REST, re-fetches the reservations shown in
- * reports displaying notes, upserts guest comments, then queues allocation reports.
- * <p>
- * Replaces the former full ~140-day {@code get_reservation} dump via worker jobs.
+ * Catches {@code wp_lh_booking_assignment} up from the Cloudbeds activity log (REST-refreshing every
+ * reservation changed since the last run), enriches rows never REST-fetched, upserts guest comments,
+ * then queues allocation reports.
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.AllocationScraperJob" )
@@ -36,11 +36,15 @@ public class AllocationScraperJob extends AbstractJob {
     @Transient
     private BookingAssignmentEnrichService enrichService;
 
+    @Autowired
+    @Transient
+    private ActivityLogSyncService activityLogSyncService;
+
     @Override
     public void processJob() throws Exception {
-        LocalDate start = LocalDate.now();
-        LocalDate end = getEndLocalDate();
-        enrichService.healAndRefreshGuestComments( webClient, getId(), start, end );
+        activityLogSyncService.sync( webClient );
+        enrichService.enrichAllNeedingRest( webClient );
+        enrichService.refreshGuestComments();
         insertCreateReportsJob();
     }
 
