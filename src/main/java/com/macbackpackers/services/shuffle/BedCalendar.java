@@ -160,11 +160,20 @@ public class BedCalendar {
      * @param allowGroupSplit true for the "split a group across two rooms" alternative
      */
     public List<String> validate( Map<String, String> assignment, Set<String> relaxedKeys, boolean allowGroupSplit ) {
+        return validate( assignment, relaxedKeys, allowGroupSplit, false );
+    }
+
+    /**
+     * @param allowUnlock true for the "remove a bed lock" alternative: locked bookings may move
+     */
+    public List<String> validate( Map<String, String> assignment, Set<String> relaxedKeys, boolean allowGroupSplit,
+            boolean allowUnlock ) {
         List<String> errors = new ArrayList<>();
         Map<String, List<ShuffleBooking>> byBed = new HashMap<>();
         for ( ShuffleBooking b : bookings.values() ) {
             String bedId = assignment.get( b.key() );
-            if ( b.pinned() && false == Objects.equals( bedId, current.get( b.key() ) ) ) {
+            boolean mayMove = allowUnlock && b.locked();
+            if ( b.pinned() && false == mayMove && false == Objects.equals( bedId, current.get( b.key() ) ) ) {
                 errors.add( "Pinned booking moved: " + b.label() );
             }
             if ( bedId == null ) {

@@ -2236,6 +2236,13 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Override
     @Transactional( readOnly = true )
+    public List<BedLock> fetchActiveBedLocks() {
+        return em.createQuery( "FROM BedLock l WHERE l.unlockedDate IS NULL ORDER BY l.id", BedLock.class )
+                .getResultList();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
     public List<BedLock> fetchActiveBedLocksForReservation( long reservationId ) {
         return em.createQuery(
                 "FROM BedLock l WHERE l.reservationId = :id AND l.unlockedDate IS NULL ORDER BY l.id", BedLock.class )

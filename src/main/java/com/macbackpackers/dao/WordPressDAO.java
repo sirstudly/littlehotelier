@@ -891,6 +891,9 @@ public interface WordPressDAO {
     /** Reservation ids with at least one active (not unlocked) bed lock. */
     Set<Long> fetchActiveBedLockReservationIds();
 
+    /** All active bed locks. */
+    List<BedLock> fetchActiveBedLocks();
+
     /** Active bed locks for a reservation. */
     List<BedLock> fetchActiveBedLocksForReservation( long reservationId );
 

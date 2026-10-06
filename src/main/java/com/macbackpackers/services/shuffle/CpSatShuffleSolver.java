@@ -62,6 +62,8 @@ public class CpSatShuffleSolver {
     /** What to solve. */
     public static final class Spec {
         Set<String> targetKeys = Set.of();
+        /** Reservations whose locked beds stay put even with {@link Relaxation#UNLOCK}. */
+        Set<Long> keepLocked = Set.of();
         FallbackLevel level = FallbackLevel.SAME_TYPE;
         Relaxation relaxation;
         boolean splitTargets;
@@ -76,6 +78,11 @@ public class CpSatShuffleSolver {
 
         public Spec targets( Set<String> keys ) {
             this.targetKeys = keys;
+            return this;
+        }
+
+        public Spec keepLocked( Set<Long> reservationIds ) {
+            this.keepLocked = reservationIds;
             return this;
         }
 
@@ -115,6 +122,7 @@ public class CpSatShuffleSolver {
         public Spec copy() {
             Spec s = new Spec();
             s.targetKeys = targetKeys;
+            s.keepLocked = keepLocked;
             s.level = level;
             s.relaxation = relaxation;
             s.splitTargets = splitTargets;
@@ -194,6 +202,8 @@ public class CpSatShuffleSolver {
         final Map<String, BoolVar> x = new LinkedHashMap<>();
         BoolVar none;
         long noneCost;
+        /** Added to {@link #MOVE_COST} when it leaves its current bed. */
+        long extraMoveCost;
 
         Piece( ShuffleBooking booking, ShuffleBooking parent, boolean target, String current, boolean fallbackEligible ) {
             this.booking = booking;
@@ -397,17 +407,27 @@ public class CpSatShuffleSolver {
             // in fallback room types only guests in the target's way move; the rest just leave their free beds
             boolean fallbackBystander = false == eligible && false == competes;
             boolean outsideMovable = spec.movableStart != null && false == b.overlaps( spec.movableStart, spec.movableEnd );
-            if ( b.pinned() || crossesWindow || fallbackBystander || outsideMovable || scopeBeds.get( current ).isNonGuest() ) {
+            boolean unlocked = isUnlocked( b );
+            if ( ( b.pinned() && false == unlocked ) || crossesWindow || fallbackBystander || outsideMovable
+                    || scopeBeds.get( current ).isNonGuest() ) {
                 fixedByBed.computeIfAbsent( current, k -> new ArrayList<>() ).add( b );
                 continue;
             }
             Piece p = new Piece( b, b, false, current, eligible );
+            if ( unlocked ) {
+                p.extraMoveCost = RELAXED_COST;
+            }
             if ( spec.relaxation == Relaxation.DISPLACE && false == targetReservations.contains( b.reservationId() ) ) {
                 long daysAhead = Math.max( 0, ChronoUnit.DAYS.between( spec.windowStart, b.checkin() ) );
                 p.noneCost = DISPLACE_COST + Math.max( 0, 30 - Math.min( 30, daysAhead ) );
             }
             pieces.add( p );
         }
+    }
+
+    /** Locked booking the {@link Relaxation#UNLOCK} alternative may move. */
+    private boolean isUnlocked( ShuffleBooking b ) {
+        return spec.relaxation == Relaxation.UNLOCK && b.locked() && false == spec.keepLocked.contains( b.reservationId() );
     }
 
     // ---------------------------------------------------------------- variables
@@ -461,9 +481,10 @@ public class CpSatShuffleSolver {
             }
             if ( p.current != null ) {
                 BoolVar stay = p.x.get( p.current );
-                objective.add( MOVE_COST );
+                long moveCost = MOVE_COST + p.extraMoveCost;
+                objective.add( moveCost );
                 if ( stay != null ) {
-                    objective.addTerm( stay, -MOVE_COST );
+                    objective.addTerm( stay, -moveCost );
                     model.addHint( stay, 1 );
                 }
             }
@@ -499,6 +520,9 @@ public class CpSatShuffleSolver {
         }
         if ( f.checkout().isAfter( spec.windowEnd ) && false == f.pinned() ) {
             return f.label() + " on " + bed.label() + dates + " runs past the search window";
+        }
+        if ( f.locked() ) {
+            return f.label() + " on " + bed.label() + dates + " is locked to this bed";
         }
         return f.label() + " on " + bed.label() + dates + " is in-house or already arrived";
     }

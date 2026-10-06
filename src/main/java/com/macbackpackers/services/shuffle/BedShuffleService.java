@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.macbackpackers.beans.BedLock;
 import com.macbackpackers.beans.BookingAssignment;
 import com.macbackpackers.beans.RoomBed;
 import com.macbackpackers.dao.WordPressDAO;
@@ -56,7 +57,7 @@ public class BedShuffleService {
         double timeLimitSeconds = 15;
         double explainTimeLimitSeconds = 5;
         double alternativeTimeLimitSeconds = 5;
-        int maxAlternatives = 3;
+        int maxAlternatives = 5;
         /** Alternatives needing more steps than this aren't worth offering. */
         int maxAlternativeMoves = 20;
         /** Also bring the reservation's already-assigned beds together when split across rooms or beds. */
@@ -103,7 +104,7 @@ public class BedShuffleService {
     public ShuffleSuggestion suggestForReservation( long reservationId, Options options ) {
         LocalDate today = LocalDate.now();
         BedCalendar calendar = buildCalendar( dao.fetchActiveHousekeepingRooms(),
-                dao.fetchCurrentBookingAssignmentsCheckingOutAfter( today ), today );
+                dao.fetchCurrentBookingAssignmentsCheckingOutAfter( today ), today, dao.fetchActiveBedLocks() );
         return suggest( calendar, reservationId, options.today( today ) );
     }
 
@@ -132,7 +133,8 @@ public class BedShuffleService {
                 calendar.consolidate( c.groups(), c.chains() );
                 try {
                     // with unassigned beds too, placing those comes first if the group can't also be brought together
-                    consolidated = solve( calendar, reservationId, targets, options, c, unassigned.isEmpty() );
+                    consolidated = solve( calendar, reservationId, Set.of( reservationId ), targets, options, c,
+                            unassigned.isEmpty() );
                 }
                 finally {
                     calendar.clearConsolidation();
@@ -140,19 +142,19 @@ public class BedShuffleService {
                 if ( consolidated != null ) {
                     return consolidated;
                 }
-                ShuffleSuggestion placed = solve( calendar, reservationId, unassigned, options, null, true );
+                ShuffleSuggestion placed = solve( calendar, reservationId, Set.of( reservationId ), unassigned, options, null, true );
                 placed.addNote( "Could not also bring " + describeGroups( calendar, c ) + " back together; left as they are" );
                 return placed;
             }
         }
-        return solve( calendar, reservationId, unassigned, options, null, true );
+        return solve( calendar, reservationId, Set.of( reservationId ), unassigned, options, null, true );
     }
 
     /** From the local calendar as of today ({@code options.today} is overwritten). */
     public ShuffleSuggestion suggestForConsecutive( long reservationId, long nextReservationId, int roomTypeId, Options options ) {
         LocalDate today = LocalDate.now();
         BedCalendar calendar = buildCalendar( dao.fetchActiveHousekeepingRooms(),
-                dao.fetchCurrentBookingAssignmentsCheckingOutAfter( today ), today );
+                dao.fetchCurrentBookingAssignmentsCheckingOutAfter( today ), today, dao.fetchActiveBedLocks() );
         return suggestConsecutive( calendar, reservationId, nextReservationId, roomTypeId, options.today( today ) );
     }
 
@@ -187,13 +189,13 @@ public class BedShuffleService {
             ShuffleSuggestion suggestion = new ShuffleSuggestion( nextReservationId, targets );
             suggestion.consolidation();
             suggestion.impossible( ShuffleSuggestion.Status.INFEASIBLE, new ShuffleSuggestion.Reason(
-                    "Could not keep " + describeConsolidation( calendar, c ) + " on one bed: both are already in-house",
+                    "Could not keep " + describeConsolidation( calendar, c ) + " on one bed: both are already in-house or locked",
                     List.of(), List.of() ) );
             return suggestion;
         }
         calendar.consolidate( Set.of(), chains );
         try {
-            return solve( calendar, nextReservationId, targets, options, c, true );
+            return solve( calendar, nextReservationId, Set.of( reservationId, nextReservationId ), targets, options, c, true );
         }
         finally {
             calendar.clearConsolidation();
@@ -333,11 +335,12 @@ public class BedShuffleService {
      * Gives each target one bed for its stay, trying each fallback level; when none works, the reason, the
      * fewest-bed-change split and alternatives that break one rule each.
      *
+     * @param keepLocked     reservations of this row, whose locked beds are never unlocked
      * @param c              groups being brought together ({@link BedCalendar#consolidate} already applied); null if none
      * @param ifImpossible   false to return null rather than explain, split and look for alternatives
      */
-    private static ShuffleSuggestion solve( BedCalendar calendar, long reservationId, List<ShuffleBooking> targets,
-            Options options, Consolidation c, boolean ifImpossible ) {
+    private static ShuffleSuggestion solve( BedCalendar calendar, long reservationId, Set<Long> keepLocked,
+            List<ShuffleBooking> targets, Options options, Consolidation c, boolean ifImpossible ) {
         ShuffleSuggestion suggestion = new ShuffleSuggestion( reservationId, targets );
         if ( c != null ) {
             suggestion.consolidation();
@@ -364,7 +367,8 @@ public class BedShuffleService {
             }
         }
 
-        Spec base = new Spec().targets( keys ).window( start, end ).timeLimitSeconds( options.timeLimitSeconds );
+        Spec base = new Spec().targets( keys ).keepLocked( keepLocked ).window( start, end )
+                .timeLimitSeconds( options.timeLimitSeconds );
         LocalDate nearStart = first.minusDays( options.nearDays );
         LocalDate nearEnd = last.plusDays( options.nearDays );
         Map<FallbackLevel, CpSatShuffleSolver.Outcome> outcomes = new LinkedHashMap<>();
@@ -401,8 +405,10 @@ public class BedShuffleService {
             boolean timedOut = outcomes.containsValue( CpSatShuffleSolver.Outcome.UNKNOWN );
             boolean chainsOnly = c != null && c.groups().isEmpty();
             String problem = c == null ? null
-                    : chainsOnly ? "Could not keep " + describeConsolidation( calendar, c ) + " on one bed without moving in-house guests or blocks"
-                    : "Could not bring " + describeGroups( calendar, c ) + " together without moving in-house guests or blocks";
+                    : chainsOnly ? "Could not keep " + describeConsolidation( calendar, c )
+                            + " on one bed without moving in-house guests, blocks or locked beds"
+                    : "Could not bring " + describeGroups( calendar, c )
+                            + " together without moving in-house guests, blocks or locked beds";
             suggestion.impossible( timedOut ? ShuffleSuggestion.Status.UNKNOWN : ShuffleSuggestion.Status.INFEASIBLE,
                     explain( calendar, targets, base, nearStart, nearEnd, options, outcomes, problem ) );
             if ( chainsOnly ) {
@@ -418,7 +424,7 @@ public class BedShuffleService {
             if ( suggestion.getAlternatives().size() >= options.maxAlternatives ) {
                 break;
             }
-            if ( applicable( calendar, targets, relaxation ) ) {
+            if ( applicable( calendar, targets, keepLocked, relaxation ) ) {
                 Result r = solveNearThenFull( calendar, base.copy().relaxation( relaxation )
                         .timeLimitSeconds( options.alternativeTimeLimitSeconds ), nearStart, nearEnd );
                 ShuffleSuggestion.Option alt = alternative( calendar, keys, relaxation, r, options );
@@ -456,9 +462,12 @@ public class BedShuffleService {
         return levels;
     }
 
-    private static boolean applicable( BedCalendar calendar, List<ShuffleBooking> targets, Relaxation relaxation ) {
+    private static boolean applicable( BedCalendar calendar, List<ShuffleBooking> targets, Set<Long> keepLocked,
+            Relaxation relaxation ) {
         boolean dorm = targets.stream().anyMatch( t -> calendar.roomType( t.roomTypeId() ).isGuestDorm() );
         switch ( relaxation ) {
+            case UNLOCK:
+                return calendar.bookings().stream().anyMatch( b -> b.locked() && false == keepLocked.contains( b.reservationId() ) );
             case STAFF_LT_MIXED:
                 return targets.stream().anyMatch( t -> calendar.roomType( t.roomTypeId() ).isGuestDorm()
                         && calendar.roomType( t.roomTypeId() ).gender() == RoomTypeInfo.Gender.MIXED );
@@ -546,12 +555,25 @@ public class BedShuffleService {
         if ( false == r.isFound() ) {
             return null;
         }
-        List<String> errors = calendar.validate( r.assignment(), r.relaxedKeys(), relaxation == Relaxation.GROUP_SPLIT );
+        List<String> errors = calendar.validate( r.assignment(), r.relaxedKeys(), relaxation == Relaxation.GROUP_SPLIT,
+                relaxation == Relaxation.UNLOCK );
         if ( false == errors.isEmpty() ) {
             LOGGER.warn( "Discarding invalid {} alternative: {}", relaxation, errors );
             return null;
         }
-        List<String> notes = new ArrayList<>( describePlacements( calendar, r, keys ) );
+        List<String> notes = new ArrayList<>();
+        if ( relaxation == Relaxation.UNLOCK ) {
+            for ( ShuffleBooking b : calendar.bookings() ) {
+                String before = calendar.currentAssignment().get( b.key() );
+                if ( b.locked() && false == Objects.equals( before, r.assignment().get( b.key() ) ) ) {
+                    notes.add( "Remove the bed lock on " + b.label() + " (" + calendar.bed( before ).label() + ") first" );
+                }
+            }
+            if ( notes.isEmpty() ) {
+                return null;
+            }
+        }
+        notes.addAll( describePlacements( calendar, r, keys ) );
         if ( relaxation == Relaxation.STAFF_OTHER ) {
             for ( String key : r.relaxedKeys() ) {
                 ShuffleBooking b = calendar.booking( key );
@@ -647,6 +669,19 @@ public class BedShuffleService {
      * @param rows  current booking assignments checking out after {@code today}
      */
     public static BedCalendar buildCalendar( List<RoomBed> rooms, List<BookingAssignment> rows, LocalDate today ) {
+        return buildCalendar( rooms, rows, today, List.of() );
+    }
+
+    /**
+     * @param rooms active beds (excluding Unallocated), including staff dorms (their bookings are pinned)
+     * @param rows  current booking assignments checking out after {@code today}
+     * @param locks active bed locks; a booking on its locked bed is pinned (and marked locked)
+     */
+    public static BedCalendar buildCalendar( List<RoomBed> rooms, List<BookingAssignment> rows, LocalDate today,
+            List<BedLock> locks ) {
+        Set<String> lockedBeds = locks.stream()
+                .map( l -> lockKey( l.getReservationId(), l.getRoomId() ) )
+                .collect( Collectors.toSet() );
         Map<String, ShuffleBed> beds = rooms.stream()
                 .collect( Collectors.toMap( RoomBed::getId,
                         r -> new ShuffleBed( r.getId(), r.getRoom(), r.getBedName(), r.getRoomTypeId(),
@@ -674,12 +709,17 @@ public class BedShuffleService {
                     || row.getCheckinLocalDate().isBefore( today )
                     || ( bed != null && bed.isNonGuest() )
                     || calendar.roomType( roomTypeId ).isNonGuest();
+            boolean locked = false == pinned && bed != null && lockedBeds.contains( lockKey( row.getReservationId(), bed.id() ) );
             calendar.addBooking( new ShuffleBooking( row.getAssignmentKey(),
                     reservation ? row.getReservationId() : -row.getId(),
                     StringUtils.defaultString( row.getGuestName() ), roomTypeId,
-                    row.getCheckinLocalDate(), row.getCheckoutLocalDate(), pinned ),
+                    row.getCheckinLocalDate(), row.getCheckoutLocalDate(), pinned || locked, locked ),
                     bed == null ? null : bed.id() );
         }
         return calendar;
+    }
+
+    private static String lockKey( long reservationId, String roomId ) {
+        return reservationId + "/" + roomId;
     }
 }

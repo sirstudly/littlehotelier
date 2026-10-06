@@ -28,6 +28,10 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 
+import com.macbackpackers.beans.BedLock;
+import com.macbackpackers.beans.BookingAssignment;
+import com.macbackpackers.beans.RoomBed;
+
 public class BedShuffleTest {
 
     private static final int ROOM_TYPE_14MX = 112528;
@@ -149,6 +153,95 @@ public class BedShuffleTest {
         for ( ShuffleMove m : s.getAlternatives().get( 0 ).moves() ) {
             assertThat( m.booking().key(), is( not( "x" ) ) );
         }
+    }
+
+    @Test
+    public void lockedGuestMovesOnlyWhenUnlocked() {
+        BedCalendar calendar = twoRoomCalendar( false );
+        calendar.addBooking( new ShuffleBooking( "x", 2L, "Guest x", 1, d( 1 ), d( 3 ), true, true ), "A3" );
+        ShuffleSuggestion s = BedShuffleService.suggest( calendar, 1L );
+        System.out.println( s.describe() );
+        assertThat( s.getStatus(), is( ShuffleSuggestion.Status.INFEASIBLE ) );
+        assertThat( calendar.currentAssignment().get( "x" ), is( "A3" ) );
+        assertThat( s.getReason().blockers(), contains( anyOf(
+                containsString( "is locked to this bed" ),
+                startsWith( "Group 1 (3 beds) must stay in one room" ) ) ) );
+        List<Relaxation> order = s.getAlternatives().stream().map( ShuffleSuggestion.Option::relaxation )
+                .collect( Collectors.toList() );
+        assertThat( order, contains( Relaxation.UNLOCK, Relaxation.GROUP_SPLIT ) );
+        ShuffleSuggestion.Option unlock = s.getAlternatives().get( 0 );
+        assertThat( unlock.notes(), hasItem( startsWith( "Remove the bed lock on 2 (Guest x)" ) ) );
+        assertThat( unlock.moves().stream().anyMatch( m -> m.booking().key().equals( "x" ) ), is( true ) );
+    }
+
+    @Test
+    public void ownLockedBedIsNeverUnlocked() {
+        // room A: g1 (locked, group 1) and in-house X; room B free. g2 joins only if g1 moves or the group splits
+        BedCalendar calendar = new BedCalendar( List.of(
+                new ShuffleBed( "A1", "A", "1", 1 ), new ShuffleBed( "A2", "A", "2", 1 ),
+                new ShuffleBed( "B1", "B", "1", 1 ), new ShuffleBed( "B2", "B", "2", 1 ) ) );
+        calendar.addBooking( new ShuffleBooking( "g1", 1L, "Guest g1", 1, d( 1 ), d( 3 ), true, true ), "A1" );
+        calendar.addBooking( booking( "g2", 1L, 1, d( 1 ), d( 3 ), false ), null );
+        calendar.addBooking( booking( "x", 2L, 1, d( 1 ), d( 3 ), true ), "A2" );
+        ShuffleSuggestion s = BedShuffleService.suggest( calendar, 1L );
+        System.out.println( s.describe() );
+        assertThat( s.getStatus(), is( ShuffleSuggestion.Status.INFEASIBLE ) );
+        for ( ShuffleSuggestion.Option alt : s.getAlternatives() ) {
+            assertThat( alt.relaxation(), is( not( Relaxation.UNLOCK ) ) );
+            for ( ShuffleMove m : alt.moves() ) {
+                assertThat( m.booking().key(), is( not( "g1" ) ) );
+            }
+        }
+    }
+
+    @Test
+    public void buildCalendarPinsOnlyBookingsOnTheirLockedBed() {
+        List<RoomBed> rooms = new ArrayList<>();
+        for ( String id : List.of( "1-1", "1-2" ) ) {
+            RoomBed r = new RoomBed();
+            r.setId( id );
+            r.setRoom( "A" );
+            r.setBedName( id );
+            r.setRoomTypeId( 1 );
+            r.setActive( "Y" );
+            rooms.add( r );
+        }
+        List<BookingAssignment> rows = List.of(
+                assignment( 1, "onLock", 10L, "1-1" ),
+                assignment( 2, "offLock", 20L, "1-2" ) );
+        BedLock onBed = lock( 10L, "1-1" );
+        BedLock elsewhere = lock( 20L, "1-1" );
+        BedCalendar calendar = BedShuffleService.buildCalendar( rooms, rows, d( 1 ), List.of( onBed, elsewhere ) );
+
+        ShuffleBooking locked = calendar.booking( "onLock" );
+        assertThat( locked.locked(), is( true ) );
+        assertThat( locked.pinned(), is( true ) );
+        ShuffleBooking moved = calendar.booking( "offLock" );
+        assertThat( moved.locked(), is( false ) );
+        assertThat( moved.pinned(), is( false ) );
+    }
+
+    private static BookingAssignment assignment( long id, String key, long reservationId, String roomId ) {
+        BookingAssignment a = new BookingAssignment();
+        a.setId( id );
+        a.setAssignmentKey( key );
+        a.setReservationId( reservationId );
+        a.setGuestName( "Guest " + key );
+        a.setRoomId( roomId );
+        a.setRoom( "A" );
+        a.setRoomTypeId( 1 );
+        a.setCheckinDate( d( 5 ) );
+        a.setCheckoutDate( d( 7 ) );
+        a.setBedStatus( "confirmed" );
+        a.setInHouseYn( "N" );
+        return a;
+    }
+
+    private static BedLock lock( long reservationId, String roomId ) {
+        BedLock l = new BedLock();
+        l.setReservationId( reservationId );
+        l.setRoomId( roomId );
+        return l;
     }
 
     /**

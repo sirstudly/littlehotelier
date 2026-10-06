@@ -12,6 +12,9 @@ public enum Relaxation {
 
     STAFF_OTHER( "Other staff dorm (LT_MALE / LT_FEMALE)", "staff dorms require staff approval" ),
 
+    /** Other guests' bookings on their locked bed may move; the row's own locked beds never do. */
+    UNLOCK( "Remove a bed lock", "locked bookings stay on their bed" ),
+
     GROUP_SPLIT( "Split a group across two rooms", "a group stays in one room" ),
 
     OTHER_ROOM_TYPE( "Other room type change (same gender)", "room type fallback limits" ),
