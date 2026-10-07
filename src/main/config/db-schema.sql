@@ -34,7 +34,7 @@ CREATE TABLE `wp_lh_calendar` (
   KEY `lh_c_jobid_reservationid` (`job_id`,`reservation_id`),
   KEY `lh_c_roomid` (`job_id`,`room_id`),
   KEY `lh_c_booking_ref` (`booking_reference`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 CREATE TABLE `wp_lh_jobs` (
@@ -49,7 +49,7 @@ CREATE TABLE `wp_lh_jobs` (
   PRIMARY KEY (`job_id`),
   KEY `lh_j_classname` (`classname`),
   KEY `lh_j_class_status` (`classname`, `status`) 
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 CREATE TABLE `wp_lh_job_param` (
@@ -60,7 +60,7 @@ CREATE TABLE `wp_lh_job_param` (
   PRIMARY KEY (`job_param_id`),
   KEY `lh_j_job_id` (`job_id`)
 --  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)  -- removed cause of hibernate
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 CREATE TABLE `wp_lh_scheduled_jobs` (
@@ -71,7 +71,7 @@ CREATE TABLE `wp_lh_scheduled_jobs` (
   `last_scheduled_date` timestamp NULL DEFAULT NULL,
   `last_updated_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`job_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `wp_lh_scheduled_job_param` (
   `job_param_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -80,7 +80,7 @@ CREATE TABLE `wp_lh_scheduled_job_param` (
   `value` varchar(255) NOT NULL,
   PRIMARY KEY (`job_param_id`)
 --  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_scheduled_jobs`(`id`) -- removed cause of hibernate
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 CREATE TABLE `job_scheduler` (
@@ -93,7 +93,7 @@ CREATE TABLE `job_scheduler` (
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_updated_date` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`job_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `job_scheduler_param` (
   `job_param_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -102,7 +102,7 @@ CREATE TABLE `job_scheduler_param` (
   `value` varchar(255) NOT NULL,
   PRIMARY KEY (`job_param_id`)
 --  FOREIGN KEY (`job_id`) REFERENCES `job_scheduler`(`job_id`) -- removed cause of hibernate
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `wp_lh_job_dependency` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -112,7 +112,7 @@ CREATE TABLE `wp_lh_job_dependency` (
   KEY `lh_jd_job_id` (`job_id`)
 --  FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)  -- removed cause of hibernate
 --  FOREIGN KEY (`depends_on_job_id`) REFERENCES `wp_lh_jobs`(`job_id`)  -- removed cause of hibernate
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 -- reporting table for reservations split across multiple rooms of the same type
@@ -137,7 +137,7 @@ CREATE TABLE `wp_lh_rpt_split_rooms` (
   PRIMARY KEY (`id`),
   KEY `job_id_idx` (`job_id`),
   FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- same guest, back-to-back bookings in different rooms of the same room type
 -- Production migration: src/main/config/migrations/2026-09-29-consecutive-bookings-report.sql
@@ -166,7 +166,7 @@ CREATE TABLE `wp_lh_rpt_consecutive_bookings` (
   PRIMARY KEY (`id`),
   KEY `job_pair_idx` (`job_id`, `reservation_id_left`, `reservation_id_right`),
   FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- bookings where no deposit had been paid yet
 CREATE TABLE `wp_lh_rpt_unpaid_deposit` (
@@ -187,14 +187,14 @@ CREATE TABLE `wp_lh_rpt_unpaid_deposit` (
   PRIMARY KEY (`id`),
   KEY `job_id_idx` (`job_id`),
   FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Hostelworld bookings excluded from automated cancellation
 CREATE TABLE `wp_hwl_cancel_booking_exempt` (
   `booking_reference` varchar(50) NOT NULL,
   `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`booking_reference`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `wp_lh_group_bookings` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -214,7 +214,7 @@ CREATE TABLE `wp_lh_group_bookings` (
   PRIMARY KEY (`id`),
   KEY `job_id_idx` (`job_id`),
   FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `wp_lh_rpt_mostly_full_dorms` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -235,7 +235,7 @@ CREATE TABLE `wp_lh_rpt_mostly_full_dorms` (
   PRIMARY KEY (`id`),
   KEY `job_id_idx` (`job_id`),
   FOREIGN KEY (`job_id`) REFERENCES `wp_lh_jobs`(`job_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 CREATE TABLE `wp_lh_rpt_guest_comments` (
@@ -249,7 +249,7 @@ CREATE TABLE `wp_lh_rpt_guest_comments` (
   PRIMARY KEY (`id`),
   KEY `lh_rpt_gc_reservation` (`reservation_id`),
   UNIQUE (`reservation_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 CREATE TABLE `wp_pxpost_transaction` (
@@ -269,7 +269,7 @@ CREATE TABLE `wp_pxpost_transaction` (
   `last_updated_date` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `job_id_idx` (`job_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=200000 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=200000 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `wp_lh_send_email` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -283,7 +283,7 @@ CREATE TABLE `wp_lh_send_email` (
   `last_updated_date` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `wp_lh_rooms` (
   `id` varchar(255) NOT NULL,
@@ -295,7 +295,7 @@ CREATE TABLE `wp_lh_rooms` (
   `active_yn` char(1) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `lh_r_idx` (`room`,`bed_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- used for analytic reporting
 CREATE TABLE `rpt_bookings` (
@@ -319,7 +319,7 @@ CREATE TABLE `rpt_bookings` (
   KEY `rpt_bookings_job_id` (`job_id`),
   KEY `rpt_bookings_job_id_reservationid` (`job_id`,`reservation_id`),
   KEY `rpt_bookings_job_id_bookingref` (`booking_reference`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- If you're dumping the table from wp_lh_calendar; then you'll need to fill these in manually
 
@@ -613,7 +613,7 @@ CREATE TABLE `wp_booking_lookup_key` (
  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
  PRIMARY KEY (`id`),
  UNIQUE KEY `lookup_key` (`lookup_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Production migration: folio EVL snapshot for unpaid deposit report filtering
 -- ALTER TABLE `wp_lh_calendar` ADD COLUMN `visitor_levy_total` decimal(10,2) DEFAULT 0 AFTER `payment_outstanding`;
@@ -646,7 +646,7 @@ CREATE TABLE `wp_lh_occupancy` (
   KEY `lh_occ_assignment` (`assignment_key`, `valid_to`),
   KEY `lh_occ_reservation` (`reservation_id`, `valid_to`),
   KEY `lh_occ_event` (`calendar_event_id`, `valid_to`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Current projected bedsheet badges for /housekeeping + Mercure
 CREATE TABLE `wp_lh_housekeeping_bed` (
@@ -665,7 +665,7 @@ CREATE TABLE `wp_lh_housekeeping_bed` (
   PRIMARY KEY (`room_id`),
   KEY `lh_hk_bed_selected` (`selected_date`),
   KEY `lh_hk_bed_room` (`room`, `bed_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Production migrations:
 -- CREATE TABLE `wp_lh_occupancy` (...);
@@ -714,7 +714,7 @@ CREATE TABLE `wp_lh_booking_assignment` (
   KEY `lh_ba_reservation_identifier` (`reservation_identifier`, `valid_to`),
   KEY `lh_ba_event` (`calendar_event_id`, `valid_to`),
   KEY `lh_ba_rest_stale` (`valid_to`, `last_rest_fetched_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Production migration: src/main/config/migrations/2026-09-22-booking-assignment-scd2.sql
 
@@ -795,7 +795,7 @@ CREATE TABLE `wp_lh_booking_source_lookup` (
   `valid_to` date DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `lh_bsl_source_from` (`source`, `valid_from`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 INSERT INTO `wp_lh_booking_source_lookup` (`source`, `commission_label`, `commission_divisor`, `valid_from`, `valid_to`) VALUES
   ('Booking.com', 'BDC', 6.67, '2020-01-01', NULL),
