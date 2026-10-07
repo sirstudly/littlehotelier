@@ -29,6 +29,7 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `insert_job` | Allowlisted enqueue only (`email` / `to_emails` params accept aliases accounts/hannah/jay/ron) |
 | `enqueue_quarterly_evl_6plus_report` | Enqueue EVL nights-6+ room revenue xlsx email job (Edinburgh crh/hsh/rmb or all) |
 | `enqueue_channel_production_report` | Enqueue Channel Production xlsx email job (month vs same month in previous 2 years) |
+| `email_spreadsheet` | Build a formatted xlsx from agent-supplied table data and email it right away from the ronbot Gmail account |
 | `describe_sql_tables` | List backoffice DB tables (tagged key / other / defunct) or one table's columns. Only when `RONBOT_SQL_RO_*` is set |
 | `run_sql` | One read-only ad-hoc SELECT on any table (row cap, 15s timeout). Only when `RONBOT_SQL_RO_*` is set |
 
@@ -76,6 +77,15 @@ Each value is either an address string or an object with the user's WhatsApp ide
 - Property: `property` = `crh`\|`hsh`\|`rmb`\|`lsh`\|`all`, or `properties` array; omit neither — tool errors so the agent asks
 - One job per property; each emails `{PROP} Channel Report {Month} {Year}.xlsx` with one sheet per year (requested month plus the same month in the previous 2 years)
 
+### `email_spreadsheet`
+
+- Required: `to` (array of any valid addresses or aliases), `subject` (also the file name unless `filename` is given), `sheets` (1–10)
+- Each sheet: `name`, optional `title` / `subtitle`, `columns[]` (`header`, `type` = `text`\|`integer`\|`number`\|`currency`\|`percent`\|`date`, optional `decimals`), `rows` (arrays of string/number/null in column order, max 5000), optional `totals` (zero-based numeric column indexes, summed in a bold `SUM()` row) and `notes` (footnotes)
+- Percent values are passed as 0–100; dates as `YYYY-MM-DD` (optionally with `HH:mm`); numeric strings like `£1,234.50` are parsed
+- Built in memory with `exceljs` (`src/reports/xlsx.ts`): bold header with fill, frozen header row, autofilter, £/%/date formats, auto column widths
+- Sent with `nodemailer` over Gmail SMTP (`src/reports/mailer.ts`) using an app password. Credentials come from GCP secrets `ronbot_gmail_user` / `ronbot_gmail_app_password`; locally `RONBOT_GMAIL_USER` / `RONBOT_GMAIL_APP_PASSWORD` override them. `RONBOT_REPORT_FROM_NAME` sets the sender name (default `Ronbot`). `RONBOT_REPORT_FROM_ADDRESS` optionally sends from an alias of the Gmail user; it must be listed under Gmail Settings → Accounts → "Send mail as", or Gmail rewrites From to the account address
+- Runs in the MCP process inside `ronbot-bridge`, independent of the hostel processors
+
 ### `get_channel_production`
 
 - Required: `month` (YYYY-MM); optional `property` / `properties` (omit both for all hostels)
@@ -103,7 +113,7 @@ Ad-hoc read-only queries against `wp_<prop>_backoffice`, over a separate pool th
 ```bash
 RONBOT_SQL_RO_USER=...
 RONBOT_SQL_RO_PASSWORD=...
-# Optional; default to host/port from each property's db_url_<prop> secret
+# Optional; default to DB_HOST / DB_PORT (then mysql-tailscale:3306)
 # RONBOT_SQL_RO_HOST=...
 # RONBOT_SQL_RO_PORT=3306
 ```
@@ -112,8 +122,8 @@ RONBOT_SQL_RO_PASSWORD=...
   - Exactly one `SELECT` (UNIONs, subqueries, cross-database joins OK); no table restrictions
   - Rejected: `SLEEP` / `BENCHMARK` / `GET_LOCK` / `LOAD_FILE` (and other lock functions), `FOR UPDATE`, `LOCK IN SHARE MODE`, `SELECT ... INTO`
   - A `LIMIT` is appended when absent and clamped when larger than `max_rows`; `truncated: true` means more rows exist
-  - Cancelled with `KILL QUERY` after 15s (MySQL 5.5 has no `max_execution_time`)
-  - MySQL 5.5 syntax only: no CTEs/`WITH`, window functions or `JSON_*`
+  - Cancelled with `KILL QUERY` after 15s
+  - MariaDB 10.11 syntax: CTEs/`WITH`, window functions and `JSON_*` work; MySQL 8-only syntax (`JSON_TABLE`, `->`/`->>`, `LATERAL`) does not
   - Dates are returned as stored (strings), not converted to UTC
 - `describe_sql_tables`: `property`, optional `table`. Without `table` lists tables and views; with `table` lists its columns. Key and legacy tables carry `notes` (`TABLE_NOTES` in `src/db/adhocSql.ts`) explaining how to query them
 - Booking/stay SQL defaults to the `wp_lh_booking_assignment` views (`src/main/config/migrations/2026-09-26-booking-assignment-views.sql`): `v_wp_lh_booking_reservation` (one row per current reservation, money safe to sum), `v_wp_lh_booking_current` (one row per bed), `v_wp_lh_booking_removed` (cancelled/removed assignments), then `wp_lh_booking_assignment` itself for history and point-in-time queries
@@ -136,6 +146,9 @@ java -Dloader.main=com.macbackpackers.ronbot.RunRonbotReadApi \
 # Terminal B — MCP (stdio; Cursor uses .cursor/mcp.json)
 export RONBOT_READ_API_URL=http://127.0.0.1:8080
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials/gcp-service-account.json
+# DB for job/queue tools: wp_<prop>_backoffice on DB_HOST (default mysql-tailscale, only resolvable inside Compose);
+# credentials from GCP secrets db_username_<prop> / db_password_<prop>
+export DB_HOST=your-mysql-host.tailnet-name.ts.net
 # Optional overrides when not using Docker log mounts:
 # export LOG_DIR_CRH=../logs/crh LOG_DIR_HSH=../logs/hsh ...
 node dist/index.js
@@ -172,6 +185,7 @@ See [`.cursor/mcp.json`](../.cursor/mcp.json). Point `args` at `ronbot-mcp/dist/
 - WhatsApp: "send me the latest channel report" (from a tagged hsh group, sender listed in `email-aliases.json`) → `enqueue_channel_production_report` with `property=hsh`, previous month, `to_emails=[<Requester alias>]`
 - "Revenue by channel at hsh for July 2026" → `get_channel_production` with `property=hsh`, `month=2026-07`
 - "Occupancy at rmb from 2026-06-01 to 2026-08-31" → `get_occupancy` with `property=rmb`, `from=2026-06-01`, `to=2026-08-31`
+- Follow-up: "can you email that to me as a spreadsheet?" → `get_occupancy` again if needed, then `email_spreadsheet` with `to=[<Requester alias>]`, one sheet with month / occupancy % / beds booked / revenue columns
 - "How many HousekeepingJob runs failed at hsh this week?" → `run_sql` on `wp_lh_jobs`
 - "Which beds at crh have checkin 2026-09-25?" → `describe_sql_tables` (`table=v_wp_lh_booking_current`), then `run_sql`
 - "How many tour bookings at lsh in March 2025?" → `search_reservations` with `property=lsh`, `query=tour`, `stay_from=2025-03-01`, `stay_to=2025-03-31`; if bed/room detail is needed, `run_sql` on `v_wp_lh_booking_reservation` with `reservation_id IN (...)`

@@ -23,6 +23,14 @@ import { getJobQueueStats } from "./db/queue.js";
 import { isReadOnlySqlConfigured } from "./db/readOnlyPool.js";
 import * as scheduledDb from "./db/scheduled.js";
 import { audit } from "./lib/audit.js";
+import { sendReportEmail } from "./reports/mailer.js";
+import {
+  COLUMN_TYPES,
+  MAX_COLUMNS,
+  MAX_ROWS_PER_SHEET,
+  MAX_SHEETS,
+  buildWorkbook,
+} from "./reports/xlsx.js";
 
 function ok(data: unknown) {
   return {
@@ -44,6 +52,16 @@ const EDINBURGH_PROPERTIES = ["crh", "hsh", "rmb"] as const;
 const ALL_PROPERTIES = ["crh", "hsh", "rmb", "lsh"] as const;
 type PropertyId = (typeof ALL_PROPERTIES)[number];
 const yearMonth = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Expected YYYY-MM");
+
+function spreadsheetFilename(name: string): string {
+  const base = name
+    .replace(/\.xlsx$/i, "")
+    .replace(/[\\/:*?"<>|\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 100);
+  return `${base || "Ronbot report"}.xlsx`;
+}
 
 /** search_reservations row cap; read-api enforces 1000, ronbot-bridge sets RONBOT_SEARCH_MAX_ROWS=200. */
 const SEARCH_MAX_ROWS = Math.min(
@@ -610,6 +628,76 @@ export function createServer(): McpServer {
     },
   );
 
+  server.tool(
+    "email_spreadsheet",
+    `Build a formatted .xlsx from table data and email it immediately from the ronbot Gmail account. Use when staff ask to email/send figures as a spreadsheet (e.g. "email this to me", "send that as a spreadsheet to X"). Fill rows from MCP tool results (re-fetch if needed), never from memory. Each sheet has typed columns: text, integer, number, currency (GBP), percent (pass 0-100, e.g. 85.2 for 85.2%), date (YYYY-MM-DD or YYYY-MM-DD HH:mm). Each row is an array of values in column order (null for blank). totals = zero-based indexes of numeric columns to sum in a bold totals row (don't total percent/ADR-style averages). notes = footnotes under the table (caveats such as truncated results). to entries may be any valid email address or shorthand accounts|hannah|jay|ron. Limits: ${MAX_SHEETS} sheets, ${MAX_ROWS_PER_SHEET} rows and ${MAX_COLUMNS} columns per sheet. For the standard channel production or quarterly EVL reports use the enqueue_* tools instead.`,
+    {
+      to: z.array(z.string().min(1)).min(1).max(20),
+      subject: z.string().min(1).max(200),
+      body: z.string().max(5000).optional(),
+      filename: z.string().max(120).optional(),
+      sheets: z
+        .array(
+          z.object({
+            name: z.string().min(1).max(100),
+            title: z.string().max(200).optional(),
+            subtitle: z.string().max(300).optional(),
+            columns: z
+              .array(
+                z.object({
+                  header: z.string().min(1).max(100),
+                  type: z.enum(COLUMN_TYPES).optional(),
+                  decimals: z.number().int().min(0).max(6).optional(),
+                }),
+              )
+              .min(1)
+              .max(MAX_COLUMNS),
+            rows: z
+              .array(z.array(z.union([z.string(), z.number(), z.null()])))
+              .max(MAX_ROWS_PER_SHEET),
+            totals: z.array(z.number().int().min(0)).optional(),
+            notes: z.array(z.string().max(500)).max(20).optional(),
+          }),
+        )
+        .min(1)
+        .max(MAX_SHEETS),
+      requested_by: z.string().optional(),
+    },
+    async ({ to, subject, body, filename, sheets, requested_by }) => {
+      try {
+        const recipients = resolveEmailRecipientList(to);
+        const attachmentName = spreadsheetFilename(filename || subject);
+        const buffer = await buildWorkbook({ sheets });
+        const { messageId } = await sendReportEmail({
+          to: recipients,
+          subject,
+          body: body?.trim() || `Please find attached: ${subject}.\n\nSent by Ronbot.`,
+          filename: attachmentName,
+          attachment: buffer,
+        });
+        const sheetSummary = sheets.map((s) => ({ name: s.name, rows: s.rows.length }));
+        audit("email_spreadsheet", {
+          to: recipients,
+          subject,
+          filename: attachmentName,
+          bytes: buffer.length,
+          sheets: sheetSummary,
+          message_id: messageId,
+          requested_by: requested_by ?? null,
+        });
+        return ok({ status: "sent", to: recipients, filename: attachmentName, sheets: sheetSummary });
+      } catch (err) {
+        audit("email_spreadsheet_failed", {
+          to,
+          subject,
+          error: err instanceof Error ? err.message : String(err),
+          requested_by: requested_by ?? null,
+        });
+        return fail(err);
+      }
+    },
+  );
+
   if (isReadOnlySqlConfigured()) {
     server.tool(
       "describe_sql_tables",
@@ -629,7 +717,7 @@ export function createServer(): McpServer {
 
     server.tool(
       "run_sql",
-      `Run one read-only ad-hoc SELECT against a property's backoffice DB (dedicated read-only MySQL user). MySQL 5.5 syntax: no CTEs/WITH, window functions or JSON_*. Any table may be queried (UNIONs, subqueries and cross-database joins like wp_hsh_backoffice.wp_lh_booking_assignment are fine). ${BOOKING_SQL_HINT} Key tables: ${KEY_TABLES.join(", ")}. Legacy tables (superseded): ${LEGACY_TABLES.join(", ")}. Defunct tables, not for current data: ${DEFUNCT_TABLES.join(", ")}. Rows are capped by max_rows (default 200, max ${HARD_MAX_ROWS}); truncated=true means more rows exist. Queries are cancelled after 15s. SLEEP/BENCHMARK/GET_LOCK/LOAD_FILE, FOR UPDATE, LOCK IN SHARE MODE and SELECT ... INTO are rejected. Call describe_sql_tables first if unsure of tables or columns. Prefer the specific tools (get_job, list_jobs, get_booking, get_occupancy, ...) when they answer the question.`,
+      `Run one read-only ad-hoc SELECT against a property's backoffice DB (dedicated read-only user). MariaDB 10.11 syntax: CTEs/WITH, window functions and JSON_* functions work; MySQL 8-only syntax (JSON_TABLE, ->/->>, LATERAL) does not. Any table may be queried (UNIONs, subqueries and cross-database joins like wp_hsh_backoffice.wp_lh_booking_assignment are fine). ${BOOKING_SQL_HINT} Key tables: ${KEY_TABLES.join(", ")}. Legacy tables (superseded): ${LEGACY_TABLES.join(", ")}. Defunct tables, not for current data: ${DEFUNCT_TABLES.join(", ")}. Rows are capped by max_rows (default 200, max ${HARD_MAX_ROWS}); truncated=true means more rows exist. Queries are cancelled after 15s. SLEEP/BENCHMARK/GET_LOCK/LOAD_FILE, FOR UPDATE, LOCK IN SHARE MODE and SELECT ... INTO are rejected. Call describe_sql_tables first if unsure of tables or columns. Prefer the specific tools (get_job, list_jobs, get_booking, get_occupancy, ...) when they answer the question.`,
       {
         property: propertySchema,
         sql: z.string().min(1).max(10000),

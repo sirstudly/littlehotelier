@@ -173,11 +173,20 @@ export const config = {
   logDirHsh: env("LOG_DIR_HSH", path.join(repoRootDefault, "logs", "hsh")),
   logDirRmb: env("LOG_DIR_RMB", path.join(repoRootDefault, "logs", "rmb")),
   logDirLsh: env("LOG_DIR_LSH", path.join(repoRootDefault, "logs", "lsh")),
+  /** MCP DB host/port (job tools); MCP defaults to mysql-tailscale:3306. */
+  dbHost: env("DB_HOST"),
+  dbPort: env("DB_PORT"),
   /** Read-only MySQL user for MCP run_sql / describe_sql_tables; tools are hidden when unset. */
   sqlRoHost: env("RONBOT_SQL_RO_HOST"),
   sqlRoPort: env("RONBOT_SQL_RO_PORT"),
   sqlRoUser: env("RONBOT_SQL_RO_USER"),
   sqlRoPassword: process.env.RONBOT_SQL_RO_PASSWORD ?? "",
+  /** Optional overrides for the GCP secrets ronbot_gmail_user / ronbot_gmail_app_password (email_spreadsheet). */
+  gmailUser: env("RONBOT_GMAIL_USER"),
+  gmailAppPassword: process.env.RONBOT_GMAIL_APP_PASSWORD ?? "",
+  reportFromName: env("RONBOT_REPORT_FROM_NAME"),
+  /** From address for email_spreadsheet; defaults to the Gmail sign-in user. */
+  reportFromAddress: env("RONBOT_REPORT_FROM_ADDRESS"),
 };
 
 export function isAllowlistedGroup(chatId: string): boolean {

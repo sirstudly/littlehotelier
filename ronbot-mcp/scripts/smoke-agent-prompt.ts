@@ -84,7 +84,7 @@ async function readApiHealthy(baseUrl: string): Promise<boolean> {
 }
 
 function buildMcpEnv(): Record<string, string> {
-  return {
+  const env: Record<string, string> = {
     GOOGLE_APPLICATION_CREDENTIALS: requireEnv("GOOGLE_APPLICATION_CREDENTIALS"),
     GCP_PROJECT_ID: process.env.GCP_PROJECT_ID?.trim() || "macbackpackers-backoffice",
     RONBOT_READ_API_URL: process.env.RONBOT_READ_API_URL?.trim() || "http://127.0.0.1:8080",
@@ -94,6 +94,16 @@ function buildMcpEnv(): Record<string, string> {
     LOG_DIR_RMB: logDir("LOG_DIR_RMB", "rmb"),
     LOG_DIR_LSH: logDir("LOG_DIR_LSH", "lsh"),
   };
+  for (const key of [
+    "RONBOT_GMAIL_USER",
+    "RONBOT_GMAIL_APP_PASSWORD",
+    "RONBOT_REPORT_FROM_NAME",
+    "RONBOT_REPORT_FROM_ADDRESS",
+  ]) {
+    const value = process.env[key]?.trim();
+    if (value) env[key] = value;
+  }
+  return env;
 }
 
 function agentOptions(mcpEnv: Record<string, string>, apiKey?: string) {
@@ -174,6 +184,34 @@ async function runOptionalBookingSmoke(
   }
 }
 
+async function runOptionalSpreadsheetSmoke(
+  mcpEnv: Record<string, string>,
+  apiKey?: string,
+): Promise<void> {
+  const to = process.env.RONBOT_SMOKE_SPREADSHEET_TO?.trim();
+  if (!to) {
+    console.log("Skipping email_spreadsheet smoke (RONBOT_SMOKE_SPREADSHEET_TO unset).");
+    return;
+  }
+  if (!(await readApiHealthy(mcpEnv.RONBOT_READ_API_URL))) {
+    console.error(
+      `RONBOT_SMOKE_SPREADSHEET_TO is set but ${mcpEnv.RONBOT_READ_API_URL}/ronbot/health is not OK — skipping spreadsheet prompt.`,
+    );
+    return;
+  }
+
+  const year = new Date().getFullYear();
+  const prompt = `Using the ronbot-ops MCP tools: call get_occupancy for property "crh" from ${year}-01-01 to ${year}-12-31, then email the monthly breakdown as a spreadsheet to "${to}" with email_spreadsheet (subject "CRH occupancy by month ${year}"; columns month, occupancy %, beds booked, revenue; totals for beds booked and revenue). Report the email_spreadsheet result. Do not invent data.`;
+
+  console.log(`Running optional email_spreadsheet Agent.prompt (to ${to})...`);
+  const result = await Agent.prompt(prompt, agentOptions(mcpEnv, apiKey));
+  console.log("status:", result.status);
+  console.log("result:\n", result.result ?? "(no result text)");
+  if (result.status === "error") {
+    process.exit(2);
+  }
+}
+
 async function main(): Promise<void> {
   if (!existsSync(mcpEntry)) {
     console.error(`MCP entry missing: ${mcpEntry}\nRun: npm run build`);
@@ -186,6 +224,7 @@ async function main(): Promise<void> {
   try {
     await runMainSmoke(mcpEnv, apiKey);
     await runOptionalBookingSmoke(mcpEnv, apiKey);
+    await runOptionalSpreadsheetSmoke(mcpEnv, apiKey);
   } catch (err) {
     if (err instanceof CursorAgentError) {
       console.error(

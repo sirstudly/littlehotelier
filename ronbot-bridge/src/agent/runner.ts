@@ -34,12 +34,20 @@ function mcpEnv(): Record<string, string> {
   if (config.googleCredentials) {
     env.GOOGLE_APPLICATION_CREDENTIALS = config.googleCredentials;
   }
+  if (config.dbHost) env.DB_HOST = config.dbHost;
+  if (config.dbPort) env.DB_PORT = config.dbPort;
   if (config.sqlRoUser && config.sqlRoPassword) {
     env.RONBOT_SQL_RO_USER = config.sqlRoUser;
     env.RONBOT_SQL_RO_PASSWORD = config.sqlRoPassword;
     if (config.sqlRoHost) env.RONBOT_SQL_RO_HOST = config.sqlRoHost;
     if (config.sqlRoPort) env.RONBOT_SQL_RO_PORT = config.sqlRoPort;
   }
+  if (config.gmailUser && config.gmailAppPassword) {
+    env.RONBOT_GMAIL_USER = config.gmailUser;
+    env.RONBOT_GMAIL_APP_PASSWORD = config.gmailAppPassword;
+  }
+  if (config.reportFromName) env.RONBOT_REPORT_FROM_NAME = config.reportFromName;
+  if (config.reportFromAddress) env.RONBOT_REPORT_FROM_ADDRESS = config.reportFromAddress;
   return env;
 }
 

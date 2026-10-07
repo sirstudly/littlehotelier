@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "smoke:agent": "tsx scripts/smoke-agent-prompt.ts"
+    "smoke:agent": "tsx scripts/smoke-agent-prompt.ts",
+    "smoke:xlsx": "tsx scripts/smoke-xlsx.ts"
   },
   "engines": {
     "node": ">=22.13"
@@ -18,13 +19,16 @@
   "dependencies": {
     "@google-cloud/secret-manager": "^5.6.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "exceljs": "^4.4.0",
     "mysql2": "^3.14.1",
     "node-sql-parser": "^5.4.0",
+    "nodemailer": "^6.10.1",
     "zod": "^3.25.28"
   },
   "devDependencies": {
     "@cursor/sdk": "^1.0.31",
     "@types/node": "^22.15.21",
+    "@types/nodemailer": "^6.4.24",
     "dotenv": "^16.6.1",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"

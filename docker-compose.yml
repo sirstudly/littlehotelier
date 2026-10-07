@@ -354,10 +354,16 @@ services:
       - LOG_DIR_RMB=/logs/rmb
       - LOG_DIR_LSH=/logs/lsh
       - HOME=/home/node
+      # MCP job/queue tools (credentials from GCP secrets db_username_<prop> / db_password_<prop>)
+      - DB_HOST=mysql-tailscale
       # MCP run_sql / describe_sql_tables (read-only MySQL user); hidden when user/password empty
       - RONBOT_SQL_RO_HOST=mysql-tailscale
       - RONBOT_SQL_RO_USER=${RONBOT_SQL_RO_USER:-}
       - RONBOT_SQL_RO_PASSWORD=${RONBOT_SQL_RO_PASSWORD:-}
+      # MCP email_spreadsheet: Gmail creds come from GCP secrets ronbot_gmail_user / ronbot_gmail_app_password
+      - RONBOT_REPORT_FROM_NAME=${RONBOT_REPORT_FROM_NAME:-RONBOT}
+      # Optional "Send mail as" alias of the Gmail user; blank sends from the Gmail user itself
+      - RONBOT_REPORT_FROM_ADDRESS=${RONBOT_REPORT_FROM_ADDRESS:-}
     volumes:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json:ro
       # MCP dist + node_modules are baked into the image (do not mount host dist —

@@ -86,6 +86,12 @@ export function loadEmailAliases(): Record<string, string> {
   return cachedAliases;
 }
 
+const EMAIL_ADDRESS = /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[A-Za-z]{2,}$/;
+
+export function isValidEmailAddress(address: string): boolean {
+  return EMAIL_ADDRESS.test(address);
+}
+
 /**
  * Resolves shorthand aliases or returns a literal email address.
  * Case-insensitive for aliases. Inputs containing `@` are treated as literal addresses.
@@ -96,6 +102,9 @@ export function resolveEmailRecipient(input: string): string {
     throw new Error("email is blank");
   }
   if (trimmed.includes("@")) {
+    if (!isValidEmailAddress(trimmed)) {
+      throw new Error(`'${trimmed}' is not a valid email address`);
+    }
     return trimmed;
   }
   const aliases = loadEmailAliases();
