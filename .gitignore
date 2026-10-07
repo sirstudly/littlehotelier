@@ -1,8 +1,10 @@
 /bin
+/*har
 /*log
 /conf/config.properties
 /test.lock
 /target
+/target-agent
 /*ser
 /cookie.file
 /logs
@@ -24,3 +26,4 @@
 /ronbot-bridge/dist
 /waha_sessions
 /.sessions
+/AGENTS.md

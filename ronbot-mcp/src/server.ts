@@ -253,22 +253,6 @@ export function createServer(): McpServer {
   );
 
   server.tool(
-    "suggest_bed_shuffle",
-    "Bed allocation help when a booking is unassigned, split across rooms, or has a mid-stay bed change: suggests the ordered moves (Assign/Unassign/Move) of not-yet-arrived guests so every bed of the reservation gets one bed for its whole stay — unassigned beds are placed, and assigned beds are brought into as few rooms as the group needs and back-to-back stays onto one bed (in-house beds stay put and anchor the rest). ALREADY_ASSIGNED means nothing needs changing. Uses the local booking-assignment calendar (a few minutes behind Cloudbeds). Rules: in-house guests, blocks and staff dorms are never touched; groups stay in as few rooms as they need; F never goes to MX. status FOUND → give staff the moves in order. OVERBOOKED/INFEASIBLE → report reason (overbooked nights or the bookings/rules in the way), split (fewest bed changes within the rules) and alternatives (each breaks exactly one rule, best first; mention the rule broken and any notes such as checking gender). `text` is the whole answer ready to send. Suggestions only — nothing is changed in Cloudbeds. Takes up to a minute.",
-    {
-      property: propertySchema,
-      query: z.string().min(1),
-    },
-    async ({ property, query }) => {
-      try {
-        return ok(await readApi.getBedShuffle({ property, query }));
-      } catch (err) {
-        return fail(err);
-      }
-    },
-  );
-
-  server.tool(
     "search_reservations",
     `Live Cloudbeds reservation list search via ronbot-read-api; returns up to max_rows (default and max ${SEARCH_MAX_ROWS}) matching reservations — truncated=true means more matched, so narrow the criteria (shorter date range, statuses, sources) rather than reporting a partial count as the total. Compact rows: reservationId, identifier, thirdPartyIdentifier, status, firstName, lastName, sourceName, checkinDate, checkoutDate, nights, bookingDate, grandTotal, balanceDue. Criteria (combine freely; at least query or one date range required): query = free text (guest name, reservation number, OTA ref — e.g. "tour"); stay_from/stay_to (reservations staying any night in range), checkin_from/checkin_to, checkout_from/checkout_to, booked_from/booked_to (YYYY-MM-DD, inclusive; a lone from or to means that single day); statuses = comma-separated (confirmed, not_confirmed, checked_in, checked_out, canceled, no_show; default all); sources = comma-separated OTA names exactly as in Cloudbeds (e.g. Booking.com, Hostelworld). Use this (not get_booking) to list bookings by name/criteria over a date range, e.g. to collect reservation ids and then join to wp_lh_booking_assignment / the views with run_sql (reservation_id IN (...)). Keep date ranges tight.`,
     {

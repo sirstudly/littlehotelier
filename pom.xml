@@ -263,4 +263,14 @@
         </plugins>
     </build>
 
+    <profiles>
+        <!-- Separate build dir for agent/CLI builds so they don't clash with IntelliJ writing to target/ -->
+        <profile>
+            <id>agent</id>
+            <build>
+                <directory>${project.basedir}/target-agent</directory>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
