@@ -1,6 +1,7 @@
 import mysql, { type Pool, type RowDataPacket, type ResultSetHeader } from "mysql2/promise";
 import { assertProperty, loadProperties, type PropertyId } from "../config/properties.js";
-import { getDbCredentials, parseJdbcUrl } from "../config/secrets.js";
+import { getDbCredentials } from "../config/secrets.js";
+import { dbTarget } from "./target.js";
 
 const pools = new Map<PropertyId, Pool>();
 
@@ -13,7 +14,7 @@ export async function getPool(property: string): Promise<Pool> {
 
   const meta = loadProperties()[id];
   const creds = await getDbCredentials(meta.secretSuffix);
-  const { host, port, database } = parseJdbcUrl(creds.url);
+  const { host, port, database } = dbTarget(id);
 
   const pool = mysql.createPool({
     host,

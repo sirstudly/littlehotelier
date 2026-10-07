@@ -1,15 +1,8 @@
 import mysql, { type Pool } from "mysql2/promise";
-import { assertProperty, loadProperties, type PropertyId } from "../config/properties.js";
-import { getDbCredentials, parseJdbcUrl } from "../config/secrets.js";
-
-interface Target {
-  host: string;
-  port: number;
-  database: string;
-}
+import { assertProperty, type PropertyId } from "../config/properties.js";
+import { dbTarget, type DbTarget } from "./target.js";
 
 const pools = new Map<PropertyId, Pool>();
-const targets = new Map<PropertyId, Target>();
 
 function roUser(): string {
   return process.env.RONBOT_SQL_RO_USER?.trim() ?? "";
@@ -24,28 +17,8 @@ export function isReadOnlySqlConfigured(): boolean {
   return roUser() !== "" && roPassword() !== "";
 }
 
-async function resolveTarget(id: PropertyId): Promise<Target> {
-  const cached = targets.get(id);
-  if (cached) return cached;
-
-  const hostOverride = process.env.RONBOT_SQL_RO_HOST?.trim();
-  const portOverride = process.env.RONBOT_SQL_RO_PORT?.trim();
-  const meta = loadProperties()[id];
-
-  let parsed: Target | null = null;
-  try {
-    parsed = parseJdbcUrl((await getDbCredentials(meta.secretSuffix)).url);
-  } catch (err) {
-    if (!hostOverride) throw err;
-  }
-
-  const target: Target = {
-    host: hostOverride || parsed!.host,
-    port: portOverride ? Number(portOverride) : (parsed?.port ?? 3306),
-    database: parsed?.database || `wp_${id}_backoffice`,
-  };
-  targets.set(id, target);
-  return target;
+function resolveTarget(id: PropertyId): DbTarget {
+  return dbTarget(id, process.env.RONBOT_SQL_RO_HOST, process.env.RONBOT_SQL_RO_PORT);
 }
 
 export async function getReadOnlyPool(property: string): Promise<Pool> {
@@ -58,7 +31,7 @@ export async function getReadOnlyPool(property: string): Promise<Pool> {
     return existing;
   }
 
-  const { host, port, database } = await resolveTarget(id);
+  const { host, port, database } = resolveTarget(id);
   const pool = mysql.createPool({
     host,
     port,
@@ -83,7 +56,7 @@ export async function getReadOnlyPool(property: string): Promise<Pool> {
  */
 export async function killReadOnlyQuery(property: string, threadId: number): Promise<void> {
   const id = assertProperty(property);
-  const { host, port, database } = await resolveTarget(id);
+  const { host, port, database } = resolveTarget(id);
   const conn = await mysql.createConnection({
     host,
     port,

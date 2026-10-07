@@ -15,7 +15,7 @@ function getClient(): SecretManagerServiceClient {
 
 /**
  * Fetches a secret version from GCP Secret Manager.
- * Secret names mirror Spring: db_url_crh, db_username_hsh, etc.
+ * Secret names mirror Spring: db_username_crh, db_password_hsh, etc.
  */
 export async function getSecret(secretId: string): Promise<string> {
   const cached = cache.get(secretId);
@@ -44,29 +44,12 @@ export async function getSecret(secretId: string): Promise<string> {
 }
 
 export async function getDbCredentials(secretSuffix: string): Promise<{
-  url: string;
   username: string;
   password: string;
 }> {
-  const [url, username, password] = await Promise.all([
-    getSecret(`db_url_${secretSuffix}`),
+  const [username, password] = await Promise.all([
     getSecret(`db_username_${secretSuffix}`),
     getSecret(`db_password_${secretSuffix}`),
   ]);
-  return { url, username, password };
-}
-
-/** Convert Spring-style jdbc:mysql://host:port/db?... to mysql2 config pieces. */
-export function parseJdbcUrl(jdbcUrl: string): {
-  host: string;
-  port: number;
-  database: string;
-} {
-  const cleaned = jdbcUrl.replace(/^jdbc:/, "");
-  const parsed = new URL(cleaned);
-  return {
-    host: parsed.hostname,
-    port: parsed.port ? Number(parsed.port) : 3306,
-    database: parsed.pathname.replace(/^\//, "").split("?")[0]!,
-  };
+  return { username, password };
 }
