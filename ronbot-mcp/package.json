@@ -22,13 +22,12 @@
     "exceljs": "^4.4.0",
     "mysql2": "^3.14.1",
     "node-sql-parser": "^5.4.0",
-    "nodemailer": "^6.10.1",
+    "nodemailer": "^10.0.16",
     "zod": "^3.25.28"
   },
   "devDependencies": {
     "@cursor/sdk": "^1.0.31",
     "@types/node": "^22.15.21",
-    "@types/nodemailer": "^6.4.24",
     "dotenv": "^16.6.1",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
