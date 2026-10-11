@@ -103,9 +103,16 @@ public class BedShuffleService {
     /** From the local calendar as of today ({@code options.today} is overwritten). */
     public ShuffleSuggestion suggestForReservation( long reservationId, Options options ) {
         LocalDate today = LocalDate.now();
-        BedCalendar calendar = buildCalendar( dao.fetchActiveHousekeepingRooms(),
-                dao.fetchCurrentBookingAssignmentsCheckingOutAfter( today ), today, dao.fetchActiveBedLocks() );
-        return suggest( calendar, reservationId, options.today( today ) );
+        return suggest( loadCalendar( today ), reservationId, options.today( today ) );
+    }
+
+    /**
+     * Includes stays checking out today: an in-house bed ending today is the first half of a bed change that the
+     * rest of the stay should continue on.
+     */
+    private BedCalendar loadCalendar( LocalDate today ) {
+        return buildCalendar( dao.fetchActiveHousekeepingRooms(),
+                dao.fetchCurrentBookingAssignmentsCheckingOutAfter( today.minusDays( 1 ) ), today, dao.fetchActiveBedLocks() );
     }
 
     public static ShuffleSuggestion suggest( BedCalendar calendar, long reservationId ) {
@@ -153,9 +160,7 @@ public class BedShuffleService {
     /** From the local calendar as of today ({@code options.today} is overwritten). */
     public ShuffleSuggestion suggestForConsecutive( long reservationId, long nextReservationId, int roomTypeId, Options options ) {
         LocalDate today = LocalDate.now();
-        BedCalendar calendar = buildCalendar( dao.fetchActiveHousekeepingRooms(),
-                dao.fetchCurrentBookingAssignmentsCheckingOutAfter( today ), today, dao.fetchActiveBedLocks() );
-        return suggestConsecutive( calendar, reservationId, nextReservationId, roomTypeId, options.today( today ) );
+        return suggestConsecutive( loadCalendar( today ), reservationId, nextReservationId, roomTypeId, options.today( today ) );
     }
 
     /**
@@ -668,7 +673,7 @@ public class BedShuffleService {
 
     /**
      * @param rooms active beds (excluding Unallocated), including staff dorms (their bookings are pinned)
-     * @param rows  current booking assignments checking out after {@code today}
+     * @param rows  current booking assignments checking out on or after {@code today}
      */
     public static BedCalendar buildCalendar( List<RoomBed> rooms, List<BookingAssignment> rows, LocalDate today ) {
         return buildCalendar( rooms, rows, today, List.of() );
@@ -676,7 +681,7 @@ public class BedShuffleService {
 
     /**
      * @param rooms active beds (excluding Unallocated), including staff dorms (their bookings are pinned)
-     * @param rows  current booking assignments checking out after {@code today}
+     * @param rows  current booking assignments checking out on or after {@code today}
      * @param locks active bed locks; a booking on its locked bed is pinned (and marked locked)
      */
     public static BedCalendar buildCalendar( List<RoomBed> rooms, List<BookingAssignment> rows, LocalDate today,

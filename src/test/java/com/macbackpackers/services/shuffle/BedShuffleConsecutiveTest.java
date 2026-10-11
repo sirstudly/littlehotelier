@@ -62,6 +62,22 @@ public class BedShuffleConsecutiveTest {
     }
 
     @Test
+    public void restOfStayJoinsInHouseBedCheckingOutToday() {
+        // as at 11-Oct: in-house on A1 until today, then B1; another guest has A1 tonight
+        BedCalendar calendar = calendar();
+        calendar.addBooking( booking( "left", 1L, d( 1 ), d( 3 ), true ), "A1" );
+        calendar.addBooking( booking( "right", 1L, d( 3 ), d( 4 ), false ), "B1" );
+        calendar.addBooking( booking( "z", 2L, d( 3 ), d( 4 ), false ), "A1" );
+
+        ShuffleSuggestion s = BedShuffleService.suggestConsecutive( calendar, 1L, 1L, 1,
+                new BedShuffleService.Options().today( d( 3 ) ) );
+        System.out.println( s.describe() );
+        assertThat( s.getStatus(), is( ShuffleSuggestion.Status.FOUND ) );
+        assertThat( calendar.currentAssignment().get( "right" ), is( "A1" ) );
+        assertThat( calendar.currentAssignment().get( "z" ), is( not( "A1" ) ) );
+    }
+
+    @Test
     public void alreadyOnOneBedNeedsNothing() {
         BedCalendar calendar = calendar();
         calendar.addBooking( booking( "left", 1L, d( 1 ), d( 3 ), false ), "A1" );
