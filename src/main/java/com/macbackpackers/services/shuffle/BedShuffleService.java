@@ -195,7 +195,9 @@ public class BedShuffleService {
         }
         calendar.consolidate( Set.of(), chains );
         try {
-            return solve( calendar, nextReservationId, Set.of( reservationId, nextReservationId ), targets, options, c, true );
+            // the same reservation when one booking has back-to-back rooms on different beds
+            Set<Long> keepLocked = new LinkedHashSet<>( List.of( reservationId, nextReservationId ) );
+            return solve( calendar, nextReservationId, keepLocked, targets, options, c, true );
         }
         finally {
             calendar.clearConsolidation();
