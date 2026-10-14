@@ -42,6 +42,7 @@ import com.stripe.model.PaymentIntent;
 import com.stripe.model.Refund;
 import com.stripe.net.RequestOptions.RequestOptionsBuilder;
 import com.stripe.param.RefundCreateParams;
+import com.stripe.param.RefundListParams;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.htmlunit.WebClient;
@@ -1170,7 +1171,7 @@ public class PaymentProcessorService {
             Stripe.apiKey = getStripeApiKey();
             if ( txn.getReservationId() == null ) {
                 // process stripe invoice payment
-                PaymentIntent paymentIntent = txn.getPaymentIntent( gson );
+                PaymentIntent paymentIntent = txn.getPaymentIntent();
                 if ( "succeeded".equals( paymentIntent.getStatus() ) ) {
                     createSendStripePaymentConfirmationEmailJob( txn.getVendorTxCode() );
                 }
@@ -1198,8 +1199,8 @@ public class PaymentProcessorService {
             LOGGER.info( "We already have a transaction on the folio page with this vendor tx code: " + txn.getVendorTxCode() + ". Not adding it again..." );
         }
         else { // call Stripe server and record result manually
-            PaymentIntent paymentIntent = txn.getPaymentIntent( gson );
-            PaymentMethodDetails details = paymentIntent.getCharges().getData().get( 0 ).getPaymentMethodDetails();
+            PaymentIntent paymentIntent = txn.getPaymentIntent();
+            PaymentMethodDetails details = getLatestCharge( paymentIntent ).getPaymentMethodDetails();
             updateStripeTransactionWithPayment( txn, paymentIntent );
 
             if ( "succeeded".equals( paymentIntent.getStatus() ) ) {
@@ -1221,7 +1222,7 @@ public class PaymentProcessorService {
      * @param paymentIntent updated payment details
      */
     private void updateStripeTransactionWithPayment( StripeTransaction txn, PaymentIntent paymentIntent ) {
-        Charge charge = paymentIntent.getCharges().getData().get( 0 );
+        Charge charge = getLatestCharge( paymentIntent );
         PaymentMethodDetails details = charge.getPaymentMethodDetails();
         Outcome outcome = charge.getOutcome();
         String authDetails = outcome.getSellerMessage();
@@ -1230,6 +1231,21 @@ public class PaymentProcessorService {
         }
         wordpressDAO.updateStripeTransaction( txn.getId(), paymentIntent.getStatus(), outcome.getType(),
                 authDetails, charge.getId(), details.getCard().getBrand(), details.getCard().getLast4() );
+    }
+
+    /**
+     * Returns the latest charge on the payment intent. Requires {@code latest_charge} to have been
+     * expanded when the payment intent was retrieved.
+     * 
+     * @param paymentIntent payment intent to inspect
+     * @return non-null charge
+     */
+    private static Charge getLatestCharge( PaymentIntent paymentIntent ) {
+        Charge charge = paymentIntent.getLatestChargeObject();
+        if ( charge == null ) {
+            throw new MissingUserDataException( "No charge found for payment intent " + paymentIntent.getId() );
+        }
+        return charge;
     }
 
     /**
@@ -1243,22 +1259,23 @@ public class PaymentProcessorService {
         Stripe.apiKey = getStripeApiKey();
         StripeRefund refund = wordpressDAO.fetchStripeRefund( refundTxnId );
         LOGGER.info( "Updating refund status for reservation " + refund.getReservationId() + " and txn " + refundTxnId );
-        Charge charge = Charge.retrieve( refund.getChargeId() );
-        if ( charge.getRefunds().getData().size() == 0 ) {
+        List<Refund> refunds = Refund.list( RefundListParams.builder()
+                .setCharge( refund.getChargeId() ).build() ).getData();
+        if ( refunds.size() == 0 ) {
             throw new MissingUserDataException( "Unable to find refund transaction." );
         }
 
         // if any refunds are not at succeeded, that status has precedence
         String[] status = new String[1];
-        charge.getRefunds().getData().forEach( r -> {
+        refunds.forEach( r -> {
             if ( false == "succeeded".equals( r.getStatus() ) || status[0] == null ) {
                 status[0] = r.getStatus();
             }
         } );
-        String jsonResponse = charge.getRefunds().getData().stream()
+        String jsonResponse = refunds.stream()
                 .map( r -> r.toJson() ).collect( Collectors.joining( ",\n" ) );
         LOGGER.info( jsonResponse );
-        wordpressDAO.updateStripeRefund( refundTxnId, charge.getId(), jsonResponse, status[0] );
+        wordpressDAO.updateStripeRefund( refundTxnId, refund.getChargeId(), jsonResponse, status[0] );
     }
 
     /**

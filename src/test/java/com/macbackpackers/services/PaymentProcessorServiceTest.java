@@ -18,11 +18,9 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import com.stripe.Stripe;
 import com.stripe.model.Charge;
 import com.stripe.model.Refund;
-import com.stripe.model.Token;
 import com.stripe.net.RequestOptions.RequestOptionsBuilder;
 import com.stripe.param.ChargeCreateParams;
 import com.stripe.param.RefundCreateParams;
-import com.stripe.param.TokenCreateParams;
 
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReference;
@@ -86,17 +84,8 @@ public class PaymentProcessorServiceTest {
     public void testProcessStripeRefund() throws Exception {
         Stripe.apiKey = "sk_test_4eC39HqLyjWDarjtT1zdp7dc";
 
-        Token token = Token.create( TokenCreateParams.builder()
-                .setCard( TokenCreateParams.Card.builder()
-                        .setNumber( "4242424242424242" )
-                        .setCvc( "314" )
-                        .setExpMonth( "4" )
-                        .setExpYear( "2021" )
-                        .build() )
-                .build() );
-
         Charge charge = Charge.create( ChargeCreateParams.builder()
-                .setSource( token.getId() )
+                .setSource( "tok_visa" )
                 .setCurrency( "usd" )
                 .setAmount( 1099L )
                 .build() );
@@ -107,7 +96,7 @@ public class PaymentProcessorServiceTest {
                         .build(),
                 // set idempotency key so we can re-run safely in case of previous failure
                 new RequestOptionsBuilder()
-                        .setIdempotencyKey( token.getId() )
+                        .setIdempotencyKey( charge.getId() )
                         .build() );
         LOGGER.info( "Refund: " + refund.toJson() );
     }

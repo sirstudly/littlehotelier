@@ -11,11 +11,13 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
+import org.apache.commons.lang3.StringUtils;
+
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
+import com.stripe.model.checkout.Session;
+import com.stripe.param.checkout.SessionRetrieveParams;
 
 @Entity
 @Table( name = "wp_stripe_transaction" )
@@ -244,18 +246,26 @@ public class StripeTransaction {
     }
 
     /**
-     * Looks up the payment intent for this transaction. Stripe.apiKey needs to be set prior to
+     * Looks up the payment intent (with its latest charge expanded) for this transaction via its
+     * checkout session. The stored checkout session JSON can't be used for this as the payment
+     * intent is only created once the customer pays. Stripe.apiKey needs to be set prior to
      * calling this.
      * 
-     * @param gson
-     * @return
+     * @return non-null payment intent
      * @throws StripeException
      */
-    public PaymentIntent getPaymentIntent( Gson gson ) throws StripeException {
-        JsonElement pi = gson.fromJson( getCheckoutSession(), JsonElement.class ).getAsJsonObject().get( "payment_intent" );
-        if ( pi == null ) {
+    public PaymentIntent getPaymentIntent() throws StripeException {
+        if ( StringUtils.isBlank( getSessionId() ) ) {
+            throw new MissingUserDataException( "Missing checkout session for vendor tx code: " + getVendorTxCode() + ". Unable to proceed." );
+        }
+        Session session = Session.retrieve( getSessionId(), SessionRetrieveParams.builder()
+                .addExpand( "payment_intent" )
+                .addExpand( "payment_intent.latest_charge" )
+                .build(), null );
+        PaymentIntent paymentIntent = session.getPaymentIntentObject();
+        if ( paymentIntent == null ) {
             throw new MissingUserDataException( "Missing payment intent for vendor tx code: " + getVendorTxCode() + ". Unable to proceed." );
         }
-        return PaymentIntent.retrieve( pi.getAsString() );
+        return paymentIntent;
     }
 }
