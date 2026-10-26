@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Cloudbeds Manipulator
 // @namespace    http://cloudbeds.com/
-// @version      1.4
+// @version      1.5
 // @updateURL    https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsManipulator.js
 // @downloadURL  https://raw.githubusercontent.com/sirstudly/littlehotelier/refs/heads/master/scripts/tampermonkey/CloudbedsManipulator.js
-// @description  Highlight Channel Collect / Airbnb bookings that must not be charged (with EVL levy exception).
+// @description  Highlight Channel Collect / Airbnb / Hostelworld Pay Now bookings that must not be charged (with EVL levy exception).
 // @author       RONBOT
 // @match        https://hotels.cloudbeds.com/connect/*
 // @match        https://macbackpackers.cloudbeds.com/connect/*
@@ -90,7 +90,9 @@
         }
 
         var sourceText = (sourceType.textContent || '').trim();
-        var isAltCollect = (sourceText === 'Agoda' || sourceText === 'Airbnb (API)');
+        // Agoda / Airbnb / Hostelworld Pay Now: OTA collects room; guest may still owe EVL on arrival.
+        var isAltCollect = (sourceText === 'Agoda' || sourceText === 'Airbnb (API)'
+            || sourceText.indexOf('Hostelworld') === 0);
         if (isAltCollect) {
             // Default to CHARGE GUEST LEVY! when checkout is missing or unparseable.
             return shouldChargeGuestLevy(findCheckoutText())
