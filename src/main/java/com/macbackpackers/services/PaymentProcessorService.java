@@ -465,6 +465,11 @@ public class PaymentProcessorService {
             LOGGER.info( "Reservation {} is canceled; skipping Hostelworld Pay Now payment", reservationId );
             return;
         }
+        if ( isHealthyChannelCollectPrepaidFolio( res ) ) {
+            LOGGER.info( "Nothing to do for Hostelworld Pay Now on reservation {}; already paid "
+                    + "(balanceDue is 0 or just EVL)", reservationId );
+            return;
+        }
 
         boolean alreadyRecorded = cloudbedsScraper.isExistsPaymentWithDescription( webClient, res,
                 CloudbedsScraper.HOSTELWORLD_PAYNOW_PAYMENT_DESCRIPTION );
@@ -511,6 +516,11 @@ public class PaymentProcessorService {
         }
         if ( "canceled".equalsIgnoreCase( res.getStatus() ) ) {
             LOGGER.info( "Reservation {} is canceled; skipping Airbnb prepaid payment", reservationId );
+            return;
+        }
+        if ( isHealthyChannelCollectPrepaidFolio( res ) ) {
+            LOGGER.info( "Nothing to do for Airbnb prepaid on reservation {}; already paid "
+                    + "(balanceDue is 0 or just EVL)", reservationId );
             return;
         }
 
