@@ -549,8 +549,15 @@ public class PaymentProcessorService {
     }
 
     /**
+     * Allowed |balanceDue − EVL| for channel-collect prepaid folios. Cloudbeds nightly/room rate
+     * splits can differ from the channel remittance by a few pence.
+     */
+    static final BigDecimal CHANNEL_COLLECT_PREPAID_BALANCE_TOLERANCE = new BigDecimal( "0.10" );
+
+    /**
      * Healthy channel-collect prepaid folio (HWL Pay Now / Airbnb): something paid, and remaining
-     * balance is either zero (fully paid incl. EVL) or exactly the visitor levy (due on arrival).
+     * balance is either zero (fully paid incl. EVL) or within
+     * {@link #CHANNEL_COLLECT_PREPAID_BALANCE_TOLERANCE} of the visitor levy (due on arrival).
      */
     public static boolean isHealthyChannelCollectPrepaidFolio( Reservation res ) {
         if ( res == null ) {
@@ -565,7 +572,8 @@ public class PaymentProcessorService {
             return true;
         }
         BigDecimal evl = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( res );
-        return balanceDue.compareTo( evl ) == 0;
+        return balanceDue.subtract( evl ).abs()
+                .compareTo( CHANNEL_COLLECT_PREPAID_BALANCE_TOLERANCE ) <= 0;
     }
 
     private void assertHealthyChannelCollectPrepaidFolio( Reservation res, String label,
@@ -574,17 +582,27 @@ public class PaymentProcessorService {
         BigDecimal balanceDue = res.getBalanceDue() != null ? res.getBalanceDue() : BigDecimal.ZERO;
         BigDecimal evl = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( res );
         if ( isHealthyChannelCollectPrepaidFolio( res ) ) {
-            LOGGER.info( "{} folio healthy for {}: paid={}, balanceDue={}, evl={}",
-                    label, res.getReservationId(), paid, balanceDue, evl );
+            if ( balanceDue.compareTo( BigDecimal.ZERO ) != 0 && balanceDue.compareTo( evl ) != 0 ) {
+                LOGGER.info( "{} folio healthy within tolerance for {}: paid={}, balanceDue={}, evl={}, "
+                                + "tolerance={}",
+                        label, res.getReservationId(), paid, balanceDue, evl,
+                        CHANNEL_COLLECT_PREPAID_BALANCE_TOLERANCE );
+            }
+            else {
+                LOGGER.info( "{} folio healthy for {}: paid={}, balanceDue={}, evl={}",
+                        label, res.getReservationId(), paid, balanceDue, evl );
+            }
             return;
         }
         throw new UnrecoverableFault( String.format(
                 "%s folio discrepancy for reservation %s (amount posted=%s): "
-                        + "paid=%s, balanceDue=%s, evl=%s. Expected paid>0 and (balanceDue==0 or balanceDue==evl).",
+                        + "paid=%s, balanceDue=%s, evl=%s. Expected paid>0 and (balanceDue==0 or "
+                        + "|balanceDue-evl|<=%s).",
                 label,
                 res.getReservationId(),
                 amountPosted != null ? amountPosted.toPlainString() : "(not posted this run)",
-                paid.toPlainString(), balanceDue.toPlainString(), evl.toPlainString() ) );
+                paid.toPlainString(), balanceDue.toPlainString(), evl.toPlainString(),
+                CHANNEL_COLLECT_PREPAID_BALANCE_TOLERANCE.toPlainString() ) );
     }
 
     /**

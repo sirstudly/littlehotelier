@@ -27,8 +27,33 @@ public class HostelworldPayNowFolioHealthTest {
     }
 
     @Test
+    public void healthyWhenBalanceDueWithinToleranceAboveEvl() {
+        // job 818669 shape: channel remittance left 6.11 vs EVL 6.08
+        Reservation res = reservation( "99.63", "6.11", "6.08" );
+        assertTrue( PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( res ) );
+    }
+
+    @Test
+    public void healthyWhenBalanceDueWithinToleranceBelowEvl() {
+        Reservation res = reservation( "99.66", "6.05", "6.08" );
+        assertTrue( PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( res ) );
+    }
+
+    @Test
+    public void healthyWhenBalanceDueAtToleranceBoundary() {
+        Reservation res = reservation( "34.43", "1.82", "1.72" );
+        assertTrue( PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( res ) );
+    }
+
+    @Test
     public void unhealthyWhenUnpaid() {
         Reservation res = reservation( "0.00", "36.15", "1.72" );
+        assertFalse( PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( res ) );
+    }
+
+    @Test
+    public void unhealthyWhenBalanceDueJustOutsideTolerance() {
+        Reservation res = reservation( "34.43", "1.83", "1.72" );
         assertFalse( PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( res ) );
     }
 
