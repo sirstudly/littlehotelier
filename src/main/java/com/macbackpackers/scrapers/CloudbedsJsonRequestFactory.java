@@ -751,6 +751,34 @@ public class CloudbedsJsonRequestFactory {
                 new NameValuePair( "inventory_object", String.format( "{\"type\":\"reservation_room\",\"id\":\"%s\"}", bookingRoomId ) ) ) );
         return webRequest;
     }
+
+    /**
+     * Records a third-party (Terceiros) payment on the next-gen folio — used for Hostelworld Pay Now
+     * channel-collect bookings where Hostelworld has already collected the money.
+     *
+     * @param bookingRoomId reservation room allocation to attach the payment to
+     * @param amount amount to record (GBP)
+     * @param description payment description (idempotency marker)
+     * @return web request
+     * @throws IOException on creation failure
+     */
+    public WebRequest createAddThirdPartyPaymentRequest( String bookingRoomId, BigDecimal amount,
+            String description ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
+        webRequest.setAdditionalHeader( "Accept", "application/json, text/plain, */*" );
+        webRequest.setAdditionalHeader( "X-Property-Id", getPropertyId() );
+        String paymentJson = IOUtils.toString( getClass().getClassLoader()
+                .getResourceAsStream( "add_third_party_payment_data.json" ), StandardCharsets.UTF_8 )
+                .replace( "__PROPERTY_ID__", getPropertyId() )
+                .replace( "__PAYMENT_AMOUNT__", CURRENCY_FORMAT.format( amount ) )
+                .replace( "__DESCRIPTION__", description );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "payment", paymentJson ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "inventory_object",
+                        String.format( "{\"type\":\"reservation_room\",\"id\":\"%s\"}", bookingRoomId ) ) ) );
+        return webRequest;
+    }
     
     /**
      * Processes a new refund onto an existing reservation with the given card.

@@ -19,6 +19,16 @@
     "requiredParams": ["reservation_id"],
     "description": "Charge non-refundable booking in Cloudbeds"
   },
+  "HostelworldPayNowPaymentJob": {
+    "classname": "com.macbackpackers.jobs.HostelworldPayNowPaymentJob",
+    "requiredParams": ["reservation_id"],
+    "description": "Record Hostelworld Pay Now third-party payment on Cloudbeds folio"
+  },
+  "CreateHostelworldPayNowPaymentJob": {
+    "classname": "com.macbackpackers.jobs.CreateHostelworldPayNowPaymentJob",
+    "requiredParams": ["days_back"],
+    "description": "Scan recent Hostelworld Pay Now bookings and enqueue folio payment jobs"
+  },
   "RunQuarterlyEvl6PlusNightsReportJob": {
     "classname": "com.macbackpackers.jobs.RunQuarterlyEvl6PlusNightsReportJob",
     "requiredParams": ["email"],

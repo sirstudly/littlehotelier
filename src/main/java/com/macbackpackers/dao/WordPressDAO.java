@@ -119,6 +119,22 @@ public interface WordPressDAO {
     boolean hasCalculateEdinburghVisitorLevyJobForReservation( String reservationId );
 
     /**
+     * True if a pending {@code HostelworldPayNowPaymentJob} exists for the reservation
+     * (status {@code submitted}, {@code processing}, or {@code retry}).
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    boolean hasPendingHostelworldPayNowPaymentJobForReservation( String reservationId );
+
+    /**
+     * True if a {@code HostelworldPayNowPaymentJob} for the reservation has already completed
+     * successfully (used by the WebSocket listener to avoid re-enqueueing after a successful run).
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    boolean hasCompletedHostelworldPayNowPaymentJobForReservation( String reservationId );
+
+    /**
      * True if a pending {@code BookingAssignmentEnrichJob} exists for the reservation
      * (status {@code submitted}, {@code processing}, or {@code retry}).
      *

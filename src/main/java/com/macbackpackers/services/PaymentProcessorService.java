@@ -438,6 +438,100 @@ public class PaymentProcessorService {
     }
 
     /**
+     * Records a one-time Cloudbeds third-party (Terceiros) payment for a Hostelworld Pay Now
+     * channel-collect booking, using the GBP {@code totalPrice} from Hostelworld Inbox. Afterward
+     * (and on re-checks) asserts the folio is healthy: paid &gt; 0 and balance due is either 0 or
+     * exactly the visitor levy. Discrepancies throw {@link UnrecoverableFault} so support is emailed.
+     *
+     * @param webClient cloudbeds web client
+     * @param reservationId cloudbeds reservation id
+     * @throws Exception on lookup/payment failure or folio discrepancy
+     */
+    public synchronized void recordHostelworldPayNowPayment( WebClient webClient, String reservationId )
+            throws Exception {
+        LOGGER.info( "Processing Hostelworld Pay Now third-party payment for reservation {}", reservationId );
+        Reservation res = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+
+        if ( false == res.isHostelworldBooking() ) {
+            throw new UnrecoverableFault( "Reservation " + reservationId + " is not a Hostelworld booking" );
+        }
+        if ( false == res.isChannelCollectBooking() ) {
+            throw new UnrecoverableFault( "Reservation " + reservationId + " is not channel-collect" );
+        }
+        if ( false == res.isNonRefundable() ) {
+            throw new UnrecoverableFault( "Reservation " + reservationId + " is not non-refundable" );
+        }
+        if ( "canceled".equalsIgnoreCase( res.getStatus() ) ) {
+            LOGGER.info( "Reservation {} is canceled; skipping Hostelworld Pay Now payment", reservationId );
+            return;
+        }
+
+        boolean alreadyRecorded = cloudbedsScraper.isExistsPaymentWithDescription( webClient, res,
+                CloudbedsScraper.HOSTELWORLD_PAYNOW_PAYMENT_DESCRIPTION );
+        BigDecimal hwlPrice = null;
+        if ( false == alreadyRecorded ) {
+            String bookingRef = res.getThirdPartyIdentifier();
+            if ( StringUtils.isBlank( bookingRef ) ) {
+                throw new MissingUserDataException(
+                        "Reservation " + reservationId + " has no Hostelworld third-party identifier" );
+            }
+            try ( WebClient hwlWebClient = context.getBean( "webClientForHostelworld", WebClient.class ) ) {
+                hwlPrice = hostelworldScraper.getPayNowTotalPriceGbp( hwlWebClient, bookingRef );
+            }
+            if ( hwlPrice.compareTo( BigDecimal.ZERO ) <= 0 ) {
+                throw new UnrecoverableFault( "Hostelworld Pay Now totalPrice for " + bookingRef
+                        + " is not positive: " + hwlPrice );
+            }
+            cloudbedsScraper.addThirdPartyPayment( webClient, res, hwlPrice,
+                    CloudbedsScraper.HOSTELWORLD_PAYNOW_PAYMENT_DESCRIPTION );
+            res = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+        }
+        else {
+            LOGGER.info( "Pay Now payment already on folio for reservation {}; checking folio health only",
+                    reservationId );
+        }
+
+        assertHealthyHostelworldPayNowFolio( res, hwlPrice );
+    }
+
+    /**
+     * Healthy Pay Now folio: something paid, and remaining balance is either zero (fully paid incl.
+     * EVL) or exactly the visitor levy (due on arrival).
+     */
+    public static boolean isHealthyHostelworldPayNowFolio( Reservation res ) {
+        if ( res == null ) {
+            return false;
+        }
+        BigDecimal paid = res.getPaidValue() != null ? res.getPaidValue() : BigDecimal.ZERO;
+        if ( paid.compareTo( BigDecimal.ZERO ) <= 0 ) {
+            return false;
+        }
+        BigDecimal balanceDue = res.getBalanceDue() != null ? res.getBalanceDue() : BigDecimal.ZERO;
+        if ( balanceDue.compareTo( BigDecimal.ZERO ) == 0 ) {
+            return true;
+        }
+        BigDecimal evl = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( res );
+        return balanceDue.compareTo( evl ) == 0;
+    }
+
+    private void assertHealthyHostelworldPayNowFolio( Reservation res, BigDecimal hwlPricePosted ) {
+        BigDecimal paid = res.getPaidValue() != null ? res.getPaidValue() : BigDecimal.ZERO;
+        BigDecimal balanceDue = res.getBalanceDue() != null ? res.getBalanceDue() : BigDecimal.ZERO;
+        BigDecimal evl = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( res );
+        if ( isHealthyHostelworldPayNowFolio( res ) ) {
+            LOGGER.info( "Hostelworld Pay Now folio healthy for {}: paid={}, balanceDue={}, evl={}",
+                    res.getReservationId(), paid, balanceDue, evl );
+            return;
+        }
+        throw new UnrecoverableFault( String.format(
+                "Hostelworld Pay Now folio discrepancy for reservation %s (HWL price posted=%s): "
+                        + "paid=%s, balanceDue=%s, evl=%s. Expected paid>0 and (balanceDue==0 or balanceDue==evl).",
+                res.getReservationId(),
+                hwlPricePosted != null ? hwlPricePosted.toPlainString() : "(not posted this run)",
+                paid.toPlainString(), balanceDue.toPlainString(), evl.toPlainString() ) );
+    }
+
+    /**
      * Does a AUTHORIZE/CAPTURE on the card details on the booking for the balance remaining if the
      * Rate Plan is "Non-refundable".
      * 

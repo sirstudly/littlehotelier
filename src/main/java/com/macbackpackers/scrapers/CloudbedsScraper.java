@@ -31,6 +31,7 @@ import com.macbackpackers.exceptions.PaymentPendingException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
 import com.macbackpackers.scrapers.cloudbedsws.EdinburghVisitorLevyBookingCriteria;
+import com.macbackpackers.scrapers.cloudbedsws.HostelworldPayNowPaymentCriteria;
 import com.macbackpackers.scrapers.cloudbedsws.NonRefundableBookingCriteria;
 import com.macbackpackers.scrapers.datainsights.CloudbedsDataInsightsClient;
 import com.macbackpackers.scrapers.datainsights.RoomAssignmentsReportRow;
@@ -103,6 +104,8 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_GROUP_BOOKING_APPROVAL_REQUIRED_PREPAID = "Group Booking Approval Required PREPAID";
     public static final String TEMPLATE_GROUP_BOOKING_PAYMENT_REMINDER = "Group Booking Payment Reminder";
     public static final String TEMPLATE_GUEST_REGISTRATION_REQUEST = "Guest Registration Request";
+    /** Folio payment description / idempotency marker for Hostelworld Pay Now third-party payments. */
+    public static final String HOSTELWORLD_PAYNOW_PAYMENT_DESCRIPTION = "Hostelworld PayNow channel collect -ronbot";
     /** Suffix on pending CNP notes waiting for guest email confirmation. */
     public static final String NOTE_WILL_POST_AUTOMATICALLY = " will post automatically when customer confirms via email.";
     public static final double DEFAULT_RATE_LIMIT = 1.0; // requests per second
@@ -139,6 +142,15 @@ public class CloudbedsScraper {
             } );
 
     private static final LoadingCache<String, Set<String>> nonRefundableSubSourceIdCache = CacheBuilder.newBuilder()
+            .expireAfterWrite( BOOKING_SUB_SOURCE_CACHE_HOURS, TimeUnit.HOURS )
+            .build( new CacheLoader<String, Set<String>>() {
+                @Override
+                public Set<String> load( String propertyId ) {
+                    throw new UnsupportedOperationException( "Not used." ); // logic defined in get(key, Callable)
+                }
+            } );
+
+    private static final LoadingCache<String, Set<String>> hostelworldPayNowSubSourceIdCache = CacheBuilder.newBuilder()
             .expireAfterWrite( BOOKING_SUB_SOURCE_CACHE_HOURS, TimeUnit.HOURS )
             .build( new CacheLoader<String, Set<String>>() {
                 @Override
@@ -553,6 +565,20 @@ public class CloudbedsScraper {
                 } )
                 .findFirst();
         return txnNote.isPresent();
+    }
+
+    /**
+     * Returns true if any folio transaction description or notes contains the given substring.
+     */
+    public boolean isExistsPaymentWithDescription( WebClient webClient, Reservation res, String descriptionSubstring )
+            throws IOException {
+        if ( StringUtils.isBlank( descriptionSubstring ) ) {
+            return false;
+        }
+        return getTransactionsByReservation( webClient, res.getReservationId() ).stream()
+                .anyMatch( t -> StringUtils.contains( t.getDescription(), descriptionSubstring )
+                        || StringUtils.contains( t.getNotes(), descriptionSubstring )
+                        || StringUtils.contains( t.getOriginalDescription(), descriptionSubstring ) );
     }
 
     /**
@@ -1035,6 +1061,28 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Records a third-party (Terceiros) payment on the reservation folio without charging a card.
+     *
+     * @param webClient web client instance to use
+     * @param res cloudbeds reservation
+     * @param amount amount to record
+     * @param description payment description
+     * @throws IOException on request failure
+     */
+    public void addThirdPartyPayment( WebClient webClient, Reservation res, BigDecimal amount, String description )
+            throws IOException {
+        if ( res.getBookingRooms() == null || res.getBookingRooms().isEmpty() ) {
+            throw new MissingUserDataException( "Unable to find allocation to assign payment to!" );
+        }
+        BookingRoom bookingRoom = res.getBookingRooms().get( 0 );
+        LOGGER.info( "Recording third-party payment of {} on reservation {} ({})",
+                getCurrencyFormat().format( amount ), res.getReservationId(), description );
+        WebRequest requestSettings = jsonRequestFactory.createAddThirdPartyPaymentRequest(
+                bookingRoom.getId(), amount, description );
+        doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
+    }
+
+    /**
      * Registers an existing refund to the given reservation.
      * 
      * @param webClient web client instance to use
@@ -1446,6 +1494,27 @@ public class CloudbedsScraper {
                             NonRefundableBookingCriteria.ELIGIBLE_SOURCE_NAMES );
                     Set<String> ids = NonRefundableBookingCriteria.parseSubSourceIds( lookup );
                     LOGGER.info( "Resolved eligible non-refundable booking sub-source ids: {}", ids );
+                    return Collections.unmodifiableSet( ids );
+                }
+            } );
+        }
+        catch ( ExecutionException ex ) {
+            throw new IOException( ex );
+        }
+    }
+
+    /**
+     * Sub-source ids for Hostelworld channel-collect (Pay Now) sources used on calendar WebSocket events.
+     */
+    public Set<String> lookupHostelworldPayNowSubSourceIds( WebClient webClient ) throws IOException {
+        try {
+            return hostelworldPayNowSubSourceIdCache.get( getPropertyId(), new Callable<Set<String>>() {
+                @Override
+                public Set<String> call() throws Exception {
+                    String lookup = lookupBookingSourceIds( webClient,
+                            HostelworldPayNowPaymentCriteria.ELIGIBLE_SOURCE_NAMES );
+                    Set<String> ids = HostelworldPayNowPaymentCriteria.parseSubSourceIds( lookup );
+                    LOGGER.info( "Resolved Hostelworld Pay Now booking sub-source ids: {}", ids );
                     return Collections.unmodifiableSet( ids );
                 }
             } );
