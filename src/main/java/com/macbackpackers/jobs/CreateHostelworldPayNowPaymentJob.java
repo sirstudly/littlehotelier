@@ -50,7 +50,7 @@ public class CreateHostelworldPayNowPaymentJob extends AbstractJob {
                 .filter( p -> p.isChannelCollectBooking() )
                 .filter( p -> p.isNonRefundable() )
                 .filter( p -> false == dao.hasPendingHostelworldPayNowPaymentJobForReservation( p.getReservationId() ) )
-                .filter( p -> false == PaymentProcessorService.isHealthyHostelworldPayNowFolio( p ) )
+                .filter( p -> false == PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( p ) )
                 .forEach( p -> {
                     LOGGER.info( "Creating a HostelworldPayNowPaymentJob for booking {} ({}): {} {}",
                             p.getThirdPartyIdentifier(), p.getStatus(),

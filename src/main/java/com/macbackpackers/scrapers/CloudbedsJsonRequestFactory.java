@@ -764,11 +764,27 @@ public class CloudbedsJsonRequestFactory {
      */
     public WebRequest createAddThirdPartyPaymentRequest( String bookingRoomId, BigDecimal amount,
             String description ) throws IOException {
+        return createAddFolioPaymentMethodRequest( bookingRoomId, amount, description,
+                "add_third_party_payment_data.json" );
+    }
+
+    /**
+     * Records an AirBnB Prepaid Card payment on the next-gen folio — used for Airbnb (API)
+     * channel-collect bookings where Airbnb has already collected the money.
+     */
+    public WebRequest createAddAirbnbPrepaidPaymentRequest( String bookingRoomId, BigDecimal amount,
+            String description ) throws IOException {
+        return createAddFolioPaymentMethodRequest( bookingRoomId, amount, description,
+                "add_airbnb_prepaid_payment_data.json" );
+    }
+
+    private WebRequest createAddFolioPaymentMethodRequest( String bookingRoomId, BigDecimal amount,
+            String description, String templateResource ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
         webRequest.setAdditionalHeader( "Accept", "application/json, text/plain, */*" );
         webRequest.setAdditionalHeader( "X-Property-Id", getPropertyId() );
         String paymentJson = IOUtils.toString( getClass().getClassLoader()
-                .getResourceAsStream( "add_third_party_payment_data.json" ), StandardCharsets.UTF_8 )
+                .getResourceAsStream( templateResource ), StandardCharsets.UTF_8 )
                 .replace( "__PROPERTY_ID__", getPropertyId() )
                 .replace( "__PAYMENT_AMOUNT__", CURRENCY_FORMAT.format( amount ) )
                 .replace( "__DESCRIPTION__", description );

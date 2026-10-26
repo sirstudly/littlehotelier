@@ -135,6 +135,20 @@ public interface WordPressDAO {
     boolean hasCompletedHostelworldPayNowPaymentJobForReservation( String reservationId );
 
     /**
+     * True if a pending {@code AirbnbPrepaidPaymentJob} exists for the reservation.
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    boolean hasPendingAirbnbPrepaidPaymentJobForReservation( String reservationId );
+
+    /**
+     * True if an {@code AirbnbPrepaidPaymentJob} for the reservation has already completed.
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    boolean hasCompletedAirbnbPrepaidPaymentJobForReservation( String reservationId );
+
+    /**
      * True if a pending {@code BookingAssignmentEnrichJob} exists for the reservation
      * (status {@code submitted}, {@code processing}, or {@code retry}).
      *

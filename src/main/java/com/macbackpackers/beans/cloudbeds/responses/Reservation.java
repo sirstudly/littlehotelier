@@ -623,6 +623,10 @@ public class Reservation extends CloudbedsJsonResponse {
         return getSourceName() != null && getSourceName().startsWith( "Hostelworld" );
     }
 
+    public boolean isAirbnbBooking() {
+        return getSourceName() != null && getSourceName().startsWith( "Airbnb" );
+    }
+
     public boolean isBookingDotComBooking() {
         return getSourceName() != null && getSourceName().startsWith( "Booking.com" );
     }

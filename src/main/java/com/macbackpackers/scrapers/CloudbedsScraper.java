@@ -30,6 +30,7 @@ import com.macbackpackers.exceptions.PaymentNotAuthorizedException;
 import com.macbackpackers.exceptions.PaymentPendingException;
 import com.macbackpackers.exceptions.RecordPaymentFailedException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.scrapers.cloudbedsws.AirbnbPrepaidPaymentCriteria;
 import com.macbackpackers.scrapers.cloudbedsws.EdinburghVisitorLevyBookingCriteria;
 import com.macbackpackers.scrapers.cloudbedsws.HostelworldPayNowPaymentCriteria;
 import com.macbackpackers.scrapers.cloudbedsws.NonRefundableBookingCriteria;
@@ -106,6 +107,8 @@ public class CloudbedsScraper {
     public static final String TEMPLATE_GUEST_REGISTRATION_REQUEST = "Guest Registration Request";
     /** Folio payment description / idempotency marker for Hostelworld Pay Now third-party payments. */
     public static final String HOSTELWORLD_PAYNOW_PAYMENT_DESCRIPTION = "Hostelworld PayNow channel collect -ronbot";
+    /** Folio payment description / idempotency marker for Airbnb prepaid channel-collect payments. */
+    public static final String AIRBNB_PREPAID_PAYMENT_DESCRIPTION = "Airbnb channel collect -ronbot";
     /** Suffix on pending CNP notes waiting for guest email confirmation. */
     public static final String NOTE_WILL_POST_AUTOMATICALLY = " will post automatically when customer confirms via email.";
     public static final double DEFAULT_RATE_LIMIT = 1.0; // requests per second
@@ -151,6 +154,15 @@ public class CloudbedsScraper {
             } );
 
     private static final LoadingCache<String, Set<String>> hostelworldPayNowSubSourceIdCache = CacheBuilder.newBuilder()
+            .expireAfterWrite( BOOKING_SUB_SOURCE_CACHE_HOURS, TimeUnit.HOURS )
+            .build( new CacheLoader<String, Set<String>>() {
+                @Override
+                public Set<String> load( String propertyId ) {
+                    throw new UnsupportedOperationException( "Not used." ); // logic defined in get(key, Callable)
+                }
+            } );
+
+    private static final LoadingCache<String, Set<String>> airbnbPrepaidSubSourceIdCache = CacheBuilder.newBuilder()
             .expireAfterWrite( BOOKING_SUB_SOURCE_CACHE_HOURS, TimeUnit.HOURS )
             .build( new CacheLoader<String, Set<String>>() {
                 @Override
@@ -1083,6 +1095,22 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Records an AirBnB Prepaid Card payment on the reservation folio without charging a guest card.
+     */
+    public void addAirbnbPrepaidPayment( WebClient webClient, Reservation res, BigDecimal amount, String description )
+            throws IOException {
+        if ( res.getBookingRooms() == null || res.getBookingRooms().isEmpty() ) {
+            throw new MissingUserDataException( "Unable to find allocation to assign payment to!" );
+        }
+        BookingRoom bookingRoom = res.getBookingRooms().get( 0 );
+        LOGGER.info( "Recording Airbnb prepaid payment of {} on reservation {} ({})",
+                getCurrencyFormat().format( amount ), res.getReservationId(), description );
+        WebRequest requestSettings = jsonRequestFactory.createAddAirbnbPrepaidPaymentRequest(
+                bookingRoom.getId(), amount, description );
+        doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
+    }
+
+    /**
      * Registers an existing refund to the given reservation.
      * 
      * @param webClient web client instance to use
@@ -1515,6 +1543,27 @@ public class CloudbedsScraper {
                             HostelworldPayNowPaymentCriteria.ELIGIBLE_SOURCE_NAMES );
                     Set<String> ids = HostelworldPayNowPaymentCriteria.parseSubSourceIds( lookup );
                     LOGGER.info( "Resolved Hostelworld Pay Now booking sub-source ids: {}", ids );
+                    return Collections.unmodifiableSet( ids );
+                }
+            } );
+        }
+        catch ( ExecutionException ex ) {
+            throw new IOException( ex );
+        }
+    }
+
+    /**
+     * Sub-source ids for Airbnb (API) channel-collect sources used on calendar WebSocket events.
+     */
+    public Set<String> lookupAirbnbPrepaidSubSourceIds( WebClient webClient ) throws IOException {
+        try {
+            return airbnbPrepaidSubSourceIdCache.get( getPropertyId(), new Callable<Set<String>>() {
+                @Override
+                public Set<String> call() throws Exception {
+                    String lookup = lookupBookingSourceIds( webClient,
+                            AirbnbPrepaidPaymentCriteria.ELIGIBLE_SOURCE_NAMES );
+                    Set<String> ids = AirbnbPrepaidPaymentCriteria.parseSubSourceIds( lookup );
+                    LOGGER.info( "Resolved Airbnb prepaid booking sub-source ids: {}", ids );
                     return Collections.unmodifiableSet( ids );
                 }
             } );

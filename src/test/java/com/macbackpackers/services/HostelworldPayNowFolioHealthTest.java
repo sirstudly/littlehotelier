@@ -17,25 +17,25 @@ public class HostelworldPayNowFolioHealthTest {
     @Test
     public void healthyWhenFullyPaidIncludingEvl() {
         Reservation res = reservation( "34.43", "0.00", "1.72" );
-        assertTrue( PaymentProcessorService.isHealthyHostelworldPayNowFolio( res ) );
+        assertTrue( PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( res ) );
     }
 
     @Test
     public void healthyWhenOnlyEvlRemains() {
         Reservation res = reservation( "34.43", "1.72", "1.72" );
-        assertTrue( PaymentProcessorService.isHealthyHostelworldPayNowFolio( res ) );
+        assertTrue( PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( res ) );
     }
 
     @Test
     public void unhealthyWhenUnpaid() {
         Reservation res = reservation( "0.00", "36.15", "1.72" );
-        assertFalse( PaymentProcessorService.isHealthyHostelworldPayNowFolio( res ) );
+        assertFalse( PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( res ) );
     }
 
     @Test
     public void unhealthyWhenBalanceDueIsNeitherZeroNorEvl() {
         Reservation res = reservation( "34.43", "10.00", "1.72" );
-        assertFalse( PaymentProcessorService.isHealthyHostelworldPayNowFolio( res ) );
+        assertFalse( PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( res ) );
     }
 
     private static Reservation reservation( String paid, String balanceDue, String evl ) {

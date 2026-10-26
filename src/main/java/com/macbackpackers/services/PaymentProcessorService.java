@@ -491,14 +491,57 @@ public class PaymentProcessorService {
                     reservationId );
         }
 
-        assertHealthyHostelworldPayNowFolio( res, hwlPrice );
+        assertHealthyChannelCollectPrepaidFolio( res, "Hostelworld Pay Now", hwlPrice );
     }
 
     /**
-     * Healthy Pay Now folio: something paid, and remaining balance is either zero (fully paid incl.
-     * EVL) or exactly the visitor levy (due on arrival).
+     * Records a one-time Cloudbeds AirBnB Prepaid Card payment for an Airbnb (API) channel-collect
+     * booking for {@code balanceDue − EVL}. Afterward asserts the folio is healthy.
      */
-    public static boolean isHealthyHostelworldPayNowFolio( Reservation res ) {
+    public synchronized void recordAirbnbPrepaidPayment( WebClient webClient, String reservationId )
+            throws Exception {
+        LOGGER.info( "Processing Airbnb prepaid payment for reservation {}", reservationId );
+        Reservation res = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+
+        if ( false == res.isAirbnbBooking() ) {
+            throw new UnrecoverableFault( "Reservation " + reservationId + " is not an Airbnb booking" );
+        }
+        if ( false == res.isChannelCollectBooking() ) {
+            throw new UnrecoverableFault( "Reservation " + reservationId + " is not channel-collect" );
+        }
+        if ( "canceled".equalsIgnoreCase( res.getStatus() ) ) {
+            LOGGER.info( "Reservation {} is canceled; skipping Airbnb prepaid payment", reservationId );
+            return;
+        }
+
+        boolean alreadyRecorded = cloudbedsScraper.isExistsPaymentWithDescription( webClient, res,
+                CloudbedsScraper.AIRBNB_PREPAID_PAYMENT_DESCRIPTION );
+        BigDecimal amountPosted = null;
+        if ( false == alreadyRecorded ) {
+            amountPosted = EdinburghVisitorLevyCalculator.getBalanceDueExcludingVisitorLevy( res );
+            if ( amountPosted.compareTo( BigDecimal.ZERO ) <= 0 ) {
+                LOGGER.info( "Nothing to record for Airbnb prepaid on reservation {} after excluding EVL",
+                        reservationId );
+            }
+            else {
+                cloudbedsScraper.addAirbnbPrepaidPayment( webClient, res, amountPosted,
+                        CloudbedsScraper.AIRBNB_PREPAID_PAYMENT_DESCRIPTION );
+                res = cloudbedsScraper.getReservationRetry( webClient, reservationId );
+            }
+        }
+        else {
+            LOGGER.info( "Airbnb prepaid payment already on folio for reservation {}; checking folio health only",
+                    reservationId );
+        }
+
+        assertHealthyChannelCollectPrepaidFolio( res, "Airbnb prepaid", amountPosted );
+    }
+
+    /**
+     * Healthy channel-collect prepaid folio (HWL Pay Now / Airbnb): something paid, and remaining
+     * balance is either zero (fully paid incl. EVL) or exactly the visitor levy (due on arrival).
+     */
+    public static boolean isHealthyChannelCollectPrepaidFolio( Reservation res ) {
         if ( res == null ) {
             return false;
         }
@@ -514,20 +557,22 @@ public class PaymentProcessorService {
         return balanceDue.compareTo( evl ) == 0;
     }
 
-    private void assertHealthyHostelworldPayNowFolio( Reservation res, BigDecimal hwlPricePosted ) {
+    private void assertHealthyChannelCollectPrepaidFolio( Reservation res, String label,
+            BigDecimal amountPosted ) {
         BigDecimal paid = res.getPaidValue() != null ? res.getPaidValue() : BigDecimal.ZERO;
         BigDecimal balanceDue = res.getBalanceDue() != null ? res.getBalanceDue() : BigDecimal.ZERO;
         BigDecimal evl = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( res );
-        if ( isHealthyHostelworldPayNowFolio( res ) ) {
-            LOGGER.info( "Hostelworld Pay Now folio healthy for {}: paid={}, balanceDue={}, evl={}",
-                    res.getReservationId(), paid, balanceDue, evl );
+        if ( isHealthyChannelCollectPrepaidFolio( res ) ) {
+            LOGGER.info( "{} folio healthy for {}: paid={}, balanceDue={}, evl={}",
+                    label, res.getReservationId(), paid, balanceDue, evl );
             return;
         }
         throw new UnrecoverableFault( String.format(
-                "Hostelworld Pay Now folio discrepancy for reservation %s (HWL price posted=%s): "
+                "%s folio discrepancy for reservation %s (amount posted=%s): "
                         + "paid=%s, balanceDue=%s, evl=%s. Expected paid>0 and (balanceDue==0 or balanceDue==evl).",
+                label,
                 res.getReservationId(),
-                hwlPricePosted != null ? hwlPricePosted.toPlainString() : "(not posted this run)",
+                amountPosted != null ? amountPosted.toPlainString() : "(not posted this run)",
                 paid.toPlainString(), balanceDue.toPlainString(), evl.toPlainString() ) );
     }
 

@@ -29,6 +29,16 @@
     "requiredParams": ["days_back"],
     "description": "Scan recent Hostelworld Pay Now bookings and enqueue folio payment jobs"
   },
+  "AirbnbPrepaidPaymentJob": {
+    "classname": "com.macbackpackers.jobs.AirbnbPrepaidPaymentJob",
+    "requiredParams": ["reservation_id"],
+    "description": "Record Airbnb prepaid (AirBnB Prepaid Card) payment on Cloudbeds folio"
+  },
+  "CreateAirbnbPrepaidPaymentJob": {
+    "classname": "com.macbackpackers.jobs.CreateAirbnbPrepaidPaymentJob",
+    "requiredParams": ["days_back"],
+    "description": "Scan recent Airbnb channel-collect bookings and enqueue folio payment jobs"
+  },
   "RunQuarterlyEvl6PlusNightsReportJob": {
     "classname": "com.macbackpackers.jobs.RunQuarterlyEvl6PlusNightsReportJob",
     "requiredParams": ["email"],
