@@ -1,6 +1,9 @@
 package com.macbackpackers.services;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.comparesEqualTo;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
@@ -11,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import com.macbackpackers.beans.cloudbeds.responses.BalanceDetails;
 import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TaxBreakdownItem;
+import com.macbackpackers.exceptions.UnrecoverableFault;
 
 public class HostelworldPayNowFolioHealthTest {
 
@@ -61,6 +65,29 @@ public class HostelworldPayNowFolioHealthTest {
     public void unhealthyWhenBalanceDueIsNeitherZeroNorEvl() {
         Reservation res = reservation( "34.43", "10.00", "1.72" );
         assertFalse( PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( res ) );
+    }
+
+    @Test
+    public void requireChannelBalance_returnsPositiveAmount() {
+        Reservation res = new Reservation();
+        res.setReservationId( "189870634" );
+        res.setChannelBalance( new BigDecimal( "99.63" ) );
+        assertThat( PaymentProcessorService.requireHostelworldPayNowChannelBalance( res ),
+                comparesEqualTo( new BigDecimal( "99.63" ) ) );
+    }
+
+    @Test
+    public void requireChannelBalance_rejectsNullOrNonPositive() {
+        Reservation res = new Reservation();
+        res.setReservationId( "189870634" );
+        assertThrows( UnrecoverableFault.class,
+                () -> PaymentProcessorService.requireHostelworldPayNowChannelBalance( res ) );
+        res.setChannelBalance( BigDecimal.ZERO );
+        assertThrows( UnrecoverableFault.class,
+                () -> PaymentProcessorService.requireHostelworldPayNowChannelBalance( res ) );
+        res.setChannelBalance( new BigDecimal( "-1.00" ) );
+        assertThrows( UnrecoverableFault.class,
+                () -> PaymentProcessorService.requireHostelworldPayNowChannelBalance( res ) );
     }
 
     private static Reservation reservation( String paid, String balanceDue, String evl ) {

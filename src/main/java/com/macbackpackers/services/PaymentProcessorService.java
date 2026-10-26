@@ -439,10 +439,10 @@ public class PaymentProcessorService {
 
     /**
      * Records a one-time Cloudbeds third-party (Terceiros) payment for a Hostelworld Pay Now
-     * channel-collect booking, using the GBP {@code balanceDueNow} from Hostelworld Inbox (not
-     * {@code totalPrice}, which includes the HWL deposit). Afterward (and on re-checks) asserts the
-     * folio is healthy: paid &gt; 0 and balance due is either 0 or exactly the visitor levy.
-     * Discrepancies throw {@link UnrecoverableFault} so support is emailed.
+     * channel-collect booking, using Cloudbeds {@code channel_balance} (UI: Hostelworld Remaining
+     * Total). Afterward (and on re-checks) asserts the folio is healthy: paid &gt; 0 and balance due
+     * is either 0 or within tolerance of the visitor levy. Discrepancies throw
+     * {@link UnrecoverableFault} so support is emailed.
      *
      * @param webClient cloudbeds web client
      * @param reservationId cloudbeds reservation id
@@ -476,18 +476,9 @@ public class PaymentProcessorService {
                 CloudbedsScraper.HOSTELWORLD_PAYNOW_PAYMENT_DESCRIPTION );
         BigDecimal hwlPrice = null;
         if ( false == alreadyRecorded ) {
-            String bookingRef = res.getThirdPartyIdentifier();
-            if ( StringUtils.isBlank( bookingRef ) ) {
-                throw new MissingUserDataException(
-                        "Reservation " + reservationId + " has no Hostelworld third-party identifier" );
-            }
-            try ( WebClient hwlWebClient = context.getBean( "webClientForHostelworld", WebClient.class ) ) {
-                hwlPrice = hostelworldScraper.getPayNowAmountGbp( hwlWebClient, bookingRef );
-            }
-            if ( hwlPrice.compareTo( BigDecimal.ZERO ) <= 0 ) {
-                throw new UnrecoverableFault( "Hostelworld Pay Now balanceDueNow for " + bookingRef
-                        + " is not positive: " + hwlPrice );
-            }
+            hwlPrice = requireHostelworldPayNowChannelBalance( res );
+            LOGGER.info( "Hostelworld Pay Now channel_balance (Remaining Total) for {} ({}): £{}",
+                    reservationId, res.getThirdPartyIdentifier(), hwlPrice );
             cloudbedsScraper.addThirdPartyPayment( webClient, res, hwlPrice,
                     CloudbedsScraper.HOSTELWORLD_PAYNOW_PAYMENT_DESCRIPTION );
             res = cloudbedsScraper.getReservationRetry( webClient, reservationId );
@@ -498,6 +489,18 @@ public class PaymentProcessorService {
         }
 
         assertHealthyChannelCollectPrepaidFolio( res, "Hostelworld Pay Now", hwlPrice );
+    }
+
+    /**
+     * Cloudbeds {@code channel_balance} / Hostelworld Remaining Total — the amount to post for Pay Now.
+     */
+    static BigDecimal requireHostelworldPayNowChannelBalance( Reservation res ) {
+        BigDecimal channelBalance = res.getChannelBalance();
+        if ( channelBalance == null || channelBalance.compareTo( BigDecimal.ZERO ) <= 0 ) {
+            throw new UnrecoverableFault( "Reservation " + res.getReservationId()
+                    + " has no positive channel_balance (Hostelworld Remaining Total): " + channelBalance );
+        }
+        return channelBalance;
     }
 
     /**
