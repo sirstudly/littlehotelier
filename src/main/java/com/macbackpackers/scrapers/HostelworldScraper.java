@@ -432,22 +432,30 @@ public class HostelworldScraper {
      * @throws IOException
      */
     /**
-     * Looks up the Hostelworld Pay Now total price in GBP from the Inbox booking page
-     * ({@code APP_STATE.bookingDetails.totalPrice}).
+     * Looks up the Hostelworld Pay Now amount to post in GBP from the Inbox booking page
+     * ({@code APP_STATE.bookingDetails.balanceDueNow}). This is the property-currency remaining
+     * (matches Cloudbeds room excl. EVL); {@code totalPrice} wrongly includes the HWL deposit.
      *
      * @param webClient logged-in (or auto-login) Hostelworld web client
      * @param bookingRef Hostelworld booking reference (e.g. {@code 551-580788801} or cust id)
-     * @return non-null GBP total price
+     * @return non-null GBP amount to post as third-party payment
      * @throws IOException on page load failure
      * @throws UnrecoverableFault if not Pay Now, not GBP, or APP_STATE cannot be parsed
      */
-    public synchronized BigDecimal getPayNowTotalPriceGbp( WebClient webClient, String bookingRef )
+    public synchronized BigDecimal getPayNowAmountGbp( WebClient webClient, String bookingRef )
             throws IOException {
         String hwlBookingId = stripHostelworldPropertyPrefix( bookingRef );
         String bookingViewUrl = INBOX_ORIGIN + "/booking/view/" + hwlBookingId;
         HtmlPage bookingPage = gotoPage( webClient, bookingViewUrl );
         JsonObject bookingDetails = extractAppStateBookingDetails( bookingPage.getWebResponse().getContentAsString() );
+        return resolvePayNowAmountGbp( bookingDetails, bookingRef );
+    }
 
+    /**
+     * Resolves the GBP amount to post from Inbox {@code bookingDetails}: {@code balanceDueNow}, not
+     * {@code totalPrice} (which includes the HWL deposit).
+     */
+    BigDecimal resolvePayNowAmountGbp( JsonObject bookingDetails, String bookingRef ) {
         String type = bookingDetails.has( "type" ) ? bookingDetails.get( "type" ).getAsString() : null;
         if ( false == "PAYNOW".equals( type ) ) {
             throw new UnrecoverableFault( "Hostelworld booking " + bookingRef
@@ -458,13 +466,18 @@ public class HostelworldScraper {
             throw new UnrecoverableFault( "Hostelworld Pay Now booking " + bookingRef
                     + " currency is " + currency + "; expected GBP" );
         }
-        if ( false == bookingDetails.has( "totalPrice" )
-                || StringUtils.isBlank( bookingDetails.get( "totalPrice" ).getAsString() ) ) {
-            throw new UnrecoverableFault( "Hostelworld Pay Now booking " + bookingRef + " has no totalPrice" );
+        if ( false == bookingDetails.has( "balanceDueNow" )
+                || StringUtils.isBlank( bookingDetails.get( "balanceDueNow" ).getAsString() ) ) {
+            throw new UnrecoverableFault( "Hostelworld Pay Now booking " + bookingRef + " has no balanceDueNow" );
         }
-        BigDecimal totalPrice = new BigDecimal( bookingDetails.get( "totalPrice" ).getAsString().trim() );
-        LOGGER.info( "Hostelworld Pay Now totalPrice for {} is £{}", bookingRef, totalPrice );
-        return totalPrice;
+        BigDecimal balanceDueNow = new BigDecimal( bookingDetails.get( "balanceDueNow" ).getAsString().trim() );
+        String totalPrice = bookingDetails.has( "totalPrice" ) ? bookingDetails.get( "totalPrice" ).getAsString() : null;
+        String deposit = bookingDetails.has( "deposit" ) ? bookingDetails.get( "deposit" ).getAsString() : null;
+        LOGGER.info( "Hostelworld Pay Now amount for {}: balanceDueNow=£{} (totalPrice={}, deposit={}, txnCurrency={})",
+                bookingRef, balanceDueNow, totalPrice, deposit,
+                bookingDetails.has( "transactionCurrency" )
+                        ? bookingDetails.get( "transactionCurrency" ).getAsString() : null );
+        return balanceDueNow;
     }
 
     /**

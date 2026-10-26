@@ -439,9 +439,10 @@ public class PaymentProcessorService {
 
     /**
      * Records a one-time Cloudbeds third-party (Terceiros) payment for a Hostelworld Pay Now
-     * channel-collect booking, using the GBP {@code totalPrice} from Hostelworld Inbox. Afterward
-     * (and on re-checks) asserts the folio is healthy: paid &gt; 0 and balance due is either 0 or
-     * exactly the visitor levy. Discrepancies throw {@link UnrecoverableFault} so support is emailed.
+     * channel-collect booking, using the GBP {@code balanceDueNow} from Hostelworld Inbox (not
+     * {@code totalPrice}, which includes the HWL deposit). Afterward (and on re-checks) asserts the
+     * folio is healthy: paid &gt; 0 and balance due is either 0 or exactly the visitor levy.
+     * Discrepancies throw {@link UnrecoverableFault} so support is emailed.
      *
      * @param webClient cloudbeds web client
      * @param reservationId cloudbeds reservation id
@@ -481,10 +482,10 @@ public class PaymentProcessorService {
                         "Reservation " + reservationId + " has no Hostelworld third-party identifier" );
             }
             try ( WebClient hwlWebClient = context.getBean( "webClientForHostelworld", WebClient.class ) ) {
-                hwlPrice = hostelworldScraper.getPayNowTotalPriceGbp( hwlWebClient, bookingRef );
+                hwlPrice = hostelworldScraper.getPayNowAmountGbp( hwlWebClient, bookingRef );
             }
             if ( hwlPrice.compareTo( BigDecimal.ZERO ) <= 0 ) {
-                throw new UnrecoverableFault( "Hostelworld Pay Now totalPrice for " + bookingRef
+                throw new UnrecoverableFault( "Hostelworld Pay Now balanceDueNow for " + bookingRef
                         + " is not positive: " + hwlPrice );
             }
             cloudbedsScraper.addThirdPartyPayment( webClient, res, hwlPrice,

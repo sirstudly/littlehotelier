@@ -3,6 +3,7 @@ package com.macbackpackers.scrapers;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.comparesEqualTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
@@ -19,7 +20,6 @@ import com.macbackpackers.exceptions.UnrecoverableFault;
 public class HostelworldPayNowAppStateParseTest {
 
     private HostelworldScraper scraper;
-    private String fixtureHtml;
 
     @BeforeEach
     public void setUp() throws Exception {
@@ -28,19 +28,30 @@ public class HostelworldPayNowAppStateParseTest {
         java.lang.reflect.Field gsonField = HostelworldScraper.class.getDeclaredField( "gson" );
         gsonField.setAccessible( true );
         gsonField.set( scraper, new Gson() );
-
-        fixtureHtml = IOUtils.toString(
-                getClass().getClassLoader().getResourceAsStream( "hostelworld_paynow_app_state.html" ),
-                StandardCharsets.UTF_8 );
     }
 
     @Test
-    public void extractAppStateBookingDetails_readsPayNowGbpTotalPrice() {
-        JsonObject details = scraper.extractAppStateBookingDetails( fixtureHtml );
+    public void extractAppStateBookingDetails_readsPayNowGbpBalanceDueNow() throws Exception {
+        JsonObject details = scraper.extractAppStateBookingDetails( fixture( "hostelworld_paynow_app_state.html" ) );
         assertThat( details.get( "type" ).getAsString(), is( "PAYNOW" ) );
         assertThat( details.get( "currency" ).getAsString(), is( "GBP" ) );
+        assertThat( new BigDecimal( details.get( "balanceDueNow" ).getAsString() ),
+                comparesEqualTo( new BigDecimal( "28.23" ) ) );
+        assertThat( scraper.resolvePayNowAmountGbp( details, "551-580788801" ),
+                comparesEqualTo( new BigDecimal( "28.23" ) ) );
+    }
+
+    @Test
+    public void resolvePayNowAmountGbp_usesBalanceDueNowNotTotalPrice_forEurTxnBooking() throws Exception {
+        JsonObject details = scraper.extractAppStateBookingDetails(
+                fixture( "hostelworld_paynow_app_state_eur_txn.html" ) );
+        assertThat( details.get( "transactionCurrency" ).getAsString(), is( "EUR" ) );
         assertThat( new BigDecimal( details.get( "totalPrice" ).getAsString() ),
-                comparesEqualTo( new BigDecimal( "34.43" ) ) );
+                comparesEqualTo( new BigDecimal( "28.35" ) ) );
+
+        BigDecimal amount = scraper.resolvePayNowAmountGbp( details, "551-580776191" );
+        assertThat( amount, comparesEqualTo( new BigDecimal( "23.25" ) ) );
+        assertThat( amount, not( comparesEqualTo( new BigDecimal( "28.35" ) ) ) );
     }
 
     @Test
@@ -55,5 +66,19 @@ public class HostelworldPayNowAppStateParseTest {
     public void extractAppStateBookingDetails_missingAppStateThrows() {
         assertThrows( UnrecoverableFault.class,
                 () -> scraper.extractAppStateBookingDetails( "<html>no state</html>" ) );
+    }
+
+    @Test
+    public void resolvePayNowAmountGbp_missingBalanceDueNowThrows() {
+        JsonObject details = new Gson().fromJson(
+                "{\"type\":\"PAYNOW\",\"currency\":\"GBP\",\"totalPrice\":\"28.35\"}", JsonObject.class );
+        assertThrows( UnrecoverableFault.class,
+                () -> scraper.resolvePayNowAmountGbp( details, "551-580776191" ) );
+    }
+
+    private static String fixture( String name ) throws Exception {
+        return IOUtils.toString(
+                HostelworldPayNowAppStateParseTest.class.getClassLoader().getResourceAsStream( name ),
+                StandardCharsets.UTF_8 );
     }
 }
