@@ -49,7 +49,8 @@ public class GmailServiceTest {
 
     @Test
     public void testFetchHostelworldLoginUrl() throws Exception {
-        LOGGER.info( gmailService.fetchHostelworldLoginUrl() );
+        // Manual probe: accept any login email from the last hour
+        LOGGER.info( gmailService.fetchHostelworldLoginUrl( System.currentTimeMillis() - 3_600_000L ) );
     }
 
     @Test

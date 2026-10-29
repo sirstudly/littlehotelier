@@ -284,53 +284,73 @@ public class GmailService {
     }
 
     /**
-     * Returns the login URL from the most recent Hostelworld login email.
-     * Searches all labels including trash.
+     * Returns the login URL from the most recent Hostelworld login email sent at or after
+     * {@code notBeforeEpochMillis}. Searches all labels including trash.
      *
+     * @param notBeforeEpochMillis earliest acceptable email time (epoch millis), typically when
+     *            credentials were accepted so a stale magic-link email is ignored
      * @return non-null login URL
      * @throws IOException on I/O error
      * @throws EmptyResultDataAccessException if no message found within timeout
      */
-    public String fetchHostelworldLoginUrl() throws IOException, EmptyResultDataAccessException {
-        for(int i = 0; i < 8; i++) {
+    public String fetchHostelworldLoginUrl( long notBeforeEpochMillis ) throws IOException, EmptyResultDataAccessException {
+        // Gmail after: uses unix seconds; allow 2s skew so we don't miss the just-sent mail
+        long afterEpochSeconds = Math.max( 0L, ( notBeforeEpochMillis / 1000L ) - 2L );
+        String query = HOSTELWORLD_LOGIN_INBOX + " after:" + afterEpochSeconds;
+        LOGGER.info( "Looking for Hostelworld login email with query: {}", query );
+
+        for ( int i = 0 ; i < 8 ; i++ ) {
             Gmail service = connectAsClient();
-            ListMessagesResponse listResponse = 
+            ListMessagesResponse listResponse =
                     service.users().messages()
-                    .list( GMAIL_USER )
-                    .setQ( HOSTELWORLD_LOGIN_INBOX )
-                    .setMaxResults( 1L )
-                    .execute();
+                            .list( GMAIL_USER )
+                            .setQ( query )
+                            .setMaxResults( 5L )
+                            .execute();
             List<Message> messages = listResponse.getMessages();
             if ( messages != null && !messages.isEmpty() ) {
-                Message message = messages.get( 0 );
-                LOGGER.info( "Latest Hostelworld login message: " + message.getId() + " - " + message.getThreadId() );
-                String body = fetchMessageBody( service, message.getId() );
-                if ( body == null ) {
-                    throw new EmptyResultDataAccessException( "No body found in Hostelworld login message?", 1 );
-                }
-                try {
-                    return findAndReturn( "(https://inbox\\.hostelworld\\.com/login/[^\\s\"<>]+)", body );
-                }
-                catch ( EmptyResultDataAccessException e ) {
-                    try {
-                        return findAndReturn( "(https?://url[0-9]+\\.hostelworld\\.com/ls/click\\?[^\\s\"<>]+)", body );
+                for ( Message message : messages ) {
+                    Message fullMessage = service.users().messages()
+                            .get( GMAIL_USER, message.getId() )
+                            .setFormat( "full" )
+                            .execute();
+                    Long internalDate = fullMessage.getInternalDate();
+                    LOGGER.info( "Candidate Hostelworld login message: {} - {} (internalDate={})",
+                            message.getId(), message.getThreadId(), internalDate );
+                    if ( internalDate != null && internalDate < notBeforeEpochMillis ) {
+                        LOGGER.info( "Skipping message {} older than login attempt ({} < {})",
+                                message.getId(), internalDate, notBeforeEpochMillis );
+                        continue;
                     }
-                    catch ( EmptyResultDataAccessException e2 ) {
-                        LOGGER.info( "Unable to find login URL in latest messageId " + message.getId() + "; waiting for a newer email", e2 );
+                    String body = extractMessageBody( fullMessage );
+                    if ( body == null ) {
+                        LOGGER.info( "No body found in Hostelworld login message {}; continuing", message.getId() );
+                        continue;
+                    }
+                    try {
+                        return findAndReturn( "(https://inbox\\.hostelworld\\.com/login/[^\\s\"<>]+)", body );
+                    }
+                    catch ( EmptyResultDataAccessException e ) {
+                        try {
+                            return findAndReturn( "(https?://url[0-9]+\\.hostelworld\\.com/ls/click\\?[^\\s\"<>]+)", body );
+                        }
+                        catch ( EmptyResultDataAccessException e2 ) {
+                            LOGGER.info( "Unable to find login URL in messageId {}; continuing", message.getId(), e2 );
+                        }
                     }
                 }
             }
-            
+
             // email hasn't arrived yet? backoff.. 30 sec
             try {
-                LOGGER.info( "Email hasn't arrived yet, waiting a bit..." );
+                LOGGER.info( "Hostelworld login email hasn't arrived yet, waiting a bit..." );
                 Thread.sleep( 30000 );
             }
             catch ( InterruptedException e ) {
                 // ignore
             }
         }
-        throw new EmptyResultDataAccessException( "No Hostelworld login messages found", 1 );
+        throw new EmptyResultDataAccessException( "No Hostelworld login messages found after " + notBeforeEpochMillis, 1 );
     }
 
     /**
@@ -593,12 +613,21 @@ public class GmailService {
      * @throws IOException on I/O error
      */
     private String fetchMessageBody( Gmail gmail, String messageId ) throws IOException {
-        Message fullMessage = gmail.users().messages().get(GMAIL_USER, messageId).setFormat("full").execute();
+        Message fullMessage = gmail.users().messages().get( GMAIL_USER, messageId ).setFormat( "full" ).execute();
         LOGGER.debug( fullMessage.toPrettyString() );
-        
+        return extractMessageBody( fullMessage );
+    }
+
+    /**
+     * Returns the decoded body from an already-fetched full Gmail message.
+     *
+     * @param fullMessage message retrieved with format=full
+     * @return decoded body or null if not found
+     */
+    private String extractMessageBody( Message fullMessage ) {
         // return the first message part with a non-empty body
         // with a mime-type of text/plain or text/html
-        if ( fullMessage.getPayload() != null && fullMessage.getPayload().getBody() != null 
+        if ( fullMessage.getPayload() != null && fullMessage.getPayload().getBody() != null
                 && fullMessage.getPayload().getBody().getData() != null ) {
             return webSafeBase64Decode( fullMessage.getPayload().getBody().getData() );
         }
@@ -607,15 +636,15 @@ public class GmailService {
                 if ( part.getParts() != null ) {
                     for ( MessagePart innerPart : part.getParts() ) {
                         if ( innerPart.getBody() != null
-                                && ("text/plain".equals( innerPart.getMimeType() )
-                                        || "text/html".equals( innerPart.getMimeType() )) ) {
+                                && ( "text/plain".equals( innerPart.getMimeType() )
+                                        || "text/html".equals( innerPart.getMimeType() ) ) ) {
                             return webSafeBase64Decode( innerPart.getBody().getData() );
                         }
                     }
                 }
                 else if ( part.getBody() != null
                         && ( "text/plain".equals( part.getMimeType() )
-                        || "text/html".equals( part.getMimeType() ) ) ) {
+                                || "text/html".equals( part.getMimeType() ) ) ) {
                     return webSafeBase64Decode( part.getBody().getData() );
                 }
             }

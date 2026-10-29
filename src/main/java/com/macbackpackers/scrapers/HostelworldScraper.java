@@ -153,9 +153,10 @@ public class HostelworldScraper {
         }
 
         LOGGER.info( "Credentials accepted; waiting for secure login email..." );
+        long loginInitiatedAt = System.currentTimeMillis();
         sleep( 15000 );
 
-        String loginUrl = gmailService.fetchHostelworldLoginUrl();
+        String loginUrl = gmailService.fetchHostelworldLoginUrl( loginInitiatedAt );
         LOGGER.info( "Following secure login link from email" );
         HtmlPage loggedInPage = completeLoginAfterMagicLink( webClient, webClient.getPage( loginUrl ) );
 
