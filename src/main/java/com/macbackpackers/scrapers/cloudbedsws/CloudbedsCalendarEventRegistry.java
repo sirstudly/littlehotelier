@@ -69,6 +69,7 @@ public class CloudbedsCalendarEventRegistry {
     private final Map<String, PropertyIndex> indexesByProperty = new ConcurrentHashMap<>();
 
     private final ThreadLocal<Map<String, String>> resolvedRemovals = new ThreadLocal<>();
+    private final ThreadLocal<Map<String, String>> resolvedBookingRoomsRemovals = new ThreadLocal<>();
 
     /**
      * Rebuilds the index for a property from the {@code on_migrate} snapshot.
@@ -84,10 +85,12 @@ public class CloudbedsCalendarEventRegistry {
     }
 
     /**
-     * Captures booking ids for calendar event ids removed in this update, before listeners run.
+     * Captures booking ids for calendar event ids and NonAssigned {@code booking_rooms.id}s removed
+     * in this update, before listeners run.
      */
     public void beginUpdate( String propertyId, CloudbedsCalendarUpdate update ) {
         Map<String, String> resolved = new LinkedHashMap<>();
+        Map<String, String> resolvedRooms = new LinkedHashMap<>();
         if ( update != null ) {
             PropertyIndex index = indexesByProperty.get( propertyId );
             if ( index != null ) {
@@ -97,9 +100,22 @@ public class CloudbedsCalendarEventRegistry {
                         resolved.put( eventId, bookingId );
                     }
                 }
+                List<String> removedUnassigned = update.getDeleteSection().get( "NonAssignedReservations" );
+                if ( removedUnassigned != null ) {
+                    for ( String bookingRoomsId : removedUnassigned ) {
+                        if ( StringUtils.isBlank( bookingRoomsId ) ) {
+                            continue;
+                        }
+                        String bookingId = index.getBookingIdForBookingRoomsId( bookingRoomsId.trim() );
+                        if ( StringUtils.isNotBlank( bookingId ) ) {
+                            resolvedRooms.put( bookingRoomsId.trim(), bookingId );
+                        }
+                    }
+                }
             }
         }
         resolvedRemovals.set( resolved );
+        resolvedBookingRoomsRemovals.set( resolvedRooms );
     }
 
     /**
@@ -126,6 +142,7 @@ public class CloudbedsCalendarEventRegistry {
         }
         finally {
             resolvedRemovals.remove();
+            resolvedBookingRoomsRemovals.remove();
         }
     }
 
@@ -153,10 +170,43 @@ public class CloudbedsCalendarEventRegistry {
         return ResolvedBookingId.unknown();
     }
 
+    /**
+     * Resolves a removed {@code NonAssignedReservations} / {@code booking_rooms.id} to a booking id
+     * for the current update cycle (captured in {@link #beginUpdate} before the index entry is
+     * removed).
+     */
+    public ResolvedBookingId resolveRemovedBookingRoomsBookingId( String propertyId, String bookingRoomsId ) {
+        if ( StringUtils.isBlank( bookingRoomsId ) ) {
+            return ResolvedBookingId.unknown();
+        }
+        String key = bookingRoomsId.trim();
+        Map<String, String> resolved = resolvedBookingRoomsRemovals.get();
+        if ( resolved != null ) {
+            String bookingId = resolved.get( key );
+            if ( StringUtils.isNotBlank( bookingId ) ) {
+                return ResolvedBookingId.cached( bookingId );
+            }
+        }
+        PropertyIndex index = indexesByProperty.get( propertyId );
+        if ( index != null ) {
+            String bookingId = index.getBookingIdForBookingRoomsId( key );
+            if ( StringUtils.isNotBlank( bookingId ) ) {
+                return ResolvedBookingId.cached( bookingId );
+            }
+        }
+        return ResolvedBookingId.unknown();
+    }
+
     /** Visible for tests. */
     int calendarEventCount( String propertyId ) {
         PropertyIndex index = indexesByProperty.get( propertyId );
         return index == null ? 0 : index.calendarEventCount();
+    }
+
+    /** Visible for tests. */
+    int bookingRoomsMappingCount( String propertyId ) {
+        PropertyIndex index = indexesByProperty.get( propertyId );
+        return index == null ? 0 : index.bookingRoomsMappingCount();
     }
 
     private PropertyIndex indexFor( String propertyId ) {
@@ -203,6 +253,10 @@ public class CloudbedsCalendarEventRegistry {
             return calendarEventIdToBookingId.get( eventId );
         }
 
+        String getBookingIdForBookingRoomsId( String bookingRoomsId ) {
+            return bookingRoomsIdToBookingId.get( bookingRoomsId );
+        }
+
         void removeCalendarEvent( String eventId ) {
             calendarEventIdToBookingId.remove( eventId );
         }
@@ -213,6 +267,10 @@ public class CloudbedsCalendarEventRegistry {
 
         int calendarEventCount() {
             return calendarEventIdToBookingId.size();
+        }
+
+        int bookingRoomsMappingCount() {
+            return bookingRoomsIdToBookingId.size();
         }
     }
 }

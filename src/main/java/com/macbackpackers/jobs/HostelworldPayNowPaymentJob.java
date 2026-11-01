@@ -44,4 +44,11 @@ public class HostelworldPayNowPaymentJob extends AbstractJob {
     public void setReservationId( String reservationId ) {
         setParameter( "reservation_id", reservationId );
     }
+
+    @Override
+    public int getRetryCount() {
+        // Single attempt: Cloudbeds can accept /payment/add before get_reservation /
+        // transactions_by_reservation reflect it; retries then re-post and overpay.
+        return 1;
+    }
 }

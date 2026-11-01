@@ -44,4 +44,11 @@ public class AirbnbPrepaidPaymentJob extends AbstractJob {
     public void setReservationId( String reservationId ) {
         setParameter( "reservation_id", reservationId );
     }
+
+    @Override
+    public int getRetryCount() {
+        // Single attempt: Cloudbeds can accept the prepaid payment before folio reads
+        // catch up; retries then re-post and overpay. Same as HostelworldPayNowPaymentJob.
+        return 1;
+    }
 }

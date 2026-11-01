@@ -87,6 +87,48 @@ public class CloudbedsCalendarEventRegistryTest {
         registry.commitUpdate( PROPERTY_ID, autoAssign );
 
         assertEquals( 0, registry.calendarEventCount( PROPERTY_ID ) );
+        assertEquals( 0, registry.bookingRoomsMappingCount( PROPERTY_ID ) );
+    }
+
+    @Test
+    public void resolveRemovedBookingRoomsBookingId_usesCacheBeforeCommit() {
+        CloudbedsCalendarEvent unassigned = event(
+                "245179610",
+                "190486983",
+                "booked",
+                null,
+                null );
+        registry.onSnapshot( PROPERTY_ID, Collections.singletonList( unassigned ) );
+        assertEquals( 1, registry.bookingRoomsMappingCount( PROPERTY_ID ) );
+
+        CloudbedsCalendarUpdate deleteUpdate = new CloudbedsCalendarUpdate();
+        deleteUpdate.setPayloadAction( "changes" );
+        deleteUpdate.setDeleteSection( Collections.singletonMap(
+                "NonAssignedReservations", Collections.singletonList( "245179610" ) ) );
+        registry.beginUpdate( PROPERTY_ID, deleteUpdate );
+        CloudbedsCalendarEventRegistry.ResolvedBookingId resolved =
+                registry.resolveRemovedBookingRoomsBookingId( PROPERTY_ID, "245179610" );
+        registry.commitUpdate( PROPERTY_ID, deleteUpdate );
+
+        assertTrue( resolved.isKnown() );
+        assertEquals( "190486983", resolved.getBookingId() );
+        assertEquals( CloudbedsCalendarEventRegistry.BookingIdSource.CACHE, resolved.getSource() );
+        assertEquals( 0, registry.bookingRoomsMappingCount( PROPERTY_ID ) );
+    }
+
+    @Test
+    public void resolveRemovedBookingRoomsBookingId_unknownWhenNotCached() {
+        CloudbedsCalendarUpdate deleteUpdate = new CloudbedsCalendarUpdate();
+        deleteUpdate.setPayloadAction( "changes" );
+        deleteUpdate.setDeleteSection( Collections.singletonMap(
+                "NonAssignedReservations", Collections.singletonList( "245179610" ) ) );
+        registry.beginUpdate( PROPERTY_ID, deleteUpdate );
+        CloudbedsCalendarEventRegistry.ResolvedBookingId resolved =
+                registry.resolveRemovedBookingRoomsBookingId( PROPERTY_ID, "245179610" );
+        registry.commitUpdate( PROPERTY_ID, deleteUpdate );
+
+        assertFalse( resolved.isKnown() );
+        assertEquals( CloudbedsCalendarEventRegistry.BookingIdSource.UNKNOWN, resolved.getSource() );
     }
 
     @Test

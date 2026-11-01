@@ -324,6 +324,16 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public boolean hasPendingCreateHostelworldPayNowPaymentJob() {
+        Number count = (Number) em.createNativeQuery(
+                "SELECT COUNT(1) FROM wp_lh_jobs j "
+                        + " WHERE j.classname = 'com.macbackpackers.jobs.CreateHostelworldPayNowPaymentJob' "
+                        + "   AND j.status IN ('submitted', 'processing', 'retry')" )
+                .getSingleResult();
+        return count.longValue() > 0;
+    }
+
+    @Override
     public boolean hasPendingAirbnbPrepaidPaymentJobForReservation( String reservationId ) {
         if ( StringUtils.isBlank( reservationId ) ) {
             return false;
@@ -353,6 +363,16 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "   AND p.value = :reservationId "
                         + "   AND j.status = 'completed'" )
                 .setParameter( "reservationId", reservationId )
+                .getSingleResult();
+        return count.longValue() > 0;
+    }
+
+    @Override
+    public boolean hasPendingCreateAirbnbPrepaidPaymentJob() {
+        Number count = (Number) em.createNativeQuery(
+                "SELECT COUNT(1) FROM wp_lh_jobs j "
+                        + " WHERE j.classname = 'com.macbackpackers.jobs.CreateAirbnbPrepaidPaymentJob' "
+                        + "   AND j.status IN ('submitted', 'processing', 'retry')" )
                 .getSingleResult();
         return count.longValue() > 0;
     }

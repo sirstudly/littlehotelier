@@ -135,6 +135,12 @@ public interface WordPressDAO {
     boolean hasCompletedHostelworldPayNowPaymentJobForReservation( String reservationId );
 
     /**
+     * True if a pending {@code CreateHostelworldPayNowPaymentJob} exists (any params).
+     * Used to coalesce orphan NonAssigned-delete reconciles.
+     */
+    boolean hasPendingCreateHostelworldPayNowPaymentJob();
+
+    /**
      * True if a pending {@code AirbnbPrepaidPaymentJob} exists for the reservation.
      *
      * @param reservationId Cloudbeds reservation id
@@ -147,6 +153,12 @@ public interface WordPressDAO {
      * @param reservationId Cloudbeds reservation id
      */
     boolean hasCompletedAirbnbPrepaidPaymentJobForReservation( String reservationId );
+
+    /**
+     * True if a pending {@code CreateAirbnbPrepaidPaymentJob} exists (any params).
+     * Used to coalesce orphan NonAssigned-delete reconciles.
+     */
+    boolean hasPendingCreateAirbnbPrepaidPaymentJob();
 
     /**
      * True if a pending {@code BookingAssignmentEnrichJob} exists for the reservation
