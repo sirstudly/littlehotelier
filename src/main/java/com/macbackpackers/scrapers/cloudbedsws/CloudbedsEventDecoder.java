@@ -12,6 +12,9 @@ import java.util.Map;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -31,6 +34,8 @@ import com.google.gson.JsonParser;
  * This class is stateless; all methods are static.
  */
 public final class CloudbedsEventDecoder {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger( CloudbedsEventDecoder.class );
 
     private CloudbedsEventDecoder() {
         // utility class
@@ -85,9 +90,7 @@ public final class CloudbedsEventDecoder {
         update.setPayloadAction( asString( payload.get( "action" ) ) );
         update.setPayloadTime( asString( payload.get( "time" ) ) );
         update.setPayloadId( asString( payload.get( "id" ) ) );
-        if ( payload.has( "add" ) && false == payload.get( "add" ).isJsonNull() ) {
-            update.setRoomFreeAdd( payload.get( "add" ).getAsBoolean() );
-        }
+        applyRoomFreeAdd( update, payload.get( "add" ) );
         update.setExtraPayloadKeys( listExtraPayloadKeys( payload ) );
 
         JsonElement dataEl = payload.get( "data" );
@@ -109,6 +112,46 @@ public final class CloudbedsEventDecoder {
             }
         }
         return update;
+    }
+
+    /**
+     * {@code room_free} sends {@code "add": true|false}. Other payload shapes have been observed
+     * with a non-boolean {@code add} (e.g. a JsonObject); those are logged and ignored so the rest
+     * of the payload can still be decoded.
+     */
+    static void applyRoomFreeAdd( CloudbedsCalendarUpdate update, JsonElement addEl ) {
+        if ( addEl == null || addEl.isJsonNull() ) {
+            return;
+        }
+        if ( addEl.isJsonPrimitive() && addEl.getAsJsonPrimitive().isBoolean() ) {
+            update.setRoomFreeAdd( addEl.getAsBoolean() );
+            return;
+        }
+        LOGGER.warn(
+                "Cloudbeds payload action={} has unexpected 'add' type {} (expected boolean): {}",
+                update.getPayloadAction(), jsonTypeName( addEl ), addEl );
+    }
+
+    static String jsonTypeName( JsonElement el ) {
+        if ( el == null || el.isJsonNull() ) {
+            return "null";
+        }
+        if ( el.isJsonObject() ) {
+            return "JsonObject";
+        }
+        if ( el.isJsonArray() ) {
+            return "JsonArray";
+        }
+        if ( el.isJsonPrimitive() ) {
+            if ( el.getAsJsonPrimitive().isBoolean() ) {
+                return "boolean";
+            }
+            if ( el.getAsJsonPrimitive().isNumber() ) {
+                return "number";
+            }
+            return "string";
+        }
+        return el.getClass().getSimpleName();
     }
 
     static List<CloudbedsCalendarEvent> decodeEventList( JsonElement element ) {

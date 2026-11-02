@@ -3,6 +3,7 @@ package com.macbackpackers.scrapers.cloudbedsws;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,25 @@ public class CloudbedsEventDecoderTest {
         assertEquals( 1, update.getRemovedEventIds().size() );
         assertEquals( "177213922705803971", update.getRemovedEventIds().get( 0 ) );
         assertTrue( update.getEvents().isEmpty() );
+    }
+
+    @Test
+    public void decodePayload_nonBooleanAdd_doesNotThrowAndStillDecodesEvents() {
+        // Production saw UnsupportedOperationException: JsonObject from getAsBoolean() on add
+        String json = "{"
+                + "\"action\":\"changes\","
+                + "\"add\":{\"Events\":[\"177213922705803971\"]},"
+                + "\"data\":{"
+                + "  \"Events\":[{\"type\":\"booked\",\"booking_id\":\"166419128\",\"room_id\":\"112188-39\"}]"
+                + "}"
+                + "}";
+        CloudbedsCalendarUpdate update = CloudbedsEventDecoder.decodePayload(
+                JsonParser.parseString( json ).getAsJsonObject() );
+
+        assertEquals( "changes", update.getPayloadAction() );
+        assertNull( update.getRoomFreeAdd() );
+        assertEquals( 1, update.getEvents().size() );
+        assertEquals( "166419128", update.getEvents().get( 0 ).getBookingId() );
     }
 
     @Test

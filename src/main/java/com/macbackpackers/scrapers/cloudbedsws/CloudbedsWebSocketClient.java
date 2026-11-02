@@ -39,6 +39,8 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
     private static final Logger LOGGER = LoggerFactory.getLogger( CloudbedsWebSocketClient.class );
     private static final Gson GSON = new Gson();
     private static final int GUARANTEE_INTERVAL_SEC = 20;
+    /** Cap raw frame dumps so a pathological payload cannot flood transport.log. */
+    private static final int RAW_LOG_MAX_CHARS = 8000;
 
     private final String propertyId;
     private final String version;
@@ -101,7 +103,8 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
             handleIncoming( message );
         }
         catch ( Exception e ) {
-            LOGGER.warn( "Failed to handle Cloudbeds WebSocket message: {}", e.getMessage(), e );
+            LOGGER.warn( "Failed to handle Cloudbeds WebSocket message: {} | raw={}",
+                    e.getMessage(), truncateForLog( message ), e );
         }
     }
 
@@ -182,13 +185,30 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
     }
 
     private void handlePayload( String payloadStr ) {
-        JsonObject payload = JsonParser.parseString( payloadStr ).getAsJsonObject();
-        String action = payload.has( "action" ) ? payload.get( "action" ).getAsString() : "(none)";
-        CloudbedsCalendarUpdate update = CloudbedsEventDecoder.decodePayload( payload );
-        if ( update.getPayloadAction() == null ) {
-            update.setPayloadAction( action );
+        try {
+            JsonObject payload = JsonParser.parseString( payloadStr ).getAsJsonObject();
+            String action = payload.has( "action" ) ? payload.get( "action" ).getAsString() : "(none)";
+            CloudbedsCalendarUpdate update = CloudbedsEventDecoder.decodePayload( payload );
+            if ( update.getPayloadAction() == null ) {
+                update.setPayloadAction( action );
+            }
+            listener.onUpdate( propertyId, update );
         }
-        listener.onUpdate( propertyId, update );
+        catch ( Exception e ) {
+            LOGGER.warn( "Failed to decode Cloudbeds guarantee payload: {} | payload={}",
+                    e.getMessage(), truncateForLog( payloadStr ), e );
+            throw e;
+        }
+    }
+
+    static String truncateForLog( String value ) {
+        if ( value == null ) {
+            return null;
+        }
+        if ( value.length() <= RAW_LOG_MAX_CHARS ) {
+            return value;
+        }
+        return value.substring( 0, RAW_LOG_MAX_CHARS ) + "...[truncated, totalChars=" + value.length() + "]";
     }
 
     private void sendGuarantee() {
