@@ -20,6 +20,10 @@ public class TransactionDto {
     private String creditCardType;
     /** Masked / last4 only — never full PAN. */
     private String cardNumberLast4;
+    /** Cloudbeds payment id (needed to void); distinct from folio transaction {@link #id}. */
+    private String paymentId;
+    /** Cloudbeds payment method label, e.g. Terceiros. */
+    private String paymentType;
     private String paymentStatus;
     private String gatewayName;
     private String originalDescription;
@@ -134,6 +138,22 @@ public class TransactionDto {
 
     public void setCardNumberLast4( String cardNumberLast4 ) {
         this.cardNumberLast4 = cardNumberLast4;
+    }
+
+    public String getPaymentId() {
+        return paymentId;
+    }
+
+    public void setPaymentId( String paymentId ) {
+        this.paymentId = paymentId;
+    }
+
+    public String getPaymentType() {
+        return paymentType;
+    }
+
+    public void setPaymentType( String paymentType ) {
+        this.paymentType = paymentType;
     }
 
     public String getPaymentStatus() {

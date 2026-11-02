@@ -1,0 +1,7 @@
+{
+  "amount": __PAYMENT_AMOUNT__,
+  "payment_method": "__PAYMENT_METHOD__",
+  "parent_payment_id": "__PARENT_PAYMENT_ID__",
+  "transaction_type": "Void",
+  "property_id": "__PROPERTY_ID__"
+}

@@ -34,6 +34,11 @@
     "requiredParams": ["reservation_id"],
     "description": "Record Airbnb prepaid (AirBnB Prepaid Card) payment on Cloudbeds folio"
   },
+  "VoidFolioPaymentJob": {
+    "classname": "com.macbackpackers.jobs.VoidFolioPaymentJob",
+    "requiredParams": ["reservation_id"],
+    "description": "Void a Cloudbeds folio payment (Terceiros/Payment Recorded etc.) by payment_id or transaction_id"
+  },
   "CreateAirbnbPrepaidPaymentJob": {
     "classname": "com.macbackpackers.jobs.CreateAirbnbPrepaidPaymentJob",
     "requiredParams": ["days_back"],

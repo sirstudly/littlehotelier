@@ -778,6 +778,41 @@ public class CloudbedsJsonRequestFactory {
                 "add_airbnb_prepaid_payment_data.json" );
     }
 
+    /**
+     * Voids a folio payment (e.g. Terceiros / Payment Recorded) via next-gen
+     * {@code connect/payment/add} with {@code transaction_type=Void}. Matches the MFD UI void
+     * action — not {@code hotel/void_payment}.
+     *
+     * @param reservationId Cloudbeds reservation id (inventory object)
+     * @param paymentId Cloudbeds payment id ({@code parent_payment_id})
+     * @param amount original payment amount (positive)
+     * @param paymentMethod e.g. {@code Terceiros}
+     * @return web request
+     * @throws IOException on creation failure
+     */
+    public WebRequest createVoidFolioPaymentRequest( String reservationId, String paymentId,
+            BigDecimal amount, String paymentMethod ) throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );
+        webRequest.setAdditionalHeader( "Accept", "application/json, text/plain, */*" );
+        webRequest.setAdditionalHeader( "X-Property-Id", getPropertyId() );
+        String paymentJson = IOUtils.toString( getClass().getClassLoader()
+                .getResourceAsStream( "void_terceiros_payment_data.json" ), StandardCharsets.UTF_8 )
+                .replace( "__PROPERTY_ID__", getPropertyId() )
+                .replace( "__PAYMENT_AMOUNT__", CURRENCY_FORMAT.format( amount ) )
+                .replace( "__PAYMENT_METHOD__", paymentMethod )
+                .replace( "__PARENT_PAYMENT_ID__", paymentId );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "payment", paymentJson ),
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "inventory_object",
+                        String.format( "{\"type\":\"reservation\",\"id\":\"%s\"}", reservationId ) ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
     private WebRequest createAddFolioPaymentMethodRequest( String bookingRoomId, BigDecimal amount,
             String description, String templateResource ) throws IOException {
         WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/connect/payment/add" );

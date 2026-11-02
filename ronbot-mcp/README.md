@@ -20,8 +20,9 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `search_logs` | Grep property log dirs |
 | `get_booking` | Booking search by visible id / OTA ref / guest name (calendar DB first for names, then Cloudbeds; returns a list) |
 | `search_reservations` | Live Cloudbeds reservation list by free text and/or stay/checkin/checkout/booked date ranges, statuses, OTA sources (read-api; max 1000 rows, 200 via ronbot-bridge) |
-| `list_transactions` | Live folio lines (read-api; unique match required) |
+| `list_transactions` | Live folio lines (read-api; unique match required; includes `paymentId` for voids) |
 | `get_booking_timeline` | Live booking + transactions + job history (name queries: calendar first) |
+| `void_transaction` | Enqueue void of a folio payment (`VoidFolioPaymentJob`; staff must ask explicitly) |
 | `check_stay_continuation` | Cleaning / extension: staying on past checkout? (same reservation or linked follow-on in same beds) |
 | `get_availability` | Live sellable beds/rooms by room type (read-api; single property, subset, or all hostels in one call) |
 | `get_channel_production` | Live Channel Production numbers by source for one month (read-api; single property, subset, or all hostels in one call) |
@@ -41,8 +42,18 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 | `AllocationScraperJob` | `start_date`, `days_ahead` |
 | `CalculateEdinburghVisitorLevyForBookingJob` | `reservation_id` |
 | `ChargeNonRefundableBookingJob` | `reservation_id` |
+| `HostelworldPayNowPaymentJob` | `reservation_id` |
+| `AirbnbPrepaidPaymentJob` | `reservation_id` |
+| `VoidFolioPaymentJob` | `reservation_id` plus `payment_id` or `transaction_id` (prefer `void_transaction`) |
 | `RunQuarterlyEvl6PlusNightsReportJob` | `email` (or alias accounts/hannah/jay/ron) |
 | `RunChannelProductionReportJob` | `year_month` (YYYY-MM), `to_emails` (comma-delimited; each entry may be an alias) |
+
+### `void_transaction`
+
+- Required: `property`, `reservation_id`, and exactly one of `payment_id` (preferred, from timeline/transactions) or folio `transaction_id`
+- Prefetches the folio via read-api and refuses already-voided / non-voidable lines
+- Enqueues `VoidFolioPaymentJob` (processor posts MFD-style `connect/payment/add` with `transaction_type=Void`)
+- Only when staff explicitly ask to void a payment; gateway charges still need refunds, not void
 
 ### Email aliases
 

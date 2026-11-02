@@ -1111,6 +1111,74 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Voids a folio payment by Cloudbeds {@code payment_id} (MFD UI "Void Payment" for Terceiros /
+     * Payment Recorded and similar). Looks up the folio line, checks it is still voidable, then
+     * posts {@code connect/payment/add} with {@code transaction_type=Void}.
+     *
+     * @param webClient cloudbeds web client
+     * @param reservationId reservation id
+     * @param paymentId Cloudbeds payment id (not the folio transaction id)
+     * @throws IOException on request failure
+     */
+    public void voidFolioPayment( WebClient webClient, String reservationId, String paymentId )
+            throws IOException {
+        if ( StringUtils.isBlank( paymentId ) ) {
+            throw new MissingUserDataException( "payment_id is required to void a folio payment" );
+        }
+        TransactionRecord txn = findPaymentTransactionByPaymentId( webClient, reservationId, paymentId );
+        if ( txn == null ) {
+            throw new MissingUserDataException(
+                    "No folio payment with payment_id " + paymentId + " on reservation " + reservationId );
+        }
+        if ( txn.isVoided() ) {
+            LOGGER.info( "Payment {} on reservation {} is already voided; nothing to do",
+                    paymentId, reservationId );
+            return;
+        }
+        if ( false == txn.isVoidable() ) {
+            throw new UnrecoverableFault(
+                    "Payment " + paymentId + " on reservation " + reservationId + " cannot be voided" );
+        }
+        BigDecimal amount = txn.getPaidAsBigDecimal();
+        if ( amount == null || amount.compareTo( BigDecimal.ZERO ) <= 0 ) {
+            throw new UnrecoverableFault(
+                    "Payment " + paymentId + " on reservation " + reservationId
+                            + " has no positive paid amount to void: " + txn.getPaid() );
+        }
+        String paymentMethod = StringUtils.defaultIfBlank( txn.getPaymentType(), "Terceiros" );
+        LOGGER.info( "Voiding folio payment {} ({} {}) on reservation {}",
+                paymentId, getCurrencyFormat().format( amount ), paymentMethod, reservationId );
+        WebRequest requestSettings = jsonRequestFactory.createVoidFolioPaymentRequest(
+                reservationId, paymentId, amount, paymentMethod );
+        doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
+        LOGGER.info( "Voided folio payment {} on reservation {}", paymentId, reservationId );
+    }
+
+    /**
+     * Finds a payment folio line by Cloudbeds payment id, or by folio transaction id when
+     * {@code paymentOrTransactionId} matches {@link TransactionRecord#getId()}.
+     */
+    public TransactionRecord findPaymentTransactionByPaymentId( WebClient webClient, String reservationId,
+            String paymentOrTransactionId ) throws IOException {
+        if ( StringUtils.isBlank( paymentOrTransactionId ) ) {
+            return null;
+        }
+        List<TransactionRecord> records = getTransactionsByReservation( webClient, reservationId );
+        Optional<TransactionRecord> byPaymentId = records.stream()
+                .filter( t -> "payment".equalsIgnoreCase( t.getType() ) )
+                .filter( t -> paymentOrTransactionId.equals( t.getPaymentId() ) )
+                .findFirst();
+        if ( byPaymentId.isPresent() ) {
+            return byPaymentId.get();
+        }
+        return records.stream()
+                .filter( t -> "payment".equalsIgnoreCase( t.getType() ) )
+                .filter( t -> paymentOrTransactionId.equals( t.getId() ) )
+                .findFirst()
+                .orElse( null );
+    }
+
+    /**
      * Registers an existing refund to the given reservation.
      * 
      * @param webClient web client instance to use

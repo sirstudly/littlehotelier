@@ -1041,6 +1041,8 @@ public class RonbotReadService {
         dto.setTransactionType( record.getTransactionType() );
         dto.setCreditCardType( record.getCreditCardType() );
         dto.setCardNumberLast4( last4( record.getCardNumber() ) );
+        dto.setPaymentId( record.getPaymentId() );
+        dto.setPaymentType( record.getPaymentType() );
         dto.setPaymentStatus( record.getPaymentStatus() );
         dto.setGatewayName( record.getGatewayName() );
         dto.setOriginalDescription( record.getOriginalDescription() );

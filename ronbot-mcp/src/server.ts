@@ -483,6 +483,15 @@ export function createServer(): McpServer {
             throw new Error(`Missing required parameter '${required}' for ${job_type}`);
           }
         }
+        if (job_type === "VoidFolioPaymentJob") {
+          const paymentId = String(parameters.payment_id ?? "").trim();
+          const transactionId = String(parameters.transaction_id ?? "").trim();
+          if (!paymentId && !transactionId) {
+            throw new Error(
+              "VoidFolioPaymentJob requires payment_id or transaction_id (prefer void_transaction tool)",
+            );
+          }
+        }
         // Reject unexpected classname-style input
         if (job_type.includes(".") || job_type.includes("/")) {
           throw new Error("job_type must be a short allowlisted name, not a classname");
@@ -505,6 +514,112 @@ export function createServer(): McpServer {
           classname: entry.classname,
           status: "submitted",
           parameters: resolvedParameters,
+        });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "void_transaction",
+    "Enqueue VoidFolioPaymentJob to void a Cloudbeds folio payment (MFD Void Payment). Prefer payment_id from get_booking_timeline / list_transactions; otherwise pass folio transaction_id. Only when staff explicitly ask to void a payment. Confirm property + which line first. Does not void gateway charges (those need refunds). After enqueue, confirm job id; re-check folio with get_booking_timeline.",
+    {
+      property: propertySchema,
+      reservation_id: z.string().min(1),
+      payment_id: z.string().min(1).optional(),
+      transaction_id: z.string().min(1).optional(),
+      requested_by: z.string().optional(),
+    },
+    async ({ property, reservation_id, payment_id, transaction_id, requested_by }) => {
+      try {
+        assertProperty(property);
+        const paymentId = payment_id?.trim() || "";
+        const transactionId = transaction_id?.trim() || "";
+        if (!paymentId && !transactionId) {
+          throw new Error("Provide payment_id (preferred) or transaction_id from the folio line");
+        }
+        if (paymentId && transactionId) {
+          throw new Error("Pass only one of payment_id or transaction_id");
+        }
+
+        const allowlist = loadJobAllowlist();
+        const entry = allowlist.VoidFolioPaymentJob;
+        if (!entry) {
+          throw new Error("VoidFolioPaymentJob is not allowlisted");
+        }
+
+        // Prefetch folio so we fail fast with a clear message when the line is missing / not voidable.
+        const txnsRaw = await readApi.listTransactions(property, reservation_id);
+        const txns = Array.isArray(txnsRaw) ? txnsRaw : [];
+        type Txn = {
+          id?: string;
+          paymentId?: string;
+          type?: string;
+          voidFlag?: unknown;
+          canBeVoided?: boolean;
+          paid?: string;
+          description?: string;
+          notes?: string;
+        };
+        const match = (txns as Txn[]).find((t) => {
+          if (paymentId) return String(t.paymentId ?? "") === paymentId;
+          return String(t.id ?? "") === transactionId;
+        });
+        if (!match) {
+          throw new Error(
+            `No folio line matching ${paymentId ? `payment_id=${paymentId}` : `transaction_id=${transactionId}`} on reservation ${reservation_id}`,
+          );
+        }
+        if (String(match.type ?? "").toLowerCase() !== "payment") {
+          throw new Error(`Folio line ${match.id} is type=${match.type}, not a payment`);
+        }
+        const voided =
+          match.voidFlag === true ||
+          match.voidFlag === 1 ||
+          match.voidFlag === "1" ||
+          match.voidFlag === "true";
+        if (voided) {
+          throw new Error(`Folio payment ${match.paymentId ?? match.id} is already voided`);
+        }
+        if (match.canBeVoided === false) {
+          throw new Error(
+            `Folio payment ${match.paymentId ?? match.id} cannot be voided (canBeVoided=false)`,
+          );
+        }
+        if (!match.paymentId) {
+          throw new Error(`Folio line ${match.id} has no paymentId — cannot void`);
+        }
+
+        const parameters: Record<string, string> = {
+          reservation_id,
+          payment_id: String(match.paymentId),
+        };
+        const jobId = await jobsDb.insertJob(property, entry.classname, parameters);
+        audit("void_transaction", {
+          property,
+          job_id: jobId,
+          reservation_id,
+          payment_id: parameters.payment_id,
+          transaction_id: match.id ?? null,
+          paid: match.paid ?? null,
+          description: match.description ?? null,
+          requested_by: requested_by ?? null,
+        });
+        return ok({
+          jobId,
+          property,
+          jobType: "VoidFolioPaymentJob",
+          classname: entry.classname,
+          status: "submitted",
+          parameters,
+          folio: {
+            transactionId: match.id ?? null,
+            paymentId: parameters.payment_id,
+            paid: match.paid ?? null,
+            description: match.description ?? null,
+            notes: match.notes ?? null,
+          },
         });
       } catch (err) {
         return fail(err);

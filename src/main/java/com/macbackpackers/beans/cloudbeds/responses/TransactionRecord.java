@@ -30,6 +30,8 @@ public class TransactionRecord {
     private String cardNumber;
     private String gatewayAuthorization;
     private String paymentId;
+    @SerializedName( "payment_type" )
+    private String paymentType;
     private String paymentStatus;
     private String gatewayName;
     private String originalDescription;
@@ -212,6 +214,14 @@ public class TransactionRecord {
 
     public void setPaymentId( String paymentId ) {
         this.paymentId = paymentId;
+    }
+
+    public String getPaymentType() {
+        return paymentType;
+    }
+
+    public void setPaymentType( String paymentType ) {
+        this.paymentType = paymentType;
     }
 
     public String getPaymentStatus() {
