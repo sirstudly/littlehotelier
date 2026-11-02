@@ -179,6 +179,25 @@ public class HostelworldPayNowPaymentEventListenerTest {
         assertTrue( listener.getPendingOrphanReconcileByProperty().isEmpty() );
     }
 
+    @Test
+    public void onUpdate_cachedNonAssignedDelete_skipsNonHostelworldBooking() throws Exception {
+        CloudbedsCalendarEvent unassigned = payNowEvent( "245193467", "190498918", null );
+        registry.onSnapshot( PROPERTY_ID, Collections.singletonList( unassigned ) );
+
+        Reservation res = reservation( "190498918", "confirmed", true, true,
+                BigDecimal.ZERO, new BigDecimal( "56.16" ) );
+        res.setSourceName( "Booking.com" );
+        when( scraper.getReservation( webClient, "190498918" ) ).thenReturn( res );
+
+        CloudbedsCalendarUpdate update = orphanDeleteUpdate( "245193467" );
+        registry.beginUpdate( PROPERTY_ID, update );
+        listener.onUpdate( PROPERTY_ID, update );
+        registry.commitUpdate( PROPERTY_ID, update );
+
+        verify( dao, never() ).insertJob( any() );
+        assertTrue( listener.getPendingOrphanReconcileByProperty().isEmpty() );
+    }
+
     private static CloudbedsCalendarUpdate orphanDeleteUpdate( String bookingRoomsId ) {
         CloudbedsCalendarUpdate update = new CloudbedsCalendarUpdate();
         update.setPayloadAction( "changes" );

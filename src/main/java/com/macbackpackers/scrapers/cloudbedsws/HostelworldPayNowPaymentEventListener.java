@@ -175,6 +175,11 @@ public class HostelworldPayNowPaymentEventListener implements CloudbedsEventList
             if ( "canceled".equalsIgnoreCase( res.getStatus() ) ) {
                 return;
             }
+            if ( false == res.isHostelworldBooking() ) {
+                LOGGER.info( "Skipping HostelworldPayNowPaymentJob for reservation {} (not Hostelworld; source={})",
+                        reservationId, res.getSourceName() );
+                return;
+            }
             if ( false == res.isChannelCollectBooking() || false == res.isNonRefundable() ) {
                 return;
             }
