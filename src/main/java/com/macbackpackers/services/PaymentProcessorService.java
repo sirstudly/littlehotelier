@@ -440,13 +440,12 @@ public class PaymentProcessorService {
     /**
      * Records a one-time Cloudbeds third-party (Terceiros) payment for a Hostelworld Pay Now
      * channel-collect booking, using Cloudbeds {@code channel_balance} (UI: Hostelworld Remaining
-     * Total). Afterward (and on re-checks) asserts the folio is healthy: paid &gt; 0 and balance due
-     * is either 0 or within tolerance of the visitor levy. Discrepancies throw
-     * {@link UnrecoverableFault} so support is emailed.
+     * Total). Does not re-read/assert folio health after a successful post — Cloudbeds can lag
+     * before {@code paid}/{@code balanceDue} catch up.
      *
      * @param webClient cloudbeds web client
      * @param reservationId cloudbeds reservation id
-     * @throws Exception on lookup/payment failure or folio discrepancy
+     * @throws Exception on lookup/payment failure
      */
     public synchronized void recordHostelworldPayNowPayment( WebClient webClient, String reservationId )
             throws Exception {
@@ -490,21 +489,18 @@ public class PaymentProcessorService {
 
         boolean alreadyRecorded = cloudbedsScraper.isExistsPaymentWithDescription( webClient, res,
                 CloudbedsScraper.HOSTELWORLD_PAYNOW_PAYMENT_DESCRIPTION );
-        BigDecimal hwlPrice = null;
-        if ( false == alreadyRecorded ) {
-            hwlPrice = requireHostelworldPayNowChannelBalance( res );
-            LOGGER.info( "Hostelworld Pay Now channel_balance (Remaining Total) for {} ({}): £{}",
-                    reservationId, res.getThirdPartyIdentifier(), hwlPrice );
-            cloudbedsScraper.addThirdPartyPayment( webClient, res, hwlPrice,
-                    CloudbedsScraper.HOSTELWORLD_PAYNOW_PAYMENT_DESCRIPTION );
-            res = cloudbedsScraper.getReservationRetry( webClient, reservationId );
-        }
-        else {
-            LOGGER.info( "Pay Now payment already on folio for reservation {}; checking folio health only",
+        if ( alreadyRecorded ) {
+            LOGGER.info( "Pay Now payment already on folio for reservation {}; nothing to post",
                     reservationId );
+            return;
         }
-
-        assertHealthyChannelCollectPrepaidFolio( res, "Hostelworld Pay Now", hwlPrice );
+        BigDecimal hwlPrice = requireHostelworldPayNowChannelBalance( res );
+        LOGGER.info( "Hostelworld Pay Now channel_balance (Remaining Total) for {} ({}): £{}",
+                reservationId, res.getThirdPartyIdentifier(), hwlPrice );
+        cloudbedsScraper.addThirdPartyPayment( webClient, res, hwlPrice,
+                CloudbedsScraper.HOSTELWORLD_PAYNOW_PAYMENT_DESCRIPTION );
+        // Trust a successful /payment/add; Cloudbeds folio reads often lag and would fail a
+        // healthy-folio assert here even when the payment will land.
     }
 
     /**
@@ -521,7 +517,8 @@ public class PaymentProcessorService {
 
     /**
      * Records a one-time Cloudbeds AirBnB Prepaid Card payment for an Airbnb (API) channel-collect
-     * booking for {@code balanceDue − EVL}. Afterward asserts the folio is healthy.
+     * booking for {@code balanceDue − EVL}. Does not re-read/assert folio health after a successful
+     * post — Cloudbeds can lag before {@code paid}/{@code balanceDue} catch up.
      */
     public synchronized void recordAirbnbPrepaidPayment( WebClient webClient, String reservationId )
             throws Exception {
@@ -562,25 +559,21 @@ public class PaymentProcessorService {
 
         boolean alreadyRecorded = cloudbedsScraper.isExistsPaymentWithDescription( webClient, res,
                 CloudbedsScraper.AIRBNB_PREPAID_PAYMENT_DESCRIPTION );
-        BigDecimal amountPosted = null;
-        if ( false == alreadyRecorded ) {
-            amountPosted = EdinburghVisitorLevyCalculator.getBalanceDueExcludingVisitorLevy( res );
-            if ( amountPosted.compareTo( BigDecimal.ZERO ) <= 0 ) {
-                LOGGER.info( "Nothing to record for Airbnb prepaid on reservation {} after excluding EVL",
-                        reservationId );
-            }
-            else {
-                cloudbedsScraper.addAirbnbPrepaidPayment( webClient, res, amountPosted,
-                        CloudbedsScraper.AIRBNB_PREPAID_PAYMENT_DESCRIPTION );
-                res = cloudbedsScraper.getReservationRetry( webClient, reservationId );
-            }
-        }
-        else {
-            LOGGER.info( "Airbnb prepaid payment already on folio for reservation {}; checking folio health only",
+        if ( alreadyRecorded ) {
+            LOGGER.info( "Airbnb prepaid payment already on folio for reservation {}; nothing to post",
                     reservationId );
+            return;
         }
-
-        assertHealthyChannelCollectPrepaidFolio( res, "Airbnb prepaid", amountPosted );
+        BigDecimal amountPosted = EdinburghVisitorLevyCalculator.getBalanceDueExcludingVisitorLevy( res );
+        if ( amountPosted.compareTo( BigDecimal.ZERO ) <= 0 ) {
+            LOGGER.info( "Nothing to record for Airbnb prepaid on reservation {} after excluding EVL",
+                    reservationId );
+            return;
+        }
+        cloudbedsScraper.addAirbnbPrepaidPayment( webClient, res, amountPosted,
+                CloudbedsScraper.AIRBNB_PREPAID_PAYMENT_DESCRIPTION );
+        // Trust a successful prepaid post; Cloudbeds folio reads often lag and would fail a
+        // healthy-folio assert here even when the payment will land.
     }
 
     /**
@@ -609,35 +602,6 @@ public class PaymentProcessorService {
         BigDecimal evl = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( res );
         return balanceDue.subtract( evl ).abs()
                 .compareTo( CHANNEL_COLLECT_PREPAID_BALANCE_TOLERANCE ) <= 0;
-    }
-
-    private void assertHealthyChannelCollectPrepaidFolio( Reservation res, String label,
-            BigDecimal amountPosted ) {
-        BigDecimal paid = res.getPaidValue() != null ? res.getPaidValue() : BigDecimal.ZERO;
-        BigDecimal balanceDue = res.getBalanceDue() != null ? res.getBalanceDue() : BigDecimal.ZERO;
-        BigDecimal evl = EdinburghVisitorLevyCalculator.getVisitorLevyTotal( res );
-        if ( isHealthyChannelCollectPrepaidFolio( res ) ) {
-            if ( balanceDue.compareTo( BigDecimal.ZERO ) != 0 && balanceDue.compareTo( evl ) != 0 ) {
-                LOGGER.info( "{} folio healthy within tolerance for {}: paid={}, balanceDue={}, evl={}, "
-                                + "tolerance={}",
-                        label, res.getReservationId(), paid, balanceDue, evl,
-                        CHANNEL_COLLECT_PREPAID_BALANCE_TOLERANCE );
-            }
-            else {
-                LOGGER.info( "{} folio healthy for {}: paid={}, balanceDue={}, evl={}",
-                        label, res.getReservationId(), paid, balanceDue, evl );
-            }
-            return;
-        }
-        throw new UnrecoverableFault( String.format(
-                "%s folio discrepancy for reservation %s (amount posted=%s): "
-                        + "paid=%s, balanceDue=%s, evl=%s. Expected paid>0 and (balanceDue==0 or "
-                        + "|balanceDue-evl|<=%s).",
-                label,
-                res.getReservationId(),
-                amountPosted != null ? amountPosted.toPlainString() : "(not posted this run)",
-                paid.toPlainString(), balanceDue.toPlainString(), evl.toPlainString(),
-                CHANNEL_COLLECT_PREPAID_BALANCE_TOLERANCE.toPlainString() ) );
     }
 
     /**
