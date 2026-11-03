@@ -67,6 +67,7 @@ public class HostelworldPayNowPaymentEventListenerTest {
                 .thenReturn( Collections.singleton( SOURCE_ID ) );
         when( dao.hasPendingHostelworldPayNowPaymentJobForReservation( anyString() ) ).thenReturn( false );
         when( dao.hasCompletedHostelworldPayNowPaymentJobForReservation( anyString() ) ).thenReturn( false );
+        when( dao.hasHostelworldPayNowPaymentJobForReservation( anyString() ) ).thenReturn( false );
         when( dao.hasPendingCreateHostelworldPayNowPaymentJob() ).thenReturn( false );
         when( evlSupport.findOrCreatePendingJob( anyString() ) ).thenReturn( null );
     }
@@ -196,6 +197,20 @@ public class HostelworldPayNowPaymentEventListenerTest {
 
         verify( dao, never() ).insertJob( any() );
         assertTrue( listener.getPendingOrphanReconcileByProperty().isEmpty() );
+    }
+
+    @Test
+    public void onUpdate_skipsWhenRecentPayNowJobExists() {
+        when( dao.hasHostelworldPayNowPaymentJobForReservation( "190469923" ) ).thenReturn( true );
+
+        CloudbedsCalendarEvent assigned = payNowEvent( "evt-1", "190469923", "112202-2" );
+        CloudbedsCalendarUpdate update = new CloudbedsCalendarUpdate();
+        update.setPayloadAction( "changes" );
+        update.setEvents( Collections.singletonList( assigned ) );
+
+        listener.onUpdate( PROPERTY_ID, update );
+
+        verify( dao, never() ).insertJob( any() );
     }
 
     private static CloudbedsCalendarUpdate orphanDeleteUpdate( String bookingRoomsId ) {

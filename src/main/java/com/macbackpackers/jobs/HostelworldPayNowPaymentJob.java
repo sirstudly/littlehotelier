@@ -29,7 +29,7 @@ public class HostelworldPayNowPaymentJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        paymentProcessor.recordHostelworldPayNowPayment( cbWebClient, getReservationId() );
+        paymentProcessor.recordHostelworldPayNowPayment( cbWebClient, getReservationId(), getId() );
     }
 
     @Override

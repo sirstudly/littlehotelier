@@ -324,6 +324,19 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public boolean hasHostelworldPayNowPaymentJobForReservation( String reservationId ) {
+        return hasRecentHostelworldPayNowPaymentJobForReservation( reservationId,
+                CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS, null );
+    }
+
+    @Override
+    public boolean hasRecentHostelworldPayNowPaymentJobForReservation( String reservationId, int hoursBack,
+            Integer excludeJobId ) {
+        return hasRecentChannelCollectPrepaidPaymentJobForReservation(
+                "com.macbackpackers.jobs.HostelworldPayNowPaymentJob", reservationId, hoursBack, excludeJobId );
+    }
+
+    @Override
     public boolean hasPendingCreateHostelworldPayNowPaymentJob() {
         Number count = (Number) em.createNativeQuery(
                 "SELECT COUNT(1) FROM wp_lh_jobs j "
@@ -364,6 +377,63 @@ public class WordPressDAOImpl implements WordPressDAO {
                         + "   AND j.status = 'completed'" )
                 .setParameter( "reservationId", reservationId )
                 .getSingleResult();
+        return count.longValue() > 0;
+    }
+
+    @Override
+    public boolean hasAirbnbPrepaidPaymentJobForReservation( String reservationId ) {
+        return hasRecentAirbnbPrepaidPaymentJobForReservation( reservationId,
+                CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS, null );
+    }
+
+    @Override
+    public boolean hasRecentAirbnbPrepaidPaymentJobForReservation( String reservationId, int hoursBack,
+            Integer excludeJobId ) {
+        return hasRecentChannelCollectPrepaidPaymentJobForReservation(
+                "com.macbackpackers.jobs.AirbnbPrepaidPaymentJob", reservationId, hoursBack, excludeJobId );
+    }
+
+    /**
+     * Shared cooldown SQL for Hostelworld Pay Now / Airbnb prepaid (mirrors
+     * {@link #hasRecentChargeNonRefundableJobForReservation}).
+     */
+    private boolean hasRecentChannelCollectPrepaidPaymentJobForReservation( String classname,
+            String reservationId, int hoursBack, Integer excludeJobId ) {
+        if ( StringUtils.isBlank( reservationId ) ) {
+            return false;
+        }
+        StringBuilder sql = new StringBuilder(
+                "SELECT COUNT(1) FROM wp_lh_jobs j "
+                        + "  JOIN wp_lh_job_param p ON j.job_id = p.job_id "
+                        + " WHERE j.classname = :classname "
+                        + "   AND p.name = 'reservation_id' "
+                        + "   AND p.value = :reservationId " );
+        if ( excludeJobId != null ) {
+            sql.append( "   AND j.job_id != :excludeJobId " );
+        }
+        if ( excludeJobId == null ) {
+            // enqueue dedup: block while a job is pending, or any finished attempt within the cooldown
+            sql.append( "   AND (j.status IN ('submitted', 'processing', 'retry') "
+                    + "        OR (j.status IN ('completed', 'failed') "
+                    + "            AND (j.created_date >= DATE_SUB(NOW(), INTERVAL :hoursBack HOUR) "
+                    + "                 OR j.last_updated_date >= DATE_SUB(NOW(), INTERVAL :hoursBack HOUR))))" );
+        }
+        else {
+            // execution cooldown: only count jobs that have actually run (or are running now), not
+            // other submitted jobs waiting in the queue
+            sql.append( "   AND (j.status = 'processing' "
+                    + "        OR (j.status IN ('completed', 'failed', 'retry') "
+                    + "            AND (j.created_date >= DATE_SUB(NOW(), INTERVAL :hoursBack HOUR) "
+                    + "                 OR j.last_updated_date >= DATE_SUB(NOW(), INTERVAL :hoursBack HOUR))))" );
+        }
+        Query query = em.createNativeQuery( sql.toString() )
+                .setParameter( "classname", classname )
+                .setParameter( "reservationId", reservationId )
+                .setParameter( "hoursBack", hoursBack );
+        if ( excludeJobId != null ) {
+            query.setParameter( "excludeJobId", excludeJobId );
+        }
+        Number count = (Number) query.getSingleResult();
         return count.longValue() > 0;
     }
 

@@ -108,14 +108,15 @@ public class AirbnbPrepaidPaymentEventListener implements CloudbedsEventListener
             if ( false == reservationIdsSeenInBatch.add( reservationId ) ) {
                 continue;
             }
-            if ( dao.hasPendingAirbnbPrepaidPaymentJobForReservation( reservationId ) ) {
-                LOGGER.info( "Skipping AirbnbPrepaidPaymentJob for reservation {} (job already pending)",
-                        reservationId );
-                continue;
-            }
             if ( dao.hasCompletedAirbnbPrepaidPaymentJobForReservation( reservationId ) ) {
                 LOGGER.info( "Skipping AirbnbPrepaidPaymentJob for reservation {} (already completed)",
                         reservationId );
+                continue;
+            }
+            if ( dao.hasAirbnbPrepaidPaymentJobForReservation( reservationId ) ) {
+                LOGGER.info( "Skipping AirbnbPrepaidPaymentJob for reservation {} "
+                                + "(pending or attempted within last {}h)",
+                        reservationId, WordPressDAO.CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS );
                 continue;
             }
             enqueuePrepaidJob( event.getThirdPartyIdentifier(), event.getStatus(),
@@ -154,14 +155,15 @@ public class AirbnbPrepaidPaymentEventListener implements CloudbedsEventListener
     }
 
     private void tryEnqueuePrepaidFromReservation( String reservationId ) {
-        if ( dao.hasPendingAirbnbPrepaidPaymentJobForReservation( reservationId ) ) {
-            LOGGER.info( "Skipping AirbnbPrepaidPaymentJob for reservation {} (job already pending)",
-                    reservationId );
-            return;
-        }
         if ( dao.hasCompletedAirbnbPrepaidPaymentJobForReservation( reservationId ) ) {
             LOGGER.info( "Skipping AirbnbPrepaidPaymentJob for reservation {} (already completed)",
                     reservationId );
+            return;
+        }
+        if ( dao.hasAirbnbPrepaidPaymentJobForReservation( reservationId ) ) {
+            LOGGER.info( "Skipping AirbnbPrepaidPaymentJob for reservation {} "
+                            + "(pending or attempted within last {}h)",
+                    reservationId, WordPressDAO.CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS );
             return;
         }
         try ( WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class ) ) {

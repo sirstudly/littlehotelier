@@ -110,14 +110,15 @@ public class HostelworldPayNowPaymentEventListener implements CloudbedsEventList
             if ( false == reservationIdsSeenInBatch.add( reservationId ) ) {
                 continue;
             }
-            if ( dao.hasPendingHostelworldPayNowPaymentJobForReservation( reservationId ) ) {
-                LOGGER.info( "Skipping HostelworldPayNowPaymentJob for reservation {} (job already pending)",
-                        reservationId );
-                continue;
-            }
             if ( dao.hasCompletedHostelworldPayNowPaymentJobForReservation( reservationId ) ) {
                 LOGGER.info( "Skipping HostelworldPayNowPaymentJob for reservation {} (already completed)",
                         reservationId );
+                continue;
+            }
+            if ( dao.hasHostelworldPayNowPaymentJobForReservation( reservationId ) ) {
+                LOGGER.info( "Skipping HostelworldPayNowPaymentJob for reservation {} "
+                                + "(pending or attempted within last {}h)",
+                        reservationId, WordPressDAO.CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS );
                 continue;
             }
             enqueuePayNowJob( event.getThirdPartyIdentifier(), event.getStatus(),
@@ -157,14 +158,15 @@ public class HostelworldPayNowPaymentEventListener implements CloudbedsEventList
     }
 
     private void tryEnqueuePayNowFromReservation( String reservationId ) {
-        if ( dao.hasPendingHostelworldPayNowPaymentJobForReservation( reservationId ) ) {
-            LOGGER.info( "Skipping HostelworldPayNowPaymentJob for reservation {} (job already pending)",
-                    reservationId );
-            return;
-        }
         if ( dao.hasCompletedHostelworldPayNowPaymentJobForReservation( reservationId ) ) {
             LOGGER.info( "Skipping HostelworldPayNowPaymentJob for reservation {} (already completed)",
                     reservationId );
+            return;
+        }
+        if ( dao.hasHostelworldPayNowPaymentJobForReservation( reservationId ) ) {
+            LOGGER.info( "Skipping HostelworldPayNowPaymentJob for reservation {} "
+                            + "(pending or attempted within last {}h)",
+                    reservationId, WordPressDAO.CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS );
             return;
         }
         try ( WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class ) ) {

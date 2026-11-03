@@ -29,7 +29,7 @@ public class AirbnbPrepaidPaymentJob extends AbstractJob {
 
     @Override
     public void processJob() throws Exception {
-        paymentProcessor.recordAirbnbPrepaidPayment( cbWebClient, getReservationId() );
+        paymentProcessor.recordAirbnbPrepaidPayment( cbWebClient, getReservationId(), getId() );
     }
 
     @Override

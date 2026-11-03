@@ -47,7 +47,8 @@ public class CreateAirbnbPrepaidPaymentJob extends AbstractJob {
                 .stream()
                 .filter( p -> false == "canceled".equalsIgnoreCase( p.getStatus() ) )
                 .filter( p -> p.isChannelCollectBooking() )
-                .filter( p -> false == dao.hasPendingAirbnbPrepaidPaymentJobForReservation( p.getReservationId() ) )
+                .filter( p -> false == dao.hasCompletedAirbnbPrepaidPaymentJobForReservation( p.getReservationId() ) )
+                .filter( p -> false == dao.hasAirbnbPrepaidPaymentJobForReservation( p.getReservationId() ) )
                 .filter( p -> false == PaymentProcessorService.isHealthyChannelCollectPrepaidFolio( p ) )
                 .forEach( p -> {
                     LOGGER.info( "Creating an AirbnbPrepaidPaymentJob for booking {} ({}): {} {}",

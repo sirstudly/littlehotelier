@@ -450,6 +450,22 @@ public class PaymentProcessorService {
      */
     public synchronized void recordHostelworldPayNowPayment( WebClient webClient, String reservationId )
             throws Exception {
+        recordHostelworldPayNowPayment( webClient, reservationId, null );
+    }
+
+    /**
+     * @param excludeJobId when called from {@code HostelworldPayNowPaymentJob}, pass the current
+     *            job id so this run is not treated as a duplicate of itself
+     */
+    public synchronized void recordHostelworldPayNowPayment( WebClient webClient, String reservationId,
+            Integer excludeJobId ) throws Exception {
+        if ( wordpressDAO.hasRecentHostelworldPayNowPaymentJobForReservation( reservationId,
+                WordPressDAO.CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS, excludeJobId ) ) {
+            LOGGER.info( "A Hostelworld Pay Now payment for reservation {} was already attempted within "
+                            + "the last {} hours. Skipping.",
+                    reservationId, WordPressDAO.CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS );
+            return;
+        }
         LOGGER.info( "Processing Hostelworld Pay Now third-party payment for reservation {}", reservationId );
         Reservation res = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 
@@ -509,6 +525,22 @@ public class PaymentProcessorService {
      */
     public synchronized void recordAirbnbPrepaidPayment( WebClient webClient, String reservationId )
             throws Exception {
+        recordAirbnbPrepaidPayment( webClient, reservationId, null );
+    }
+
+    /**
+     * @param excludeJobId when called from {@code AirbnbPrepaidPaymentJob}, pass the current job id
+     *            so this run is not treated as a duplicate of itself
+     */
+    public synchronized void recordAirbnbPrepaidPayment( WebClient webClient, String reservationId,
+            Integer excludeJobId ) throws Exception {
+        if ( wordpressDAO.hasRecentAirbnbPrepaidPaymentJobForReservation( reservationId,
+                WordPressDAO.CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS, excludeJobId ) ) {
+            LOGGER.info( "An Airbnb prepaid payment for reservation {} was already attempted within "
+                            + "the last {} hours. Skipping.",
+                    reservationId, WordPressDAO.CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS );
+            return;
+        }
         LOGGER.info( "Processing Airbnb prepaid payment for reservation {}", reservationId );
         Reservation res = cloudbedsScraper.getReservationRetry( webClient, reservationId );
 

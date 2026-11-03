@@ -119,6 +119,12 @@ public interface WordPressDAO {
     boolean hasCalculateEdinburghVisitorLevyJobForReservation( String reservationId );
 
     /**
+     * Minimum hours between Hostelworld Pay Now / Airbnb prepaid payment job attempts for the
+     * same reservation (enqueue + execution cooldown).
+     */
+    int CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS = 24;
+
+    /**
      * True if a pending {@code HostelworldPayNowPaymentJob} exists for the reservation
      * (status {@code submitted}, {@code processing}, or {@code retry}).
      *
@@ -133,6 +139,25 @@ public interface WordPressDAO {
      * @param reservationId Cloudbeds reservation id
      */
     boolean hasCompletedHostelworldPayNowPaymentJobForReservation( String reservationId );
+
+    /**
+     * Enqueue gate: pending Pay Now job, or any completed/failed attempt within
+     * {@link #CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS}.
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    boolean hasHostelworldPayNowPaymentJobForReservation( String reservationId );
+
+    /**
+     * Recent {@code HostelworldPayNowPaymentJob} for the reservation (same rules as
+     * {@link #hasRecentChargeNonRefundableJobForReservation}).
+     *
+     * @param reservationId Cloudbeds reservation id
+     * @param hoursBack cooldown window in hours
+     * @param excludeJobId job id to ignore, or null when checking before enqueue
+     */
+    boolean hasRecentHostelworldPayNowPaymentJobForReservation( String reservationId, int hoursBack,
+            Integer excludeJobId );
 
     /**
      * True if a pending {@code CreateHostelworldPayNowPaymentJob} exists (any params).
@@ -153,6 +178,25 @@ public interface WordPressDAO {
      * @param reservationId Cloudbeds reservation id
      */
     boolean hasCompletedAirbnbPrepaidPaymentJobForReservation( String reservationId );
+
+    /**
+     * Enqueue gate: pending Airbnb prepaid job, or any completed/failed attempt within
+     * {@link #CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS}.
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    boolean hasAirbnbPrepaidPaymentJobForReservation( String reservationId );
+
+    /**
+     * Recent {@code AirbnbPrepaidPaymentJob} for the reservation (same rules as
+     * {@link #hasRecentChargeNonRefundableJobForReservation}).
+     *
+     * @param reservationId Cloudbeds reservation id
+     * @param hoursBack cooldown window in hours
+     * @param excludeJobId job id to ignore, or null when checking before enqueue
+     */
+    boolean hasRecentAirbnbPrepaidPaymentJobForReservation( String reservationId, int hoursBack,
+            Integer excludeJobId );
 
     /**
      * True if a pending {@code CreateAirbnbPrepaidPaymentJob} exists (any params).

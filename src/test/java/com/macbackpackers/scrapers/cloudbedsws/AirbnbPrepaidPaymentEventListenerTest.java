@@ -66,6 +66,7 @@ public class AirbnbPrepaidPaymentEventListenerTest {
                 .thenReturn( Collections.singleton( SOURCE_ID ) );
         when( dao.hasPendingAirbnbPrepaidPaymentJobForReservation( anyString() ) ).thenReturn( false );
         when( dao.hasCompletedAirbnbPrepaidPaymentJobForReservation( anyString() ) ).thenReturn( false );
+        when( dao.hasAirbnbPrepaidPaymentJobForReservation( anyString() ) ).thenReturn( false );
         when( dao.hasPendingCreateAirbnbPrepaidPaymentJob() ).thenReturn( false );
         when( evlSupport.findOrCreatePendingJob( anyString() ) ).thenReturn( null );
     }
@@ -125,6 +126,20 @@ public class AirbnbPrepaidPaymentEventListenerTest {
         assertEquals( "190514833", captor.getValue().getReservationId() );
         assertTrue( listener.getPendingOrphanReconcileByProperty().isEmpty() );
         verify( dao, never() ).insertJob( any( CreateAirbnbPrepaidPaymentJob.class ) );
+    }
+
+    @Test
+    public void onUpdate_skipsWhenRecentPrepaidJobExists() {
+        when( dao.hasAirbnbPrepaidPaymentJobForReservation( "190514833" ) ).thenReturn( true );
+
+        CloudbedsCalendarEvent assigned = airbnbEvent( "evt-1", "190514833", "112559-1" );
+        CloudbedsCalendarUpdate update = new CloudbedsCalendarUpdate();
+        update.setPayloadAction( "changes" );
+        update.setEvents( Collections.singletonList( assigned ) );
+
+        listener.onUpdate( PROPERTY_ID, update );
+
+        verify( dao, never() ).insertJob( any() );
     }
 
     private static CloudbedsCalendarUpdate orphanDeleteUpdate( String bookingRoomsId ) {
