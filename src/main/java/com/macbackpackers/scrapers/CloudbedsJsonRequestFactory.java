@@ -669,58 +669,19 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
-     * Records a new payment onto the existing reservation.
-     * 
-     * @param reservationId ID of reservation (as it appears in the URL)
-     * @param bookingRoomId (which "room" we're booking the payment to)
-     * @param guestId guest or customer ID to assign payment to
+     * Records a new payment onto the existing reservation as a third-party (Terceiros) payment
+     * via next-gen {@code connect/payment/add}.
+     *
+     * @param bookingRoomId which reservation room the payment is allocated to
      * @param amount amount to record
-     * @param description description
-     * @param billingPortalId
-     * @param frontVersion
+     * @param description payment description
      * @return web request
      * @throws IOException on creation failure
      */
-    public WebRequest createAddNewPaymentRequest( String reservationId, String bookingRoomId, String guestId, BigDecimal amount,
-                                                  String description, String billingPortalId, String frontVersion ) throws IOException {
-        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_payment" );
-        webRequest.setRequestParameters( Arrays.asList(
-                new NameValuePair( "payment_type", "check" ),
-                new NameValuePair( "paymentType", "check" ),
-                new NameValuePair( "assign_to", bookingRoomId ),
-                new NameValuePair( "assignTo", bookingRoomId ),
-                new NameValuePair( "assignToGuestId", guestId ),
-                new NameValuePair( "paid", CURRENCY_FORMAT.format( amount ) ),
-                new NameValuePair( "payment_date", LocalDate.now().format( YYYY_MM_DD ) ),
-                new NameValuePair( "paymentDate", LocalDate.now().format( YYYY_MM_DD ) ),
-                new NameValuePair( "rawDate", LocalDate.now().format( YYYY_MM_DD ) ),
-                new NameValuePair( "description", description ),
-                new NameValuePair( "process_payment", "0" ),
-                new NameValuePair( "processPayment", "false" ),
-                new NameValuePair( "refund_payment", "0" ),
-                new NameValuePair( "auth_payment", "0" ),
-                new NameValuePair( "authPayment", "false" ),
-                new NameValuePair( "keep_credit_card_info", "0" ),
-                new NameValuePair( "keep_pending_payment", "1" ),
-                new NameValuePair( "auto_date", "1" ),
-                new NameValuePair( "autoDate", "true" ),
-                new NameValuePair( "isAllocatePayment", "false" ),
-                new NameValuePair( "allocate_payment", "0" ),
-                new NameValuePair( "isAuthAvailable", "true" ),
-                new NameValuePair( "inventoryObjectType", "reservation_room" ),
-                new NameValuePair( "is_private_ha", "0" ),
-                new NameValuePair( "suppress_client_errors", "true" ),
-                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
-                new NameValuePair( "billing_portal_id", billingPortalId ),
-                new NameValuePair( "is_bp_setup_completed", "1" ),
-                new NameValuePair( "folioId", "0" ),
-                new NameValuePair( "booking_id", reservationId ),
-                new NameValuePair( "bookingId", reservationId ),
-                new NameValuePair( "property_id", getPropertyId() ),
-                new NameValuePair( "group_id", getPropertyId() ),
-                new NameValuePair( "frontVersion", frontVersion ),
-                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
-        return webRequest;
+    public WebRequest createAddNewPaymentRequest( String bookingRoomId, BigDecimal amount, String description )
+            throws IOException {
+        return createAddFolioPaymentMethodRequest( bookingRoomId, amount, description,
+                "add_third_party_payment_data.json" );
     }
     
     /**

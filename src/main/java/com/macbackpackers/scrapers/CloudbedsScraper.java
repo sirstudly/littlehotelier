@@ -1067,8 +1067,7 @@ public class CloudbedsScraper {
         // just take the first one
         BookingRoom bookingRoom = res.getBookingRooms().get( 0 );
         WebRequest requestSettings = jsonRequestFactory.createAddNewPaymentRequest(
-                res.getReservationId(), bookingRoom.getId(), bookingRoom.getGuestId(), amount, description,
-                getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+                bookingRoom.getId(), amount, description );
         doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
     }
 
