@@ -64,6 +64,17 @@ public class DatabaseConfig {
         return createDataSource( url, username, password, minPoolSize, maxPoolSize, connectionTimeoutMs );
     }
 
+    @Bean( name = "analyticsDataSource" )
+    public DataSource getAnalyticsDataSource(
+            @Value( "${analyticsdb.url}" ) String url,
+            @Value( "${analyticsdb.username}" ) String username,
+            @Value( "${analyticsdb.password}" ) String password,
+            @Value( "${analyticsdb.poolsize.min}" ) int minPoolSize,
+            @Value( "${analyticsdb.poolsize.max}" ) int maxPoolSize,
+            @Value( "${db.connection.timeout.ms:30000}" ) long connectionTimeoutMs ) throws PropertyVetoException {
+        return createDataSource( url, username, password, minPoolSize, maxPoolSize, connectionTimeoutMs );
+    }
+
     private DataSource createDataSource( String dbUrl, String user, String pass, int minPoolSize, int maxPoolSize,
             long connectionTimeoutMs ) throws PropertyVetoException {
         HikariConfig config = new HikariConfig();
@@ -98,6 +109,11 @@ public class DatabaseConfig {
 
     @Bean( name = "sharedJdbcTemplate" )
     public JdbcTemplate getSharedJdbcTemplate( @Qualifier( "sharedDataSource" ) DataSource dataSource ) {
+        return new JdbcTemplate( dataSource );
+    }
+
+    @Bean( name = "analyticsJdbcTemplate" )
+    public JdbcTemplate getAnalyticsJdbcTemplate( @Qualifier( "analyticsDataSource" ) DataSource dataSource ) {
         return new JdbcTemplate( dataSource );
     }
 

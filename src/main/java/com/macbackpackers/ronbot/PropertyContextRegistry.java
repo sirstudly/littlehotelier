@@ -76,6 +76,8 @@ public class PropertyContextRegistry {
                                 "db.poolsize.max=2",
                                 "shareddb.poolsize.min=0",
                                 "shareddb.poolsize.max=1",
+                                "analyticsdb.poolsize.min=0",
+                                "analyticsdb.poolsize.max=1",
                                 "db.connection.timeout.ms=15000" )
                         .run();
                 contexts.put( key, child );

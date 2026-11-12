@@ -48,6 +48,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
       - DB_HOST=mysql-tailscale
       - SHAREDDB_HOST=mysql-tailscale
+      - ANALYTICSDB_HOST=mysql-tailscale
       - RONBOT_TOKEN=${RONBOT_TOKEN:-}
     volumes:
       - ./logs/crh:/app/logs
@@ -98,6 +99,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
       - DB_HOST=mysql-tailscale
       - SHAREDDB_HOST=mysql-tailscale
+      - ANALYTICSDB_HOST=mysql-tailscale
       - RONBOT_TOKEN=${RONBOT_TOKEN:-}
     volumes:
       - ./logs/hsh:/app/logs
@@ -148,6 +150,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
       - DB_HOST=mysql-tailscale
       - SHAREDDB_HOST=mysql-tailscale
+      - ANALYTICSDB_HOST=mysql-tailscale
       - RONBOT_TOKEN=${RONBOT_TOKEN:-}
     volumes:
       - ./logs/rmb:/app/logs
@@ -198,6 +201,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcp-service-account.json
       - DB_HOST=mysql-tailscale
       - SHAREDDB_HOST=mysql-tailscale
+      - ANALYTICSDB_HOST=mysql-tailscale
       - RONBOT_TOKEN=${RONBOT_TOKEN:-}
     volumes:
       - ./logs/lsh:/app/logs
@@ -253,6 +257,7 @@ services:
       - ronbot.properties=${RONBOT_PROPERTIES:-crh,hsh,rmb,lsh}
       - DB_HOST=mysql-tailscale
       - SHAREDDB_HOST=mysql-tailscale
+      - ANALYTICSDB_HOST=mysql-tailscale
     volumes:
       - ./docker-entrypoint.sh:/docker-entrypoint.sh:ro
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json:ro

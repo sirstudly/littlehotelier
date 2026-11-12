@@ -87,10 +87,28 @@ public class CloudbedsDataInsightsClient {
      */
     public JsonObject queryChannelProductionByMonth( WebClient webClient, YearMonth month ) throws IOException {
         String propertyId = jsonRequestFactory.getPropertyId();
-        JsonObject body = buildChannelProductionBody( propertyId, month.atDay( 1 ), month.atEndOfMonth() );
+        JsonObject body = buildChannelProductionBody( propertyId, month.atDay( 1 ), month.atEndOfMonth(), "month" );
         String url = DI_BASE + "/stock_reports/" + CHANNEL_PRODUCTION_STOCK_REPORT_ID
                 + "/query/data?mode=Run&format=formatted";
         LOGGER.info( "Data Insights Channel Production monthly query property={} month={}", propertyId, month );
+        return postJson( webClient, url, propertyId, body );
+    }
+
+    /**
+     * Channel Production for an inclusive stay-date range, grouped by calendar day × category × source.
+     * Prefer month-sized (or smaller) windows to keep payloads bounded.
+     */
+    public JsonObject queryChannelProductionByStayDateRange( WebClient webClient, LocalDate stayDateFrom,
+            LocalDate stayDateTo ) throws IOException {
+        if ( stayDateFrom == null || stayDateTo == null || stayDateTo.isBefore( stayDateFrom ) ) {
+            throw new IllegalArgumentException( "Invalid stay date range: " + stayDateFrom + " .. " + stayDateTo );
+        }
+        String propertyId = jsonRequestFactory.getPropertyId();
+        JsonObject body = buildChannelProductionBody( propertyId, stayDateFrom, stayDateTo, "day" );
+        String url = DI_BASE + "/stock_reports/" + CHANNEL_PRODUCTION_STOCK_REPORT_ID
+                + "/query/data?mode=Run&format=formatted";
+        LOGGER.info( "Data Insights Channel Production daily query property={} stay=[{} .. {}]",
+                propertyId, stayDateFrom, stayDateTo );
         return postJson( webClient, url, propertyId, body );
     }
 
@@ -274,6 +292,14 @@ public class CloudbedsDataInsightsClient {
     }
 
     JsonObject buildChannelProductionBody( String propertyId, LocalDate startDate, LocalDate endDate ) {
+        return buildChannelProductionBody( propertyId, startDate, endDate, "month" );
+    }
+
+    /**
+     * @param stayDateModifier Data Insights group modifier for {@code stay_date}: {@code month} or {@code day}
+     */
+    JsonObject buildChannelProductionBody( String propertyId, LocalDate startDate, LocalDate endDate,
+            String stayDateModifier ) {
         JsonObject body = new JsonObject();
         JsonArray propertyIds = new JsonArray();
         propertyIds.add( propertyId );
@@ -316,7 +342,7 @@ public class CloudbedsDataInsightsClient {
             }
             gr.add( "cdf", cdf );
             if ( "stay_date".equals( col ) ) {
-                gr.addProperty( "modifier", "month" );
+                gr.addProperty( "modifier", stayDateModifier );
             }
             groupRows.add( gr );
         }

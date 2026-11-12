@@ -53,5 +53,15 @@
     "classname": "com.macbackpackers.jobs.RunChannelProductionReportJob",
     "requiredParams": ["year_month", "to_emails"],
     "description": "Build Channel Production xlsx (month vs same month in previous 2 years) and email it"
+  },
+  "SyncBookingCreatedAnalyticsJob": {
+    "classname": "com.macbackpackers.jobs.SyncBookingCreatedAnalyticsJob",
+    "requiredParams": ["start_date", "end_date"],
+    "description": "Sync Cloudbeds reservations by booked date into mac_analytics.fact_booking_created"
+  },
+  "SyncChannelStayDayAnalyticsJob": {
+    "classname": "com.macbackpackers.jobs.SyncChannelStayDayAnalyticsJob",
+    "requiredParams": ["start_date", "end_date"],
+    "description": "Sync Channel Production day×source into mac_analytics.fact_channel_stay_day"
   }
 }

@@ -1,0 +1,54 @@
+{
+  "headers": [
+    ["room_revenue", "sum"],
+    ["rooms_sold", "sum"],
+    ["adr", "aggregated"]
+  ],
+  "index": [
+    ["2024-09-15", "Direct", "Walk-In"],
+    ["2024-09-15", "OTA", "Booking.com"],
+    ["2024-09-16", "OTA", "Hostelworld"],
+    ["2024-09-16", "-", "-"]
+  ],
+  "group_rows": [
+    "stay_date",
+    "reservation_source_category",
+    "reservation_source"
+  ],
+  "group_columns": [],
+  "periods": null,
+  "records": {
+    "2024-09-15": {
+      "Direct": {
+        "Walk-In": {
+          "room_revenue": { "sum": "41.66" },
+          "rooms_sold": { "sum": "2" },
+          "adr": { "aggregated": "20.83" }
+        }
+      },
+      "OTA": {
+        "Booking.com": {
+          "room_revenue": { "sum": "190.00" },
+          "rooms_sold": { "sum": "5" },
+          "adr": { "aggregated": "38.00" }
+        }
+      }
+    },
+    "2024-09-16": {
+      "OTA": {
+        "Hostelworld": {
+          "room_revenue": { "sum": "100.00" },
+          "rooms_sold": { "sum": "4" },
+          "adr": { "aggregated": "25.00" }
+        }
+      },
+      "-": {
+        "-": {
+          "room_revenue": { "sum": "0.00" },
+          "rooms_sold": { "sum": "0" },
+          "adr": { "aggregated": "-" }
+        }
+      }
+    }
+  }
+}

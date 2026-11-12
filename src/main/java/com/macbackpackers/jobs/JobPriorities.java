@@ -32,6 +32,10 @@ public final class JobPriorities {
         map.put( BedShuffleHintJob.class.getName(), 99 );
         map.put( VoidAndResubmitLegacyEVLFolioJob.class.getName(), 999 );
 
+        // Analytics mart sync — behind transactional / guest-facing work
+        map.put( SyncBookingCreatedAnalyticsJob.class.getName(), 50 );
+        map.put( SyncChannelStayDayAnalyticsJob.class.getName(), 50 );
+
         // One-off historical backfill; only run when nothing else is queued
         map.put( CreateBackfillBookingAssignmentJob.class.getName(), 9999 );
         map.put( BackfillBookingAssignmentJob.class.getName(), 9999 );

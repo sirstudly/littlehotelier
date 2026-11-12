@@ -16,6 +16,7 @@ A long-running **job processor** polls a MySQL job queue (WordPress plugin table
 | **Reservations & folios** | Fixed-rate reservation creation, booking cancellation, card-detail copy into Cloudbeds, folio notes |
 | **Edinburgh Visitor Levy** | Real-time calendar monitoring via WebSocket; automated EVL calculation and folio adjustments by booking source |
 | **Reporting & ops** | Allocation/bed-count scrapers, booking reports, blacklist checks, housekeeping, DB purge, session refresh |
+| **Hostel analytics** | Booked-date + stay-date mart (`mac_analytics`) → Metabase — see [hostel-analytics-metabase.md](hostel-analytics-metabase.md) |
 
 Each property runs its own Docker container (`docker-compose.yml`) with a Spring profile (`crh`, `hsh`, `rmb`, `lsh`).
 

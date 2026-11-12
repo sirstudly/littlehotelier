@@ -17,6 +17,8 @@
 /ronbot-mcp/.env
 /ronbot-mcp/config/email-aliases.json
 /ronbot-bridge/.env
+/metabase/.env
+/metabase/.credentials-notes
 /.idea
 /.gradle
 /.cursor/mcp.json
