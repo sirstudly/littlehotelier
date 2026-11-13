@@ -25,12 +25,12 @@ public class AnalyticsDAO {
     private static final String UPSERT_BOOKING_CREATED =
             "INSERT INTO fact_booking_created ("
                     + "property_code, reservation_id, booked_on, booking_source, status, grand_total, "
-                    + "checkin_date, checkout_date, guest_name, first_seen_at, last_seen_at, updated_at"
-                    + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
+                    + "checkin_date, checkout_date, first_seen_at, last_seen_at, updated_at"
+                    + ") VALUES (?,?,?,?,?,?,?,?,?,?,?) "
                     + "ON DUPLICATE KEY UPDATE "
                     + "booked_on=VALUES(booked_on), booking_source=VALUES(booking_source), status=VALUES(status), "
                     + "grand_total=VALUES(grand_total), checkin_date=VALUES(checkin_date), "
-                    + "checkout_date=VALUES(checkout_date), guest_name=VALUES(guest_name), "
+                    + "checkout_date=VALUES(checkout_date), "
                     + "last_seen_at=VALUES(last_seen_at), updated_at=VALUES(updated_at)";
 
     private static final String INSERT_CHANNEL_STAY_DAY =
@@ -57,10 +57,9 @@ public class AnalyticsDAO {
                     ps.setBigDecimal( 6, f.getGrandTotal() );
                     setDateOrNull( ps, 7, f.getCheckinDate() );
                     setDateOrNull( ps, 8, f.getCheckoutDate() );
-                    ps.setString( 9, f.getGuestName() );
+                    ps.setTimestamp( 9, now );
                     ps.setTimestamp( 10, now );
                     ps.setTimestamp( 11, now );
-                    ps.setTimestamp( 12, now );
                 } );
     }
 

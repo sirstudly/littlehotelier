@@ -53,8 +53,6 @@ public class AnalyticsSyncServiceTest {
         c.setGrandTotal( "199.50" );
         c.setCheckinDate( "2024-10-01" );
         c.setCheckoutDate( "2024-10-03" );
-        c.setFirstName( "Ada" );
-        c.setLastName( "Lovelace" );
 
         BookingCreatedFact fact = AnalyticsSyncService.toBookingFact( "hsh", c, LocalDate.of( 2024, 9, 15 ) );
         assertThat( fact.getPropertyCode(), is( "hsh" ) );
@@ -62,7 +60,8 @@ public class AnalyticsSyncServiceTest {
         assertThat( fact.getBookedOn(), is( LocalDate.of( 2024, 9, 15 ) ) );
         assertThat( fact.getBookingSource(), is( "Hostelworld" ) );
         assertThat( fact.getGrandTotal(), is( new BigDecimal( "199.50" ) ) );
-        assertThat( fact.getGuestName(), is( "Ada Lovelace" ) );
+        assertThat( fact.getCheckinDate(), is( LocalDate.of( 2024, 10, 1 ) ) );
+        assertThat( fact.getCheckoutDate(), is( LocalDate.of( 2024, 10, 3 ) ) );
     }
 
     @Test

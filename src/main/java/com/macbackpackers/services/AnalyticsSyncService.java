@@ -122,8 +122,6 @@ public class AnalyticsSyncService {
         fact.setGrandTotal( parseMoney( c.getGrandTotal() ) );
         fact.setCheckinDate( parseDateOr( c.getCheckinDate(), null ) );
         fact.setCheckoutDate( parseDateOr( c.getCheckoutDate(), null ) );
-        String guest = StringUtils.trimToEmpty( c.getFirstName() ) + " " + StringUtils.trimToEmpty( c.getLastName() );
-        fact.setGuestName( StringUtils.trimToNull( guest ) );
         return fact;
     }
 

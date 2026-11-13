@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS `fact_booking_created` (
   `grand_total` decimal(12,2) NOT NULL DEFAULT 0.00,
   `checkin_date` date DEFAULT NULL,
   `checkout_date` date DEFAULT NULL,
-  `guest_name` varchar(255) DEFAULT NULL,
   `first_seen_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_seen_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

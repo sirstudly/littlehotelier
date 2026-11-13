@@ -16,7 +16,6 @@ public class BookingCreatedFact {
     private BigDecimal grandTotal = BigDecimal.ZERO;
     private LocalDate checkinDate;
     private LocalDate checkoutDate;
-    private String guestName;
 
     public String getPropertyCode() {
         return propertyCode;
@@ -80,13 +79,5 @@ public class BookingCreatedFact {
 
     public void setCheckoutDate( LocalDate checkoutDate ) {
         this.checkoutDate = checkoutDate;
-    }
-
-    public String getGuestName() {
-        return guestName;
-    }
-
-    public void setGuestName( String guestName ) {
-        this.guestName = guestName;
     }
 }
