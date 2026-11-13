@@ -8,7 +8,7 @@
 
 services:
   metabase:
-    image: metabase/metabase:v0.55.9
+    image: metabase/metabase:v0.65.4.3
     container_name: metabase
     restart: unless-stopped
     ports:
