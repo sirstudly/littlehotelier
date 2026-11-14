@@ -6,7 +6,7 @@ Non-technical dashboards for CRH / HSH / RMB / LSH: **booked-date** booking valu
 
 | Dashboard | Question | Source | Grain |
 |-----------|----------|--------|-------|
-| **Booked-date performance** | How much booking value did we take in on day X? | Cloudbeds reservation list → folio `grandTotal` by `booked_date` + channel | `fact_booking_created` |
+| **Booked-date performance** | How much booking value did we take in on day X? | Cloudbeds reservation list → folio `grandTotal` by `booked_date` + channel (statuses: confirmed, not_confirmed, canceled, no_show, checked_in, checked_out, pending_payment) | `fact_booking_created` |
 | **Stay-date production** | How much room revenue did nights on day X generate? | Data Insights stock report 191 (`room_revenue` / `rooms_sold` / ADR) | `fact_channel_stay_day` |
 
 Stay-date matches the Cloudbeds Channel Production UI. Booked-date does **not**.

@@ -37,6 +37,13 @@ public class AnalyticsSyncService {
     /** Inclusive stay-date chunk size for Data Insights day queries. */
     private static final int STAY_CHUNK_DAYS = 31;
 
+    /**
+     * Booked-date mart needs every reservation created that day, including ones that have since
+     * checked in/out or are still pending payment (not just ops "active" statuses).
+     */
+    static final String BOOKING_CREATED_STATUSES =
+            "confirmed,not_confirmed,canceled,no_show,checked_in,checked_out,pending_payment";
+
     @Autowired
     private CloudbedsScraper cloudbedsScraper;
 
@@ -70,7 +77,7 @@ public class AnalyticsSyncService {
         int upserted = 0;
         for ( LocalDate day = from; !day.isAfter( to ); day = day.plusDays( 1 ) ) {
             List<Customer> reservations = cloudbedsScraper.getReservationsByBookingDate(
-                    webClient, day, day, "confirmed,not_confirmed,canceled,no_show" );
+                    webClient, day, day, BOOKING_CREATED_STATUSES );
             List<BookingCreatedFact> facts = new ArrayList<>( reservations.size() );
             for ( Customer c : reservations ) {
                 BookingCreatedFact fact = toBookingFact( property, c, day );
