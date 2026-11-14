@@ -28,11 +28,12 @@ Wire each card to the dashboard filters (GUI: set filter target; native: `{{host
 
 | Card | Viz | How |
 |------|-----|-----|
-| Booking value by day | Line | Sum Booking value (£), group by Booked date |
+| Booking value share by hostel | Pie | Sum Booking value by Hostel (chunk of the whole) |
+| Booking value by day | Stacked area | Sum Booking value by Booked date, **series = Hostel** |
 | Booking value by ISO week (month groups) | Table or bar | Native SQL: year / month / `WEEK(..., 3)` — see bootstrap-questions.sql |
-| Booking value by month | Bar | Sum Booking value, group by year + month |
-| Channel mix | Stacked bar + optional pie | Sum Booking value, group by Channel |
-| Day-of-week pattern | Bar | Sum Booking value, group by day of week |
+| Booking value by month | Stacked bar | Sum Booking value by month, **series = Hostel** |
+| Channel mix | Stacked bar | Sum Booking value by Channel, **series = Hostel** |
+| Day-of-week pattern | Stacked bar | Sum Booking value by day of week, **series = Hostel** |
 | Stub | Text | “Competitor bed prices (coming soon)” |
 | Stub | Text | “Hostelworld search position (coming soon)” |
 
@@ -44,11 +45,12 @@ Same card layout on the stay-date model / `fact_channel_stay_day` (Room revenue 
 
 | Card | Viz |
 |------|-----|
-| Room revenue by stay day | Line |
+| Room revenue share by hostel | Pie |
+| Room revenue by stay day | Stacked area (series = Hostel) |
 | Room revenue by ISO week (month groups) | Table or bar |
-| Room revenue by month | Bar |
-| Channel mix | Stacked bar + optional pie |
-| Day-of-week pattern | Bar |
+| Room revenue by month | Stacked bar (series = Hostel) |
+| Channel mix | Stacked bar (series = Hostel) |
+| Day-of-week pattern | Stacked bar (series = Hostel) |
 | Stub | Text: competitor / Hostelworld (same as booked-date) |
 
 ## Optional

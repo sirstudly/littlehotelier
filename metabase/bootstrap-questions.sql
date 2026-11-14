@@ -6,17 +6,26 @@
 -- Booked-date performance
 -- =============================================================================
 
--- Booking value by day (line chart: sum booking_value by booked_date)
+-- Booking value by day × hostel (stacked area/line: series = hostel)
 SELECT
   p.display_name AS hostel,
   v.booked_on AS booked_date,
-  v.booking_source AS channel,
-  v.booking_value,
-  v.booking_count
+  SUM(v.booking_value) AS booking_value
 FROM v_booking_created_daily v
 JOIN dim_property p ON p.property_code = v.property_code
 WHERE v.booked_on >= CURDATE() - INTERVAL 90 DAY
-ORDER BY v.booked_on, p.display_name, v.booking_source;
+GROUP BY p.display_name, v.booked_on
+ORDER BY v.booked_on, hostel;
+
+-- Booking value share by hostel (pie)
+SELECT
+  p.display_name AS hostel,
+  SUM(v.booking_value) AS booking_value
+FROM v_booking_created_daily v
+JOIN dim_property p ON p.property_code = v.property_code
+WHERE v.booked_on >= CURDATE() - INTERVAL 90 DAY
+GROUP BY p.display_name
+ORDER BY booking_value DESC;
 
 -- Booking value by ISO week, grouped under year/month (table or bar)
 SELECT
@@ -32,18 +41,17 @@ WHERE v.booked_on >= CURDATE() - INTERVAL 90 DAY
 GROUP BY p.display_name, YEAR(v.booked_on), MONTH(v.booked_on), WEEK(v.booked_on, 3)
 ORDER BY yr, mo, iso_week, hostel;
 
--- Booking value by month (bar)
+-- Booking value by month × hostel (stacked bar; use ym for a single x-axis)
 SELECT
   p.display_name AS hostel,
-  YEAR(v.booked_on) AS yr,
-  MONTH(v.booked_on) AS mo,
+  CONCAT(YEAR(v.booked_on), '-', LPAD(MONTH(v.booked_on), 2, '0')) AS ym,
   SUM(v.booking_value) AS booking_value,
   SUM(v.booking_count) AS booking_count
 FROM v_booking_created_daily v
 JOIN dim_property p ON p.property_code = v.property_code
 WHERE v.booked_on >= CURDATE() - INTERVAL 90 DAY
 GROUP BY p.display_name, YEAR(v.booked_on), MONTH(v.booked_on)
-ORDER BY yr, mo, hostel;
+ORDER BY YEAR(v.booked_on), MONTH(v.booked_on), hostel;
 
 -- Booking value by day of week (bar; 1=Sunday .. 7=Saturday in MariaDB)
 SELECT
@@ -58,7 +66,7 @@ WHERE v.booked_on >= CURDATE() - INTERVAL 90 DAY
 GROUP BY p.display_name, DAYOFWEEK(v.booked_on), DAYNAME(v.booked_on)
 ORDER BY dow, hostel;
 
--- Booked-date channel mix (stacked bar or pie)
+-- Booked-date channel mix × hostel (stacked bar: x=channel, series=hostel)
 SELECT
   p.display_name AS hostel,
   v.booking_source AS channel,
@@ -74,17 +82,26 @@ ORDER BY booking_value DESC;
 -- Stay-date production (matches Cloudbeds Channel Production — nights occupied)
 -- =============================================================================
 
--- Room revenue by stay day (line)
+-- Room revenue by stay day × hostel (stacked area)
 SELECT
   p.display_name AS hostel,
   v.stay_date,
-  v.room_revenue,
-  v.rooms_sold AS room_nights,
-  v.adr
+  SUM(v.room_revenue) AS room_revenue
 FROM v_channel_stay_daily_total v
 JOIN dim_property p ON p.property_code = v.property_code
 WHERE v.stay_date >= CURDATE() - INTERVAL 90 DAY
-ORDER BY v.stay_date, p.display_name;
+GROUP BY p.display_name, v.stay_date
+ORDER BY v.stay_date, hostel;
+
+-- Room revenue share by hostel (pie)
+SELECT
+  p.display_name AS hostel,
+  SUM(v.room_revenue) AS room_revenue
+FROM v_channel_stay_daily_total v
+JOIN dim_property p ON p.property_code = v.property_code
+WHERE v.stay_date >= CURDATE() - INTERVAL 90 DAY
+GROUP BY p.display_name
+ORDER BY room_revenue DESC;
 
 -- Room revenue by ISO week, grouped under year/month
 SELECT
@@ -100,18 +117,17 @@ WHERE v.stay_date >= CURDATE() - INTERVAL 90 DAY
 GROUP BY p.display_name, YEAR(v.stay_date), MONTH(v.stay_date), WEEK(v.stay_date, 3)
 ORDER BY yr, mo, iso_week, hostel;
 
--- Room revenue by month (bar)
+-- Room revenue by month × hostel (stacked bar)
 SELECT
   p.display_name AS hostel,
-  YEAR(v.stay_date) AS yr,
-  MONTH(v.stay_date) AS mo,
+  CONCAT(YEAR(v.stay_date), '-', LPAD(MONTH(v.stay_date), 2, '0')) AS ym,
   SUM(v.room_revenue) AS room_revenue,
   SUM(v.rooms_sold) AS room_nights
 FROM v_channel_stay_daily_total v
 JOIN dim_property p ON p.property_code = v.property_code
 WHERE v.stay_date >= CURDATE() - INTERVAL 90 DAY
 GROUP BY p.display_name, YEAR(v.stay_date), MONTH(v.stay_date)
-ORDER BY yr, mo, hostel;
+ORDER BY YEAR(v.stay_date), MONTH(v.stay_date), hostel;
 
 -- Room revenue by day of week
 SELECT
@@ -126,7 +142,7 @@ WHERE v.stay_date >= CURDATE() - INTERVAL 90 DAY
 GROUP BY p.display_name, DAYOFWEEK(v.stay_date), DAYNAME(v.stay_date)
 ORDER BY dow, hostel;
 
--- Stay-date channel mix
+-- Stay-date channel mix × hostel (stacked bar: x=channel, series=hostel)
 SELECT
   p.display_name AS hostel,
   f.booking_source AS channel,
