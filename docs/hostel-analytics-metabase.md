@@ -77,6 +77,21 @@ Set `MB_DB_HOST` to the MariaDB **Tailscale IP** if MagicDNS does not resolve in
 
 Do **not** point `ronbot-bridge` at Metabase HTTP for analytics — use SQL / MCP against `mac_analytics` or Cloudbeds tools.
 
+### Metabot / Ollama (same host)
+
+Metabase 0.65+ can use a local Ollama for Metabot. Compose sets:
+
+| Variable | Value |
+|----------|--------|
+| `MB_LLM_ALLOWED_NETWORKS` | `allow-all` (required so Metabase may call a host-local LLM URL) |
+| `MB_LLM_OLLAMA_API_BASE_URL` | `http://host.docker.internal:11434/v1` (must end in `/v1`) |
+
+[`metabase/docker-compose.yml`](../metabase/docker-compose.yml) also adds `extra_hosts: host.docker.internal:host-gateway` so the Linux container can reach the host. Do **not** use `http://127.0.0.1:11434/v1` inside Metabase — that is the container’s own loopback.
+
+Ollama must listen on `0.0.0.0:11434` (e.g. `OLLAMA_HOST=0.0.0.0:11434`), not only `127.0.0.1`, or Docker cannot connect. Metabot needs a model context window of at least **16,384** tokens; after recreate, pick the default model under **Admin → AI**.
+
+Ship compose/env/docs via **git** (no rsync). Recreate **only** the Metabase Compose project after pull — never restart littlehotelier processor services for this change.
+
 ## Metabase models & dashboards
 
 Dashboards are created in the Metabase UI (OSS has no in-repo serialization). Apply the checklist in [`metabase/dashboard-setup.md`](../metabase/dashboard-setup.md); paste native SQL from [`metabase/bootstrap-questions.sql`](../metabase/bootstrap-questions.sql).

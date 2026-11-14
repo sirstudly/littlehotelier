@@ -25,6 +25,12 @@ services:
       JAVA_TIMEZONE: Europe/London
       # Heap ~80% of container limit (Metabase Docker prod example: 3G / -Xmx2g).
       JAVA_OPTS: "-Xmx2g"
+      # Metabot → host Ollama (OpenAI-compatible /v1). allow-all required for local URLs.
+      MB_LLM_ALLOWED_NETWORKS: ${MB_LLM_ALLOWED_NETWORKS:-allow-all}
+      MB_LLM_OLLAMA_API_BASE_URL: ${MB_LLM_OLLAMA_API_BASE_URL:-http://host.docker.internal:11434/v1}
+    # Linux: resolve host Ollama from the bridge network (do not use localhost inside the container).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - metabase_data:/metabase-data
     networks:
