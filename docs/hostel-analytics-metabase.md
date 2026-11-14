@@ -77,7 +77,9 @@ Set `MB_DB_HOST` to the MariaDB **Tailscale IP** if MagicDNS does not resolve in
 
 Do **not** point `ronbot-bridge` at Metabase HTTP for analytics — use SQL / MCP against `mac_analytics` or Cloudbeds tools.
 
-## Suggested Metabase models & dashboards
+## Metabase models & dashboards
+
+Dashboards are created in the Metabase UI (OSS has no in-repo serialization). Apply the checklist in [`metabase/dashboard-setup.md`](../metabase/dashboard-setup.md); paste native SQL from [`metabase/bootstrap-questions.sql`](../metabase/bootstrap-questions.sql).
 
 Friendly models (Admin → Table Metadata or Models):
 
@@ -86,19 +88,20 @@ Friendly models (Admin → Table Metadata or Models):
 - **Channel stay day** → `fact_channel_stay_day` / `v_channel_stay_daily_total`  
   Display: Stay date, Channel, Room revenue (£), Room nights, ADR
 
+Collection: **Hostel analytics**. Filters on both dashboards: Hostel + date range.
+
 **Booked-date performance** dashboard:
 
-- Line: booking value by `booked_on` (filter hostel + date range)
+- Line: booking value by day
+- Table/bar: ISO week under year/month groups
+- Bar: by month; by day-of-week
 - Stacked bar / pie: channel mix
-- Separate cards or Explore: group by week / month / day-of-week
-- Table: week-in-month / month
+- Text stubs: competitor bed prices / Hostelworld search position (coming soon)
 
 **Stay-date production** dashboard:
 
 - Same layout on `stay_date` + `room_revenue` / `rooms_sold`
 - Blurb: “Matches Cloudbeds Channel Production (nights occupied), not when the guest booked.”
-
-Stub cards: “Competitor bed prices (coming soon)” / “Hostelworld search position (coming soon)” on empty tables.
 
 Optional: Metabase dashboard subscription (email) on the booked-date overview.
 

@@ -1,6 +1,6 @@
 # Metabase dashboard setup (Phase 1)
 
-After Metabase is up and `mac_analytics` is connected as a MySQL database:
+After Metabase is up and `mac_analytics` is connected as a MySQL database. Native SQL for every card lives in [`bootstrap-questions.sql`](bootstrap-questions.sql).
 
 ## Models
 
@@ -11,39 +11,46 @@ After Metabase is up and `mac_analytics` is connected as a MySQL database:
    - Same Hostel mapping  
    - Rename: `stay_date` → Stay date, `room_revenue` → Room revenue (£), `rooms_sold` → Room nights, `adr` → ADR
 
+## Collection
+
+Create collection **Hostel analytics**. Put all questions and both dashboards there. Pin both dashboards on the home page if useful.
+
+## Dashboard filters (both dashboards)
+
+| Filter | Type | Maps to |
+|--------|------|---------|
+| Hostel | Category / field filter on `display_name` or `property_code` | All cards |
+| Date | Date range | `booked_on` or `stay_date` |
+
+Wire each card to the dashboard filters (GUI: set filter target; native: `{{hostel}}` / `{{date}}` field filters, or replace with literals while prototyping).
+
 ## Dashboard: Booked-date performance
 
-| Card | How |
-|------|-----|
-| Booking value over time | Sum Booking value, group by Booked date (line), filter Hostel + date |
-| By week / month / DOW | Duplicate; change group-by to week of year / month / day of week |
-| Channel mix | Sum Booking value, group by Channel (stacked bar or pie) |
-| Week-in-month table | Native SQL (example below) |
-| Stub | Text card: “Competitor bed prices (coming soon)” |
-| Stub | Text card: “Hostelworld search position (coming soon)” |
-
-```sql
-SELECT
-  p.display_name AS hostel,
-  YEAR(v.booked_on) AS yr,
-  MONTH(v.booked_on) AS mo,
-  WEEK(v.booked_on, 3) AS iso_week,
-  SUM(v.booking_value) AS booking_value
-FROM v_booking_created_daily v
-JOIN dim_property p ON p.property_code = v.property_code
-WHERE {{hostel}} AND {{date}}
-GROUP BY 1, 2, 3, 4
-ORDER BY 2, 3, 4;
-```
-
-(Use Metabase field filters or replace `{{…}}` with dashboard filters.)
+| Card | Viz | How |
+|------|-----|-----|
+| Booking value by day | Line | Sum Booking value (£), group by Booked date |
+| Booking value by ISO week (month groups) | Table or bar | Native SQL: year / month / `WEEK(..., 3)` — see bootstrap-questions.sql |
+| Booking value by month | Bar | Sum Booking value, group by year + month |
+| Channel mix | Stacked bar + optional pie | Sum Booking value, group by Channel |
+| Day-of-week pattern | Bar | Sum Booking value, group by day of week |
+| Stub | Text | “Competitor bed prices (coming soon)” |
+| Stub | Text | “Hostelworld search position (coming soon)” |
 
 ## Dashboard: Stay-date production
 
-Same card layout on stay-date model. Description on each revenue card:
+Same card layout on the stay-date model / `fact_channel_stay_day` (Room revenue (£), Room nights, ADR). Put this description on each revenue card:
 
 > This matches Cloudbeds Channel Production (nights occupied), not when the guest booked.
 
-## Landing
+| Card | Viz |
+|------|-----|
+| Room revenue by stay day | Line |
+| Room revenue by ISO week (month groups) | Table or bar |
+| Room revenue by month | Bar |
+| Channel mix | Stacked bar + optional pie |
+| Day-of-week pattern | Bar |
+| Stub | Text: competitor / Hostelworld (same as booked-date) |
 
-Pin both dashboards; collection name **Hostel analytics**. Optional email subscription on Booked-date performance (daily).
+## Optional
+
+Metabase dashboard subscription (email) on Booked-date performance for a daily report.
