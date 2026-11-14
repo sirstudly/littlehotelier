@@ -23,8 +23,8 @@ services:
       # Set in .env (Tailscale IP of MariaDB if MagicDNS does not resolve).
       MB_DB_HOST: ${MB_DB_HOST}
       JAVA_TIMEZONE: Europe/London
-      # Default heap is ~25% of the cgroup limit (~250MB at 1G) — too small for 0.65+.
-      JAVA_OPTS: "-Xmx1536m"
+      # Heap ~80% of container limit (Metabase Docker prod example: 3G / -Xmx2g).
+      JAVA_OPTS: "-Xmx2g"
     volumes:
       - metabase_data:/metabase-data
     networks:
@@ -32,7 +32,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 3G
         reservations:
           memory: 1G
     healthcheck:
