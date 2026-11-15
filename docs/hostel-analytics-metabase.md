@@ -67,15 +67,16 @@ cp .env.example .env   # fill MB_DB_* and METABASE_BIND (Tailscale IP)
 docker compose up -d
 ```
 
-UI is published on Tailscale only (`METABASE_BIND` + `METABASE_PORT`, default 3002).
+- **Staff / WhatsApp:** public HTTPS `https://analytics.macbackpackers.com` (Plesk reverse-proxy to Metabase; no-login `/public/…` links). Staff do not need Tailscale.
+- **Admin / ops:** Metabase also listens on Tailscale (`METABASE_BIND` + `METABASE_PORT`, default 3002) for logged-in editing.
 
-Set `MB_DB_HOST` to the MariaDB **Tailscale IP** if MagicDNS does not resolve inside the container. Admin login and warehouse `metabase_ro` password are in gitignored `metabase/.credentials-notes`.
+Set `MB_DB_HOST` to the MariaDB **Tailscale IP** if MagicDNS does not resolve inside the container. Admin login and warehouse `metabase_ro` password are in gitignored `metabase/.credentials-notes`. Site URL in Metabase Admin must be `https://analytics.macbackpackers.com`.
 
 1. Complete Metabase setup wizard (admin user).
 2. **Admin → Databases → Add** → MySQL → host = same as `MB_DB_HOST`, database `mac_analytics`, user `metabase_ro`.
 3. Sync schema; mark models (see below).
 
-Do **not** point `ronbot-bridge` at Metabase HTTP for analytics — use SQL / MCP against `mac_analytics` or Cloudbeds tools.
+WhatsApp authoring uses `metabase_*` MCP tools and must share `public_url` only. For ad-hoc warehouse SQL outside Metabase, use MCP/`mac_analytics` or Cloudbeds tools as appropriate.
 
 ### Metabot / Ollama (same host)
 
