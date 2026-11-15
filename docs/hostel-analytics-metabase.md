@@ -92,6 +92,10 @@ Ollama must listen on `0.0.0.0:11434` (e.g. `OLLAMA_HOST=0.0.0.0:11434`), not on
 
 Ship compose/env/docs via **git** (no rsync). Recreate **only** the Metabase Compose project after pull — never restart littlehotelier processor services for this change.
 
+### WhatsApp authoring (ronbot)
+
+When `METABASE_URL` and `METABASE_API_KEY` are set on `ronbot-bridge`, ronbot-ops exposes `metabase_*` tools so staff can ask WhatsApp ronbot to create native-SQL questions and dashboards (REST `X-API-Key`, not Metabase MCP OAuth). Create the key in Metabase Admin → Authentication → API Keys (group that can edit collection **Hostel analytics** and query `mac_analytics`). Store secrets only in the deploy host `.env` (placeholders: `http://100.x.y.z:3002`). Rebuild **ronbot-bridge** only after pull — not processors.
+
 ## Metabase models & dashboards
 
 Dashboards are created in the Metabase UI (OSS has no in-repo serialization). Apply the checklist in [`metabase/dashboard-setup.md`](../metabase/dashboard-setup.md); paste native SQL from [`metabase/bootstrap-questions.sql`](../metabase/bootstrap-questions.sql).

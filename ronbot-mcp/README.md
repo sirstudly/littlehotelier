@@ -117,6 +117,26 @@ Each value is either an address string or an object with the user's WhatsApp ide
 - Returns `count`, `truncated` (more rows matched) and compact `reservations[]` rows (reservationId, identifier, thirdPartyIdentifier, status, names, source, dates, nights, bookingDate, grandTotal, balanceDue)
 - Use it to resolve name-based filters for SQL: guest names are NULL on older `wp_lh_booking_assignment` rows, so e.g. LSH "tour" bookings are found with `query=tour` + a date range, then `run_sql ... WHERE reservation_id IN (...)`.
 
+### Metabase authoring (`metabase_*`)
+
+Create/update Metabase collections, native-SQL questions, and dashboards over the Metabase REST API (`X-API-Key`). Registered only when both are set (repo-root `.env` for Cursor; host `.env` → `ronbot-bridge` in production):
+
+```bash
+METABASE_URL=http://100.x.y.z:3002
+METABASE_API_KEY=...
+```
+
+| Tool | Purpose |
+|------|---------|
+| `metabase_list_collections` / `metabase_ensure_collection` | List or find/create a collection (default **Hostel analytics**) |
+| `metabase_list_databases` | Connected DBs (warehouse is usually `mac_analytics`) |
+| `metabase_create_native_question` | `POST /api/card` native SQL + display type |
+| `metabase_create_dashboard` | Empty dashboard |
+| `metabase_get_dashboard` | Read layout |
+| `metabase_update_dashboard_cards` | Append cards onto a dashboard |
+
+Tool results include Tailscale UI URLs. Metric definitions: [`docs/hostel-analytics-metabase.md`](../docs/hostel-analytics-metabase.md).
+
 ### `run_sql` / `describe_sql_tables`
 
 Ad-hoc read-only queries against `wp_<prop>_backoffice`, over a separate pool that logs in as a dedicated MySQL user with only `SELECT` and `SHOW VIEW`. The tools are registered only when these are set: locally from the repo-root `.env` (loaded by Cursor via `envFile` in `.cursor/mcp.json`); in production from the host `.env` via the `ronbot-bridge` Compose service, which forwards them to MCP with `RONBOT_SQL_RO_HOST=mysql-tailscale`:

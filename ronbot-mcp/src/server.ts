@@ -23,6 +23,18 @@ import { getJobQueueStats } from "./db/queue.js";
 import { isReadOnlySqlConfigured } from "./db/readOnlyPool.js";
 import * as scheduledDb from "./db/scheduled.js";
 import { audit } from "./lib/audit.js";
+import {
+  DEFAULT_COLLECTION,
+  DISPLAY_TYPES,
+  createDashboard,
+  createNativeQuestion,
+  ensureCollection,
+  getDashboard,
+  isMetabaseConfigured,
+  listCollections,
+  listDatabases,
+  updateDashboardCards,
+} from "./metabase/client.js";
 import { sendReportEmail } from "./reports/mailer.js";
 import {
   COLUMN_TYPES,
@@ -812,6 +824,178 @@ export function createServer(): McpServer {
       }
     },
   );
+
+  if (isMetabaseConfigured()) {
+    const displaySchema = z.enum(DISPLAY_TYPES);
+
+    server.tool(
+      "metabase_list_collections",
+      "List Metabase collections (folders for questions/dashboards). Use before saving analytics charts.",
+      {},
+      async () => {
+        try {
+          return ok(await listCollections());
+        } catch (err) {
+          return fail(err);
+        }
+      },
+    );
+
+    server.tool(
+      "metabase_list_databases",
+      "List Metabase connected databases (use id/name when creating native questions; warehouse is usually mac_analytics).",
+      {},
+      async () => {
+        try {
+          return ok(await listDatabases());
+        } catch (err) {
+          return fail(err);
+        }
+      },
+    );
+
+    server.tool(
+      "metabase_ensure_collection",
+      `Find or create a Metabase collection by name (default "${DEFAULT_COLLECTION}"). Prefer this before creating dashboards/questions for hostel analytics.`,
+      {
+        name: z.string().min(1).max(200).optional(),
+      },
+      async ({ name }) => {
+        try {
+          const result = await ensureCollection(name);
+          audit("metabase_ensure_collection", {
+            id: result.id,
+            name: result.name,
+            created: result.created,
+          });
+          return ok(result);
+        } catch (err) {
+          return fail(err);
+        }
+      },
+    );
+
+    server.tool(
+      "metabase_create_native_question",
+      "Create a Metabase native-SQL question (card). Prefer MariaDB SQL against mac_analytics views/facts from docs/hostel-analytics-metabase.md and metabase/bootstrap-questions.sql. Do not mix booked-date (fact_booking_created) with stay-date (fact_channel_stay_day). Spot-check with run_sql when unsure. Returns a Tailscale question URL.",
+      {
+        name: z.string().min(1).max(200),
+        sql: z.string().min(1).max(50000),
+        display: displaySchema.optional(),
+        description: z.string().max(2000).optional(),
+        collection_id: z.number().int().positive().optional(),
+        database_id: z.number().int().positive().optional(),
+        database_name: z.string().min(1).max(200).optional(),
+        visualization_settings: z.record(z.unknown()).optional(),
+        requested_by: z.string().optional(),
+      },
+      async (args) => {
+        try {
+          const result = await createNativeQuestion(args);
+          audit("metabase_create_native_question", {
+            id: result.id,
+            name: result.name,
+            display: result.display,
+            requested_by: args.requested_by ?? null,
+          });
+          return ok(result);
+        } catch (err) {
+          audit("metabase_create_native_question_failed", {
+            name: args.name,
+            error: err instanceof Error ? err.message : String(err),
+            requested_by: args.requested_by ?? null,
+          });
+          return fail(err);
+        }
+      },
+    );
+
+    server.tool(
+      "metabase_create_dashboard",
+      "Create an empty Metabase dashboard in a collection. Then add cards with metabase_update_dashboard_cards. Returns a Tailscale dashboard URL for WhatsApp.",
+      {
+        name: z.string().min(1).max(200),
+        description: z.string().max(2000).optional(),
+        collection_id: z.number().int().positive().optional(),
+        requested_by: z.string().optional(),
+      },
+      async (args) => {
+        try {
+          const result = await createDashboard(args);
+          audit("metabase_create_dashboard", {
+            id: result.id,
+            name: result.name,
+            requested_by: args.requested_by ?? null,
+          });
+          return ok(result);
+        } catch (err) {
+          audit("metabase_create_dashboard_failed", {
+            name: args.name,
+            error: err instanceof Error ? err.message : String(err),
+            requested_by: args.requested_by ?? null,
+          });
+          return fail(err);
+        }
+      },
+    );
+
+    server.tool(
+      "metabase_get_dashboard",
+      "Fetch a Metabase dashboard (name, collection, dashcard layout). Use before editing layout.",
+      {
+        dashboard_id: z.number().int().positive(),
+      },
+      async ({ dashboard_id }) => {
+        try {
+          return ok(await getDashboard(dashboard_id));
+        } catch (err) {
+          return fail(err);
+        }
+      },
+    );
+
+    server.tool(
+      "metabase_update_dashboard_cards",
+      "Append saved questions onto a Metabase dashboard (preserves existing cards). Pass card_id from metabase_create_native_question. Optional row/col/size_x/size_y (defaults: full-width 12×6 stacked below existing). Returns the dashboard URL.",
+      {
+        dashboard_id: z.number().int().positive(),
+        add: z
+          .array(
+            z.object({
+              card_id: z.number().int().positive(),
+              row: z.number().int().nonnegative().optional(),
+              col: z.number().int().nonnegative().optional(),
+              size_x: z.number().int().positive().max(24).optional(),
+              size_y: z.number().int().positive().max(24).optional(),
+            }),
+          )
+          .min(1)
+          .max(20),
+        requested_by: z.string().optional(),
+      },
+      async (args) => {
+        try {
+          const result = await updateDashboardCards({
+            dashboard_id: args.dashboard_id,
+            add: args.add,
+          });
+          audit("metabase_update_dashboard_cards", {
+            dashboard_id: result.id,
+            added: args.add.length,
+            requested_by: args.requested_by ?? null,
+          });
+          return ok(result);
+        } catch (err) {
+          audit("metabase_update_dashboard_cards_failed", {
+            dashboard_id: args.dashboard_id,
+            error: err instanceof Error ? err.message : String(err),
+            requested_by: args.requested_by ?? null,
+          });
+          return fail(err);
+        }
+      },
+    );
+  }
 
   if (isReadOnlySqlConfigured()) {
     server.tool(

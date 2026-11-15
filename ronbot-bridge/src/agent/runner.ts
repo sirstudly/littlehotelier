@@ -48,6 +48,10 @@ function mcpEnv(): Record<string, string> {
   }
   if (config.reportFromName) env.RONBOT_REPORT_FROM_NAME = config.reportFromName;
   if (config.reportFromAddress) env.RONBOT_REPORT_FROM_ADDRESS = config.reportFromAddress;
+  if (config.metabaseUrl && config.metabaseApiKey) {
+    env.METABASE_URL = config.metabaseUrl;
+    env.METABASE_API_KEY = config.metabaseApiKey;
+  }
   return env;
 }
 

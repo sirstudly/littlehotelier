@@ -372,6 +372,9 @@ services:
       - RONBOT_REPORT_FROM_NAME=${RONBOT_REPORT_FROM_NAME:-RONBOT}
       # Optional "Send mail as" alias of the Gmail user; blank sends from the Gmail user itself
       - RONBOT_REPORT_FROM_ADDRESS=${RONBOT_REPORT_FROM_ADDRESS:-}
+      # MCP Metabase authoring (dashboard/question create); tools hidden when either empty
+      - METABASE_URL=${METABASE_URL:-}
+      - METABASE_API_KEY=${METABASE_API_KEY:-}
     volumes:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json:ro
       # MCP dist + node_modules are baked into the image (do not mount host dist —

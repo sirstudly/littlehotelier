@@ -187,6 +187,9 @@ export const config = {
   reportFromName: env("RONBOT_REPORT_FROM_NAME"),
   /** From address for email_spreadsheet; defaults to the Gmail sign-in user. */
   reportFromAddress: env("RONBOT_REPORT_FROM_ADDRESS"),
+  /** Metabase REST authoring for MCP (tools hidden when either is unset). */
+  metabaseUrl: env("METABASE_URL"),
+  metabaseApiKey: process.env.METABASE_API_KEY ?? "",
 };
 
 export function isAllowlistedGroup(chatId: string): boolean {
