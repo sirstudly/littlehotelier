@@ -41,14 +41,15 @@ public class AnalyticsDAO {
                     + "property_code, stay_date, booking_source, source_category, room_revenue, rooms_sold, adr, synced_at"
                     + ") VALUES (?,?,?,?,?,?,?,?)";
 
-    private static final String UPSERT_COMPETITOR_BED_PRICE =
+    private static final String END_DATE_COMPETITOR_BED_PRICE =
+            "UPDATE fact_competitor_bed_price SET valid_to = ? "
+                    + "WHERE property_code = ? AND source = ? AND stay_date = ? AND valid_to IS NULL";
+
+    private static final String INSERT_COMPETITOR_BED_PRICE =
             "INSERT INTO fact_competitor_bed_price ("
                     + "property_code, competitor_name, room_category, stay_date, lowest_bed_price, "
-                    + "currency, source, is_own, scraped_at"
-                    + ") VALUES (?,?,?,?,?,?,?,?,?) "
-                    + "ON DUPLICATE KEY UPDATE "
-                    + "lowest_bed_price=VALUES(lowest_bed_price), currency=VALUES(currency), "
-                    + "is_own=VALUES(is_own), scraped_at=VALUES(scraped_at)";
+                    + "currency, source, is_own, scraped_at, valid_from, valid_to"
+                    + ") VALUES (?,?,?,?,?,?,?,?,?,?,NULL)";
 
     private static final String UPSERT_HW_SEARCH_RANK =
             "INSERT INTO fact_hw_search_rank ("
@@ -115,12 +116,21 @@ public class AnalyticsDAO {
                 } );
     }
 
-    public void upsertCompetitorBedPrices( List<CompetitorBedPriceFact> facts ) {
+    /**
+     * SCD2 replace for one stay night: end-dates all current rows for
+     * {@code propertyCode}/{@code source}/{@code stayDate}, then inserts {@code facts} as the new
+     * current snapshot ({@code valid_to} NULL). Empty {@code facts} still end-dates (sold-out /
+     * empty SERP clears current prices for that night).
+     */
+    public void replaceCompetitorBedPricesForStayDate( String propertyCode, String source,
+            LocalDate stayDate, List<CompetitorBedPriceFact> facts ) {
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        jdbcTemplate.update( END_DATE_COMPETITOR_BED_PRICE, now, propertyCode, source,
+                Date.valueOf( stayDate ) );
         if ( facts == null || facts.isEmpty() ) {
             return;
         }
-        Timestamp now = new Timestamp( System.currentTimeMillis() );
-        jdbcTemplate.batchUpdate( UPSERT_COMPETITOR_BED_PRICE, facts, facts.size(),
+        jdbcTemplate.batchUpdate( INSERT_COMPETITOR_BED_PRICE, facts, facts.size(),
                 ( PreparedStatement ps, CompetitorBedPriceFact f ) -> {
                     ps.setString( 1, f.getPropertyCode() );
                     ps.setString( 2, f.getCompetitorName() );
@@ -136,6 +146,7 @@ public class AnalyticsDAO {
                     ps.setString( 7, f.getSource() );
                     ps.setInt( 8, f.isOwn() ? 1 : 0 );
                     ps.setTimestamp( 9, now );
+                    ps.setTimestamp( 10, now );
                 } );
     }
 

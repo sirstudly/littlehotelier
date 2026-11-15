@@ -158,7 +158,7 @@ ORDER BY room_revenue DESC;
 -- Phase 2: Competitive position (GHS + Hostelworld)
 -- =============================================================================
 
--- GHS dorm heatmap grain: stay_date × competitor (own + market)
+-- GHS dorm heatmap grain: stay_date × competitor (own + market). Current snapshot only.
 SELECT
   stay_date,
   competitor_name,
@@ -167,11 +167,12 @@ SELECT
 FROM fact_competitor_bed_price
 WHERE source = 'ghs'
   AND room_category = 'dorm'
+  AND valid_to IS NULL
   AND stay_date >= CURDATE()
   AND stay_date < CURDATE() + INTERVAL 30 DAY
 ORDER BY stay_date, competitor_name;
 
--- GHS private heatmap grain (when private rows exist)
+-- GHS private heatmap grain (when private rows exist). Current snapshot only.
 SELECT
   stay_date,
   competitor_name,
@@ -180,11 +181,12 @@ SELECT
 FROM fact_competitor_bed_price
 WHERE source = 'ghs'
   AND room_category = 'private'
+  AND valid_to IS NULL
   AND stay_date >= CURDATE()
   AND stay_date < CURDATE() + INTERVAL 30 DAY
 ORDER BY stay_date, competitor_name;
 
--- GHS dorm prices by hostel (line series = competitor_name).
+-- GHS dorm prices by hostel (line series = competitor_name). Current snapshot only.
 -- Metabase vars:
 --   {{preset}} text: our | cheapest3 | dearest3 | our_and_extremes | custom
 --   {{hostels}} field filter on competitor_name (only when preset=custom; must hit base table)
@@ -194,6 +196,7 @@ WITH day_prices AS (
   FROM fact_competitor_bed_price
   WHERE source = 'ghs'
     AND room_category = 'dorm'
+    AND valid_to IS NULL
     AND stay_date >= CURDATE()
     AND stay_date < CURDATE() + INTERVAL 30 DAY
 ),
@@ -230,7 +233,8 @@ JOIN wanted w ON w.competitor_name = d.competitor_name
 UNION ALL
 SELECT stay_date, competitor_name, lowest_bed_price
 FROM fact_competitor_bed_price
-WHERE 1 = 0  -- live card: preset='custom' + [[AND {{hostels}}]]
+WHERE valid_to IS NULL
+  AND 1 = 0  -- live card: preset='custom' + [[AND {{hostels}}]]
 ORDER BY stay_date, competitor_name;
 
 -- Hostelworld search rank time series (CRH / HSH / RMB)

@@ -32,7 +32,7 @@ public class SyncCompetitorBedPriceJob extends AbstractJob {
         String city = StringUtils.defaultIfBlank( getParameter( "city" ), "Edinburgh" );
         int horizonDays = NumberUtils.toInt( getParameter( "horizon_days" ), 30 );
         int n = analyticsSyncService.syncCompetitorBedPrices( city, horizonDays );
-        LOGGER.info( "SyncCompetitorBedPriceJob upserted {} row(s) city={} horizon_days={}",
+        LOGGER.info( "SyncCompetitorBedPriceJob wrote {} current row(s) city={} horizon_days={}",
                 n, city, horizonDays );
     }
 }

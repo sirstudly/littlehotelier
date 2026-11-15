@@ -42,6 +42,9 @@ mysql_admin < "$ROOT/src/main/config/migrations/2026-11-12-mac-analytics.sql"
 echo "Applying Phase 2 warehouse DDL (GHS + HW rank)..."
 mysql_admin < "$ROOT/src/main/config/migrations/2026-11-15-mac-analytics-phase2.sql"
 
+echo "Applying GHS competitor bed price SCD2 columns..."
+mysql_admin < "$ROOT/src/main/config/migrations/2026-11-16-mac-analytics-competitor-bed-price-scd2.sql"
+
 echo "Creating / updating users..."
 mysql_admin <<SQL
 CREATE USER IF NOT EXISTS 'analytics_rw'@'%' IDENTIFIED BY '${ANALYTICS_RW_PASSWORD}';

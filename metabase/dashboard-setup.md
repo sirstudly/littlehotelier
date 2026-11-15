@@ -56,9 +56,9 @@ Edinburgh-only (CRH / HSH / RMB). Data from CRH processor jobs into `mac_analyti
 
 | Card | Viz | SQL / notes |
 |------|-----|-------------|
-| GHS dorm price grid | Pivot / heatmap | `stay_date` × `competitor_name`, value = `lowest_bed_price`, `room_category='dorm'` |
+| GHS dorm price grid | Pivot / heatmap | `stay_date` × `competitor_name`, value = `lowest_bed_price`, `room_category='dorm'`, **`valid_to IS NULL`** (current snapshot) |
 | GHS private price grid | Pivot / heatmap | Same for `room_category='private'` (may be empty until private prices are scraped) |
-| GHS dorm prices by hostel | Line | `stay_date` × `lowest_bed_price`, **series = `competitor_name`**. Dashboard **View** preset: `our` / `cheapest3` / `dearest3` / `our_and_extremes` (default) / `custom`. Extremes = 3 lowest/highest competitor avg prices over next 30 stay-dates. **Hostels** multi-select used when View=`custom` |
+| GHS dorm prices by hostel | Line | `stay_date` × `lowest_bed_price`, **series = `competitor_name`**, **`valid_to IS NULL`**. Dashboard **View** preset: `our` / `cheapest3` / `dearest3` / `our_and_extremes` (default) / `custom`. Extremes = 3 lowest/highest competitor avg prices over next 30 stay-dates. **Hostels** multi-select used when View=`custom` |
 | HW search rank | Line | `position` over `search_date`, **series = Hostel** (CRH/HSH/RMB) |
 
 Live cards are created via Metabase API after scrapers populate facts (same pattern as Phase 1), not OSS serialization.

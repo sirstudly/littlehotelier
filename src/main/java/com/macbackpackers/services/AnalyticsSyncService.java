@@ -87,8 +87,9 @@ public class AnalyticsSyncService {
     }
 
     /**
-     * Scrapes Google Hotels for {@code [today, today+horizonDays)} and upserts
-     * {@code fact_competitor_bed_price}.
+     * Scrapes Google Hotels for {@code [today, today+horizonDays)} and writes a new current
+     * snapshot into {@code fact_competitor_bed_price} (SCD2: prior current rows for each stay_date
+     * are end-dated).
      */
     public int syncCompetitorBedPrices( String city, int horizonDays ) throws Exception {
         if ( horizonDays < 1 ) {
@@ -96,16 +97,17 @@ public class AnalyticsSyncService {
         }
         List<PropertyMatch> own = analyticsDAO.listEdinburghPropertyMatches();
         LocalDate start = LocalDate.now();
-        int upserted = 0;
+        int inserted = 0;
         ChromeDriver driver = googleHotelsScraper.openDriver();
         try {
             for ( int i = 0; i < horizonDays; i++ ) {
                 LocalDate stayDate = start.plusDays( i );
                 List<CompetitorBedPriceFact> facts =
                         googleHotelsScraper.scrapeStayDate( driver, city, stayDate, own );
-                analyticsDAO.upsertCompetitorBedPrices( facts );
-                upserted += facts.size();
-                LOGGER.info( "GHS {} {}: upserted {} row(s)", city, stayDate, facts.size() );
+                analyticsDAO.replaceCompetitorBedPricesForStayDate( "edn", "ghs", stayDate, facts );
+                inserted += facts.size();
+                LOGGER.info( "GHS {} {}: replaced current snapshot with {} row(s)",
+                        city, stayDate, facts.size() );
                 if ( i + 1 < horizonDays ) {
                     googleHotelsScraper.pauseBetweenDates();
                 }
@@ -119,7 +121,7 @@ public class AnalyticsSyncService {
                 LOGGER.warn( "Error quitting GHS Chrome: {}", e.toString() );
             }
         }
-        return upserted;
+        return inserted;
     }
 
     /**

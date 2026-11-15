@@ -48,13 +48,15 @@ Scheduler seed (each `wp_*_backoffice`): [`2026-11-12-analytics-job-scheduler.sq
 
 | Job | Runner | Default schedule (CRH) | Params | Writes |
 |-----|--------|------------------------|--------|--------|
-| `SyncCompetitorBedPriceJob` | **CRH only** | 07:00 | `horizon_days=30`, `city=Edinburgh` | `fact_competitor_bed_price` (`property_code=edn`, `room_category` dorm/private, `is_own`) |
+| `SyncCompetitorBedPriceJob` | **CRH only** | 07:00 | `horizon_days=30`, `city=Edinburgh` | `fact_competitor_bed_price` SCD2 (`property_code=edn`, `room_category` dorm/private, `is_own`, `valid_from`/`valid_to`) |
 | `SyncHostelworldSearchRankJob` | **CRH only** | 07:15 | `guests=1`, `nights=1`, `arrival_offset_days=7`, `city=Edinburgh` | `fact_hw_search_rank` for crh/hsh/rmb |
 
 - **LSH out of scope.** Accidental enqueues on HSH/RMB/LSH log-skip and complete.
 - Scheduler seed: [`2026-11-15-analytics-phase2-job-scheduler-crh.sql`](../src/main/config/migrations/2026-11-15-analytics-phase2-job-scheduler-crh.sql) → `wp_crh_backoffice` only.
 - Matching: `dim_property_match` (display names, aliases, HW numbers 551 / 552 / 11242).
-- GHS uses a **dedicated** Chrome profile (`chromeprofile/ghs`, compose mount on `crh-processor` only) — not the Cloudbeds profile. The `dates=` query param alone does **not** drive Google’s calendar; the scraper sets check-in/out via the UI and asserts the inputs match before parsing. List scrape stores “Prices starting from £N” as **dorm** (hostel lowest); private rows when exposed. Fully booked properties may vanish from results for that night (expected).
+- GHS uses a **dedicated** Chrome profile (`chromeprofile/ghs`, compose mount on `crh-processor` only) — not the Cloudbeds profile. Stay dates are driven by the protobuf `ts=` trip blob in the search URL (plus `dates=`); the scraper asserts Check-in/out match before parsing. List scrape stores “Prices starting from £N” as **dorm** (hostel lowest); private rows when exposed.
+- **SCD2 prices:** each sync end-dates prior current rows for that `stay_date` (`valid_to = now`) and inserts a new snapshot (`valid_from = now`, `valid_to` NULL). Charts / current reports use `WHERE valid_to IS NULL`. History / as-of: `valid_from <= @ts AND (valid_to IS NULL OR valid_to > @ts)`. Fully booked properties that vanish from GHS results are end-dated with no new current row (chart gap — expected).
+- Migration: [`2026-11-16-mac-analytics-competitor-bed-price-scd2.sql`](../src/main/config/migrations/2026-11-16-mac-analytics-competitor-bed-price-scd2.sql).
 - HW uses classic SSR search HTML (`/hostels/{city}?DateFrom&DateTo&NumberOfGuests`) via HtmlUnit (`webClientForHostelworld`); PWA `/pwa/wds/s` shells need JS.
 - MCP allowlist includes both jobs (optional params).
 - Metabase: **Competitive position** dashboard — GHS heatmap / own-vs-market lines / HW rank series. See [`metabase/dashboard-setup.md`](../metabase/dashboard-setup.md) + [`metabase/bootstrap-questions.sql`](../metabase/bootstrap-questions.sql).
