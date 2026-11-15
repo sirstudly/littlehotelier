@@ -13,7 +13,8 @@
     "smoke:agent": "tsx scripts/smoke-agent-prompt.ts",
     "smoke:xlsx": "tsx scripts/smoke-xlsx.ts",
     "check:job-mutations": "tsx scripts/check-job-mutations.ts",
-    "check:adhoc-sql": "tsx scripts/check-adhoc-sql.ts"
+    "check:adhoc-sql": "tsx scripts/check-adhoc-sql.ts",
+    "check:scratch-materialize": "tsx scripts/check-scratch-materialize.ts"
   },
   "engines": {
     "node": ">=22.13"

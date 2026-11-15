@@ -91,8 +91,13 @@ export const DEFUNCT_TABLES = [
 
 export const DEFAULT_MAX_ROWS = 200;
 export const HARD_MAX_ROWS = 1000;
+/** Row cap for Tier 2 CREATE TABLE AS materialize (plus one for truncation detect). */
+export const MATERIALIZE_DEFAULT_MAX_ROWS = 100_000;
+export const MATERIALIZE_HARD_MAX_ROWS = 100_000;
 export const DEFAULT_TIMEOUT_MS = 15_000;
 export const HARD_TIMEOUT_MS = 30_000;
+export const MATERIALIZE_DEFAULT_TIMEOUT_MS = 90_000;
+export const MATERIALIZE_HARD_TIMEOUT_MS = 120_000;
 
 // The read-only user blocks writes, but not reads that stall or hold locks.
 const BANNED_FUNCTIONS = new Set([
@@ -187,12 +192,12 @@ export function clampMaxRows(maxRows?: number): number {
   return Math.max(1, Math.min(Math.floor(maxRows), HARD_MAX_ROWS));
 }
 
-/**
- * Accepts exactly one SELECT (UNIONs and subqueries allowed) against any table.
- * Rejects locking reads, INTO, and stall/lock functions; caps the row count.
- */
-export function validateSql(rawSql: string, maxRows = DEFAULT_MAX_ROWS): ValidatedSql {
-  const cap = clampMaxRows(maxRows);
+export function clampMaterializeMaxRows(maxRows?: number): number {
+  if (!maxRows || !Number.isFinite(maxRows)) return MATERIALIZE_DEFAULT_MAX_ROWS;
+  return Math.max(1, Math.min(Math.floor(maxRows), MATERIALIZE_HARD_MAX_ROWS));
+}
+
+function validateSelectWithCap(rawSql: string, cap: number): ValidatedSql {
   const fetchLimit = cap + 1;
   const sql = stripTrailing(rawSql);
   if (sql === "") throw new Error("SQL is empty");
@@ -238,6 +243,25 @@ export function validateSql(rawSql: string, maxRows = DEFAULT_MAX_ROWS): Validat
   }
   (stmt.limit as LimitNode).value[limit.index] = { type: "number", value: fetchLimit };
   return { sql: parser.sqlify(stmt as never, PARSE_OPT), fetchLimit };
+}
+
+/**
+ * Accepts exactly one SELECT (UNIONs and subqueries allowed) against any table.
+ * Rejects locking reads, INTO, and stall/lock functions; caps the row count.
+ */
+export function validateSql(rawSql: string, maxRows = DEFAULT_MAX_ROWS): ValidatedSql {
+  return validateSelectWithCap(rawSql, clampMaxRows(maxRows));
+}
+
+/**
+ * SELECT validation for Tier 2 CREATE TABLE AS — same safety rules as validateSql
+ * but with a much higher row cap (default/hard 100_000 + 1 for truncation detect).
+ */
+export function validateMaterializeSelect(
+  rawSql: string,
+  maxRows = MATERIALIZE_DEFAULT_MAX_ROWS,
+): ValidatedSql {
+  return validateSelectWithCap(rawSql, clampMaterializeMaxRows(maxRows));
 }
 
 function uniqueColumnNames(fields: FieldPacket[]): string[] {

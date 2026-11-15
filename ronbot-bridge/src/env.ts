@@ -192,6 +192,11 @@ export const config = {
   /** Optional public base for WhatsApp links; defaults to METABASE_URL in MCP. */
   metabasePublicUrl: env("METABASE_PUBLIC_URL"),
   metabaseApiKey: process.env.METABASE_API_KEY ?? "",
+  /** Tier 2 scratch materialize (mac_analytics_scratch); tools hidden when unset. */
+  analyticsAdhocRwHost: env("ANALYTICS_ADHOC_RW_HOST"),
+  analyticsAdhocRwPort: env("ANALYTICS_ADHOC_RW_PORT"),
+  analyticsAdhocRwUser: env("ANALYTICS_ADHOC_RW_USER"),
+  analyticsAdhocRwPassword: process.env.ANALYTICS_ADHOC_RW_PASSWORD ?? "",
 };
 
 export function isAllowlistedGroup(chatId: string): boolean {

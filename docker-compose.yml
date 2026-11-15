@@ -378,6 +378,10 @@ services:
       # Public hostname for WhatsApp links (defaults to METABASE_URL if unset)
       - METABASE_PUBLIC_URL=${METABASE_PUBLIC_URL:-}
       - METABASE_API_KEY=${METABASE_API_KEY:-}
+      # Tier 2 scratch materialize into mac_analytics_scratch (hidden when user/password empty)
+      - ANALYTICS_ADHOC_RW_HOST=mysql-tailscale
+      - ANALYTICS_ADHOC_RW_USER=${ANALYTICS_ADHOC_RW_USER:-}
+      - ANALYTICS_ADHOC_RW_PASSWORD=${ANALYTICS_ADHOC_RW_PASSWORD:-}
     volumes:
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json:ro
       # MCP dist + node_modules are baked into the image (do not mount host dist —

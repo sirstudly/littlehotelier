@@ -155,8 +155,10 @@ METABASE_API_KEY=...
 | `metabase_create_dashboard` | Empty dashboard + enable public link |
 | `metabase_get_dashboard` | Read layout; ensure public link |
 | `metabase_update_dashboard_cards` | Append cards; return `public_url` |
+| `metabase_materialize_sql` | Tier 2: `CREATE TABLE AS` into `mac_analytics_scratch.adhoc_*` (needs `ANALYTICS_ADHOC_RW_*`) |
+| `metabase_list_adhoc_tables` / `metabase_drop_adhoc_table` | List / manually drop scratch tables |
 
-Tool results include `public_url` (`/public/dashboard|question/{uuid}`) for no-login WhatsApp sharing. Metric definitions and adhoc/backoffice routing: [`docs/hostel-analytics-metabase.md`](../docs/hostel-analytics-metabase.md). Curated KPIs use `mac_analytics`; EVL / booking-assignment charts use `database_name=backoffice` (Metabase Admin connection + `metabase_ops_ro` from [`scripts/apply-metabase-ops-ro.sh`](../scripts/apply-metabase-ops-ro.sh)).
+Tool results include `public_url` (`/public/dashboard|question/{uuid}`) for no-login WhatsApp sharing. Metric definitions and adhoc/backoffice/scratch routing: [`docs/hostel-analytics-metabase.md`](../docs/hostel-analytics-metabase.md). Curated KPIs use `mac_analytics`; EVL / booking-assignment charts use `database_name=backoffice` ([`scripts/apply-metabase-ops-ro.sh`](../scripts/apply-metabase-ops-ro.sh)). Heavy snapshots: materialize then chart `mac_analytics_scratch.adhoc_*` ([`scripts/apply-mac-analytics-scratch.sh`](../scripts/apply-mac-analytics-scratch.sh)).
 
 ### `run_sql` / `describe_sql_tables`
 

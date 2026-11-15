@@ -22,6 +22,12 @@ import * as jobsDb from "./db/jobs.js";
 import { searchLogs } from "./db/logs.js";
 import { getJobQueueStats } from "./db/queue.js";
 import { isReadOnlySqlConfigured } from "./db/readOnlyPool.js";
+import {
+  dropAdhocTable,
+  isScratchMaterializeConfigured,
+  listAdhocTables,
+  materializeSql,
+} from "./db/scratchMaterialize.js";
 import { audit } from "./lib/audit.js";
 import {
   DEFAULT_COLLECTION,
@@ -1235,6 +1241,87 @@ export function createServer(): McpServer {
         } catch (err) {
           audit("metabase_update_dashboard_cards_failed", {
             dashboard_id: args.dashboard_id,
+            error: err instanceof Error ? err.message : String(err),
+            requested_by: args.requested_by ?? null,
+          });
+          return fail(err);
+        }
+      },
+    );
+  }
+
+  if (isScratchMaterializeConfigured()) {
+    server.tool(
+      "metabase_materialize_sql",
+      "Tier 2: run a validated SELECT (cross-DB wp_* OK) as CREATE TABLE AS into mac_analytics_scratch.adhoc_<slug>_<yyyyMMdd>_<HHmm> (Europe/London). Use when live backoffice SQL is too heavy for a public Metabase card. Then chart with metabase_create_native_question on database_name=mac_analytics querying mac_analytics_scratch.<table>. Fails if table exists or row count would exceed 100000. Prefer live database_name=backoffice when cheap.",
+      {
+        sql: z.string().min(1).max(50000),
+        slug: z.string().min(1).max(41).optional(),
+        table_name: z.string().min(1).max(80).optional(),
+        requested_by: z.string().optional(),
+      },
+      async (args) => {
+        try {
+          const result = await materializeSql({
+            sql: args.sql,
+            slug: args.slug,
+            table_name: args.table_name,
+          });
+          audit("metabase_materialize_sql", {
+            table: result.table,
+            row_count: result.row_count,
+            create_ms: result.create_ms,
+            requested_by: args.requested_by ?? null,
+          });
+          return ok(result);
+        } catch (err) {
+          audit("metabase_materialize_sql_failed", {
+            error: err instanceof Error ? err.message : String(err),
+            requested_by: args.requested_by ?? null,
+          });
+          return fail(err);
+        }
+      },
+    );
+
+    server.tool(
+      "metabase_list_adhoc_tables",
+      "List mac_analytics_scratch.adhoc_* tables (Tier 2 scratch materializations).",
+      {
+        requested_by: z.string().optional(),
+      },
+      async (args) => {
+        try {
+          const result = await listAdhocTables();
+          audit("metabase_list_adhoc_tables", {
+            count: result.tables.length,
+            requested_by: args.requested_by ?? null,
+          });
+          return ok(result);
+        } catch (err) {
+          return fail(err);
+        }
+      },
+    );
+
+    server.tool(
+      "metabase_drop_adhoc_table",
+      "Manually DROP one mac_analytics_scratch.adhoc_* table (name must match adhoc_<slug>_<yyyyMMdd>_<HHmm>). No automated purge.",
+      {
+        table: z.string().min(1).max(80),
+        requested_by: z.string().optional(),
+      },
+      async (args) => {
+        try {
+          const result = await dropAdhocTable(args.table);
+          audit("metabase_drop_adhoc_table", {
+            table: result.dropped,
+            requested_by: args.requested_by ?? null,
+          });
+          return ok(result);
+        } catch (err) {
+          audit("metabase_drop_adhoc_table_failed", {
+            table: args.table,
             error: err instanceof Error ? err.message : String(err),
             requested_by: args.requested_by ?? null,
           });

@@ -55,6 +55,12 @@ function mcpEnv(): Record<string, string> {
       env.METABASE_PUBLIC_URL = config.metabasePublicUrl;
     }
   }
+  if (config.analyticsAdhocRwUser && config.analyticsAdhocRwPassword) {
+    env.ANALYTICS_ADHOC_RW_USER = config.analyticsAdhocRwUser;
+    env.ANALYTICS_ADHOC_RW_PASSWORD = config.analyticsAdhocRwPassword;
+    if (config.analyticsAdhocRwHost) env.ANALYTICS_ADHOC_RW_HOST = config.analyticsAdhocRwHost;
+    if (config.analyticsAdhocRwPort) env.ANALYTICS_ADHOC_RW_PORT = config.analyticsAdhocRwPort;
+  }
   return env;
 }
 

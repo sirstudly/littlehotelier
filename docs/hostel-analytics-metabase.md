@@ -136,7 +136,7 @@ Prefer **live native SQL** on the Metabase **`backoffice`** connection over new 
 | Tier | When | How |
 |------|------|-----|
 | **1 — Live backoffice** (default) | Data already in `wp_*_backoffice` | Native SQL with fully-qualified names (`wp_crh_backoffice.v_wp_lh_booking_reservation`, …); `database_name=backoffice` |
-| **2 — Scratch table** | Cloudbeds-only / too heavy to re-run live | Materialize into `mac_analytics` as `adhoc_<slug>_<yyyymmdd>_<hhmm>`; chart on warehouse; **manual** `DROP` when done (no automated purge) |
+| **2 — Scratch table** | Too heavy to re-run live on every public-link open | `metabase_materialize_sql` → `mac_analytics_scratch.adhoc_<slug>_<yyyyMMdd>_<HHmm>` (Europe/London); chart via `mac_analytics` + cross-schema SQL; **manual** `metabase_drop_adhoc_table` (no automated purge) |
 | **3 — Warehouse fact** | Recurring management KPI | New fact/column + sync job + bootstrap question |
 
 Example EVL takings by booking source (Edinburgh; Metabase DB display name `backoffice`):
@@ -162,7 +162,23 @@ GROUP BY property_code, booking_source;
 
 Do not put guest_name / email / notes on public cards. Session `TEMPORARY` tables cannot back Metabase cards (new connection per query).
 
-**Deferred:** dedicated `mac_analytics_scratch` schema and a materialize MCP tool — add when a Tier 2 use case appears; until then name adhoc tables under `mac_analytics` with the `adhoc_` prefix and drop them manually.
+### Tier 2 scratch (`mac_analytics_scratch`)
+
+```bash
+# MYSQL_HOST + MYSQL_PWD (admin), or on the MariaDB/Plesk host:
+#   sudo plesk db   # then paste the SQL from the script
+./scripts/apply-mac-analytics-scratch.sh
+```
+
+Creates schema `mac_analytics_scratch`, user `analytics_adhoc_rw` (SELECT on `wp_*_backoffice` + DDL on scratch), and `GRANT SELECT` on scratch to `metabase_ro`. Set host `.env`:
+
+```bash
+ANALYTICS_ADHOC_RW_USER=analytics_adhoc_rw
+ANALYTICS_ADHOC_RW_PASSWORD=...
+# Compose forces ANALYTICS_ADHOC_RW_HOST=mysql-tailscale for ronbot-bridge
+```
+
+MCP tools (when those env vars are set): `metabase_materialize_sql`, `metabase_list_adhoc_tables`, `metabase_drop_adhoc_table`. Chart with `database_name=mac_analytics` and `FROM mac_analytics_scratch.adhoc_…`. Cloudbeds-only materialization is out of scope for this path (SQL SELECT only).
 
 ## Metabase models & dashboards
 
