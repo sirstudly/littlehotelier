@@ -35,6 +35,8 @@ public final class JobPriorities {
         // Analytics mart sync — behind transactional / guest-facing work
         map.put( SyncBookingCreatedAnalyticsJob.class.getName(), 50 );
         map.put( SyncChannelStayDayAnalyticsJob.class.getName(), 50 );
+        map.put( SyncCompetitorBedPriceJob.class.getName(), 50 );
+        map.put( SyncHostelworldSearchRankJob.class.getName(), 50 );
 
         // One-off historical backfill; only run when nothing else is queued
         map.put( CreateBackfillBookingAssignmentJob.class.getName(), 9999 );

@@ -15,6 +15,9 @@ import org.springframework.stereotype.Repository;
 
 import com.macbackpackers.beans.analytics.BookingCreatedFact;
 import com.macbackpackers.beans.analytics.ChannelStayDayFact;
+import com.macbackpackers.beans.analytics.CompetitorBedPriceFact;
+import com.macbackpackers.beans.analytics.HwSearchRankFact;
+import com.macbackpackers.beans.analytics.PropertyMatch;
 
 /**
  * Writes to the shared {@code mac_analytics} MariaDB warehouse.
@@ -37,6 +40,24 @@ public class AnalyticsDAO {
             "INSERT INTO fact_channel_stay_day ("
                     + "property_code, stay_date, booking_source, source_category, room_revenue, rooms_sold, adr, synced_at"
                     + ") VALUES (?,?,?,?,?,?,?,?)";
+
+    private static final String UPSERT_COMPETITOR_BED_PRICE =
+            "INSERT INTO fact_competitor_bed_price ("
+                    + "property_code, competitor_name, room_category, stay_date, lowest_bed_price, "
+                    + "currency, source, is_own, scraped_at"
+                    + ") VALUES (?,?,?,?,?,?,?,?,?) "
+                    + "ON DUPLICATE KEY UPDATE "
+                    + "lowest_bed_price=VALUES(lowest_bed_price), currency=VALUES(currency), "
+                    + "is_own=VALUES(is_own), scraped_at=VALUES(scraped_at)";
+
+    private static final String UPSERT_HW_SEARCH_RANK =
+            "INSERT INTO fact_hw_search_rank ("
+                    + "property_code, search_date, arrival_date, query_label, position, "
+                    + "result_count, page_url, scraped_at"
+                    + ") VALUES (?,?,?,?,?,?,?,?) "
+                    + "ON DUPLICATE KEY UPDATE "
+                    + "position=VALUES(position), result_count=VALUES(result_count), "
+                    + "page_url=VALUES(page_url), scraped_at=VALUES(scraped_at)";
 
     @Autowired
     @Qualifier( "analyticsJdbcTemplate" )
@@ -91,6 +112,73 @@ public class AnalyticsDAO {
                         ps.setBigDecimal( 7, f.getAdr() );
                     }
                     ps.setTimestamp( 8, now );
+                } );
+    }
+
+    public void upsertCompetitorBedPrices( List<CompetitorBedPriceFact> facts ) {
+        if ( facts == null || facts.isEmpty() ) {
+            return;
+        }
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        jdbcTemplate.batchUpdate( UPSERT_COMPETITOR_BED_PRICE, facts, facts.size(),
+                ( PreparedStatement ps, CompetitorBedPriceFact f ) -> {
+                    ps.setString( 1, f.getPropertyCode() );
+                    ps.setString( 2, f.getCompetitorName() );
+                    ps.setString( 3, f.getRoomCategory() );
+                    ps.setDate( 4, Date.valueOf( f.getStayDate() ) );
+                    if ( f.getLowestBedPrice() == null ) {
+                        ps.setNull( 5, Types.DECIMAL );
+                    }
+                    else {
+                        ps.setBigDecimal( 5, f.getLowestBedPrice() );
+                    }
+                    ps.setString( 6, f.getCurrency() );
+                    ps.setString( 7, f.getSource() );
+                    ps.setInt( 8, f.isOwn() ? 1 : 0 );
+                    ps.setTimestamp( 9, now );
+                } );
+    }
+
+    public void upsertHwSearchRanks( List<HwSearchRankFact> facts ) {
+        if ( facts == null || facts.isEmpty() ) {
+            return;
+        }
+        Timestamp now = new Timestamp( System.currentTimeMillis() );
+        jdbcTemplate.batchUpdate( UPSERT_HW_SEARCH_RANK, facts, facts.size(),
+                ( PreparedStatement ps, HwSearchRankFact f ) -> {
+                    ps.setString( 1, f.getPropertyCode() );
+                    ps.setDate( 2, Date.valueOf( f.getSearchDate() ) );
+                    ps.setDate( 3, Date.valueOf( f.getArrivalDate() ) );
+                    ps.setString( 4, f.getQueryLabel() );
+                    if ( f.getPosition() == null ) {
+                        ps.setNull( 5, Types.INTEGER );
+                    }
+                    else {
+                        ps.setInt( 5, f.getPosition() );
+                    }
+                    if ( f.getResultCount() == null ) {
+                        ps.setNull( 6, Types.INTEGER );
+                    }
+                    else {
+                        ps.setInt( 6, f.getResultCount() );
+                    }
+                    ps.setString( 7, f.getPageUrl() );
+                    ps.setTimestamp( 8, now );
+                } );
+    }
+
+    public List<PropertyMatch> listEdinburghPropertyMatches() {
+        return jdbcTemplate.query(
+                "SELECT property_code, display_name, hw_hostel_number, name_aliases, edinburgh_yn "
+                        + "FROM dim_property_match WHERE edinburgh_yn = 'Y' ORDER BY property_code",
+                ( rs, rowNum ) -> {
+                    PropertyMatch m = new PropertyMatch();
+                    m.setPropertyCode( rs.getString( "property_code" ) );
+                    m.setDisplayName( rs.getString( "display_name" ) );
+                    m.setHwHostelNumber( rs.getString( "hw_hostel_number" ) );
+                    m.setNameAliases( PropertyMatch.parseAliases( rs.getString( "name_aliases" ) ) );
+                    m.setEdinburgh( "Y".equalsIgnoreCase( rs.getString( "edinburgh_yn" ) ) );
+                    return m;
                 } );
     }
 

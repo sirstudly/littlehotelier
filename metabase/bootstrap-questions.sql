@@ -155,7 +155,56 @@ GROUP BY p.display_name, f.booking_source
 ORDER BY room_revenue DESC;
 
 -- =============================================================================
--- Phase 2 stubs (should return 0 until scrapers land)
+-- Phase 2: Competitive position (GHS + Hostelworld)
 -- =============================================================================
-SELECT COUNT(*) AS competitor_rows FROM fact_competitor_bed_price;
-SELECT COUNT(*) AS hw_rank_rows FROM fact_hw_search_rank;
+
+-- GHS dorm heatmap grain: stay_date × competitor (own + market)
+SELECT
+  stay_date,
+  competitor_name,
+  is_own,
+  lowest_bed_price
+FROM fact_competitor_bed_price
+WHERE source = 'ghs'
+  AND room_category = 'dorm'
+  AND stay_date >= CURDATE()
+  AND stay_date < CURDATE() + INTERVAL 30 DAY
+ORDER BY stay_date, competitor_name;
+
+-- GHS private heatmap grain (when private rows exist)
+SELECT
+  stay_date,
+  competitor_name,
+  is_own,
+  lowest_bed_price
+FROM fact_competitor_bed_price
+WHERE source = 'ghs'
+  AND room_category = 'private'
+  AND stay_date >= CURDATE()
+  AND stay_date < CURDATE() + INTERVAL 30 DAY
+ORDER BY stay_date, competitor_name;
+
+-- Our lowest dorm vs cheapest competitor dorm (by stay_date)
+SELECT
+  stay_date,
+  MIN(CASE WHEN is_own = 1 THEN lowest_bed_price END) AS our_lowest_dorm,
+  MIN(CASE WHEN is_own = 0 THEN lowest_bed_price END) AS competitor_min_dorm
+FROM fact_competitor_bed_price
+WHERE source = 'ghs'
+  AND room_category = 'dorm'
+  AND stay_date >= CURDATE()
+  AND stay_date < CURDATE() + INTERVAL 30 DAY
+GROUP BY stay_date
+ORDER BY stay_date;
+
+-- Hostelworld search rank time series (CRH / HSH / RMB)
+SELECT
+  p.display_name AS hostel,
+  f.search_date,
+  f.arrival_date,
+  f.query_label,
+  f.position
+FROM fact_hw_search_rank f
+JOIN dim_property p ON p.property_code = f.property_code
+WHERE f.search_date >= CURDATE() - INTERVAL 90 DAY
+ORDER BY f.search_date, hostel;

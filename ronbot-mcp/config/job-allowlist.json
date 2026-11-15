@@ -63,5 +63,15 @@
     "classname": "com.macbackpackers.jobs.SyncChannelStayDayAnalyticsJob",
     "requiredParams": ["start_date", "end_date"],
     "description": "Sync Channel Production day×source into mac_analytics.fact_channel_stay_day"
+  },
+  "SyncCompetitorBedPriceJob": {
+    "classname": "com.macbackpackers.jobs.SyncCompetitorBedPriceJob",
+    "requiredParams": [],
+    "description": "CRH-only: scrape Google Hotels Edinburgh dorm (and private when available) bed prices for next horizon_days into mac_analytics.fact_competitor_bed_price"
+  },
+  "SyncHostelworldSearchRankJob": {
+    "classname": "com.macbackpackers.jobs.SyncHostelworldSearchRankJob",
+    "requiredParams": [],
+    "description": "CRH-only: scrape Hostelworld Edinburgh search ranks for CRH/HSH/RMB into mac_analytics.fact_hw_search_rank"
   }
 }

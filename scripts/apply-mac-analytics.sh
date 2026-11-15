@@ -39,6 +39,9 @@ mysql_admin() {
 echo "Applying warehouse + metabase DDL..."
 mysql_admin < "$ROOT/src/main/config/migrations/2026-11-12-mac-analytics.sql"
 
+echo "Applying Phase 2 warehouse DDL (GHS + HW rank)..."
+mysql_admin < "$ROOT/src/main/config/migrations/2026-11-15-mac-analytics-phase2.sql"
+
 echo "Creating / updating users..."
 mysql_admin <<SQL
 CREATE USER IF NOT EXISTS 'analytics_rw'@'%' IDENTIFIED BY '${ANALYTICS_RW_PASSWORD}';
@@ -56,9 +59,12 @@ FLUSH PRIVILEGES;
 SQL
 
 for db in wp_crh_backoffice wp_hsh_backoffice wp_rmb_backoffice wp_lsh_backoffice; do
-  echo "Seeding job_scheduler on $db..."
+  echo "Seeding Phase 1 job_scheduler on $db..."
   mysql_admin "$db" < "$ROOT/src/main/config/migrations/2026-11-12-analytics-job-scheduler.sql"
 done
+
+echo "Seeding Phase 2 job_scheduler on wp_crh_backoffice only..."
+mysql_admin wp_crh_backoffice < "$ROOT/src/main/config/migrations/2026-11-15-analytics-phase2-job-scheduler-crh.sql"
 
 echo
 echo "Done. Store these secrets (shown once):"
@@ -69,3 +75,4 @@ echo "  metabase/.env MB_DB_PASS=${METABASE_APP_PASSWORD}"
 echo "  Metabase Admin warehouse user metabase_ro / ${METABASE_RO_PASSWORD}"
 echo
 echo "Then rebuild processors so they pick up analyticsdb.*, deploy metabase/, and enqueue backfills."
+echo "Phase 2 also needs host dir chromeprofile/ghs (CRH compose mount) before SyncCompetitorBedPriceJob."

@@ -21,10 +21,17 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.macbackpackers.beans.analytics.BookingCreatedFact;
 import com.macbackpackers.beans.analytics.ChannelStayDayFact;
+import com.macbackpackers.beans.analytics.CompetitorBedPriceFact;
+import com.macbackpackers.beans.analytics.HwSearchRankFact;
+import com.macbackpackers.beans.analytics.PropertyMatch;
 import com.macbackpackers.beans.cloudbeds.responses.Customer;
 import com.macbackpackers.dao.AnalyticsDAO;
 import com.macbackpackers.scrapers.CloudbedsScraper;
+import com.macbackpackers.scrapers.GoogleHotelsScraper;
+import com.macbackpackers.scrapers.HostelworldSearchRankScraper;
 import com.macbackpackers.scrapers.datainsights.CloudbedsDataInsightsClient;
+
+import org.openqa.selenium.chrome.ChromeDriver;
 
 /**
  * Syncs Cloudbeds booked-date and stay-date production into {@code mac_analytics}.
@@ -54,6 +61,12 @@ public class AnalyticsSyncService {
     private AnalyticsDAO analyticsDAO;
 
     @Autowired
+    private GoogleHotelsScraper googleHotelsScraper;
+
+    @Autowired
+    private HostelworldSearchRankScraper hostelworldSearchRankScraper;
+
+    @Autowired
     private Environment environment;
 
     public String resolvePropertyCode() {
@@ -66,6 +79,63 @@ public class AnalyticsSyncService {
             }
         }
         return "unknown";
+    }
+
+    /** Phase 2 Edinburgh scrapers run on the CRH processor only. */
+    public boolean isCrhProfile() {
+        return "crh".equalsIgnoreCase( resolvePropertyCode() );
+    }
+
+    /**
+     * Scrapes Google Hotels for {@code [today, today+horizonDays)} and upserts
+     * {@code fact_competitor_bed_price}.
+     */
+    public int syncCompetitorBedPrices( String city, int horizonDays ) throws Exception {
+        if ( horizonDays < 1 ) {
+            throw new IllegalArgumentException( "horizon_days must be >= 1" );
+        }
+        List<PropertyMatch> own = analyticsDAO.listEdinburghPropertyMatches();
+        LocalDate start = LocalDate.now();
+        int upserted = 0;
+        ChromeDriver driver = googleHotelsScraper.openDriver();
+        try {
+            for ( int i = 0; i < horizonDays; i++ ) {
+                LocalDate stayDate = start.plusDays( i );
+                List<CompetitorBedPriceFact> facts =
+                        googleHotelsScraper.scrapeStayDate( driver, city, stayDate, own );
+                analyticsDAO.upsertCompetitorBedPrices( facts );
+                upserted += facts.size();
+                LOGGER.info( "GHS {} {}: upserted {} row(s)", city, stayDate, facts.size() );
+                if ( i + 1 < horizonDays ) {
+                    googleHotelsScraper.pauseBetweenDates();
+                }
+            }
+        }
+        finally {
+            try {
+                driver.quit();
+            }
+            catch ( Exception e ) {
+                LOGGER.warn( "Error quitting GHS Chrome: {}", e.toString() );
+            }
+        }
+        return upserted;
+    }
+
+    /**
+     * Scrapes Hostelworld consumer search and upserts rank rows for Edinburgh properties.
+     */
+    public int syncHostelworldSearchRanks( WebClient webClient, String city, int guests, int nights,
+            int arrivalOffsetDays ) throws IOException {
+        List<PropertyMatch> matches = analyticsDAO.listEdinburghPropertyMatches();
+        LocalDate arrival = LocalDate.now().plusDays( arrivalOffsetDays );
+        String queryLabel = HostelworldSearchRankScraper.buildQueryLabel(
+                city, guests, nights, arrivalOffsetDays );
+        List<HwSearchRankFact> facts = hostelworldSearchRankScraper.scrapeRanks(
+                webClient, city, arrival, nights, guests, queryLabel, matches );
+        analyticsDAO.upsertHwSearchRanks( facts );
+        LOGGER.info( "HW search rank {}: upserted {} row(s) query_label={}", city, facts.size(), queryLabel );
+        return facts.size();
     }
 
     /**

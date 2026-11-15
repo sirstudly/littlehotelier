@@ -1,6 +1,6 @@
-# Hostel analytics (Metabase) — Phase 1
+# Hostel analytics (Metabase)
 
-Non-technical dashboards for CRH / HSH / RMB / LSH: **booked-date** booking value and **stay-date** Channel Production, stored in MariaDB `mac_analytics` and explored in Metabase.
+Non-technical dashboards for CRH / HSH / RMB / LSH: **booked-date** booking value and **stay-date** Channel Production, plus Edinburgh **competitive position** (Google Hotels bed prices + Hostelworld search rank), stored in MariaDB `mac_analytics` and explored in Metabase.
 
 ## Metric definitions (do not mix)
 
@@ -18,7 +18,8 @@ Stay-date matches the Cloudbeds Channel Production UI. Booked-date does **not**.
 | `mac_analytics` | Warehouse (facts + views). Collation `utf8mb4_general_ci`. |
 | `metabase` | Metabase application DB only (users, dashboards). Collation `utf8mb4_unicode_ci`. |
 
-DDL: [`src/main/config/migrations/2026-11-12-mac-analytics.sql`](../src/main/config/migrations/2026-11-12-mac-analytics.sql)
+DDL: [`src/main/config/migrations/2026-11-12-mac-analytics.sql`](../src/main/config/migrations/2026-11-12-mac-analytics.sql)  
+Phase 2 alter + match seeds: [`2026-11-15-mac-analytics-phase2.sql`](../src/main/config/migrations/2026-11-15-mac-analytics-phase2.sql)
 
 Create users (or run [`scripts/apply-mac-analytics.sh`](../scripts/apply-mac-analytics.sh) with admin `MYSQL_PWD`). Processor creds: GCP Secret Manager `analyticsdb_username` / `analyticsdb_password`. Example grants:
 
@@ -43,7 +44,20 @@ FLUSH PRIVILEGES;
 
 Scheduler seed (each `wp_*_backoffice`): [`2026-11-12-analytics-job-scheduler.sql`](../src/main/config/migrations/2026-11-12-analytics-job-scheduler.sql)
 
-Phase 2 stubs (unscheduled): `SyncCompetitorBedPriceJob`, `SyncHostelworldSearchRankJob`.
+### Phase 2 — competitive position (Edinburgh only)
+
+| Job | Runner | Default schedule (CRH) | Params | Writes |
+|-----|--------|------------------------|--------|--------|
+| `SyncCompetitorBedPriceJob` | **CRH only** | 07:00 | `horizon_days=30`, `city=Edinburgh` | `fact_competitor_bed_price` (`property_code=edn`, `room_category` dorm/private, `is_own`) |
+| `SyncHostelworldSearchRankJob` | **CRH only** | 07:15 | `guests=1`, `nights=1`, `arrival_offset_days=7`, `city=Edinburgh` | `fact_hw_search_rank` for crh/hsh/rmb |
+
+- **LSH out of scope.** Accidental enqueues on HSH/RMB/LSH log-skip and complete.
+- Scheduler seed: [`2026-11-15-analytics-phase2-job-scheduler-crh.sql`](../src/main/config/migrations/2026-11-15-analytics-phase2-job-scheduler-crh.sql) → `wp_crh_backoffice` only.
+- Matching: `dim_property_match` (display names, aliases, HW numbers 551 / 552 / 11242).
+- GHS uses a **dedicated** Chrome profile (`chromeprofile/ghs`, compose mount on `crh-processor` only) — not the Cloudbeds profile. List scrape stores “Prices starting from £N” as **dorm** (hostel lowest); private rows when exposed.
+- HW uses classic SSR search HTML (`/hostels/{city}?DateFrom&DateTo&NumberOfGuests`) via HtmlUnit (`webClientForHostelworld`); PWA `/pwa/wds/s` shells need JS.
+- MCP allowlist includes both jobs (optional params).
+- Metabase: **Competitive position** dashboard — GHS heatmap / own-vs-market lines / HW rank series. See [`metabase/dashboard-setup.md`](../metabase/dashboard-setup.md) + [`metabase/bootstrap-questions.sql`](../metabase/bootstrap-questions.sql).
 
 ### Backfill
 
@@ -118,12 +132,18 @@ Collection: **Hostel analytics**. Filters on both dashboards: Hostel + date rang
 - Table/bar: ISO week under year/month groups
 - Bar: by month; by day-of-week
 - Stacked bar / pie: channel mix
-- Text stubs: competitor bed prices / Hostelworld search position (coming soon)
 
 **Stay-date production** dashboard:
 
 - Same layout on `stay_date` + `room_revenue` / `rooms_sold`
 - Blurb: “Matches Cloudbeds Channel Production (nights occupied), not when the guest booked.”
+
+**Competitive position** dashboard (Edinburgh / Phase 2):
+
+- GHS dorm (and private) price heatmap: stay_date × competitor
+- Line: our lowest dorm vs cheapest competitor dorm
+- Line: Hostelworld search `position` over `search_date` for CRH / HSH / RMB
+- Remove any leftover “coming soon” text stubs from Booked/Stay dashboards
 
 Optional: Metabase dashboard subscription (email) on the booked-date overview.
 

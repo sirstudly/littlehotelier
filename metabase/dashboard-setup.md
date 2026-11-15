@@ -1,4 +1,4 @@
-# Metabase dashboard setup (Phase 1)
+# Metabase dashboard setup
 
 After Metabase is up and `mac_analytics` is connected as a MySQL database. Native SQL for every card lives in [`bootstrap-questions.sql`](bootstrap-questions.sql).
 
@@ -13,9 +13,9 @@ After Metabase is up and `mac_analytics` is connected as a MySQL database. Nativ
 
 ## Collection
 
-Create collection **Hostel analytics**. Put all questions and both dashboards there. Pin both dashboards on the home page if useful.
+Create collection **Hostel analytics**. Put all questions and dashboards there. Pin dashboards on the home page if useful.
 
-## Dashboard filters (both dashboards)
+## Dashboard filters (Booked-date / Stay-date)
 
 | Filter | Type | Maps to |
 |--------|------|---------|
@@ -34,8 +34,6 @@ Wire each card to the dashboard filters (GUI: set filter target; native: `{{host
 | Booking value by month | Stacked bar | Sum Booking value by month, **series = Hostel** |
 | Channel mix | Stacked bar | Sum Booking value by Channel, **series = Hostel** |
 | Day-of-week pattern | Stacked bar | Sum Booking value by day of week, **series = Hostel** |
-| Stub | Text | “Competitor bed prices (coming soon)” |
-| Stub | Text | “Hostelworld search position (coming soon)” |
 
 ## Dashboard: Stay-date production
 
@@ -51,7 +49,19 @@ Same card layout on the stay-date model / `fact_channel_stay_day` (Room revenue 
 | Room revenue by month | Stacked bar (series = Hostel) |
 | Channel mix | Stacked bar (series = Hostel) |
 | Day-of-week pattern | Stacked bar (series = Hostel) |
-| Stub | Text: competitor / Hostelworld (same as booked-date) |
+
+## Dashboard: Competitive position (Phase 2)
+
+Edinburgh-only (CRH / HSH / RMB). Data from CRH processor jobs into `mac_analytics`. Prefer a dedicated dashboard; remove any “coming soon” text stubs from Booked/Stay dashboards.
+
+| Card | Viz | SQL / notes |
+|------|-----|-------------|
+| GHS dorm price grid | Pivot / heatmap | `stay_date` × `competitor_name`, value = `lowest_bed_price`, `room_category='dorm'` |
+| GHS private price grid | Pivot / heatmap | Same for `room_category='private'` (may be empty until private prices are scraped) |
+| Our dorm vs market | Line | `our_lowest_dorm` vs `competitor_min_dorm` by `stay_date` |
+| HW search rank | Line | `position` over `search_date`, **series = Hostel** (CRH/HSH/RMB) |
+
+Live cards are created via Metabase API after scrapers populate facts (same pattern as Phase 1), not OSS serialization.
 
 ## Optional
 
