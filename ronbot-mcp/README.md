@@ -122,7 +122,8 @@ Each value is either an address string or an object with the user's WhatsApp ide
 Create/update Metabase collections, native-SQL questions, and dashboards over the Metabase REST API (`X-API-Key`). Registered only when both are set (repo-root `.env` for Cursor; host `.env` → `ronbot-bridge` in production):
 
 ```bash
-METABASE_URL=http://100.x.y.z:3002
+METABASE_URL=https://analytics.example.com
+METABASE_PUBLIC_URL=https://analytics.example.com   # WhatsApp links; defaults to METABASE_URL
 METABASE_API_KEY=...
 ```
 
@@ -130,12 +131,13 @@ METABASE_API_KEY=...
 |------|---------|
 | `metabase_list_collections` / `metabase_ensure_collection` | List or find/create a collection (default **Hostel analytics**) |
 | `metabase_list_databases` | Connected DBs (warehouse is usually `mac_analytics`) |
-| `metabase_create_native_question` | `POST /api/card` native SQL + display type |
-| `metabase_create_dashboard` | Empty dashboard |
-| `metabase_get_dashboard` | Read layout |
-| `metabase_update_dashboard_cards` | Append cards onto a dashboard |
+| `metabase_run_sql` | Spot-check `mac_analytics` via Metabase `/api/dataset` (not backoffice `run_sql`) |
+| `metabase_create_native_question` | `POST /api/card` + enable public link |
+| `metabase_create_dashboard` | Empty dashboard + enable public link |
+| `metabase_get_dashboard` | Read layout; ensure public link |
+| `metabase_update_dashboard_cards` | Append cards; return `public_url` |
 
-Tool results include Tailscale UI URLs. Metric definitions: [`docs/hostel-analytics-metabase.md`](../docs/hostel-analytics-metabase.md).
+Tool results include `public_url` (`/public/dashboard|question/{uuid}`) for no-login WhatsApp sharing. Metric definitions: [`docs/hostel-analytics-metabase.md`](../docs/hostel-analytics-metabase.md).
 
 ### `run_sql` / `describe_sql_tables`
 

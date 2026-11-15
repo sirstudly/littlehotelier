@@ -187,8 +187,10 @@ export const config = {
   reportFromName: env("RONBOT_REPORT_FROM_NAME"),
   /** From address for email_spreadsheet; defaults to the Gmail sign-in user. */
   reportFromAddress: env("RONBOT_REPORT_FROM_ADDRESS"),
-  /** Metabase REST authoring for MCP (tools hidden when either is unset). */
+  /** Metabase REST authoring for MCP (tools hidden when URL+key unset). */
   metabaseUrl: env("METABASE_URL"),
+  /** Optional public base for WhatsApp links; defaults to METABASE_URL in MCP. */
+  metabasePublicUrl: env("METABASE_PUBLIC_URL"),
   metabaseApiKey: process.env.METABASE_API_KEY ?? "",
 };
 

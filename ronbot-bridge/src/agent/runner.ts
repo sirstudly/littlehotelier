@@ -51,6 +51,9 @@ function mcpEnv(): Record<string, string> {
   if (config.metabaseUrl && config.metabaseApiKey) {
     env.METABASE_URL = config.metabaseUrl;
     env.METABASE_API_KEY = config.metabaseApiKey;
+    if (config.metabasePublicUrl) {
+      env.METABASE_PUBLIC_URL = config.metabasePublicUrl;
+    }
   }
   return env;
 }

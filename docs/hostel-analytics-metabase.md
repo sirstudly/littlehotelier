@@ -94,7 +94,9 @@ Ship compose/env/docs via **git** (no rsync). Recreate **only** the Metabase Com
 
 ### WhatsApp authoring (ronbot)
 
-When `METABASE_URL` and `METABASE_API_KEY` are set on `ronbot-bridge`, ronbot-ops exposes `metabase_*` tools so staff can ask WhatsApp ronbot to create native-SQL questions and dashboards (REST `X-API-Key`, not Metabase MCP OAuth). Create the key in Metabase Admin → Authentication → API Keys (group that can edit collection **Hostel analytics** and query `mac_analytics`). Store secrets only in the deploy host `.env` (placeholders: `http://100.x.y.z:3002`). Rebuild **ronbot-bridge** only after pull — not processors.
+When `METABASE_URL` and `METABASE_API_KEY` are set on `ronbot-bridge`, ronbot-ops exposes `metabase_*` tools so staff can ask WhatsApp ronbot to create native-SQL questions and dashboards (REST `X-API-Key`, not Metabase MCP OAuth). Create the key in Metabase Admin → Authentication → API Keys (group that can edit collection **Hostel analytics** and query `mac_analytics`). New cards/dashboards get a **public link** automatically; WhatsApp replies should use `public_url` (no login). Set `METABASE_PUBLIC_URL` (and usually `METABASE_URL`) to the public HTTPS origin staff use (see local `AGENTS.md` for the real hostname). Admin → Settings → Public sharing must be enabled.
+
+Warehouse spot-checks use `metabase_run_sql` (Metabase `/api/dataset` on `mac_analytics`). Do **not** use `run_sql` for that — `run_sql` only queries `wp_*_backoffice` via `RONBOT_SQL_RO_*` (no `mac_analytics` grant). Rebuild **ronbot-bridge** only after pull — not processors.
 
 ## Metabase models & dashboards
 

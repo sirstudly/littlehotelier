@@ -26,6 +26,7 @@ import { audit } from "./lib/audit.js";
 import {
   DEFAULT_COLLECTION,
   DISPLAY_TYPES,
+  ANALYTICS_HARD_MAX_ROWS,
   createDashboard,
   createNativeQuestion,
   ensureCollection,
@@ -33,6 +34,7 @@ import {
   isMetabaseConfigured,
   listCollections,
   listDatabases,
+  runAnalyticsSql,
   updateDashboardCards,
 } from "./metabase/client.js";
 import { sendReportEmail } from "./reports/mailer.js";
@@ -876,8 +878,38 @@ export function createServer(): McpServer {
     );
 
     server.tool(
+      "metabase_run_sql",
+      `Spot-check warehouse SQL against mac_analytics via Metabase (not the backoffice run_sql tool). Use before creating charts. MariaDB 10.11; rows capped (default 50, max ${ANALYTICS_HARD_MAX_ROWS}). Do not mix booked-date vs stay-date facts.`,
+      {
+        sql: z.string().min(1).max(50000),
+        database_id: z.number().int().positive().optional(),
+        database_name: z.string().min(1).max(200).optional(),
+        max_rows: z.number().int().positive().max(ANALYTICS_HARD_MAX_ROWS).optional(),
+        requested_by: z.string().optional(),
+      },
+      async (args) => {
+        try {
+          const result = await runAnalyticsSql(args);
+          audit("metabase_run_sql", {
+            database_id: result.database_id,
+            row_count: result.row_count,
+            truncated: result.truncated,
+            requested_by: args.requested_by ?? null,
+          });
+          return ok(result);
+        } catch (err) {
+          audit("metabase_run_sql_failed", {
+            error: err instanceof Error ? err.message : String(err),
+            requested_by: args.requested_by ?? null,
+          });
+          return fail(err);
+        }
+      },
+    );
+
+    server.tool(
       "metabase_create_native_question",
-      "Create a Metabase native-SQL question (card). Prefer MariaDB SQL against mac_analytics views/facts from docs/hostel-analytics-metabase.md and metabase/bootstrap-questions.sql. Do not mix booked-date (fact_booking_created) with stay-date (fact_channel_stay_day). Spot-check with run_sql when unsure. Returns a Tailscale question URL.",
+      "Create a Metabase native-SQL question (card) and enable a public (no-login) link. Prefer MariaDB SQL against mac_analytics from docs/hostel-analytics-metabase.md and metabase/bootstrap-questions.sql. Spot-check with metabase_run_sql first. Returns public_url for WhatsApp (prefer over url).",
       {
         name: z.string().min(1).max(200),
         sql: z.string().min(1).max(50000),
@@ -896,6 +928,7 @@ export function createServer(): McpServer {
             id: result.id,
             name: result.name,
             display: result.display,
+            public_uuid: result.public_uuid,
             requested_by: args.requested_by ?? null,
           });
           return ok(result);
@@ -912,7 +945,7 @@ export function createServer(): McpServer {
 
     server.tool(
       "metabase_create_dashboard",
-      "Create an empty Metabase dashboard in a collection. Then add cards with metabase_update_dashboard_cards. Returns a Tailscale dashboard URL for WhatsApp.",
+      "Create a Metabase dashboard with a public (no-login) link enabled. Then add cards with metabase_update_dashboard_cards. Returns public_url for WhatsApp (prefer over url).",
       {
         name: z.string().min(1).max(200),
         description: z.string().max(2000).optional(),
@@ -925,6 +958,7 @@ export function createServer(): McpServer {
           audit("metabase_create_dashboard", {
             id: result.id,
             name: result.name,
+            public_uuid: result.public_uuid,
             requested_by: args.requested_by ?? null,
           });
           return ok(result);
@@ -941,7 +975,7 @@ export function createServer(): McpServer {
 
     server.tool(
       "metabase_get_dashboard",
-      "Fetch a Metabase dashboard (name, collection, dashcard layout). Use before editing layout.",
+      "Fetch a Metabase dashboard (name, collection, dashcard layout, public_url). Ensures a public link exists when possible.",
       {
         dashboard_id: z.number().int().positive(),
       },
@@ -956,7 +990,7 @@ export function createServer(): McpServer {
 
     server.tool(
       "metabase_update_dashboard_cards",
-      "Append saved questions onto a Metabase dashboard (preserves existing cards). Pass card_id from metabase_create_native_question. Optional row/col/size_x/size_y (defaults: full-width 12×6 stacked below existing). Returns the dashboard URL.",
+      "Append saved questions onto a Metabase dashboard (preserves existing cards). Pass card_id from metabase_create_native_question. Optional row/col/size_x/size_y (defaults: full-width 12×6 stacked below existing). Ensures public link; returns public_url for WhatsApp.",
       {
         dashboard_id: z.number().int().positive(),
         add: z
@@ -982,6 +1016,7 @@ export function createServer(): McpServer {
           audit("metabase_update_dashboard_cards", {
             dashboard_id: result.id,
             added: args.add.length,
+            public_uuid: result.public_uuid,
             requested_by: args.requested_by ?? null,
           });
           return ok(result);

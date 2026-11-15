@@ -1,28 +1,50 @@
 /**
  * Headless Metabase REST client (X-API-Key). Used by gated MCP tools for
  * WhatsApp-driven dashboard/question authoring. Tools are hidden when unset.
+ *
+ * Links returned to staff use METABASE_PUBLIC_URL (falls back to METABASE_URL) —
+ * the public HTTPS origin, not a Tailscale-only address.
  */
 
 const DEFAULT_COLLECTION = "Hostel analytics";
+const ANALYTICS_HARD_MAX_ROWS = 200;
 
 export function isMetabaseConfigured(): boolean {
   return Boolean(metabaseUrl() && metabaseApiKey());
 }
 
+/** Base URL for API calls (from the bridge / MCP process). */
 function metabaseUrl(): string {
   return (process.env.METABASE_URL ?? "").replace(/\/$/, "").trim();
+}
+
+/**
+ * Base URL embedded in WhatsApp / staff-facing links.
+ * Prefer the public HTTPS origin staff open in a browser; defaults to METABASE_URL.
+ */
+function metabasePublicUrl(): string {
+  const pub = (process.env.METABASE_PUBLIC_URL ?? "").replace(/\/$/, "").trim();
+  return pub || metabaseUrl();
 }
 
 function metabaseApiKey(): string {
   return (process.env.METABASE_API_KEY ?? "").trim();
 }
 
-function dashboardUrl(id: number): string {
-  return `${metabaseUrl()}/dashboard/${id}`;
+function loginDashboardUrl(id: number): string {
+  return `${metabasePublicUrl()}/dashboard/${id}`;
 }
 
-function questionUrl(id: number): string {
-  return `${metabaseUrl()}/question/${id}`;
+function loginQuestionUrl(id: number): string {
+  return `${metabasePublicUrl()}/question/${id}`;
+}
+
+function publicDashboardUrl(uuid: string): string {
+  return `${metabasePublicUrl()}/public/dashboard/${uuid}`;
+}
+
+function publicQuestionUrl(uuid: string): string {
+  return `${metabasePublicUrl()}/public/question/${uuid}`;
 }
 
 async function mbFetch<T>(
@@ -66,6 +88,38 @@ async function mbFetch<T>(
   return parsed as T;
 }
 
+/** Ensure instance-wide public sharing is on (idempotent). */
+async function ensurePublicSharingEnabled(): Promise<void> {
+  try {
+    await mbFetch("PUT", "/api/setting/enable-public-sharing", true);
+  } catch {
+    // May already be on, or key lacks settings write — public_link calls will surface errors.
+  }
+}
+
+async function enableCardPublicLink(cardId: number): Promise<{ uuid: string; public_url: string }> {
+  await ensurePublicSharingEnabled();
+  const res = await mbFetch<{ uuid: string }>("POST", `/api/card/${cardId}/public_link`);
+  if (!res?.uuid) {
+    throw new Error(`Metabase did not return a public UUID for card ${cardId}`);
+  }
+  return { uuid: res.uuid, public_url: publicQuestionUrl(res.uuid) };
+}
+
+async function enableDashboardPublicLink(
+  dashboardId: number,
+): Promise<{ uuid: string; public_url: string }> {
+  await ensurePublicSharingEnabled();
+  const res = await mbFetch<{ uuid: string }>(
+    "POST",
+    `/api/dashboard/${dashboardId}/public_link`,
+  );
+  if (!res?.uuid) {
+    throw new Error(`Metabase did not return a public UUID for dashboard ${dashboardId}`);
+  }
+  return { uuid: res.uuid, public_url: publicDashboardUrl(res.uuid) };
+}
+
 type CollectionRow = {
   id: number | string;
   name: string;
@@ -96,6 +150,7 @@ type Dashboard = {
   name: string;
   description?: string | null;
   collection_id?: number | null;
+  public_uuid?: string | null;
   dashcards?: Dashcard[];
   ordered_cards?: Dashcard[];
   parameters?: unknown[];
@@ -132,7 +187,7 @@ export async function ensureCollection(name?: string): Promise<{
       id: existing.id,
       name: existing.name,
       created: false,
-      url_hint: `${metabaseUrl()}/collection/${existing.id}`,
+      url_hint: `${metabasePublicUrl()}/collection/${existing.id}`,
     };
   }
   const created = await mbFetch<CollectionRow>("POST", "/api/collection", {
@@ -143,7 +198,7 @@ export async function ensureCollection(name?: string): Promise<{
     id: created.id,
     name: created.name,
     created: true,
-    url_hint: `${metabaseUrl()}/collection/${created.id}`,
+    url_hint: `${metabasePublicUrl()}/collection/${created.id}`,
   };
 }
 
@@ -204,7 +259,11 @@ export async function createNativeQuestion(params: {
   name: string;
   display: string;
   collection_id: number | null;
+  /** Login URL (requires Metabase account). Prefer public_url for WhatsApp. */
   url: string;
+  public_uuid: string;
+  /** No-login link for staff / WhatsApp. */
+  public_url: string;
 }> {
   const databaseId = await resolveDatabaseId(params.database_id, params.database_name);
   const display = params.display ?? "table";
@@ -228,12 +287,15 @@ export async function createNativeQuestion(params: {
       },
     },
   });
+  const pub = await enableCardPublicLink(card.id);
   return {
     id: card.id,
     name: card.name,
     display: card.display,
     collection_id: card.collection_id,
-    url: questionUrl(card.id),
+    url: loginQuestionUrl(card.id),
+    public_uuid: pub.uuid,
+    public_url: pub.public_url,
   };
 }
 
@@ -241,7 +303,14 @@ export async function createDashboard(params: {
   name: string;
   description?: string;
   collection_id?: number;
-}): Promise<{ id: number; name: string; collection_id: number | null; url: string }> {
+}): Promise<{
+  id: number;
+  name: string;
+  collection_id: number | null;
+  url: string;
+  public_uuid: string;
+  public_url: string;
+}> {
   const dash = await mbFetch<{
     id: number;
     name: string;
@@ -252,11 +321,14 @@ export async function createDashboard(params: {
     collection_id: params.collection_id ?? null,
     parameters: [],
   });
+  const pub = await enableDashboardPublicLink(dash.id);
   return {
     id: dash.id,
     name: dash.name,
     collection_id: dash.collection_id,
-    url: dashboardUrl(dash.id),
+    url: loginDashboardUrl(dash.id),
+    public_uuid: pub.uuid,
+    public_url: pub.public_url,
   };
 }
 
@@ -266,6 +338,8 @@ export async function getDashboard(id: number): Promise<{
   description: string | null;
   collection_id: number | null;
   url: string;
+  public_uuid: string | null;
+  public_url: string | null;
   dashcards: Array<{
     id: number;
     card_id: number | null;
@@ -278,12 +352,25 @@ export async function getDashboard(id: number): Promise<{
 }> {
   const dash = await mbFetch<Dashboard>("GET", `/api/dashboard/${id}`);
   const cards = dashcardsOf(dash);
+  let public_uuid = dash.public_uuid ?? null;
+  let public_url: string | null = public_uuid ? publicDashboardUrl(public_uuid) : null;
+  if (!public_uuid) {
+    try {
+      const pub = await enableDashboardPublicLink(id);
+      public_uuid = pub.uuid;
+      public_url = pub.public_url;
+    } catch {
+      // leave null if sharing unavailable
+    }
+  }
   return {
     id: dash.id,
     name: dash.name,
     description: dash.description ?? null,
     collection_id: dash.collection_id ?? null,
-    url: dashboardUrl(dash.id),
+    url: loginDashboardUrl(dash.id),
+    public_uuid,
+    public_url,
     dashcards: cards.map((c) => ({
       id: c.id,
       card_id: c.card_id ?? c.card?.id ?? null,
@@ -306,7 +393,7 @@ export type DashcardAdd = {
 
 /**
  * Append question cards onto a dashboard. New dashcards use negative temporary ids
- * (Metabase API convention). Existing cards are preserved.
+ * (Metabase API convention). Existing cards are preserved. Ensures a public link exists.
  */
 export async function updateDashboardCards(params: {
   dashboard_id: number;
@@ -315,6 +402,8 @@ export async function updateDashboardCards(params: {
   id: number;
   name: string;
   url: string;
+  public_uuid: string | null;
+  public_url: string | null;
   dashcards: Awaited<ReturnType<typeof getDashboard>>["dashcards"];
 }> {
   if (!params.add.length) {
@@ -358,13 +447,79 @@ export async function updateDashboardCards(params: {
       parameter_mappings: c.parameter_mappings ?? [],
     })),
   });
+  // Ensure each added card is publicly shareable too (iframe embeds / direct links).
+  for (const a of params.add) {
+    try {
+      await enableCardPublicLink(a.card_id);
+    } catch {
+      // dashboard public link is the primary WhatsApp share target
+    }
+  }
   const updated = await getDashboard(params.dashboard_id);
   return {
     id: updated.id,
     name: updated.name,
     url: updated.url,
+    public_uuid: updated.public_uuid,
+    public_url: updated.public_url,
     dashcards: updated.dashcards,
   };
 }
 
-export { DISPLAY_TYPES, DEFAULT_COLLECTION };
+/**
+ * Spot-check warehouse SQL via Metabase's /api/dataset (uses the Metabase DB connection
+ * for mac_analytics). Prefer this over run_sql — that tool only hits wp_*_backoffice.
+ */
+export async function runAnalyticsSql(params: {
+  sql: string;
+  database_id?: number;
+  database_name?: string;
+  max_rows?: number;
+}): Promise<{
+  database_id: number;
+  columns: string[];
+  rows: unknown[][];
+  row_count: number;
+  truncated: boolean;
+}> {
+  const databaseId = await resolveDatabaseId(params.database_id, params.database_name);
+  const maxRows = Math.min(
+    ANALYTICS_HARD_MAX_ROWS,
+    Math.max(1, params.max_rows ?? 50),
+  );
+  const sql = params.sql.trim().replace(/;+\s*$/, "");
+  const result = await mbFetch<{
+    data?: {
+      cols?: Array<{ name?: string; display_name?: string }>;
+      rows?: unknown[][];
+      results_metadata?: unknown;
+    };
+    error?: string;
+    status?: string;
+  }>("POST", "/api/dataset", {
+    database: databaseId,
+    type: "native",
+    native: {
+      query: sql,
+      "template-tags": {},
+    },
+  });
+  if (result.error) {
+    throw new Error(result.error);
+  }
+  const cols = (result.data?.cols ?? []).map(
+    (c) => c.display_name || c.name || "col",
+  );
+  const allRows = result.data?.rows ?? [];
+  const truncated = allRows.length > maxRows;
+  const rows = truncated ? allRows.slice(0, maxRows) : allRows;
+  return {
+    database_id: databaseId,
+    columns: cols,
+    rows,
+    row_count: rows.length,
+    truncated,
+  };
+}
+
+export { DISPLAY_TYPES, DEFAULT_COLLECTION, ANALYTICS_HARD_MAX_ROWS };
