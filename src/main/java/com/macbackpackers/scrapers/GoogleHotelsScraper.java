@@ -19,14 +19,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.Keys;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.interactions.Actions;
-import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,10 +39,9 @@ import io.github.bonigarcia.wdm.WebDriverManager;
  * Google Hotels (Travel) Edinburgh listings via a dedicated Chrome user-data-dir
  * (not the Cloudbeds/Booking profile).
  * <p>
- * The {@code dates=} query param alone is <strong>not</strong> enough: Google's check-in /
- * check-out inputs often keep a default (or profile-cached) range and price the page for that.
- * After navigation we force the calendar UI to the requested stay and verify the inputs before
- * parsing prices.
+ * Stay dates are driven by the protobuf {@code ts=} trip blob in the search URL (the same shape
+ * Google writes after a UI date change). {@code dates=} alone is ignored when the profile has a
+ * cached range — we assert the Check-in / Check-out inputs match before parsing prices.
  * <p>
  * List pages expose a single "Prices starting from £N" per property — for hostel searches that
  * is almost always the cheapest dorm bed. We store it as {@code room_category=dorm}. When the
@@ -79,23 +75,11 @@ public class GoogleHotelsScraper {
     @Value( "${ghs.scrape.pause.millis:2500}" )
     private long pauseBetweenDatesMillis;
 
-    /**
-     * Dedicated timeout for date UI interactions. Do not reuse {@link #maxWaitSeconds} (Cloudbeds
-     * can be 660s) — calendar waits would appear "stuck" for the full duration.
-     */
-    @Value( "${ghs.date.wait.seconds:45}" )
-    private int dateWaitSeconds;
-
-    /** Cleared once per {@link #openDriver()} session — not every stay date. */
-    private boolean travelClientStateCleared;
-
     /** Opens a Chrome session bound to the dedicated GHS profile. Caller must {@link WebDriver#quit()}. */
     public ChromeDriver openDriver() {
         WebDriverManager.chromedriver().setup();
-        travelClientStateCleared = false;
         ChromeDriver driver = new ChromeDriver( buildChromeOptions() );
         driver.manage().timeouts().pageLoadTimeout( Duration.ofSeconds( Math.max( 60, maxWaitSeconds ) ) );
-        // Headless --start-maximized is unreliable; a short viewport leaves #gb over the date inputs.
         try {
             driver.manage().window().setSize( new Dimension( 1920, 1200 ) );
         }
@@ -103,10 +87,6 @@ public class GoogleHotelsScraper {
             LOGGER.debug( "GHS window resize skipped: {}", e.toString() );
         }
         return driver;
-    }
-
-    private WebDriverWait dateWait( WebDriver driver ) {
-        return new WebDriverWait( driver, Duration.ofSeconds( Math.max( 15, dateWaitSeconds ) ) );
     }
 
     public void pauseBetweenDates() throws InterruptedException {
@@ -127,18 +107,9 @@ public class GoogleHotelsScraper {
         LOGGER.info( "Google Hotels: {}", url );
         driver.get( url );
         dismissConsentIfPresent( driver );
-        // Profile-cached dates override dates=; clear storage once per Chrome session only.
-        // Clearing every stay_date reloads the profile default (Nov 29) and forces keyboard/calendar
-        // every iteration — and a long calendar wait then looks like a hung job.
-        if ( false == travelClientStateCleared ) {
-            clearTravelClientDateState( driver );
-            driver.get( url );
-            dismissConsentIfPresent( driver );
-            travelClientStateCleared = true;
-        }
-        applyAndVerifyStayDates( driver, stayDate, checkout );
+        assertStayDatesSelected( driver, stayDate, checkout );
         waitForListings( driver );
-        // Re-check after listings settle — SPA may revert dates when refreshing results.
+        // SPA may refresh results; re-check before parsing.
         assertStayDatesSelected( driver, stayDate, checkout );
         String html = driver.getPageSource();
         if ( looksLikeCaptcha( html ) ) {
@@ -158,9 +129,7 @@ public class GoogleHotelsScraper {
     }
 
     /**
-     * Prefer {@code /travel/search}. The {@code dates=} query param alone is ignored when the
-     * Chrome profile has a cached range — include the protobuf {@code ts=} trip blob (same shape
-     * Google writes after a successful UI date change) so listings price for the requested stay.
+     * Prefer {@code /travel/search} with both {@code dates=} and the protobuf {@code ts=} trip blob.
      */
     public static String buildSearchUrl( String city, LocalDate checkin, LocalDate checkout ) {
         String q = URLEncoder.encode( city.trim() + " hostels", StandardCharsets.UTF_8 );
@@ -173,8 +142,7 @@ public class GoogleHotelsScraper {
 
     /**
      * Builds the Google Travel {@code ts} URL parameter for a city hostel search in GBP.
-     * Edinburgh uses Knowledge Graph mid {@code /m/02m77}; other cities fall back to name-only
-     * (still better than dates= alone). Round-tripped against live successful scrape URLs.
+     * Edinburgh uses Knowledge Graph mid {@code /m/02m77}. Round-tripped against live scrape URLs.
      */
     static String buildTravelTs( String city, LocalDate checkin, LocalDate checkout ) {
         String mid = edinburghMidFor( city );
@@ -184,7 +152,7 @@ public class GoogleHotelsScraper {
         int nights = (int) ( checkout.toEpochDay() - checkin.toEpochDay() );
         byte[] dateRange = concat( ld( 1, dateMsg( checkin ) ), ld( 2, dateMsg( checkout ) ), vi( 3, nights ) );
         byte[] dates = ld( 2, concat( ld( 2, dateRange ), ld( 6, vi( 1, 1 ) ) ) );
-        // Currency blob copied from live GBP searches: field1=':\x03GBP', field3 empty
+        // Currency blob from live GBP searches: field1=':\x03GBP', field3 empty
         byte[] currency = ld( 5, new byte[] {
                 0x0a, 0x05, 0x3a, 0x03, 0x47, 0x42, 0x50, 0x1a, 0x00 } );
         byte[] root = concat( vi( 1, 1 ), ld( 3, concat( dest, dates ) ), currency );
@@ -195,7 +163,6 @@ public class GoogleHotelsScraper {
         if ( "Edinburgh".equalsIgnoreCase( city ) ) {
             return "/m/02m77";
         }
-        // Unknown city: empty mid still lets date fields apply; place name carries the query.
         return "";
     }
 
@@ -247,403 +214,17 @@ public class GoogleHotelsScraper {
         return date.format( GHS_DATE_LABEL );
     }
 
-    /**
-     * Sets check-in / check-out to the requested stay, then asserts the inputs match.
-     * Prefers typing into the date fields (calendar grid markup is unreliable); falls back to
-     * opening the picker and clicking days.
-     */
-    void applyAndVerifyStayDates( WebDriver driver, LocalDate checkin, LocalDate checkout ) {
-        String expectedIn = formatDateLabel( checkin );
-        String expectedOut = formatDateLabel( checkout );
-        if ( datesMatch( driver, expectedIn, expectedOut ) ) {
-            LOGGER.info( "GHS dates already selected: {} → {}", expectedIn, expectedOut );
-            return;
-        }
-        LOGGER.info( "GHS dates UI shows '{}' → '{}'; setting {} → {}",
-                readDateInput( driver, "Check-in" ), readDateInput( driver, "Check-out" ),
-                expectedIn, expectedOut );
-
-        WebDriverWait wait = dateWait( driver );
-        dismissGoogleChromeHeaderOverlay( driver );
-
-        if ( false == datesMatch( driver, expectedIn, expectedOut ) ) {
-            LOGGER.info( "GHS trying date entry via keyboard" );
-            typeStayDates( driver, wait, expectedIn, expectedOut );
-        }
-        if ( false == datesMatch( driver, expectedIn, expectedOut ) ) {
-            LOGGER.info( "GHS keyboard entry did not stick; trying calendar picker" );
-            openDatePicker( driver, wait );
-            clickCalendarDay( driver, wait, checkin );
-            clickCalendarDay( driver, wait, checkout );
-            clickDoneIfPresent( driver );
-        }
-
-        try {
-            wait.until( d -> datesMatch( d, expectedIn, expectedOut ) );
-        }
-        catch ( TimeoutException e ) {
-            throw new IllegalStateException(
-                    "Failed to set GHS dates to " + expectedIn + " → " + expectedOut
-                            + "; UI shows '" + readDateInput( driver, "Check-in" ) + "' → '"
-                            + readDateInput( driver, "Check-out" ) + "'; url=" + driver.getCurrentUrl()
-                            + "; calendarHints=" + calendarDebugHints( driver ),
-                    e );
-        }
-        try {
-            Thread.sleep( 1500 );
-        }
-        catch ( InterruptedException ie ) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private void typeStayDates( WebDriver driver, WebDriverWait wait, String expectedIn, String expectedOut ) {
-        // Prefer the topmost visible inputs — a date-picker dialog duplicates Check-in/out fields
-        // (job 835901: aria-describedby i6 covered by c0), and typing into the wrong one never sticks.
-        WebElement checkinInput = wait.until( d -> findVisibleDateInput( d, "Check-in" ) );
-        if ( checkinInput == null ) {
-            return;
-        }
-        if ( isReadonlyDateInput( checkinInput ) ) {
-            LOGGER.info( "GHS Check-in input is readonly; skipping keyboard entry" );
-            return;
-        }
-        WebElement checkoutInput = findVisibleDateInput( driver, "Check-out" );
-        if ( checkoutInput == null ) {
-            return;
-        }
-        typeDateInto( driver, checkinInput, expectedIn );
-        typeDateInto( driver, checkoutInput, expectedOut );
-        // Commit / blur so the SPA requeries
-        try {
-            checkoutInput.sendKeys( Keys.ENTER );
-            checkoutInput.sendKeys( Keys.TAB );
-        }
-        catch ( Exception ignored ) {
-            // ignore
-        }
-        try {
-            Thread.sleep( 800 );
-        }
-        catch ( InterruptedException ie ) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private static boolean isReadonlyDateInput( WebElement input ) {
-        String readonly = input.getAttribute( "readonly" );
-        // Presence of the attribute (including empty string) means readonly in HTML.
-        return readonly != null;
-    }
-
-    private void typeDateInto( WebDriver driver, WebElement input, String label ) {
-        clickBypassingOverlay( driver, input );
-        try {
-            input.sendKeys( Keys.chord( Keys.CONTROL, "a" ) );
-            input.sendKeys( Keys.BACK_SPACE );
-            input.sendKeys( label );
-        }
-        catch ( Exception e ) {
-            // Readonly-ish widgets: set value via JS then fire input/change
-            LOGGER.info( "GHS sendKeys failed ({}); setting value via JS", e.toString() );
-            ( (JavascriptExecutor) driver ).executeScript(
-                    "var el=arguments[0], v=arguments[1];"
-                            + "el.focus(); el.value=v;"
-                            + "el.dispatchEvent(new Event('input',{bubbles:true}));"
-                            + "el.dispatchEvent(new Event('change',{bubbles:true}));",
-                    input, label );
-        }
-    }
-
-    private void openDatePicker( WebDriver driver, WebDriverWait wait ) {
-        dismissGoogleChromeHeaderOverlay( driver );
-        // Prefer the calendar button beside Check-in (jsname a1ZUMe in current markup).
-        List<WebElement> openers = driver.findElements( By.cssSelector(
-                "button[aria-label*='Check-in'], "
-                        + "button[aria-label*='calendar'], "
-                        + "button[jsname='a1ZUMe'], "
-                        + "input[aria-label='Check-in'] ~ div button, "
-                        + "input[aria-label='Check-in'] ~ button, "
-                        + "input[aria-label='Check-in']" ) );
-        for ( WebElement opener : openers ) {
-            try {
-                if ( false == opener.isDisplayed() ) {
-                    continue;
-                }
-                clickBypassingOverlay( driver, opener );
-                if ( calendarAppearsOpen( driver, 3 ) ) {
-                    return;
-                }
-            }
-            catch ( Exception ignored ) {
-                // try next
-            }
-        }
-        WebElement checkinInput = wait.until(
-                ExpectedConditions.presenceOfElementLocated( By.cssSelector( "input[aria-label='Check-in']" ) ) );
-        dismissGoogleChromeHeaderOverlay( driver );
-        new Actions( driver ).moveToElement( checkinInput ).click().perform();
-        if ( false == calendarAppearsOpen( driver, 5 ) ) {
-            LOGGER.warn( "GHS date picker still not open after clicks; hints={}", calendarDebugHints( driver ) );
-        }
-    }
-
-    /** True if a calendar grid / dialog is present within {@code seconds}. */
-    private boolean calendarAppearsOpen( WebDriver driver, int seconds ) {
-        try {
-            new WebDriverWait( driver, Duration.ofSeconds( seconds ) ).until( d ->
-                    false == d.findElements( By.cssSelector(
-                            "[data-iso], [role='gridcell'], [role='dialog'] [role='grid']" ) ).isEmpty() );
-            return true;
-        }
-        catch ( TimeoutException e ) {
-            return false;
-        }
-    }
-
-    /** Clears SPA-cached travel dates that ignore the dates= query param. */
-    private void clearTravelClientDateState( WebDriver driver ) {
-        try {
-            ( (JavascriptExecutor) driver ).executeScript(
-                    "try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}" );
-            LOGGER.info( "Cleared Google Travel local/session storage for date reset" );
-        }
-        catch ( Exception e ) {
-            LOGGER.debug( "GHS storage clear skipped: {}", e.toString() );
-        }
-    }
-
-    private String calendarDebugHints( WebDriver driver ) {
-        try {
-            Object hint = ( (JavascriptExecutor) driver ).executeScript(
-                    "var iso=[].slice.call(document.querySelectorAll('[data-iso]')).slice(0,8)"
-                            + ".map(function(e){return e.getAttribute('data-iso');});"
-                            + "var cells=document.querySelectorAll('[role=gridcell]').length;"
-                            + "var dialogs=document.querySelectorAll('[role=dialog]').length;"
-                            + "return 'iso='+JSON.stringify(iso)+' gridcells='+cells+' dialogs='+dialogs;" );
-            return String.valueOf( hint );
-        }
-        catch ( Exception e ) {
-            return "n/a";
-        }
-    }
-
     void assertStayDatesSelected( WebDriver driver, LocalDate checkin, LocalDate checkout ) {
         String expectedIn = formatDateLabel( checkin );
         String expectedOut = formatDateLabel( checkout );
-        if ( false == datesMatch( driver, expectedIn, expectedOut ) ) {
-            throw new IllegalStateException(
-                    "GHS date mismatch after scrape wait: wanted " + expectedIn + " → " + expectedOut
-                            + " but UI shows '" + readDateInput( driver, "Check-in" ) + "' → '"
-                            + readDateInput( driver, "Check-out" ) + "'" );
-        }
-    }
-
-    private void clickCalendarDay( WebDriver driver, WebDriverWait wait, LocalDate day ) {
-        // Ensure a calendar grid is open (check-in click should have opened it).
-        ensureCalendarVisible( driver, wait );
-        // Profile often opens on a later cached month (e.g. Nov 29) while we need near-term — go back first.
-        if ( false == tryClickIsoDay( driver, day ) ) {
-            for ( int i = 0; i < 14 && false == tryClickIsoDay( driver, day ); i++ ) {
-                if ( false == clickMonthNav( driver, true ) ) {
-                    break;
-                }
-                sleepQuietly( 400 );
-            }
-        }
-        if ( false == tryClickIsoDay( driver, day ) ) {
-            for ( int i = 0; i < 14 && false == tryClickIsoDay( driver, day ); i++ ) {
-                if ( false == clickMonthNav( driver, false ) ) {
-                    break;
-                }
-                sleepQuietly( 400 );
-            }
-        }
-        if ( false == tryClickIsoDay( driver, day ) ) {
-            // Fallback: aria-label contains month name + day + year
-            String month = day.format( DateTimeFormatter.ofPattern( "MMMM", Locale.ENGLISH ) );
-            String ariaSnippet = month + " " + day.getDayOfMonth() + ", " + day.getYear();
-            List<WebElement> byAria = driver.findElements( By.cssSelector(
-                    "[role='gridcell'][aria-label*='" + ariaSnippet + "'], "
-                            + "div[role='button'][aria-label*='" + ariaSnippet + "'], "
-                            + "button[aria-label*='" + ariaSnippet + "']" ) );
-            if ( byAria.isEmpty() ) {
-                throw new IllegalStateException(
-                        "GHS calendar day not found for " + day + " (iso + aria). Page date UI='"
-                                + readDateInput( driver, "Check-in" ) + "'; hints="
-                                + calendarDebugHints( driver ) );
-            }
-            clickBypassingOverlay( driver, byAria.get( 0 ) );
-        }
-    }
-
-    private void ensureCalendarVisible( WebDriver driver, WebDriverWait wait ) {
-        if ( calendarAppearsOpen( driver, 2 ) ) {
+        if ( datesMatch( driver, expectedIn, expectedOut ) ) {
+            LOGGER.info( "GHS dates selected: {} → {}", expectedIn, expectedOut );
             return;
         }
-        // Opener click may have been a no-op (JS click under #gb); try again with Actions.
-        LOGGER.warn( "GHS calendar grid not detected; re-opening date picker" );
-        openDatePicker( driver, wait );
-        if ( false == calendarAppearsOpen( driver, 8 ) ) {
-            LOGGER.warn( "GHS calendar grid still missing; trying day selectors anyway; hints={}",
-                    calendarDebugHints( driver ) );
-        }
-    }
-
-    private static void sleepQuietly( long millis ) {
-        try {
-            Thread.sleep( millis );
-        }
-        catch ( InterruptedException ie ) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private boolean tryClickIsoDay( WebDriver driver, LocalDate day ) {
-        String iso = day.toString();
-        // Scope to a visible dialog first when present — dozens of hidden grids share data-iso.
-        List<WebElement> cells = driver.findElements( By.cssSelector(
-                "[role='dialog'] [data-iso='" + iso + "'], [role='dialog'] [data-ical*='" + iso + "'], "
-                        + "[data-iso='" + iso + "'], [data-ical*='" + iso + "']" ) );
-        List<WebElement> visible = new ArrayList<>();
-        for ( WebElement cell : cells ) {
-            try {
-                if ( cell.isDisplayed() ) {
-                    visible.add( cell );
-                }
-            }
-            catch ( Exception ignored ) {
-                // stale — skip
-            }
-        }
-        String before = readDateInput( driver, "Check-in" ) + "|" + readDateInput( driver, "Check-out" );
-        for ( WebElement cell : visible ) {
-            try {
-                clickBypassingOverlay( driver, cell );
-                sleepQuietly( 300 );
-                String after = readDateInput( driver, "Check-in" ) + "|" + readDateInput( driver, "Check-out" );
-                if ( false == before.equals( after ) ) {
-                    return true;
-                }
-            }
-            catch ( Exception ignored ) {
-                // try next visible
-            }
-        }
-        return false;
-    }
-
-    private boolean clickMonthNav( WebDriver driver, boolean previous ) {
-        String[] labels = previous
-                ? new String[] { "Previous month", "Previous", "Go to previous month" }
-                : new String[] { "Next month", "Next", "Go to next month" };
-        for ( String label : labels ) {
-            List<WebElement> buttons = driver.findElements( By.cssSelector(
-                    "button[aria-label='" + label + "'], div[role='button'][aria-label='" + label + "']" ) );
-            for ( WebElement b : buttons ) {
-                try {
-                    if ( b.isDisplayed() ) {
-                        b.click();
-                        return true;
-                    }
-                }
-                catch ( Exception ignored ) {
-                    // try next
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Google's account/app bar ({@code #gb}) often covers the Travel date inputs in headless /
-     * small viewports, causing {@code ElementClickInterceptedException}. Remove the overlay, then
-     * prefer a real Selenium/Actions click (JS click alone does not open the date picker).
-     */
-    private void clickBypassingOverlay( WebDriver driver, WebElement element ) {
-        dismissGoogleChromeHeaderOverlay( driver );
-        try {
-            ( (JavascriptExecutor) driver ).executeScript(
-                    "arguments[0].scrollIntoView({block:'center', inline:'nearest'});", element );
-            sleepQuietly( 200 );
-        }
-        catch ( Exception ignored ) {
-            // continue
-        }
-        try {
-            element.click();
-            return;
-        }
-        catch ( org.openqa.selenium.ElementClickInterceptedException intercepted ) {
-            LOGGER.info( "GHS click intercepted after overlay hide; retrying with Actions: {}",
-                    intercepted.getMessage().split( "\n" )[0] );
-        }
-        dismissGoogleChromeHeaderOverlay( driver );
-        try {
-            new Actions( driver ).moveToElement( element ).pause( Duration.ofMillis( 100 ) ).click().perform();
-            return;
-        }
-        catch ( Exception actionsFailed ) {
-            LOGGER.info( "GHS Actions click failed ({}); using JS click as last resort",
-                    actionsFailed.toString() );
-        }
-        ( (JavascriptExecutor) driver ).executeScript( "arguments[0].click();", element );
-        try {
-            ( (JavascriptExecutor) driver ).executeScript(
-                    "var el=arguments[0]; el.focus();"
-                            + "el.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));"
-                            + "el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));"
-                            + "el.dispatchEvent(new MouseEvent('click',{bubbles:true}));",
-                    element );
-        }
-        catch ( Exception ignored ) {
-            // click above is enough in most builds
-        }
-    }
-
-    /**
-     * Remove sticky Google header/banner that steals clicks at the top of the viewport.
-     * Also injects a persistent style so SPA re-renders keep it out of the way.
-     */
-    private void dismissGoogleChromeHeaderOverlay( WebDriver driver ) {
-        try {
-            ( (JavascriptExecutor) driver ).executeScript(
-                    "var s=document.getElementById('ghs-hide-gb');"
-                            + "if(!s){ s=document.createElement('style'); s.id='ghs-hide-gb';"
-                            // gb_7d is a 64px spacer that survives removing #gb and still intercepts clicks.
-                            + "  s.textContent='#gb, header[role=banner], header.gb_Ta, div[class*=\"gb_\"] {"
-                            + "display:none!important;pointer-events:none!important;height:0!important;"
-                            + "min-height:0!important;overflow:hidden!important;}';"
-                            + "  document.documentElement.appendChild(s); }"
-                            + "var gb=document.getElementById('gb'); if(gb){ gb.remove(); }"
-                            + "document.querySelectorAll('header[role=banner], div[class*=\"gb_\"]').forEach(function(el){"
-                            + "  try { el.remove(); } catch(e) {}"
-                            + "});"
-                            + "window.scrollTo(0, 200);" );
-        }
-        catch ( Exception e ) {
-            LOGGER.debug( "GHS header overlay remove skipped: {}", e.toString() );
-        }
-    }
-
-    private void clickDoneIfPresent( WebDriver driver ) {
-        for ( String text : List.of( "Done", "Apply", "OK" ) ) {
-            List<WebElement> buttons = driver.findElements(
-                    By.xpath( "//button[normalize-space()='" + text + "']"
-                            + " | //div[@role='button'][normalize-space()='" + text + "']" ) );
-            for ( WebElement b : buttons ) {
-                try {
-                    if ( b.isDisplayed() ) {
-                        b.click();
-                        LOGGER.info( "Clicked GHS date picker '{}'", text );
-                        return;
-                    }
-                }
-                catch ( Exception ignored ) {
-                    // try next
-                }
-            }
-        }
+        throw new IllegalStateException(
+                "GHS date mismatch (ts= did not stick): wanted " + expectedIn + " → " + expectedOut
+                        + " but UI shows '" + readDateInput( driver, "Check-in" ) + "' → '"
+                        + readDateInput( driver, "Check-out" ) + "'; url=" + driver.getCurrentUrl() );
     }
 
     private static boolean datesMatch( WebDriver driver, String expectedIn, String expectedOut ) {
@@ -660,7 +241,7 @@ public class GoogleHotelsScraper {
         return value == null ? "" : value.trim();
     }
 
-    /** Last visible matching input wins (dialog fields sit above the summary bar duplicates). */
+    /** Last visible matching input wins (dialog fields can duplicate the summary bar). */
     private static WebElement findVisibleDateInput( WebDriver driver, String ariaLabel ) {
         List<WebElement> inputs = driver.findElements(
                 By.cssSelector( "input[aria-label='" + ariaLabel + "']" ) );
@@ -762,14 +343,11 @@ public class GoogleHotelsScraper {
         }
         args.add( "--user-data-dir=" + ghsUserDataDir );
         args.add( "--disable-blink-features=AutomationControlled" );
-        // Explicit size: headless ignores --start-maximized. Chrome also sets
-        // --ozone-override-screen-size=800,600 by default, which keeps date inputs under the gb bar.
-        boolean hasWindowSize = args.stream().anyMatch( a -> a.startsWith( "--window-size=" ) );
-        if ( false == hasWindowSize ) {
+        // Headless ignores --start-maximized and defaults to 800x600 without an explicit size.
+        if ( args.stream().noneMatch( a -> a.startsWith( "--window-size=" ) ) ) {
             args.add( "--window-size=1920,1200" );
         }
-        boolean hasOzoneSize = args.stream().anyMatch( a -> a.startsWith( "--ozone-override-screen-size=" ) );
-        if ( false == hasOzoneSize ) {
+        if ( args.stream().noneMatch( a -> a.startsWith( "--ozone-override-screen-size=" ) ) ) {
             args.add( "--ozone-override-screen-size=1920,1200" );
         }
         options.addArguments( args );
