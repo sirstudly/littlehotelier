@@ -78,9 +78,20 @@ public class GoogleHotelsScraper {
     @Value( "${ghs.scrape.pause.millis:2500}" )
     private long pauseBetweenDatesMillis;
 
+    /**
+     * Dedicated timeout for date UI interactions. Do not reuse {@link #maxWaitSeconds} (Cloudbeds
+     * can be 660s) — calendar waits would appear "stuck" for the full duration.
+     */
+    @Value( "${ghs.date.wait.seconds:45}" )
+    private int dateWaitSeconds;
+
+    /** Cleared once per {@link #openDriver()} session — not every stay date. */
+    private boolean travelClientStateCleared;
+
     /** Opens a Chrome session bound to the dedicated GHS profile. Caller must {@link WebDriver#quit()}. */
     public ChromeDriver openDriver() {
         WebDriverManager.chromedriver().setup();
+        travelClientStateCleared = false;
         ChromeDriver driver = new ChromeDriver( buildChromeOptions() );
         driver.manage().timeouts().pageLoadTimeout( Duration.ofSeconds( Math.max( 60, maxWaitSeconds ) ) );
         // Headless --start-maximized is unreliable; a short viewport leaves #gb over the date inputs.
@@ -91,6 +102,10 @@ public class GoogleHotelsScraper {
             LOGGER.debug( "GHS window resize skipped: {}", e.toString() );
         }
         return driver;
+    }
+
+    private WebDriverWait dateWait( WebDriver driver ) {
+        return new WebDriverWait( driver, Duration.ofSeconds( Math.max( 15, dateWaitSeconds ) ) );
     }
 
     public void pauseBetweenDates() throws InterruptedException {
@@ -111,10 +126,15 @@ public class GoogleHotelsScraper {
         LOGGER.info( "Google Hotels: {}", url );
         driver.get( url );
         dismissConsentIfPresent( driver );
-        // Profile-cached date state often overrides dates= — clear and reload once.
-        clearTravelClientDateState( driver );
-        driver.get( url );
-        dismissConsentIfPresent( driver );
+        // Profile-cached dates override dates=; clear storage once per Chrome session only.
+        // Clearing every stay_date reloads the profile default (Nov 29) and forces keyboard/calendar
+        // every iteration — and a long calendar wait then looks like a hung job.
+        if ( false == travelClientStateCleared ) {
+            clearTravelClientDateState( driver );
+            driver.get( url );
+            dismissConsentIfPresent( driver );
+            travelClientStateCleared = true;
+        }
         applyAndVerifyStayDates( driver, stayDate, checkout );
         waitForListings( driver );
         // Re-check after listings settle — SPA may revert dates when refreshing results.
@@ -167,7 +187,7 @@ public class GoogleHotelsScraper {
                 readDateInput( driver, "Check-in" ), readDateInput( driver, "Check-out" ),
                 expectedIn, expectedOut );
 
-        WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( Math.max( 30, maxWaitSeconds ) ) );
+        WebDriverWait wait = dateWait( driver );
         dismissGoogleChromeHeaderOverlay( driver );
 
         if ( false == datesMatch( driver, expectedIn, expectedOut ) ) {
@@ -401,25 +421,26 @@ public class GoogleHotelsScraper {
         String iso = day.toString();
         List<WebElement> cells = driver.findElements( By.cssSelector(
                 "[data-iso='" + iso + "'], [data-ical*='" + iso + "']" ) );
+        // Prefer visible cells only — the page can keep dozens of hidden dialogs/grids in the DOM
+        // (job 835900 saw dialogs=86); JS-clicking a hidden cell returns "success" without changing UI.
+        List<WebElement> visible = new ArrayList<>();
         for ( WebElement cell : cells ) {
             try {
                 if ( cell.isDisplayed() ) {
-                    cell.click();
-                    return true;
+                    visible.add( cell );
                 }
             }
             catch ( Exception ignored ) {
-                // try next
+                // stale — skip
             }
         }
-        // JS click fallback for covered overlays
-        if ( false == cells.isEmpty() ) {
+        for ( WebElement cell : visible ) {
             try {
-                ( (JavascriptExecutor) driver ).executeScript( "arguments[0].click();", cells.get( 0 ) );
+                clickBypassingOverlay( driver, cell );
                 return true;
             }
             catch ( Exception ignored ) {
-                return false;
+                // try next visible
             }
         }
         return false;
@@ -502,12 +523,13 @@ public class GoogleHotelsScraper {
             ( (JavascriptExecutor) driver ).executeScript(
                     "var s=document.getElementById('ghs-hide-gb');"
                             + "if(!s){ s=document.createElement('style'); s.id='ghs-hide-gb';"
-                            + "  s.textContent='#gb, header[role=banner], header.gb_Ta {"
+                            // gb_7d is a 64px spacer that survives removing #gb and still intercepts clicks.
+                            + "  s.textContent='#gb, header[role=banner], header.gb_Ta, div[class*=\"gb_\"] {"
                             + "display:none!important;pointer-events:none!important;height:0!important;"
-                            + "overflow:hidden!important;}';"
+                            + "min-height:0!important;overflow:hidden!important;}';"
                             + "  document.documentElement.appendChild(s); }"
                             + "var gb=document.getElementById('gb'); if(gb){ gb.remove(); }"
-                            + "document.querySelectorAll('header[role=banner]').forEach(function(el){"
+                            + "document.querySelectorAll('header[role=banner], div[class*=\"gb_\"]').forEach(function(el){"
                             + "  try { el.remove(); } catch(e) {}"
                             + "});"
                             + "window.scrollTo(0, 200);" );
@@ -636,10 +658,15 @@ public class GoogleHotelsScraper {
         }
         args.add( "--user-data-dir=" + ghsUserDataDir );
         args.add( "--disable-blink-features=AutomationControlled" );
-        // Explicit size: headless ignores --start-maximized and defaults too short, covering dates with #gb.
+        // Explicit size: headless ignores --start-maximized. Chrome also sets
+        // --ozone-override-screen-size=800,600 by default, which keeps date inputs under the gb bar.
         boolean hasWindowSize = args.stream().anyMatch( a -> a.startsWith( "--window-size=" ) );
         if ( false == hasWindowSize ) {
             args.add( "--window-size=1920,1200" );
+        }
+        boolean hasOzoneSize = args.stream().anyMatch( a -> a.startsWith( "--ozone-override-screen-size=" ) );
+        if ( false == hasOzoneSize ) {
+            args.add( "--ozone-override-screen-size=1920,1200" );
         }
         options.addArguments( args );
         if ( StringUtils.isNotBlank( chromeUserAgent ) ) {
