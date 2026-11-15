@@ -152,9 +152,10 @@ public class GoogleHotelsScraper {
                 expectedIn, expectedOut );
 
         WebDriverWait wait = new WebDriverWait( driver, Duration.ofSeconds( Math.max( 30, maxWaitSeconds ) ) );
+        dismissGoogleChromeHeaderOverlay( driver );
         WebElement checkinInput = wait.until(
-                ExpectedConditions.elementToBeClickable( By.cssSelector( "input[aria-label='Check-in']" ) ) );
-        checkinInput.click();
+                ExpectedConditions.presenceOfElementLocated( By.cssSelector( "input[aria-label='Check-in']" ) ) );
+        clickBypassingOverlay( driver, checkinInput );
 
         clickCalendarDay( driver, wait, checkin );
         clickCalendarDay( driver, wait, checkout );
@@ -298,6 +299,56 @@ public class GoogleHotelsScraper {
             }
         }
         return false;
+    }
+
+    /**
+     * Google's account/app bar ({@code gb_*}) often covers the Travel date inputs in headless /
+     * small viewports, causing {@code ElementClickInterceptedException}. Scroll the field into the
+     * clear area and fall back to a JS click.
+     */
+    private void clickBypassingOverlay( WebDriver driver, WebElement element ) {
+        try {
+            ( (JavascriptExecutor) driver ).executeScript(
+                    "arguments[0].scrollIntoView({block:'center', inline:'nearest'});", element );
+            Thread.sleep( 200 );
+        }
+        catch ( Exception ignored ) {
+            // continue
+        }
+        try {
+            element.click();
+            return;
+        }
+        catch ( org.openqa.selenium.ElementClickInterceptedException intercepted ) {
+            LOGGER.info( "GHS date input click intercepted by overlay; using JS click: {}",
+                    intercepted.getMessage().split( "\n" )[0] );
+        }
+        ( (JavascriptExecutor) driver ).executeScript( "arguments[0].click();", element );
+        // Also dispatch a focus/mousedown in case the SPA listens on the wrapper, not the input
+        try {
+            ( (JavascriptExecutor) driver ).executeScript(
+                    "var el=arguments[0]; el.focus();"
+                            + "el.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));"
+                            + "el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));",
+                    element );
+        }
+        catch ( Exception ignored ) {
+            // click above is enough in most builds
+        }
+    }
+
+    /** Hide sticky Google header bars that steal clicks at the top of the viewport. */
+    private void dismissGoogleChromeHeaderOverlay( WebDriver driver ) {
+        try {
+            ( (JavascriptExecutor) driver ).executeScript(
+                    "document.querySelectorAll('div[class*=\"gb_\"]').forEach(function(el){"
+                            + "  try { el.style.pointerEvents='none'; } catch(e) {}"
+                            + "});"
+                            + "window.scrollTo(0, 120);" );
+        }
+        catch ( Exception e ) {
+            LOGGER.debug( "GHS header overlay soften skipped: {}", e.toString() );
+        }
     }
 
     private void clickDoneIfPresent( WebDriver driver ) {
