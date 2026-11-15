@@ -17,11 +17,11 @@ import {
   describeTables,
   runAdhocSelect,
 } from "./db/adhocSql.js";
+import * as jobSchedulerDb from "./db/jobScheduler.js";
 import * as jobsDb from "./db/jobs.js";
 import { searchLogs } from "./db/logs.js";
 import { getJobQueueStats } from "./db/queue.js";
 import { isReadOnlySqlConfigured } from "./db/readOnlyPool.js";
-import * as scheduledDb from "./db/scheduled.js";
 import { audit } from "./lib/audit.js";
 import {
   DEFAULT_COLLECTION,
@@ -153,15 +153,21 @@ export function createServer(): McpServer {
   );
 
   server.tool(
-    "list_scheduled_jobs",
-    "List scheduled jobs (cron templates) for a property",
+    "list_job_schedulers",
+    "List processor schedules from job_scheduler (+ job_scheduler_param).",
     {
       property: propertySchema,
       active_only: z.boolean().optional(),
+      classname: z.string().optional(),
     },
-    async ({ property, active_only }) => {
+    async ({ property, active_only, classname }) => {
       try {
-        return ok(await scheduledDb.listScheduledJobs(property, active_only ?? true));
+        return ok(
+          await jobSchedulerDb.listJobSchedulers(property, {
+            activeOnly: active_only ?? true,
+            classname,
+          }),
+        );
       } catch (err) {
         return fail(err);
       }
@@ -169,17 +175,17 @@ export function createServer(): McpServer {
   );
 
   server.tool(
-    "get_scheduled_job",
-    "Get one scheduled job by id",
+    "get_job_scheduler",
+    "Get one job_scheduler row by id (with params)",
     {
       property: propertySchema,
-      scheduled_job_id: z.number().int().positive(),
+      scheduler_id: z.number().int().positive(),
     },
-    async ({ property, scheduled_job_id }) => {
+    async ({ property, scheduler_id }) => {
       try {
-        const job = await scheduledDb.getScheduledJob(property, scheduled_job_id);
-        if (!job) return fail(new Error(`Scheduled job ${scheduled_job_id} not found`));
-        return ok(job);
+        const row = await jobSchedulerDb.getJobScheduler(property, scheduler_id);
+        if (!row) return fail(new Error(`Scheduler ${scheduler_id} not found`));
+        return ok(row);
       } catch (err) {
         return fail(err);
       }
@@ -529,6 +535,212 @@ export function createServer(): McpServer {
           status: "submitted",
           parameters: resolvedParameters,
         });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "update_job_status",
+    "Change wp_lh_jobs.status with ops-safe transitions only (abort/pause/requeue/retry). Never sets completed or processing. Requeue to submitted clears processed_by/start/end. Confirm property + job id + old→new with staff first.",
+    {
+      property: propertySchema,
+      job_id: z.number().int().positive(),
+      status: z.enum(["submitted", "aborted", "paused", "retry"]),
+      requested_by: z.string().optional(),
+    },
+    async ({ property, job_id, status, requested_by }) => {
+      try {
+        assertProperty(property);
+        const before = await jobsDb.getJob(property, job_id);
+        if (!before) throw new Error(`Job ${job_id} not found`);
+        const job = await jobsDb.updateJobStatus(property, job_id, status);
+        audit("update_job_status", {
+          property,
+          job_id,
+          from: before.status,
+          to: status,
+          classname: job.classname,
+          requested_by: requested_by ?? null,
+        });
+        return ok({ property, before: { status: before.status }, job });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "update_job_params",
+    "Upsert or delete wp_lh_job_param rows for a job. Refuses while status is processing. Confirm property + job id + changes with staff first.",
+    {
+      property: propertySchema,
+      job_id: z.number().int().positive(),
+      set: z.record(z.string()).optional(),
+      delete: z.array(z.string().min(1)).optional(),
+      requested_by: z.string().optional(),
+    },
+    async ({ property, job_id, set, delete: del, requested_by }) => {
+      try {
+        assertProperty(property);
+        const before = await jobsDb.getJob(property, job_id);
+        if (!before) throw new Error(`Job ${job_id} not found`);
+        const job = await jobsDb.updateJobParams(property, job_id, {
+          set,
+          delete: del,
+        });
+        audit("update_job_params", {
+          property,
+          job_id,
+          set: set ?? {},
+          delete: del ?? [],
+          before_parameters: before.parameters,
+          after_parameters: job.parameters,
+          requested_by: requested_by ?? null,
+        });
+        return ok({ property, before: { parameters: before.parameters }, job });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "create_job_scheduler",
+    "Insert a live job_scheduler row (+ optional params). job_type must be allowlisted (same as insert_job). Provide exactly one of repeat_time_minutes or repeat_daily_at (HH:MM or HH:MM:SS). Confirm with staff first.",
+    {
+      property: propertySchema,
+      job_type: z.string().min(1),
+      repeat_time_minutes: z.number().int().positive().optional(),
+      repeat_daily_at: z.string().min(1).optional(),
+      active: z.boolean().optional(),
+      parameters: z.record(z.string()).default({}),
+      requested_by: z.string().optional(),
+    },
+    async ({
+      property,
+      job_type,
+      repeat_time_minutes,
+      repeat_daily_at,
+      active,
+      parameters,
+      requested_by,
+    }) => {
+      try {
+        assertProperty(property);
+        if (job_type.includes(".") || job_type.includes("/")) {
+          throw new Error("job_type must be a short allowlisted name, not a classname");
+        }
+        const allowlist = loadJobAllowlist();
+        const entry = allowlist[job_type];
+        if (!entry) {
+          throw new Error(
+            `Job type '${job_type}' is not allowlisted. Allowed: ${Object.keys(allowlist).join(", ")}`,
+          );
+        }
+        for (const required of entry.requiredParams) {
+          if (!parameters[required] || String(parameters[required]).trim() === "") {
+            throw new Error(`Missing required parameter '${required}' for ${job_type}`);
+          }
+        }
+        const resolvedParameters = resolveEmailParamInParameters(parameters);
+        const row = await jobSchedulerDb.createJobScheduler(property, {
+          classname: entry.classname,
+          repeatTimeMinutes: repeat_time_minutes ?? null,
+          repeatDailyAt: repeat_daily_at ?? null,
+          active,
+          parameters: resolvedParameters,
+        });
+        audit("create_job_scheduler", {
+          property,
+          job_type,
+          classname: entry.classname,
+          scheduler_id: row.schedulerId,
+          parameters: resolvedParameters,
+          requested_by: requested_by ?? null,
+        });
+        return ok({ property, jobType: job_type, scheduler: row });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "update_job_scheduler",
+    "Update a live job_scheduler row: toggle active, change repeat schedule (setting one clears the other), and/or upsert/delete params. Confirm with staff first.",
+    {
+      property: propertySchema,
+      scheduler_id: z.number().int().positive(),
+      active: z.boolean().optional(),
+      repeat_time_minutes: z.number().int().positive().nullable().optional(),
+      repeat_daily_at: z.string().min(1).nullable().optional(),
+      set: z.record(z.string()).optional(),
+      delete: z.array(z.string().min(1)).optional(),
+      requested_by: z.string().optional(),
+    },
+    async ({
+      property,
+      scheduler_id,
+      active,
+      repeat_time_minutes,
+      repeat_daily_at,
+      set,
+      delete: del,
+      requested_by,
+    }) => {
+      try {
+        assertProperty(property);
+        const before = await jobSchedulerDb.getJobScheduler(property, scheduler_id);
+        if (!before) throw new Error(`Scheduler ${scheduler_id} not found`);
+        const scheduler = await jobSchedulerDb.updateJobScheduler(property, scheduler_id, {
+          active,
+          repeatTimeMinutes: repeat_time_minutes,
+          repeatDailyAt: repeat_daily_at,
+          set,
+          delete: del,
+        });
+        audit("update_job_scheduler", {
+          property,
+          scheduler_id,
+          active: active ?? null,
+          repeat_time_minutes: repeat_time_minutes ?? null,
+          repeat_daily_at: repeat_daily_at ?? null,
+          set: set ?? {},
+          delete: del ?? [],
+          before,
+          after: scheduler,
+          requested_by: requested_by ?? null,
+        });
+        return ok({ property, before, scheduler });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "delete_job_scheduler",
+    "Delete a live job_scheduler row and its job_scheduler_param rows. Confirm property + scheduler id with staff first.",
+    {
+      property: propertySchema,
+      scheduler_id: z.number().int().positive(),
+      requested_by: z.string().optional(),
+    },
+    async ({ property, scheduler_id, requested_by }) => {
+      try {
+        assertProperty(property);
+        const before = await jobSchedulerDb.getJobScheduler(property, scheduler_id);
+        if (!before) throw new Error(`Scheduler ${scheduler_id} not found`);
+        await jobSchedulerDb.deleteJobScheduler(property, scheduler_id);
+        audit("delete_job_scheduler", {
+          property,
+          scheduler_id,
+          before,
+          requested_by: requested_by ?? null,
+        });
+        return ok({ property, deleted: true, scheduler_id, before });
       } catch (err) {
         return fail(err);
       }

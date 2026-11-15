@@ -4,10 +4,10 @@ MCP ops server for Cloudbeds. Exposes allowlisted job enqueue, job/queue queries
 
 ## Architecture
 
-- **This package (TypeScript)** — MCP tools over stdio; MySQL for jobs/scheduled/queue; log file search; HTTP client to read-api
+- **This package (TypeScript)** — MCP tools over stdio; MySQL for jobs/job_scheduler/queue; log file search; HTTP client to read-api
 - **`ronbot-read-api` (Java)** — live `CloudbedsScraper` reads; one child Spring context per property (`crh`/`hsh`/`rmb`/`lsh`)
 
-Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows into `wp_lh_jobs`.
+Cloudbeds mutations are never done from MCP. DB writes are limited to allowlisted `wp_lh_jobs` enqueue, ops-safe job status/param edits, and CRUD on live `job_scheduler` / `job_scheduler_param`.
 
 ## Tools
 
@@ -15,7 +15,10 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 |------|---------|
 | `list_properties` | Property ids |
 | `get_job` / `list_jobs` | `wp_lh_jobs` |
-| `list_scheduled_jobs` / `get_scheduled_job` | Cron templates |
+| `update_job_status` | Ops-safe status change on `wp_lh_jobs` (abort/pause/requeue/retry) |
+| `update_job_params` | Upsert/delete `wp_lh_job_param` (refuses while `processing`) |
+| `list_job_schedulers` / `get_job_scheduler` | Processor schedules (`job_scheduler`) |
+| `create_job_scheduler` / `update_job_scheduler` / `delete_job_scheduler` | CRUD on `job_scheduler` (+ params) |
 | `get_job_queue_stats` | submitted / processing / retry counts |
 | `search_logs` | Grep property log dirs |
 | `get_booking` | Booking search by visible id / OTA ref / guest name (calendar DB first for names, then Cloudbeds; returns a list) |
@@ -54,6 +57,22 @@ Cloudbeds mutations are never done from MCP. Writes only insert allowlisted rows
 - Prefetches the folio via read-api and refuses already-voided / non-voidable lines
 - Enqueues `VoidFolioPaymentJob` (processor posts MFD-style `connect/payment/add` with `transaction_type=Void`)
 - Only when staff explicitly ask to void a payment; gateway charges still need refunds, not void
+
+### `update_job_status` / `update_job_params`
+
+- `update_job_status`: `property`, `job_id`, `status` (`submitted` | `aborted` | `paused` | `retry`)
+  - Allowed: → `aborted` from submitted/retry/paused/failed/processing; → `paused` from submitted/retry; → `submitted` (requeue) from failed/aborted/paused/retry/completed; → `retry` from processing/failed/aborted
+  - Never sets `completed` or `processing`. Requeue clears `processed_by` / `start_date` / `end_date`
+- `update_job_params`: `property`, `job_id`, optional `set` map and/or `delete` name list; refuses while status is `processing`
+
+### `job_scheduler` tools
+
+Processors poll `job_scheduler` / `job_scheduler_param`.
+
+- `list_job_schedulers` / `get_job_scheduler` — inspect schedules
+- `create_job_scheduler` — allowlisted `job_type` (same file as `insert_job`); exactly one of `repeat_time_minutes` or `repeat_daily_at` (`HH:MM` / `HH:MM:SS`); optional `active` (default true) + `parameters`
+- `update_job_scheduler` — toggle `active`, change repeat (setting one clears the other), upsert/delete params
+- `delete_job_scheduler` — deletes params then the scheduler row
 
 ### Email aliases
 
@@ -212,6 +231,10 @@ See [`.cursor/mcp.json`](../.cursor/mcp.json). Point `args` at `ronbot-mcp/dist/
 - "How many beds free tomorrow at hsh?" → `get_availability` with `property=hsh` (or omit from/to for today→tomorrow)
 - "Availability tonight across all hostels" → `get_availability` once with `properties` omitted (fans out to crh/hsh/rmb/lsh)
 - "Run housekeeping for crh for today" → `insert_job` with `HousekeepingJob` / `selected_date`
+- "Abort stuck job 12345 at hsh" → `update_job_status` with `status=aborted`
+- "Re-run completed job 12345 at crh" → `update_job_status` with `status=submitted`
+- "List active job schedules at crh" → `list_job_schedulers`
+- "Disable scheduler 12 at crh" → `update_job_scheduler` with `active=false`
 - "Run the quarterly EVL nights 6+ report for hsh to accounts" → `enqueue_quarterly_evl_6plus_report` with `property=hsh`, `email=accounts`
 - "EVL over 5 nights report for all Edinburgh hostels, email jay" → `enqueue_quarterly_evl_6plus_report` with `property=all`, `email=jay`
 - "Channel report for August 2026 at rmb, email accounts and ron" → `enqueue_channel_production_report` with `property=rmb`, `year_month=2026-08`, `to_emails=["accounts","ron"]`
@@ -303,7 +326,8 @@ MCP `dist` is compiled inside the `ronbot-bridge` image; rebuilding the bridge i
 ## Security notes
 
 - MCP never calls Cloudbeds directly
-- `insert_job` classname comes only from `config/job-allowlist.json`
+- `insert_job` / `create_job_scheduler` classname comes only from `config/job-allowlist.json`
+- Job status changes are ops-safe transition-gated; never set `completed` / `processing` from MCP
 - `run_sql` / `describe_sql_tables` use a dedicated read-only DB user (`SELECT` + `SHOW VIEW` only), never the read/write pool
 - Those tools are not registered unless `RONBOT_SQL_RO_USER` / `RONBOT_SQL_RO_PASSWORD` are set. `ronbot-bridge` forwards them to its MCP child when set (Compose uses `RONBOT_SQL_RO_HOST=mysql-tailscale`), so WhatsApp staff get them in production
 - Booking/transaction responses redact full card numbers

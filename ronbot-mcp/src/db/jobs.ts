@@ -1,5 +1,5 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
-import { query, withTransaction } from "./pools.js";
+import { execute, query, withTransaction } from "./pools.js";
 
 export interface JobRow {
   jobId: number;
@@ -156,4 +156,165 @@ export async function insertJob(
     }
     return jobId;
   });
+}
+
+/** Valid JobStatus values on wp_lh_jobs.status. */
+export const JOB_STATUSES = [
+  "submitted",
+  "processing",
+  "completed",
+  "failed",
+  "aborted",
+  "retry",
+  "paused",
+] as const;
+
+export type JobStatus = (typeof JOB_STATUSES)[number];
+
+const MAX_PARAM_VALUE_LEN = 255;
+
+/** Ops-safe transitions for WhatsApp / MCP. Never set completed or processing from chat. */
+const ALLOWED_TRANSITIONS: Record<string, ReadonlySet<string>> = {
+  aborted: new Set(["submitted", "retry", "paused", "failed", "processing"]),
+  paused: new Set(["submitted", "retry"]),
+  submitted: new Set(["failed", "aborted", "paused", "retry", "completed"]),
+  retry: new Set(["processing", "failed", "aborted"]),
+};
+
+export function assertJobStatusTransition(from: string, to: string): void {
+  if (from === to) return;
+  if (to === "completed" || to === "processing") {
+    throw new Error(`Cannot set status to '${to}' from chat (ops-safe policy)`);
+  }
+  const allowedFrom = ALLOWED_TRANSITIONS[to];
+  if (!allowedFrom) {
+    throw new Error(
+      `Target status '${to}' is not allowed. Allowed targets: ${Object.keys(ALLOWED_TRANSITIONS).join(", ")}`,
+    );
+  }
+  if (!allowedFrom.has(from)) {
+    throw new Error(
+      `Cannot change status from '${from}' to '${to}'. Allowed sources for '${to}': ${[...allowedFrom].join(", ")}`,
+    );
+  }
+}
+
+export function assertParamValue(name: string, value: string): void {
+  if (!name || name.trim() === "") {
+    throw new Error("Parameter name must be non-empty");
+  }
+  if (value.length > MAX_PARAM_VALUE_LEN) {
+    throw new Error(`Parameter '${name}' value exceeds ${MAX_PARAM_VALUE_LEN} characters`);
+  }
+}
+
+/**
+ * Update wp_lh_jobs.status with ops-safe transition rules.
+ * Requeue to submitted clears processed_by / start_date / end_date.
+ */
+export async function updateJobStatus(
+  property: string,
+  jobId: number,
+  status: string,
+): Promise<JobRow> {
+  const existing = await getJob(property, jobId);
+  if (!existing) {
+    throw new Error(`Job ${jobId} not found`);
+  }
+  assertJobStatusTransition(existing.status, status);
+  if (existing.status === status) {
+    return existing;
+  }
+
+  const requeue = status === "submitted";
+  if (requeue) {
+    await execute(
+      property,
+      `UPDATE wp_lh_jobs
+          SET status = ?, processed_by = NULL, start_date = NULL, end_date = NULL, last_updated_date = NOW()
+        WHERE job_id = ?`,
+      [status, jobId],
+    );
+  } else {
+    await execute(
+      property,
+      `UPDATE wp_lh_jobs SET status = ?, last_updated_date = NOW() WHERE job_id = ?`,
+      [status, jobId],
+    );
+  }
+
+  const updated = await getJob(property, jobId);
+  if (!updated) {
+    throw new Error(`Job ${jobId} disappeared after status update`);
+  }
+  return updated;
+}
+
+export interface UpdateJobParamsInput {
+  set?: Record<string, string>;
+  delete?: string[];
+}
+
+/**
+ * Upsert / delete wp_lh_job_param rows. Refuses while status is processing.
+ */
+export async function updateJobParams(
+  property: string,
+  jobId: number,
+  input: UpdateJobParamsInput,
+): Promise<JobRow> {
+  const set = input.set ?? {};
+  const del = input.delete ?? [];
+  if (Object.keys(set).length === 0 && del.length === 0) {
+    throw new Error("Provide at least one parameter to set or delete");
+  }
+
+  const existing = await getJob(property, jobId);
+  if (!existing) {
+    throw new Error(`Job ${jobId} not found`);
+  }
+  if (existing.status === "processing") {
+    throw new Error(`Cannot modify parameters while job ${jobId} is processing`);
+  }
+
+  for (const [name, value] of Object.entries(set)) {
+    assertParamValue(name, value);
+  }
+  for (const name of del) {
+    if (!name || name.trim() === "") {
+      throw new Error("Parameter name to delete must be non-empty");
+    }
+  }
+
+  await withTransaction(property, async (conn) => {
+    for (const name of del) {
+      await conn.query(`DELETE FROM wp_lh_job_param WHERE job_id = ? AND name = ?`, [jobId, name]);
+    }
+    for (const [name, value] of Object.entries(set)) {
+      const [rows] = await conn.query<RowDataPacket[]>(
+        `SELECT job_param_id FROM wp_lh_job_param WHERE job_id = ? AND name = ? LIMIT 1`,
+        [jobId, name],
+      );
+      if (rows.length > 0) {
+        await conn.query(`UPDATE wp_lh_job_param SET value = ? WHERE job_id = ? AND name = ?`, [
+          value,
+          jobId,
+          name,
+        ]);
+      } else {
+        await conn.query(`INSERT INTO wp_lh_job_param (job_id, name, value) VALUES (?, ?, ?)`, [
+          jobId,
+          name,
+          value,
+        ]);
+      }
+    }
+    await conn.query(`UPDATE wp_lh_jobs SET last_updated_date = NOW() WHERE job_id = ?`, [jobId]);
+  });
+
+  const updated = await getJob(property, jobId);
+  if (!updated) {
+    throw new Error(`Job ${jobId} disappeared after param update`);
+  }
+  return updated;
 }

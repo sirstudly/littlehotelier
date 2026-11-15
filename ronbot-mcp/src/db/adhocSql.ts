@@ -37,7 +37,11 @@ export const KEY_TABLES = [
 ] as const;
 
 /** No longer written; use the replacement noted in TABLE_NOTES. */
-export const LEGACY_TABLES = ["wp_lh_calendar"] as const;
+export const LEGACY_TABLES = [
+  "wp_lh_calendar",
+  "wp_lh_scheduled_jobs",
+  "wp_lh_scheduled_job_param",
+] as const;
 
 const BOOKING_ASSIGNMENT_NOTES =
   "SCD2 snapshot of Cloudbeds bed assignments; the default source for cached booking/stay data. " +
@@ -61,6 +65,14 @@ export const TABLE_NOTES: Record<string, string> = {
     "Latest closed version of each guest assignment that no longer has a current row: cancellations, deletions and beds removed from a reservation (reservation_current_yn='Y' means the reservation still has other beds). removed_at is when it was closed. Backfilled cancellations show bed_status canceled/no_show; live cancellations keep their previous status.",
   wp_lh_calendar:
     "Legacy: per-job allocation snapshots, no longer written (stale, due to be dropped) — use wp_lh_booking_assignment / v_wp_lh_booking_* instead.",
+  wp_lh_scheduled_jobs:
+    "Legacy unused cron templates — processors poll job_scheduler instead. Prefer list_job_schedulers / get_job_scheduler.",
+  wp_lh_scheduled_job_param:
+    "Legacy unused params for wp_lh_scheduled_jobs — use job_scheduler_param / list_job_schedulers instead.",
+  job_scheduler:
+    "Live processor schedule rows (repeat_time_minutes or repeat_daily_at, active_yn). Prefer list_job_schedulers / get_job_scheduler MCP tools over ad-hoc SQL.",
+  job_scheduler_param:
+    "Params for job_scheduler rows (job_id, name, value). Prefer get_job_scheduler / update_job_scheduler.",
 };
 
 /** One-line pointer for tool descriptions. */
