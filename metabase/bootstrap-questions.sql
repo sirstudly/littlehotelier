@@ -1,6 +1,9 @@
 -- Reference queries for Metabase native questions (paste into Metabase).
 -- Prefer Metabase models + GUI once connected; use these when building native cards.
 -- Default window: last 90 days. Wire hostel/date as Metabase field filters or dashboard filters.
+--
+-- Adhoc / backoffice (Metabase DB display name "backoffice", not this warehouse file):
+-- EVL by booking source and similar ops SQL — docs/hostel-analytics-metabase.md.
 
 -- =============================================================================
 -- Booked-date performance

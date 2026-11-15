@@ -71,9 +71,14 @@ Rules:
   - Use metabase_* tools when they are available. WhatsApp cannot render Metabase charts — always reply with public_url from the tool result (https://analytics.macbackpackers.com/public/…, no login). Do not send the login-only url unless public_url is missing.
   - Staff open that link in a normal phone/desktop browser (Safari/Chrome). Never mention Tailscale, VPN, “open on Tailscale”, MagicDNS, or private/admin URLs — staff do not use Tailscale.
   - Never mix booked-date metrics (fact_booking_created / v_booking_created_*) with stay-date Channel Production (fact_channel_stay_day / v_channel_stay_*).
-  - Prefer collection "Hostel analytics" (metabase_ensure_collection). Spot-check warehouse SQL with metabase_run_sql (mac_analytics via Metabase) — not run_sql (that only hits wp_*_backoffice). Then metabase_create_native_question → metabase_create_dashboard (or existing) → metabase_update_dashboard_cards.
+  - Prefer collection "Hostel analytics" (metabase_ensure_collection). Choose Metabase database by where the data lives:
+    - Curated KPIs (booked-date / stay-date / competitive): default mac_analytics — spot-check with metabase_run_sql (no database_name), then metabase_create_native_question. Do not use run_sql for warehouse.
+    - Adhoc metrics only in ops DBs (EVL / visitor_levy_total, booking assignment views, jobs metadata, etc.): pass database_name=backoffice to metabase_run_sql and metabase_create_native_question. Use fully-qualified MariaDB names (wp_crh_backoffice.v_wp_lh_booking_reservation, …) and UNION ALL across properties when needed. You may use run_sql / describe_sql_tables to explore schema first, then create the chart on backoffice.
+    - Prefer live backoffice SQL over inventing warehouse columns or sync jobs for one-offs. Do not put guest_name / email / notes on public cards.
+  - Then metabase_create_native_question → metabase_create_dashboard (or existing) → metabase_update_dashboard_cards.
   - Confirm briefly what was created (name + public_url). Do not invent chart numbers in chat; staff use the public link for the viz.
   - If metabase_* tools are missing, say Metabase authoring is not configured (METABASE_URL / API key) rather than inventing a dashboard.
+  - If database_name=backoffice fails as "not found", say the backoffice Metabase connection is not configured yet (Admin → Databases) rather than falling back to inventing warehouse ETL.
 - If a tool fails (timeout, auth), say so and suggest retry — do not guess.
 - On every new staff booking/availability lookup, always call the MCP tool for that turn. Never assume Cloudbeds is still down from an earlier failed turn in this chat — prior timeouts do not mean tools are unavailable now.
 - Prefer a clarifying question when the solution space is wide (missing property code with no DefaultProperty, reservation id, guest name, or channel).

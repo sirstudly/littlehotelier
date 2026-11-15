@@ -149,14 +149,14 @@ METABASE_API_KEY=...
 | Tool | Purpose |
 |------|---------|
 | `metabase_list_collections` / `metabase_ensure_collection` | List or find/create a collection (default **Hostel analytics**) |
-| `metabase_list_databases` | Connected DBs (warehouse is usually `mac_analytics`) |
-| `metabase_run_sql` | Spot-check `mac_analytics` via Metabase `/api/dataset` (not backoffice `run_sql`) |
-| `metabase_create_native_question` | `POST /api/card` + enable public link |
+| `metabase_list_databases` | Connected DBs (`mac_analytics` warehouse; `backoffice` for live `wp_*`) |
+| `metabase_run_sql` | Spot-check via Metabase `/api/dataset` (default `mac_analytics`; pass `database_name=backoffice` for ops SQL) |
+| `metabase_create_native_question` | `POST /api/card` + enable public link (`database_name` as above) |
 | `metabase_create_dashboard` | Empty dashboard + enable public link |
 | `metabase_get_dashboard` | Read layout; ensure public link |
 | `metabase_update_dashboard_cards` | Append cards; return `public_url` |
 
-Tool results include `public_url` (`/public/dashboard|question/{uuid}`) for no-login WhatsApp sharing. Metric definitions: [`docs/hostel-analytics-metabase.md`](../docs/hostel-analytics-metabase.md).
+Tool results include `public_url` (`/public/dashboard|question/{uuid}`) for no-login WhatsApp sharing. Metric definitions and adhoc/backoffice routing: [`docs/hostel-analytics-metabase.md`](../docs/hostel-analytics-metabase.md). Curated KPIs use `mac_analytics`; EVL / booking-assignment charts use `database_name=backoffice` (Metabase Admin connection + `metabase_ops_ro` from [`scripts/apply-metabase-ops-ro.sh`](../scripts/apply-metabase-ops-ro.sh)).
 
 ### `run_sql` / `describe_sql_tables`
 

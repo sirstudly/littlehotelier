@@ -17,6 +17,7 @@ Stay-date matches the Cloudbeds Channel Production UI. Booked-date does **not**.
 |----------|------|
 | `mac_analytics` | Warehouse (facts + views). Collation `utf8mb4_general_ci`. |
 | `metabase` | Metabase application DB only (users, dashboards). Collation `utf8mb4_unicode_ci`. |
+| `wp_*_backoffice` | Live ops DBs (booking assignment, EVL, jobs, …). Queried by Metabase only via the separate **backoffice** connection (see Adhoc below). |
 
 DDL: [`src/main/config/migrations/2026-11-12-mac-analytics.sql`](../src/main/config/migrations/2026-11-12-mac-analytics.sql)  
 Phase 2 alter + match seeds: [`2026-11-15-mac-analytics-phase2.sql`](../src/main/config/migrations/2026-11-15-mac-analytics-phase2.sql)
@@ -34,6 +35,17 @@ CREATE USER IF NOT EXISTS 'metabase_app'@'%' IDENTIFIED BY '...';
 GRANT ALL PRIVILEGES ON metabase.* TO 'metabase_app'@'%';
 FLUSH PRIVILEGES;
 ```
+
+Adhoc Metabase charts against live backoffice SQL use a **separate** Metabase connection (keep `metabase_ro` warehouse-only). Preferred JDBC user:
+
+```bash
+# MYSQL_HOST + MYSQL_PWD (admin) required — see script header
+./scripts/apply-metabase-ops-ro.sh
+```
+
+That creates `metabase_ops_ro` with `SELECT, SHOW VIEW` on `wp_crh_backoffice`, `wp_hsh_backoffice`, `wp_rmb_backoffice`, `wp_lsh_backoffice` only (no DML/DDL; no `scotlandstophostels` unless added later). Store the password in gitignored `metabase/.credentials-notes`.
+
+Until that script is run with MariaDB admin, the Metabase **`backoffice`** connection may use the existing ops read-only user (`RONBOT_SQL_RO_*` / same SELECT grants). Rotate to `metabase_ops_ro` when admin is available.
 
 ## Collection jobs
 
@@ -89,10 +101,12 @@ docker compose up -d
 Set `MB_DB_HOST` to the MariaDB **Tailscale IP** if MagicDNS does not resolve inside the container. Admin login and warehouse `metabase_ro` password are in gitignored `metabase/.credentials-notes`. Site URL in Metabase Admin must be `https://analytics.macbackpackers.com`.
 
 1. Complete Metabase setup wizard (admin user).
-2. **Admin → Databases → Add** → MySQL → host = same as `MB_DB_HOST`, database `mac_analytics`, user `metabase_ro`.
+2. **Admin → Databases → Add** → MySQL → host = same as `MB_DB_HOST`, database `mac_analytics`, user `metabase_ro`. Display name should be `mac_analytics` (WhatsApp tools default to this name).
 3. Sync schema; mark models (see below).
+4. **Adhoc / backoffice (optional but required for EVL-style charts):** **Admin → Databases → Add** → MySQL → same host, **display name `backoffice`**, database `wp_crh_backoffice` (default schema only; native SQL may use fully-qualified `wp_*_backoffice.table`), user `metabase_ops_ro`. Sync schema. Grant the WhatsApp **API key** group permission to query this database.
 
 WhatsApp authoring uses `metabase_*` MCP tools and must share `public_url` only. For ad-hoc warehouse SQL outside Metabase, use MCP/`mac_analytics` or Cloudbeds tools as appropriate.
+
 
 ### Metabot / Ollama (same host)
 
@@ -111,9 +125,44 @@ Ship compose/env/docs via **git** (no rsync). Recreate **only** the Metabase Com
 
 ### WhatsApp authoring (ronbot)
 
-When `METABASE_URL` and `METABASE_API_KEY` are set on `ronbot-bridge`, ronbot-ops exposes `metabase_*` tools so staff can ask WhatsApp ronbot to create native-SQL questions and dashboards (REST `X-API-Key`, not Metabase MCP OAuth). Create the key in Metabase Admin → Authentication → API Keys (group that can edit collection **Hostel analytics** and query `mac_analytics`). New cards/dashboards get a **public link** automatically; WhatsApp replies should use `public_url` (no login). Set `METABASE_PUBLIC_URL` (and usually `METABASE_URL`) to the public HTTPS origin staff use (see local `AGENTS.md` for the real hostname). Admin → Settings → Public sharing must be enabled.
+When `METABASE_URL` and `METABASE_API_KEY` are set on `ronbot-bridge`, ronbot-ops exposes `metabase_*` tools so staff can ask WhatsApp ronbot to create native-SQL questions and dashboards (REST `X-API-Key`, not Metabase MCP OAuth). Create the key in Metabase Admin → Authentication → API Keys (group that can edit collection **Hostel analytics** and query **`mac_analytics` and `backoffice`**). New cards/dashboards get a **public link** automatically; WhatsApp replies should use `public_url` (no login). Set `METABASE_PUBLIC_URL` (and usually `METABASE_URL`) to the public HTTPS origin staff use (see local `AGENTS.md` for the real hostname). Admin → Settings → Public sharing must be enabled.
 
-Warehouse spot-checks use `metabase_run_sql` (Metabase `/api/dataset` on `mac_analytics`). Do **not** use `run_sql` for that — `run_sql` only queries `wp_*_backoffice` via `RONBOT_SQL_RO_*` (no `mac_analytics` grant). Rebuild **ronbot-bridge** only after pull — not processors.
+Warehouse spot-checks use `metabase_run_sql` (Metabase `/api/dataset` on `mac_analytics`). Do **not** use `run_sql` for that — `run_sql` only queries `wp_*_backoffice` via `RONBOT_SQL_RO_*` (no `mac_analytics` grant). For charts against live ops tables, pass `database_name=backoffice` to `metabase_run_sql` / `metabase_create_native_question`. Rebuild **ronbot-bridge** only after pull — not processors.
+
+## Adhoc / backoffice charts (beyond mac_analytics)
+
+Prefer **live native SQL** on the Metabase **`backoffice`** connection over new warehouse columns or sync jobs for one-off WhatsApp asks (EVL by source, assignment-view metrics, etc.).
+
+| Tier | When | How |
+|------|------|-----|
+| **1 — Live backoffice** (default) | Data already in `wp_*_backoffice` | Native SQL with fully-qualified names (`wp_crh_backoffice.v_wp_lh_booking_reservation`, …); `database_name=backoffice` |
+| **2 — Scratch table** | Cloudbeds-only / too heavy to re-run live | Materialize into `mac_analytics` as `adhoc_<slug>_<yyyymmdd>_<hhmm>`; chart on warehouse; **manual** `DROP` when done (no automated purge) |
+| **3 — Warehouse fact** | Recurring management KPI | New fact/column + sync job + bootstrap question |
+
+Example EVL takings by booking source (Edinburgh; Metabase DB display name `backoffice`):
+
+```sql
+SELECT property_code, booking_source,
+       SUM(visitor_levy_total) AS evl_folio_total,
+       COUNT(*) AS stays
+FROM (
+  SELECT 'crh' AS property_code, booking_source, visitor_levy_total, checkout_date
+  FROM wp_crh_backoffice.v_wp_lh_booking_reservation
+  UNION ALL
+  SELECT 'hsh', booking_source, visitor_levy_total, checkout_date
+  FROM wp_hsh_backoffice.v_wp_lh_booking_reservation
+  UNION ALL
+  SELECT 'rmb', booking_source, visitor_levy_total, checkout_date
+  FROM wp_rmb_backoffice.v_wp_lh_booking_reservation
+) t
+WHERE checkout_date >= '2026-07-24'
+  AND visitor_levy_total > 0
+GROUP BY property_code, booking_source;
+```
+
+Do not put guest_name / email / notes on public cards. Session `TEMPORARY` tables cannot back Metabase cards (new connection per query).
+
+**Deferred:** dedicated `mac_analytics_scratch` schema and a materialize MCP tool — add when a Tier 2 use case appears; until then name adhoc tables under `mac_analytics` with the `adhoc_` prefix and drop them manually.
 
 ## Metabase models & dashboards
 

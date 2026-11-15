@@ -2,6 +2,8 @@
 
 After Metabase is up and `mac_analytics` is connected as a MySQL database. Native SQL for every card lives in [`bootstrap-questions.sql`](bootstrap-questions.sql).
 
+For WhatsApp **adhoc** charts against live ops data (EVL, assignment views), also add a MySQL connection with display name **`backoffice`** (`metabase_ops_ro` → `wp_crh_backoffice` default; see [`docs/hostel-analytics-metabase.md`](../docs/hostel-analytics-metabase.md) and [`scripts/apply-metabase-ops-ro.sh`](../scripts/apply-metabase-ops-ro.sh)). That path is separate from these curated dashboards.
+
 ## Models
 
 1. **New → Model** from `v_booking_created_daily`  

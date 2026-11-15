@@ -1057,7 +1057,7 @@ export function createServer(): McpServer {
 
     server.tool(
       "metabase_list_databases",
-      "List Metabase connected databases (use id/name when creating native questions; warehouse is usually mac_analytics).",
+      "List Metabase connected databases (use id/name when creating native questions). Warehouse: mac_analytics. Adhoc ops SQL: backoffice.",
       {},
       async () => {
         try {
@@ -1091,7 +1091,7 @@ export function createServer(): McpServer {
 
     server.tool(
       "metabase_run_sql",
-      `Spot-check warehouse SQL against mac_analytics via Metabase (not the backoffice run_sql tool). Use before creating charts. MariaDB 10.11; rows capped (default 50, max ${ANALYTICS_HARD_MAX_ROWS}). Do not mix booked-date vs stay-date facts.`,
+      `Spot-check SQL via Metabase /api/dataset before creating charts (not the backoffice run_sql tool). Default database_name=mac_analytics (warehouse). For EVL / assignment-view / other ops-only metrics use database_name=backoffice (live wp_*_backoffice; fully-qualified table names OK). MariaDB 10.11; rows capped (default 50, max ${ANALYTICS_HARD_MAX_ROWS}). Do not mix booked-date vs stay-date facts.`,
       {
         sql: z.string().min(1).max(50000),
         database_id: z.number().int().positive().optional(),
@@ -1121,7 +1121,7 @@ export function createServer(): McpServer {
 
     server.tool(
       "metabase_create_native_question",
-      "Create a Metabase native-SQL question (card) and enable a public (no-login) link. Prefer MariaDB SQL against mac_analytics from docs/hostel-analytics-metabase.md and metabase/bootstrap-questions.sql. Spot-check with metabase_run_sql first. Returns public_url for WhatsApp (prefer over url).",
+      "Create a Metabase native-SQL question (card) and enable a public (no-login) link. Default database_name=mac_analytics (docs/hostel-analytics-metabase.md, metabase/bootstrap-questions.sql). For adhoc ops metrics (EVL, booking views, etc.) pass database_name=backoffice with fully-qualified wp_*_backoffice SQL. Spot-check with metabase_run_sql first. Returns public_url for WhatsApp (prefer over url).",
       {
         name: z.string().min(1).max(200),
         sql: z.string().min(1).max(50000),
