@@ -58,7 +58,7 @@ Edinburgh-only (CRH / HSH / RMB). Data from CRH processor jobs into `mac_analyti
 |------|-----|-------------|
 | GHS dorm price grid | Pivot / heatmap | `stay_date` × `competitor_name`, value = `lowest_bed_price`, `room_category='dorm'` |
 | GHS private price grid | Pivot / heatmap | Same for `room_category='private'` (may be empty until private prices are scraped) |
-| Our dorm vs market | Line | `our_lowest_dorm` vs `competitor_min_dorm` by `stay_date` |
+| GHS dorm prices by hostel | Line | `stay_date` × `lowest_bed_price`, **series = `competitor_name`**. Dashboard **View** preset: `our` / `cheapest3` / `dearest3` / `our_and_extremes` (default) / `custom`. Extremes = 3 lowest/highest competitor avg prices over next 30 stay-dates. **Hostels** multi-select used when View=`custom` |
 | HW search rank | Line | `position` over `search_date`, **series = Hostel** (CRH/HSH/RMB) |
 
 Live cards are created via Metabase API after scrapers populate facts (same pattern as Phase 1), not OSS serialization.

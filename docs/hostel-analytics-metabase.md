@@ -54,7 +54,7 @@ Scheduler seed (each `wp_*_backoffice`): [`2026-11-12-analytics-job-scheduler.sq
 - **LSH out of scope.** Accidental enqueues on HSH/RMB/LSH log-skip and complete.
 - Scheduler seed: [`2026-11-15-analytics-phase2-job-scheduler-crh.sql`](../src/main/config/migrations/2026-11-15-analytics-phase2-job-scheduler-crh.sql) → `wp_crh_backoffice` only.
 - Matching: `dim_property_match` (display names, aliases, HW numbers 551 / 552 / 11242).
-- GHS uses a **dedicated** Chrome profile (`chromeprofile/ghs`, compose mount on `crh-processor` only) — not the Cloudbeds profile. List scrape stores “Prices starting from £N” as **dorm** (hostel lowest); private rows when exposed.
+- GHS uses a **dedicated** Chrome profile (`chromeprofile/ghs`, compose mount on `crh-processor` only) — not the Cloudbeds profile. The `dates=` query param alone does **not** drive Google’s calendar; the scraper sets check-in/out via the UI and asserts the inputs match before parsing. List scrape stores “Prices starting from £N” as **dorm** (hostel lowest); private rows when exposed. Fully booked properties may vanish from results for that night (expected).
 - HW uses classic SSR search HTML (`/hostels/{city}?DateFrom&DateTo&NumberOfGuests`) via HtmlUnit (`webClientForHostelworld`); PWA `/pwa/wds/s` shells need JS.
 - MCP allowlist includes both jobs (optional params).
 - Metabase: **Competitive position** dashboard — GHS heatmap / own-vs-market lines / HW rank series. See [`metabase/dashboard-setup.md`](../metabase/dashboard-setup.md) + [`metabase/bootstrap-questions.sql`](../metabase/bootstrap-questions.sql).
@@ -141,7 +141,7 @@ Collection: **Hostel analytics**. Filters on both dashboards: Hostel + date rang
 **Competitive position** dashboard (Edinburgh / Phase 2):
 
 - GHS dorm (and private) price heatmap: stay_date × competitor
-- Line: our lowest dorm vs cheapest competitor dorm
+- Line: GHS dorm prices by hostel (`competitor_name` series) with **View** preset (`our` / `cheapest3` / `dearest3` / `our_and_extremes` / `custom`) and **Hostels** multi-select for `custom`
 - Line: Hostelworld search `position` over `search_date` for CRH / HSH / RMB
 - Remove any leftover “coming soon” text stubs from Booked/Stay dashboards
 

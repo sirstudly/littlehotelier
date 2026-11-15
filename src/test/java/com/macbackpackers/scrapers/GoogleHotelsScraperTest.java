@@ -8,6 +8,7 @@ import static org.hamcrest.Matchers.is;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -44,5 +45,22 @@ public class GoogleHotelsScraperTest {
         assertThat( GoogleHotelsScraper.looksLikeCaptcha( "<html>Prices starting from £10</html>" ), is( false ) );
         assertThat( GoogleHotelsScraper.looksLikeCaptcha( "Our systems have detected unusual traffic" ),
                 is( true ) );
+    }
+
+    @Test
+    public void formatDateLabel_matchesGoogleHotelsInput() {
+        assertThat( GoogleHotelsScraper.formatDateLabel( LocalDate.of( 2026, 11, 21 ) ),
+                is( "Sat, Nov 21" ) );
+        assertThat( GoogleHotelsScraper.formatDateLabel( LocalDate.of( 2026, 11, 29 ) ),
+                is( "Sun, Nov 29" ) );
+    }
+
+    @Test
+    public void buildSearchUrl_usesTravelSearchWithDates() {
+        String url = GoogleHotelsScraper.buildSearchUrl(
+                "Edinburgh", LocalDate.of( 2026, 11, 21 ), LocalDate.of( 2026, 11, 22 ) );
+        assertThat( url.contains( "/travel/search?" ), is( true ) );
+        assertThat( url.contains( "dates=2026-11-21,2026-11-22" ), is( true ) );
+        assertThat( url.contains( "curr=GBP" ), is( true ) );
     }
 }

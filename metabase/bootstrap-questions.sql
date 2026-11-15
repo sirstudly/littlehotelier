@@ -184,18 +184,54 @@ WHERE source = 'ghs'
   AND stay_date < CURDATE() + INTERVAL 30 DAY
 ORDER BY stay_date, competitor_name;
 
--- Our lowest dorm vs cheapest competitor dorm (by stay_date)
-SELECT
-  stay_date,
-  MIN(CASE WHEN is_own = 1 THEN lowest_bed_price END) AS our_lowest_dorm,
-  MIN(CASE WHEN is_own = 0 THEN lowest_bed_price END) AS competitor_min_dorm
+-- GHS dorm prices by hostel (line series = competitor_name).
+-- Metabase vars:
+--   {{preset}} text: our | cheapest3 | dearest3 | our_and_extremes | custom
+--   {{hostels}} field filter on competitor_name (only when preset=custom; must hit base table)
+-- Extremes ranked by AVG(lowest_bed_price) over the next 30 stay-dates (competitors only).
+WITH day_prices AS (
+  SELECT stay_date, competitor_name, lowest_bed_price, is_own
+  FROM fact_competitor_bed_price
+  WHERE source = 'ghs'
+    AND room_category = 'dorm'
+    AND stay_date >= CURDATE()
+    AND stay_date < CURDATE() + INTERVAL 30 DAY
+),
+avg_price AS (
+  SELECT competitor_name, MAX(is_own) AS is_own, AVG(lowest_bed_price) AS avg_price
+  FROM day_prices
+  GROUP BY competitor_name
+),
+ranked AS (
+  SELECT
+    competitor_name,
+    is_own,
+    avg_price,
+    CASE WHEN is_own = 0 THEN ROW_NUMBER() OVER (ORDER BY avg_price ASC) END AS cheap_rn,
+    CASE WHEN is_own = 0 THEN ROW_NUMBER() OVER (ORDER BY avg_price DESC) END AS dear_rn
+  FROM avg_price
+),
+wanted AS (
+  SELECT competitor_name
+  FROM ranked
+  WHERE
+    CASE LOWER(TRIM(/* {{preset}} */ 'our_and_extremes'))
+      WHEN 'cheapest3' THEN cheap_rn BETWEEN 1 AND 3
+      WHEN 'dearest3' THEN dear_rn BETWEEN 1 AND 3
+      WHEN 'our_and_extremes' THEN is_own = 1 OR cheap_rn BETWEEN 1 AND 3 OR dear_rn BETWEEN 1 AND 3
+      WHEN 'custom' THEN FALSE
+      ELSE is_own = 1
+    END
+)
+SELECT d.stay_date, d.competitor_name, d.lowest_bed_price
+FROM day_prices d
+JOIN wanted w ON w.competitor_name = d.competitor_name
+-- WHERE LOWER(TRIM({{preset}})) <> 'custom'
+UNION ALL
+SELECT stay_date, competitor_name, lowest_bed_price
 FROM fact_competitor_bed_price
-WHERE source = 'ghs'
-  AND room_category = 'dorm'
-  AND stay_date >= CURDATE()
-  AND stay_date < CURDATE() + INTERVAL 30 DAY
-GROUP BY stay_date
-ORDER BY stay_date;
+WHERE 1 = 0  -- live card: preset='custom' + [[AND {{hostels}}]]
+ORDER BY stay_date, competitor_name;
 
 -- Hostelworld search rank time series (CRH / HSH / RMB)
 SELECT
