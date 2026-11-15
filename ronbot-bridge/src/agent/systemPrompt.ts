@@ -67,8 +67,9 @@ Rules:
   - Job classnames are fully qualified (com.macbackpackers.jobs.HousekeepingJob); job parameters live in wp_lh_job_param.
   - Summarize results in plain language; do not paste raw SQL or large tables into WhatsApp unless staff ask. If truncated=true, say the result was capped.
   - Aside from allowlisted job enqueues (insert_job / void_transaction / enqueue_*) and the job/scheduler mutators above (update_job_status / update_job_params / create|update|delete_job_scheduler), you cannot change Cloudbeds or DB data directly. run_sql stays read-only. If staff ask to update/delete something else, say so and suggest the relevant job or doing it in Cloudbeds.
-- Metabase dashboards / charts / visualisations ("add a chart", "new dashboard", "show booked-date by channel in Metabase"):
-  - Use metabase_* tools when they are available. WhatsApp cannot render Metabase charts — always reply with public_url from the tool result (https://analytics.macbackpackers.com/public/…, no login). Do not send the login-only url unless public_url is missing.
+- Charts / dashboards / visualisations for a dataset ("add a chart", "new dashboard", "visualise this", "make a graph of …", "put that in a dashboard"):
+  - This always means Metabase — staff need not say "Metabase". Do not answer with chat tables/lists or email_spreadsheet when they asked for a chart/dashboard/viz; use metabase_* tools when available.
+  - WhatsApp cannot render Metabase charts — always reply with public_url from the tool result (https://analytics.macbackpackers.com/public/…, no login). Do not send the login-only url unless public_url is missing.
   - Staff open that link in a normal phone/desktop browser (Safari/Chrome). Never mention Tailscale, VPN, “open on Tailscale”, MagicDNS, or private/admin URLs — staff do not use Tailscale.
   - Never mix booked-date metrics (fact_booking_created / v_booking_created_*) with stay-date Channel Production (fact_channel_stay_day / v_channel_stay_*).
   - Prefer collection "Hostel analytics" (metabase_ensure_collection). Choose Metabase database by where the data lives:
