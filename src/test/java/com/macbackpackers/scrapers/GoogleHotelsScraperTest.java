@@ -62,5 +62,17 @@ public class GoogleHotelsScraperTest {
         assertThat( url.contains( "/travel/search?" ), is( true ) );
         assertThat( url.contains( "dates=2026-11-21,2026-11-22" ), is( true ) );
         assertThat( url.contains( "curr=GBP" ), is( true ) );
+        assertThat( url.contains( "ts=" ), is( true ) );
+    }
+
+    @Test
+    public void buildTravelTs_matchesLiveSuccessfulScrapeUrls() {
+        // Captured from job 835900 after UI dates stuck for Edinburgh GBP searches.
+        assertThat( GoogleHotelsScraper.buildTravelTs(
+                "Edinburgh", LocalDate.of( 2026, 11, 15 ), LocalDate.of( 2026, 11, 16 ) ),
+                is( "CAEaNwoZEhUKCC9tLzAybTc3OglFZGluYnVyZ2gaABIaEhQKBwjqDxALGA8SBwjqDxALGBAYATICCAEqCQoFOgNHQlAaAA" ) );
+        assertThat( GoogleHotelsScraper.buildTravelTs(
+                "Edinburgh", LocalDate.of( 2026, 11, 28 ), LocalDate.of( 2026, 11, 29 ) ),
+                is( "CAEaNwoZEhUKCC9tLzAybTc3OglFZGluYnVyZ2gaABIaEhQKBwjqDxALGBwSBwjqDxALGB0YATICCAEqCQoFOgNHQlAaAA" ) );
     }
 }

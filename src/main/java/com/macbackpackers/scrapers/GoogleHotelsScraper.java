@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -157,14 +158,89 @@ public class GoogleHotelsScraper {
     }
 
     /**
-     * Prefer {@code /travel/search} — {@code /travel/hotels/{city}} redirects there and the
-     * {@code dates=} param alone does not drive the calendar widget.
+     * Prefer {@code /travel/search}. The {@code dates=} query param alone is ignored when the
+     * Chrome profile has a cached range — include the protobuf {@code ts=} trip blob (same shape
+     * Google writes after a successful UI date change) so listings price for the requested stay.
      */
     public static String buildSearchUrl( String city, LocalDate checkin, LocalDate checkout ) {
         String q = URLEncoder.encode( city.trim() + " hostels", StandardCharsets.UTF_8 );
+        String ts = URLEncoder.encode( buildTravelTs( city.trim(), checkin, checkout ), StandardCharsets.UTF_8 );
         return "https://www.google.com/travel/search?q=" + q
                 + "&dates=" + checkin + "," + checkout
+                + "&ts=" + ts
                 + "&curr=GBP";
+    }
+
+    /**
+     * Builds the Google Travel {@code ts} URL parameter for a city hostel search in GBP.
+     * Edinburgh uses Knowledge Graph mid {@code /m/02m77}; other cities fall back to name-only
+     * (still better than dates= alone). Round-tripped against live successful scrape URLs.
+     */
+    static String buildTravelTs( String city, LocalDate checkin, LocalDate checkout ) {
+        String mid = edinburghMidFor( city );
+        byte[] place = concat( ld( 1, mid.getBytes( StandardCharsets.UTF_8 ) ),
+                ld( 7, city.getBytes( StandardCharsets.UTF_8 ) ) );
+        byte[] dest = ld( 1, concat( ld( 2, place ), ld( 3, new byte[0] ) ) );
+        int nights = (int) ( checkout.toEpochDay() - checkin.toEpochDay() );
+        byte[] dateRange = concat( ld( 1, dateMsg( checkin ) ), ld( 2, dateMsg( checkout ) ), vi( 3, nights ) );
+        byte[] dates = ld( 2, concat( ld( 2, dateRange ), ld( 6, vi( 1, 1 ) ) ) );
+        // Currency blob copied from live GBP searches: field1=':\x03GBP', field3 empty
+        byte[] currency = ld( 5, new byte[] {
+                0x0a, 0x05, 0x3a, 0x03, 0x47, 0x42, 0x50, 0x1a, 0x00 } );
+        byte[] root = concat( vi( 1, 1 ), ld( 3, concat( dest, dates ) ), currency );
+        return Base64.getUrlEncoder().withoutPadding().encodeToString( root );
+    }
+
+    private static String edinburghMidFor( String city ) {
+        if ( "Edinburgh".equalsIgnoreCase( city ) ) {
+            return "/m/02m77";
+        }
+        // Unknown city: empty mid still lets date fields apply; place name carries the query.
+        return "";
+    }
+
+    private static byte[] dateMsg( LocalDate d ) {
+        return concat( vi( 1, d.getYear() ), vi( 2, d.getMonthValue() ), vi( 3, d.getDayOfMonth() ) );
+    }
+
+    private static byte[] vi( int field, int value ) {
+        return concat( tag( field, 0 ), varint( value ) );
+    }
+
+    private static byte[] ld( int field, byte[] payload ) {
+        return concat( tag( field, 2 ), varint( payload.length ), payload );
+    }
+
+    private static byte[] tag( int field, int wire ) {
+        return varint( ( field << 3 ) | wire );
+    }
+
+    private static byte[] varint( int value ) {
+        int n = value;
+        byte[] buf = new byte[5];
+        int i = 0;
+        while ( ( n & ~0x7f ) != 0 ) {
+            buf[i++] = (byte) ( ( n & 0x7f ) | 0x80 );
+            n >>>= 7;
+        }
+        buf[i++] = (byte) n;
+        byte[] out = new byte[i];
+        System.arraycopy( buf, 0, out, 0, i );
+        return out;
+    }
+
+    private static byte[] concat( byte[]... parts ) {
+        int len = 0;
+        for ( byte[] p : parts ) {
+            len += p.length;
+        }
+        byte[] out = new byte[len];
+        int at = 0;
+        for ( byte[] p : parts ) {
+            System.arraycopy( p, 0, out, at, p.length );
+            at += p.length;
+        }
+        return out;
     }
 
     static String formatDateLabel( LocalDate date ) {
@@ -222,14 +298,20 @@ public class GoogleHotelsScraper {
     }
 
     private void typeStayDates( WebDriver driver, WebDriverWait wait, String expectedIn, String expectedOut ) {
-        WebElement checkinInput = wait.until(
-                ExpectedConditions.presenceOfElementLocated( By.cssSelector( "input[aria-label='Check-in']" ) ) );
+        // Prefer the topmost visible inputs — a date-picker dialog duplicates Check-in/out fields
+        // (job 835901: aria-describedby i6 covered by c0), and typing into the wrong one never sticks.
+        WebElement checkinInput = wait.until( d -> findVisibleDateInput( d, "Check-in" ) );
+        if ( checkinInput == null ) {
+            return;
+        }
         if ( isReadonlyDateInput( checkinInput ) ) {
             LOGGER.info( "GHS Check-in input is readonly; skipping keyboard entry" );
             return;
         }
-        WebElement checkoutInput = wait.until(
-                ExpectedConditions.presenceOfElementLocated( By.cssSelector( "input[aria-label='Check-out']" ) ) );
+        WebElement checkoutInput = findVisibleDateInput( driver, "Check-out" );
+        if ( checkoutInput == null ) {
+            return;
+        }
         typeDateInto( driver, checkinInput, expectedIn );
         typeDateInto( driver, checkoutInput, expectedOut );
         // Commit / blur so the SPA requeries
@@ -419,10 +501,10 @@ public class GoogleHotelsScraper {
 
     private boolean tryClickIsoDay( WebDriver driver, LocalDate day ) {
         String iso = day.toString();
+        // Scope to a visible dialog first when present — dozens of hidden grids share data-iso.
         List<WebElement> cells = driver.findElements( By.cssSelector(
-                "[data-iso='" + iso + "'], [data-ical*='" + iso + "']" ) );
-        // Prefer visible cells only — the page can keep dozens of hidden dialogs/grids in the DOM
-        // (job 835900 saw dialogs=86); JS-clicking a hidden cell returns "success" without changing UI.
+                "[role='dialog'] [data-iso='" + iso + "'], [role='dialog'] [data-ical*='" + iso + "'], "
+                        + "[data-iso='" + iso + "'], [data-ical*='" + iso + "']" ) );
         List<WebElement> visible = new ArrayList<>();
         for ( WebElement cell : cells ) {
             try {
@@ -434,10 +516,15 @@ public class GoogleHotelsScraper {
                 // stale — skip
             }
         }
+        String before = readDateInput( driver, "Check-in" ) + "|" + readDateInput( driver, "Check-out" );
         for ( WebElement cell : visible ) {
             try {
                 clickBypassingOverlay( driver, cell );
-                return true;
+                sleepQuietly( 300 );
+                String after = readDateInput( driver, "Check-in" ) + "|" + readDateInput( driver, "Check-out" );
+                if ( false == before.equals( after ) ) {
+                    return true;
+                }
             }
             catch ( Exception ignored ) {
                 // try next visible
@@ -565,13 +652,30 @@ public class GoogleHotelsScraper {
     }
 
     private static String readDateInput( WebDriver driver, String ariaLabel ) {
-        List<WebElement> inputs = driver.findElements(
-                By.cssSelector( "input[aria-label='" + ariaLabel + "']" ) );
-        if ( inputs.isEmpty() ) {
+        WebElement input = findVisibleDateInput( driver, ariaLabel );
+        if ( input == null ) {
             return "";
         }
-        String value = inputs.get( 0 ).getAttribute( "value" );
+        String value = input.getAttribute( "value" );
         return value == null ? "" : value.trim();
+    }
+
+    /** Last visible matching input wins (dialog fields sit above the summary bar duplicates). */
+    private static WebElement findVisibleDateInput( WebDriver driver, String ariaLabel ) {
+        List<WebElement> inputs = driver.findElements(
+                By.cssSelector( "input[aria-label='" + ariaLabel + "']" ) );
+        WebElement visible = null;
+        for ( WebElement input : inputs ) {
+            try {
+                if ( input.isDisplayed() ) {
+                    visible = input;
+                }
+            }
+            catch ( Exception ignored ) {
+                // stale
+            }
+        }
+        return visible;
     }
 
     /** Package-visible for unit tests. */
