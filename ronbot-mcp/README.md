@@ -47,6 +47,7 @@ Cloudbeds mutations are never done from MCP. DB writes are limited to allowliste
 | `ChargeNonRefundableBookingJob` | `reservation_id` |
 | `HostelworldPayNowPaymentJob` | `reservation_id` |
 | `AirbnbPrepaidPaymentJob` | `reservation_id` |
+| `AirbnbImportTransactionJob` | `confirmation_code` (optional `action`) |
 | `VoidFolioPaymentJob` | `reservation_id` plus `payment_id` or `transaction_id` (prefer `void_transaction`) |
 | `RunQuarterlyEvl6PlusNightsReportJob` | `email` (or alias accounts/hannah/jay/ron) |
 | `RunChannelProductionReportJob` | `year_month` (YYYY-MM), `to_emails` (comma-delimited; each entry may be an alias) |
