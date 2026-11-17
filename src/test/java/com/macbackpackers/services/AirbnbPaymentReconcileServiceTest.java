@@ -11,6 +11,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import com.macbackpackers.beans.AirbnbPayment;
+import com.macbackpackers.beans.cloudbeds.responses.Reservation;
 import com.macbackpackers.beans.cloudbeds.responses.TransactionRecord;
 import com.macbackpackers.jobs.AirbnbImportTransactionsJob;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -48,6 +49,35 @@ public class AirbnbPaymentReconcileServiceTest {
     }
 
     @Test
+    public void resolveRoomRatePlusVat_usesFolioWhenPresent() {
+        TransactionRecord rate = folioLine( "rate", "Room rate", "23.33" );
+        TransactionRecord vat = folioLine( "tax", "VAT", "4.67" );
+        Reservation res = new Reservation();
+        res.setChannelPriceListed( new BigDecimal( "999.00" ) );
+        BigDecimal total = AirbnbPaymentReconcileService.resolveRoomRatePlusVat(
+                Arrays.asList( rate, vat ), res );
+        assertThat( total, comparesEqualTo( new BigDecimal( "28.00" ) ) );
+    }
+
+    @Test
+    public void resolveRoomRatePlusVat_fallsBackToChannelPriceWhenFolioEmpty() {
+        Reservation res = new Reservation();
+        res.setReservationId( "190181178" );
+        res.setChannelPriceListed( new BigDecimal( "281.00" ) );
+        BigDecimal total = AirbnbPaymentReconcileService.resolveRoomRatePlusVat(
+                Collections.emptyList(), res );
+        assertThat( total, comparesEqualTo( new BigDecimal( "281.00" ) ) );
+    }
+
+    @Test
+    public void resolveRoomRatePlusVat_staysZeroWithoutFolioOrChannel() {
+        Reservation res = new Reservation();
+        BigDecimal total = AirbnbPaymentReconcileService.resolveRoomRatePlusVat(
+                Collections.emptyList(), res );
+        assertThat( total, comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
+    }
+
+    @Test
     public void knownPatterns_coverHsh2026Cases() {
         AirbnbPayment reservationOnly = new AirbnbPayment();
         reservationOnly.setHasReservation( "Y" );
@@ -76,6 +106,14 @@ public class AirbnbPaymentReconcileServiceTest {
         t.setPaid( paid );
         t.setNotes( notes );
         t.setDescription( notes );
+        return t;
+    }
+
+    private static TransactionRecord folioLine( String type, String description, String credit ) {
+        TransactionRecord t = new TransactionRecord();
+        t.setType( type );
+        t.setDescription( description );
+        t.setCredit( credit );
         return t;
     }
 }

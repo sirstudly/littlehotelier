@@ -30,7 +30,7 @@ import com.macbackpackers.scrapers.CloudbedsScraper;
 @Service
 public class AirbnbPaymentReconcileService {
 
-    private final Logger LOGGER = LoggerFactory.getLogger( getClass() );
+    private static final Logger LOGGER = LoggerFactory.getLogger( AirbnbPaymentReconcileService.class );
 
     static final BigDecimal TOLERANCE = new BigDecimal( "0.10" );
 
@@ -293,6 +293,28 @@ public class AirbnbPaymentReconcileService {
     private BigDecimal roomRatePlusVat( WebClient webClient, Reservation res ) throws IOException {
         List<TransactionRecord> txns = cloudbedsScraper.getTransactionsByReservation( webClient,
                 res.getReservationId() );
+        return resolveRoomRatePlusVat( txns, res );
+    }
+
+    /**
+     * Sums posted folio rate + VAT lines. Future stays often have none yet (Cloudbeds posts
+     * nightly around 02:01), so fall back to channel_price_listed which matches Airbnb gross.
+     */
+    static BigDecimal resolveRoomRatePlusVat( List<TransactionRecord> txns, Reservation res ) {
+        BigDecimal folio = sumFolioRoomRatePlusVat( txns );
+        if ( folio.compareTo( BigDecimal.ZERO ) != 0 ) {
+            return folio;
+        }
+        BigDecimal channel = res.getChannelPriceListed();
+        if ( channel != null && channel.compareTo( BigDecimal.ZERO ) > 0 ) {
+            LOGGER.debug( "No folio rate/VAT lines for {}; using channelPriceListed {}",
+                    res.getReservationId(), channel );
+            return channel.setScale( 2, RoundingMode.HALF_UP );
+        }
+        return folio;
+    }
+
+    static BigDecimal sumFolioRoomRatePlusVat( List<TransactionRecord> txns ) {
         BigDecimal total = BigDecimal.ZERO;
         for ( TransactionRecord txn : txns ) {
             if ( txn.isVoided() ) {
