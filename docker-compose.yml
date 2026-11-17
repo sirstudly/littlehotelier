@@ -262,9 +262,12 @@ services:
     volumes:
       - ./docker-entrypoint.sh:/docker-entrypoint.sh:ro
       - ./credentials/gcp-service-account.json:/app/credentials/gcp-service-account.json:ro
-      # Gmail used by POST /ronbot/{property}/alerts/email (must match RONBOT_ALERT_PROPERTY on ronbot-bridge).
-      # Writable: the Gmail client persists refreshed OAuth tokens here.
-      - ./credentials/${RONBOT_ALERT_PROPERTY:-crh}_gmail:/app/credentials/gmail
+      # Per-property Gmail (search + alerts). Writable: OAuth token refresh updates StoredCredential.
+      # PropertyContextRegistry overrides paths to /app/credentials/{prop}_gmail.
+      - ./credentials/crh_gmail:/app/credentials/crh_gmail
+      - ./credentials/hsh_gmail:/app/credentials/hsh_gmail
+      - ./credentials/rmb_gmail:/app/credentials/rmb_gmail
+      - ./credentials/lsh_gmail:/app/credentials/lsh_gmail
       - ./logs/crh:/app/logs/crh
       - ./logs/hsh:/app/logs/hsh
       - ./logs/rmb:/app/logs/rmb

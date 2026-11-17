@@ -23,6 +23,7 @@ Cloudbeds mutations are never done from MCP. DB writes are limited to allowliste
 | `search_logs` | Grep property log dirs |
 | `get_booking` | Booking search by visible id / OTA ref / guest name (calendar DB first for names, then Cloudbeds; returns a list) |
 | `search_reservations` | Live Cloudbeds reservation list by free text and/or stay/checkin/checkout/booked date ranges, statuses, OTA sources (read-api; max 1000 rows, 200 via ronbot-bridge) |
+| `search_gmail` | Search a hostel reception Gmail inbox (read-api → property `GmailService`; raw `q` and/or structured filters) |
 | `list_transactions` | Live folio lines (read-api; unique match required; includes `paymentId` for voids) |
 | `get_booking_timeline` | Live booking + transactions + job history (name queries: calendar first) |
 | `void_transaction` | Enqueue void of a folio payment (`VoidFolioPaymentJob`; staff must ask explicitly) |
@@ -137,6 +138,16 @@ Each value is either an address string or an object with the user's WhatsApp ide
 - Row cap: read-api default/hard max 1000; the MCP caps at `RONBOT_SEARCH_MAX_ROWS` (default 1000, set to 200 by ronbot-bridge); `max_rows` can only lower it
 - Returns `count`, `truncated` (more rows matched) and compact `reservations[]` rows (reservationId, identifier, thirdPartyIdentifier, status, names, source, dates, nights, bookingDate, grandTotal, balanceDue)
 - Use it to resolve name-based filters for SQL: guest names are NULL on older `wp_lh_booking_assignment` rows, so e.g. LSH "tour" bookings are found with `query=tour` + a date range, then `run_sql ... WHERE reservation_id IN (...)`.
+
+### `search_gmail`
+
+- Required: `property` (`crh`\|`hsh`\|`rmb`\|`lsh`)
+- Filters (at least one required): raw `q` (Gmail search syntax) and/or `from` / `to` / `subject` / `body` / `after` / `before` (`YYYY-MM-DD`) / `label` / `has_attachment`; or `message_id` to fetch one message from a prior result
+- Structured filters are AND-combined with `q` on read-api into a single Gmail `q` string
+- `max_results` default 10, hard max 100; `include_body` default false (body truncated to ~8k chars when true)
+- Proxies `GET /ronbot/{property}/gmail/search?...` on read-api → that property's `GmailService` (OAuth under `credentials/{prop}_gmail`)
+- Returns `property`, `query`, `count`, and `messages[]` (`id`, `threadId`, `from`, `to`, `subject`, `date`, `snippet`, `labelIds`, `attachmentNames`, optional `body`) — never attachment bytes
+- Hostel reception inboxes only; sending spreadsheets stays on `email_spreadsheet` (ronbot SMTP)
 
 ### Metabase authoring (`metabase_*`)
 

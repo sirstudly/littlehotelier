@@ -16,10 +16,12 @@ import com.google.api.services.gmail.GmailScopes;
 import com.google.api.services.gmail.model.ListMessagesResponse;
 import com.google.api.services.gmail.model.Message;
 import com.google.api.services.gmail.model.MessagePart;
+import com.google.api.services.gmail.model.MessagePartHeader;
 import com.google.api.services.gmail.model.Profile;
 import com.macbackpackers.beans.CardDetails;
 import com.macbackpackers.exceptions.MissingUserDataException;
 import com.macbackpackers.exceptions.UnrecoverableFault;
+import com.macbackpackers.ronbot.dto.GmailMessageDto;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -44,9 +46,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -585,6 +591,111 @@ public class GmailService {
         Message message = new Message();
         message.setRaw( encodedEmail );
         return message;
+    }
+
+    /** Max characters returned for a message body in {@link #searchMessages}. */
+    public static final int SEARCH_BODY_MAX_CHARS = 8000;
+
+    /** Hard cap for {@link #searchMessages} maxResults. */
+    public static final int SEARCH_MAX_RESULTS = 100;
+
+    /**
+     * Search the mailbox with a Gmail {@code q} string, or fetch a single message by id.
+     *
+     * @param q Gmail search query (ignored when {@code messageId} is set; may be blank only then)
+     * @param maxResults number of messages to return (clamped 1..{@link #SEARCH_MAX_RESULTS})
+     * @param includeBody when true, include truncated plain/HTML body
+     * @param messageId optional Gmail message id to fetch a single message
+     * @return non-null list (possibly empty)
+     * @throws IOException on Gmail API failure
+     */
+    public List<GmailMessageDto> searchMessages( String q, int maxResults, boolean includeBody, String messageId )
+            throws IOException {
+        Gmail service = connectAsClient();
+        int limit = Math.max( 1, Math.min( maxResults, SEARCH_MAX_RESULTS ) );
+        List<GmailMessageDto> results = new ArrayList<>();
+
+        if ( StringUtils.isNotBlank( messageId ) ) {
+            Message full = service.users().messages().get( GMAIL_USER, messageId.trim() )
+                    .setFormat( "full" )
+                    .execute();
+            results.add( toSearchDto( full, includeBody ) );
+            return results;
+        }
+
+        ListMessagesResponse listResponse = service.users().messages()
+                .list( GMAIL_USER )
+                .setQ( q )
+                .setMaxResults( (long) limit )
+                .execute();
+        List<Message> messages = listResponse.getMessages();
+        if ( messages == null || messages.isEmpty() ) {
+            return results;
+        }
+        for ( Message ref : messages ) {
+            // full format: headers + attachment filenames; body only copied when includeBody
+            Message full = service.users().messages().get( GMAIL_USER, ref.getId() )
+                    .setFormat( "full" )
+                    .execute();
+            results.add( toSearchDto( full, includeBody ) );
+        }
+        return results;
+    }
+
+    private GmailMessageDto toSearchDto( Message message, boolean includeBody ) {
+        GmailMessageDto dto = new GmailMessageDto();
+        dto.setId( message.getId() );
+        dto.setThreadId( message.getThreadId() );
+        dto.setSnippet( message.getSnippet() );
+        dto.setLabelIds( message.getLabelIds() );
+        dto.setFrom( headerValue( message, "From" ) );
+        dto.setTo( headerValue( message, "To" ) );
+        dto.setSubject( headerValue( message, "Subject" ) );
+        dto.setDate( headerValue( message, "Date" ) );
+        dto.setAttachmentNames( attachmentFilenames( message ) );
+        if ( includeBody ) {
+            String body = extractMessageBody( message );
+            if ( body != null && body.length() > SEARCH_BODY_MAX_CHARS ) {
+                body = body.substring( 0, SEARCH_BODY_MAX_CHARS ) + "…[truncated]";
+            }
+            dto.setBody( body );
+        }
+        return dto;
+    }
+
+    private static String headerValue( Message message, String name ) {
+        if ( message.getPayload() == null || message.getPayload().getHeaders() == null ) {
+            return null;
+        }
+        for ( MessagePartHeader header : message.getPayload().getHeaders() ) {
+            if ( name.equalsIgnoreCase( header.getName() ) ) {
+                return header.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static List<String> attachmentFilenames( Message message ) {
+        if ( message.getPayload() == null ) {
+            return Collections.emptyList();
+        }
+        Set<String> names = new LinkedHashSet<>();
+        collectAttachmentFilenames( message.getPayload(), names );
+        return names.isEmpty() ? Collections.emptyList() : new ArrayList<>( names );
+    }
+
+    private static void collectAttachmentFilenames( MessagePart part, Set<String> names ) {
+        if ( part == null ) {
+            return;
+        }
+        if ( StringUtils.isNotBlank( part.getFilename() ) ) {
+            names.add( part.getFilename() );
+        }
+        if ( part.getParts() != null ) {
+            for ( MessagePart child : part.getParts() ) {
+                collectAttachmentFilenames( child, names );
+            }
+        }
     }
 
     /**

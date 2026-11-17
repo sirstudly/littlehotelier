@@ -59,6 +59,7 @@ import com.macbackpackers.services.BasicCardMask;
                                 com.macbackpackers.ronbot.RunRonbotReadApi.class,
                                 com.macbackpackers.ronbot.PropertyContextRegistry.class,
                                 com.macbackpackers.ronbot.RonbotReadController.class,
+                                com.macbackpackers.ronbot.RonbotGmailController.class,
                                 com.macbackpackers.ronbot.RonbotReadService.class,
                                 com.macbackpackers.ronbot.RonbotAuthFilter.class,
                                 com.macbackpackers.ronbot.RonbotPropertyBootstrap.class

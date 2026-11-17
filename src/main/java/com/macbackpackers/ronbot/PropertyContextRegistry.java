@@ -59,6 +59,7 @@ public class PropertyContextRegistry {
                     throw new IllegalStateException( "Unknown ronbot property: " + key );
                 }
                 LOGGER.info( "Starting ronbot property context for {}", key );
+                String gmailDir = "/app/credentials/" + key + "_gmail";
                 ConfigurableApplicationContext child = new SpringApplicationBuilder( RonbotPropertyBootstrap.class )
                         .web( WebApplicationType.NONE )
                         .profiles( key, "ronbot-child" )
@@ -71,6 +72,9 @@ public class PropertyContextRegistry {
                                 "spring.main.lazy-initialization=false",
                                 // HtmlUnit-only reads — skip WebDriverManager / Chrome download
                                 "chrome.for.testing.enabled=false",
+                                // Container paths (override absolute application-*.properties)
+                                "user.credentials.directory=" + gmailDir,
+                                "gmail.oauth.client.id.file=" + gmailDir + "/client_secret_" + key + ".json",
                                 // Small pools: 4 properties × (txn + shared) must stay well under MySQL max_connections
                                 "db.poolsize.min=1",
                                 "db.poolsize.max=2",

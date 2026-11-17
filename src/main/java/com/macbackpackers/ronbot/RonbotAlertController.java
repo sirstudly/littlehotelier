@@ -20,8 +20,8 @@ import com.macbackpackers.services.GmailService;
 
 /**
  * Operational alerts (e.g. WhatsApp session down) sent from a property's Gmail account.
- * Only the property whose Gmail credentials are mounted at {@code /app/credentials/gmail}
- * in the read-api container can send.
+ * Uses the property child context's Gmail credentials at
+ * {@code /app/credentials/{property}_gmail} (mounted on ronbot-read-api).
  */
 @Profile( "ronbot-parent" )
 @RestController

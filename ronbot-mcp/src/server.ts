@@ -339,6 +339,77 @@ export function createServer(): McpServer {
     },
   );
 
+  const GMAIL_SEARCH_MAX = 100;
+
+  server.tool(
+    "search_gmail",
+    `Search a hostel reception Gmail inbox (crh/hsh/rmb/lsh) via ronbot-read-api. Required: property. Pass raw q (Gmail search syntax, e.g. from:alice@x.com newer_than:7d) and/or structured filters from/to/subject/body/after/before/label/has_attachment — filters are AND-combined with q. Or pass message_id to fetch one message from a prior search. max_results default 10, hard max ${GMAIL_SEARCH_MAX}. include_body default false (bodies truncated to 8k when true). Returns id, threadId, from, to, subject, date, snippet, labelIds, attachmentNames, optional body — never attachment bytes. Use for staff questions about emails in a hostel inbox; for "email me this" spreadsheet send use email_spreadsheet instead.`,
+    {
+      property: propertySchema,
+      q: z.string().min(1).optional(),
+      from: z.string().min(1).optional(),
+      to: z.string().min(1).optional(),
+      subject: z.string().min(1).optional(),
+      body: z.string().min(1).optional(),
+      after: isoDate.optional(),
+      before: isoDate.optional(),
+      label: z.string().min(1).optional(),
+      has_attachment: z.boolean().optional(),
+      message_id: z.string().min(1).optional(),
+      max_results: z.number().int().min(1).max(GMAIL_SEARCH_MAX).optional(),
+      include_body: z.boolean().optional(),
+    },
+    async (args) => {
+      try {
+        const hasFilter =
+          Boolean(args.q?.trim()) ||
+          Boolean(args.from?.trim()) ||
+          Boolean(args.to?.trim()) ||
+          Boolean(args.subject?.trim()) ||
+          Boolean(args.body?.trim()) ||
+          Boolean(args.after?.trim()) ||
+          Boolean(args.before?.trim()) ||
+          Boolean(args.label?.trim()) ||
+          args.has_attachment === true ||
+          Boolean(args.message_id?.trim());
+        if (!hasFilter) {
+          throw new Error(
+            "Provide q and/or from/to/subject/body/after/before/label/has_attachment, or message_id",
+          );
+        }
+        const result = await readApi.searchGmail({
+          property: args.property,
+          q: args.q,
+          from: args.from,
+          to: args.to,
+          subject: args.subject,
+          body: args.body,
+          after: args.after,
+          before: args.before,
+          label: args.label,
+          hasAttachment: args.has_attachment,
+          messageId: args.message_id,
+          maxResults: args.max_results ?? 10,
+          includeBody: args.include_body ?? false,
+        });
+        audit("search_gmail", {
+          property: args.property,
+          q: args.q ?? null,
+          message_id: args.message_id ?? null,
+          max_results: args.max_results ?? 10,
+          include_body: args.include_body ?? false,
+        });
+        return ok(result);
+      } catch (err) {
+        audit("search_gmail_failed", {
+          property: args.property,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return fail(err);
+      }
+    },
+  );
+
   server.tool(
     "get_availability",
     "Live Cloudbeds sellable availability (beds for dorms, rooms for privates) via ronbot-read-api. Pass properties for one or more hostels, or omit both properties and property to query all (crh/hsh/rmb/lsh) in one call. Optional from/to (YYYY-MM-DD, inclusive; defaults today→tomorrow). Do not issue multiple get_availability calls for a multi-property question — use one fan-out call.",

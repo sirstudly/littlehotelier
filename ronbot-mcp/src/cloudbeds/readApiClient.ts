@@ -158,6 +158,42 @@ export async function getOccupancy(params: {
   return request(`/ronbot/${property}/occupancy?${q}`);
 }
 
+export type GmailSearchParams = {
+  property: string;
+  q?: string;
+  from?: string;
+  to?: string;
+  subject?: string;
+  body?: string;
+  after?: string;
+  before?: string;
+  label?: string;
+  hasAttachment?: boolean;
+  messageId?: string;
+  maxResults?: number;
+  includeBody?: boolean;
+};
+
+/**
+ * Search a hostel reception Gmail inbox (read-api → property GmailService).
+ * Pass raw `q` and/or structured filters, or `messageId` to fetch one message.
+ */
+export async function searchGmail(params: GmailSearchParams): Promise<unknown> {
+  const { property, hasAttachment, maxResults, includeBody, ...rest } = params;
+  const q = new URLSearchParams();
+  for (const [key, value] of Object.entries(rest)) {
+    if (typeof value === "string" && value.trim()) {
+      q.set(key, value.trim());
+    }
+  }
+  if (hasAttachment === true) q.set("hasAttachment", "true");
+  if (hasAttachment === false) q.set("hasAttachment", "false");
+  if (maxResults != null) q.set("maxResults", String(maxResults));
+  if (includeBody === true) q.set("includeBody", "true");
+  const qs = q.toString();
+  return request(`/ronbot/${property}/gmail/search${qs ? `?${qs}` : ""}`);
+}
+
 export async function health(): Promise<unknown> {
   return request("/ronbot/health");
 }
