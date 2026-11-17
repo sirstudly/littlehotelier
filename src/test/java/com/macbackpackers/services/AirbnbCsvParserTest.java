@@ -56,6 +56,25 @@ public class AirbnbCsvParserTest {
         assertThat( AirbnbCsvParser.isAutoEligible( p ), is( false ) );
     }
 
+    @Test
+    public void pre2026StartDateIsBeforeScope() throws Exception {
+        String csv = HEADER
+                + "12/15/2025,Reservation,HMOLD2025,12/01/2025,12/14/2025,12/15/2025,Old Guest,10.00,1.50,11.50\n"
+                + "01/02/2026,Reservation,HMNEW2026,01/01/2026,01/01/2026,01/02/2026,New Guest,20.00,3.00,23.00\n";
+        ParseResult result = AirbnbCsvParser.parse( csv );
+        assertThat( result.getPayments(), hasSize( 2 ) );
+        AirbnbPayment oldRow = result.getPayments().stream()
+                .filter( p -> "HMOLD2025".equals( p.getConfirmationCode() ) ).findFirst().orElse( null );
+        AirbnbPayment newRow = result.getPayments().stream()
+                .filter( p -> "HMNEW2026".equals( p.getConfirmationCode() ) ).findFirst().orElse( null );
+        assertThat( oldRow, notNullValue() );
+        assertThat( newRow, notNullValue() );
+        assertThat( com.macbackpackers.jobs.AirbnbImportTransactionsJob.isBeforeScope( oldRow.getStartDate() ),
+                is( true ) );
+        assertThat( com.macbackpackers.jobs.AirbnbImportTransactionsJob.isBeforeScope( newRow.getStartDate() ),
+                is( false ) );
+    }
+
     /** Access package-visible helper without coupling test to job class load quirks. */
     static final class AirbnbImportTransactionsJobKnownPattern {
         static boolean isKnown( AirbnbPayment p ) {

@@ -1,5 +1,8 @@
 package com.macbackpackers.jobs;
 
+import java.sql.Date;
+import java.time.LocalDate;
+
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 
@@ -17,6 +20,9 @@ import com.macbackpackers.services.AirbnbPaymentReconcileService;
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.AirbnbImportTransactionsJob" )
 public class AirbnbImportTransactionsJob extends AbstractJob {
+
+    /** Import / page scope: start date on or after this day. */
+    public static final LocalDate SCOPE_FROM = LocalDate.of( 2026, 1, 1 );
 
     @Override
     public void processJob() throws Exception {
@@ -42,8 +48,15 @@ public class AirbnbImportTransactionsJob extends AbstractJob {
             }
         }
 
+        int skippedPre2026 = 0;
         int enqueued = 0;
         for ( AirbnbPayment row : parsed.getPayments() ) {
+            if ( isBeforeScope( row.getStartDate() ) ) {
+                skippedPre2026++;
+                LOGGER.info( "Skipping records older than 2026: {} (start {})",
+                        row.getConfirmationCode(), row.getStartDate() );
+                continue;
+            }
             row.setBatchId( batchId );
             row.setPostPaymentField( batch.getPostPaymentField() );
 
@@ -71,8 +84,14 @@ public class AirbnbImportTransactionsJob extends AbstractJob {
 
         batch.setStatus( "completed" );
         dao.updateAirbnbImportBatch( batch );
-        LOGGER.info( "Airbnb import batch {}: {} confirmation codes, {} child jobs enqueued",
-                batchId, parsed.getPayments().size(), enqueued );
+        LOGGER.info(
+                "Airbnb import batch {}: {} confirmation codes ({} skipped older than 2026), {} child jobs enqueued",
+                batchId, parsed.getPayments().size(), skippedPre2026, enqueued );
+    }
+
+    /** True when start date is present and before {@link #SCOPE_FROM}. */
+    public static boolean isBeforeScope( Date startDate ) {
+        return startDate != null && startDate.toLocalDate().isBefore( SCOPE_FROM );
     }
 
     /**
