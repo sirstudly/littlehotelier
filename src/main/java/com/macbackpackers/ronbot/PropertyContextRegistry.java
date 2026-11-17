@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.env.MapPropertySource;
 
 import com.macbackpackers.dao.WordPressDAO;
 import com.macbackpackers.scrapers.CloudbedsScraper;
@@ -59,10 +60,18 @@ public class PropertyContextRegistry {
                     throw new IllegalStateException( "Unknown ronbot property: " + key );
                 }
                 LOGGER.info( "Starting ronbot property context for {}", key );
+                // Per-property Gmail mounts on ronbot-read-api. Must win over
+                // @PropertySource application-*.properties (Builder.properties() is too weak).
                 String gmailDir = "/app/credentials/" + key + "_gmail";
+                Map<String, Object> gmailOverrides = new LinkedHashMap<>();
+                gmailOverrides.put( "user.credentials.directory", gmailDir );
+                gmailOverrides.put( "gmail.oauth.client.id.file",
+                        gmailDir + "/client_secret_" + key + ".json" );
                 ConfigurableApplicationContext child = new SpringApplicationBuilder( RonbotPropertyBootstrap.class )
                         .web( WebApplicationType.NONE )
                         .profiles( key, "ronbot-child" )
+                        .initializers( ctx -> ctx.getEnvironment().getPropertySources()
+                                .addFirst( new MapPropertySource( "ronbotGmailOverrides", gmailOverrides ) ) )
                         .properties(
                                 // Must stay a single profile name — LittleHotelierConfig loads
                                 // application-${spring.profiles.active}.properties
@@ -72,9 +81,6 @@ public class PropertyContextRegistry {
                                 "spring.main.lazy-initialization=false",
                                 // HtmlUnit-only reads — skip WebDriverManager / Chrome download
                                 "chrome.for.testing.enabled=false",
-                                // Container paths (override absolute application-*.properties)
-                                "user.credentials.directory=" + gmailDir,
-                                "gmail.oauth.client.id.file=" + gmailDir + "/client_secret_" + key + ".json",
                                 // Small pools: 4 properties × (txn + shared) must stay well under MySQL max_connections
                                 "db.poolsize.min=1",
                                 "db.poolsize.max=2",
@@ -85,7 +91,7 @@ public class PropertyContextRegistry {
                                 "db.connection.timeout.ms=15000" )
                         .run();
                 contexts.put( key, child );
-                LOGGER.info( "Property context ready: {}", key );
+                LOGGER.info( "Property context ready: {} (gmail dir {})", key, gmailDir );
             }
             if ( contexts.isEmpty() ) {
                 throw new IllegalStateException( "No ronbot property contexts started" );
