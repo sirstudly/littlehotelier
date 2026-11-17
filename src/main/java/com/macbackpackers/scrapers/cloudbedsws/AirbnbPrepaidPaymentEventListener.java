@@ -42,6 +42,9 @@ import com.macbackpackers.services.PaymentProcessorService;
  * {@link CreateAirbnbPrepaidPaymentJob} ({@code days_back=1}).</li>
  * </ul>
  * Depends on {@link CalculateEdinburghVisitorLevyForBookingJob} when EVL is enabled.
+ * <p>
+ * Skipped entirely when {@code hbo_airbnb_post_payment_field} is {@code amount} (default): prepaid
+ * amount then comes from CSV import, not {@code balanceDue − EVL} (≈gross).
  */
 @Component
 public class AirbnbPrepaidPaymentEventListener implements CloudbedsEventListener {
@@ -83,6 +86,11 @@ public class AirbnbPrepaidPaymentEventListener implements CloudbedsEventListener
     @Override
     public void onUpdate( String propertyId, CloudbedsCalendarUpdate update ) {
         if ( update == null ) {
+            return;
+        }
+        if ( false == dao.isAirbnbPostPaymentFieldGrossEarnings() ) {
+            LOGGER.debug( "Skipping Airbnb prepaid enqueue (hbo_airbnb_post_payment_field is amount; "
+                    + "wait for CSV import)" );
             return;
         }
         processReservationEvents( update.getAllReservationEvents() );

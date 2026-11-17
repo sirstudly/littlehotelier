@@ -531,6 +531,12 @@ public class PaymentProcessorService {
      */
     public synchronized void recordAirbnbPrepaidPayment( WebClient webClient, String reservationId,
             Integer excludeJobId ) throws Exception {
+        if ( false == wordpressDAO.isAirbnbPostPaymentFieldGrossEarnings() ) {
+            LOGGER.info( "Skipping Airbnb prepaid payment for reservation {} "
+                            + "(hbo_airbnb_post_payment_field is amount; wait for CSV import)",
+                    reservationId );
+            return;
+        }
         if ( wordpressDAO.hasRecentAirbnbPrepaidPaymentJobForReservation( reservationId,
                 WordPressDAO.CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS, excludeJobId ) ) {
             LOGGER.info( "An Airbnb prepaid payment for reservation {} was already attempted within "

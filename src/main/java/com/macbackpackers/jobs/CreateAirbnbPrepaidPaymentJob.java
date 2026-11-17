@@ -20,6 +20,9 @@ import com.macbackpackers.services.PaymentProcessorService;
 /**
  * Scans recent Airbnb (API) channel-collect bookings and enqueues {@link AirbnbPrepaidPaymentJob}s
  * for those that still need a prepaid folio payment or whose folio no longer looks healthy.
+ * <p>
+ * No-op when {@code hbo_airbnb_post_payment_field} is {@code amount} (default): wait for CSV import
+ * rather than posting {@code balanceDue − EVL} (≈gross).
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.CreateAirbnbPrepaidPaymentJob" )
@@ -41,6 +44,11 @@ public class CreateAirbnbPrepaidPaymentJob extends AbstractJob {
     @Override
     @Transactional
     public void processJob() throws Exception {
+        if ( false == dao.isAirbnbPostPaymentFieldGrossEarnings() ) {
+            LOGGER.info( "Skipping CreateAirbnbPrepaidPaymentJob "
+                    + "(hbo_airbnb_post_payment_field is amount; wait for CSV import)" );
+            return;
+        }
         cbScraper.getReservationsForBookingSources( cbWebClient, null, null,
                 LocalDate.now().minusDays( getDaysBack() ), LocalDate.now(),
                 AirbnbPrepaidPaymentCriteria.ELIGIBLE_SOURCE_NAMES )

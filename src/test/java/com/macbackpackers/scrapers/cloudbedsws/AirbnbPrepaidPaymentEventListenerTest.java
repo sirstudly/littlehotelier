@@ -69,7 +69,23 @@ public class AirbnbPrepaidPaymentEventListenerTest {
         when( dao.hasAirbnbPrepaidPaymentJobForReservation( anyString() ) ).thenReturn( false );
         when( dao.hasPendingCreateAirbnbPrepaidPaymentJob() ).thenReturn( false );
         when( dao.hasActiveAirbnbPaymentImportForReservation( anyString() ) ).thenReturn( false );
+        when( dao.isAirbnbPostPaymentFieldGrossEarnings() ).thenReturn( true );
         when( evlSupport.findOrCreatePendingJob( anyString() ) ).thenReturn( null );
+    }
+
+    @Test
+    public void onUpdate_skipsWhenPostPaymentFieldIsAmount() throws Exception {
+        when( dao.isAirbnbPostPaymentFieldGrossEarnings() ).thenReturn( false );
+
+        CloudbedsCalendarEvent assigned = airbnbEvent( "evt-1", "190514833", "112559-1" );
+        CloudbedsCalendarUpdate update = new CloudbedsCalendarUpdate();
+        update.setPayloadAction( "changes" );
+        update.setEvents( Collections.singletonList( assigned ) );
+
+        listener.onUpdate( PROPERTY_ID, update );
+
+        verify( dao, never() ).insertJob( any() );
+        verify( scraper, never() ).lookupAirbnbPrepaidSubSourceIds( any() );
     }
 
     @Test

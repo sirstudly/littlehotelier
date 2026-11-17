@@ -215,6 +215,13 @@ public interface WordPressDAO {
     boolean hasPendingCreateAirbnbPrepaidPaymentJob();
 
     /**
+     * True when {@code hbo_airbnb_post_payment_field} is {@code gross_earnings}.
+     * Auto {@code AirbnbPrepaidPaymentJob} posts {@code balanceDue − EVL} (≈gross); when the option
+     * is {@code amount} (WordPress default), skip auto prepaid and wait for CSV import.
+     */
+    boolean isAirbnbPostPaymentFieldGrossEarnings();
+
+    /**
      * True if a pending {@code BookingAssignmentEnrichJob} exists for the reservation
      * (status {@code submitted}, {@code processing}, or {@code retry}).
      *

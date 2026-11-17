@@ -467,6 +467,13 @@ public class WordPressDAOImpl implements WordPressDAO {
     }
 
     @Override
+    public boolean isAirbnbPostPaymentFieldGrossEarnings() {
+        String field = StringUtils.defaultIfBlank( getOption( "hbo_airbnb_post_payment_field" ),
+                AirbnbPayment.FIELD_AMOUNT );
+        return AirbnbPayment.FIELD_GROSS.equalsIgnoreCase( field );
+    }
+
+    @Override
     public boolean hasBookingAssignmentEnrichJobForReservation( String reservationId ) {
         if ( StringUtils.isBlank( reservationId ) ) {
             return false;
