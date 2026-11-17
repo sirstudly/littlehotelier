@@ -141,6 +141,13 @@ public class AirbnbPaymentReconcileService {
 
     private ReconcileResult reconcileReservationOnly( WebClient webClient, AirbnbPayment payment,
             Reservation res, String action ) throws Exception {
+        // Airbnb may still report a Reservation payout after Cloudbeds canceled/no-showed and
+        // wiped rates — never post prepaid / service-fee adjust onto those folios.
+        if ( res.isCanceledOrNoShow() ) {
+            return new ReconcileResult( AirbnbPayment.STATUS_NEEDS_REVIEW,
+                    "Reservation payout but Cloudbeds booking is " + res.getStatus() );
+        }
+
         boolean useGross = AirbnbPayment.FIELD_GROSS.equalsIgnoreCase( payment.getPostPaymentField() )
                 || ACTION_POST_GROSS.equals( action );
         if ( ACTION_POST_AMOUNT.equals( action ) ) {
@@ -152,23 +159,25 @@ public class AirbnbPaymentReconcileService {
         BigDecimal serviceFee = nullToZero( payment.getServiceFee() );
         BigDecimal gross = nullToZero( payment.getGrossEarnings() );
 
+        List<TransactionRecord> txns = cloudbedsScraper.getTransactionsByReservation( webClient,
+                res.getReservationId() );
         if ( false == useGross && gross.compareTo( BigDecimal.ZERO ) > 0 ) {
-            BigDecimal roomTotal = roomRatePlusVat( webClient, res );
+            BigDecimal folioRates = sumFolioRoomRatePlusVat( txns );
+            BigDecimal roomTotal = resolveRoomRatePlusVat( txns, res );
             if ( false == withinTolerance( roomTotal, gross ) ) {
                 return new ReconcileResult( AirbnbPayment.STATUS_NEEDS_REVIEW,
                         "Room rate+VAT " + roomTotal + " does not match Gross earnings " + gross );
             }
+            // Only write down revenue when folio still has rate lines to adjust against.
             if ( serviceFee.compareTo( BigDecimal.ZERO ) > 0
-                    && false == hasServiceFeeAdjust( webClient, res ) ) {
+                    && folioRates.compareTo( BigDecimal.ZERO ) > 0
+                    && false == hasServiceFeeAdjust( txns ) ) {
                 // Cloudbeds Adjust Charge → Manual room revenue: positive amount writes down
                 // revenue (negative credit on the folio). UI only accepts positive values.
                 cloudbedsScraper.addManualRoomRevenueAdjust( webClient, res, serviceFee,
                         CloudbedsScraper.AIRBNB_SERVICE_FEE_ADJUST_NOTE );
             }
         }
-
-        List<TransactionRecord> txns = cloudbedsScraper.getTransactionsByReservation( webClient,
-                res.getReservationId() );
         List<TransactionRecord> airbnbPayments = airbnbPaymentLines( txns );
         List<TransactionRecord> unsafeCredits = unsafeNonAirbnbPaymentCredits( txns );
         if ( false == unsafeCredits.isEmpty() && false == ACTION_VOID_REPOST.equals( action ) ) {
@@ -290,19 +299,18 @@ public class AirbnbPaymentReconcileService {
                 "After voiding prepaid, balanceDue=" + balanceDue );
     }
 
-    private BigDecimal roomRatePlusVat( WebClient webClient, Reservation res ) throws IOException {
-        List<TransactionRecord> txns = cloudbedsScraper.getTransactionsByReservation( webClient,
-                res.getReservationId() );
-        return resolveRoomRatePlusVat( txns, res );
-    }
-
     /**
      * Sums posted folio rate + VAT lines. Future stays often have none yet (Cloudbeds posts
-     * nightly around 02:01), so fall back to channel_price_listed which matches Airbnb gross.
+     * nightly around 02:01), so for live bookings fall back to channel_price_listed (matches
+     * Airbnb gross). Never fall back for canceled/no_show — channel price stays set after rates
+     * are wiped and would incorrectly authorize posting.
      */
     static BigDecimal resolveRoomRatePlusVat( List<TransactionRecord> txns, Reservation res ) {
         BigDecimal folio = sumFolioRoomRatePlusVat( txns );
         if ( folio.compareTo( BigDecimal.ZERO ) != 0 ) {
+            return folio;
+        }
+        if ( false == isLiveBookingForRoomRateFallback( res ) ) {
             return folio;
         }
         BigDecimal channel = res.getChannelPriceListed();
@@ -314,7 +322,14 @@ public class AirbnbPaymentReconcileService {
         return folio;
     }
 
-    static BigDecimal sumFolioRoomRatePlusVat( List<TransactionRecord> txns ) {
+    /** confirmed / checked_in / checked_out — safe to use channel_price_listed when folio rates absent. */
+    static boolean isLiveBookingForRoomRateFallback( Reservation res ) {
+        String status = StringUtils.defaultString( res.getStatus() ).toLowerCase();
+        return "confirmed".equals( status ) || "checked_in".equals( status )
+                || "checked_out".equals( status );
+    }
+
+    public static BigDecimal sumFolioRoomRatePlusVat( List<TransactionRecord> txns ) {
         BigDecimal total = BigDecimal.ZERO;
         for ( TransactionRecord txn : txns ) {
             if ( txn.isVoided() ) {
@@ -333,8 +348,8 @@ public class AirbnbPaymentReconcileService {
         return total.setScale( 2, RoundingMode.HALF_UP );
     }
 
-    private boolean hasServiceFeeAdjust( WebClient webClient, Reservation res ) throws IOException {
-        return cloudbedsScraper.getTransactionsByReservation( webClient, res.getReservationId() ).stream()
+    static boolean hasServiceFeeAdjust( List<TransactionRecord> txns ) {
+        return txns.stream()
                 .filter( t -> false == t.isVoided() )
                 .anyMatch( t -> StringUtils.containsIgnoreCase( t.getNotes(),
                         CloudbedsScraper.AIRBNB_SERVICE_FEE_ADJUST_NOTE )

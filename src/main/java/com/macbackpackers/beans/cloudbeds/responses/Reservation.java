@@ -643,7 +643,7 @@ public class Reservation extends CloudbedsJsonResponse {
     }
 
     public boolean isCanceledOrNoShow() {
-        return "canceled".equals( getStatus() ) || "no_show".equals( getStatus() );
+        return "canceled".equalsIgnoreCase( getStatus() ) || "no_show".equalsIgnoreCase( getStatus() );
     }
 
     /**

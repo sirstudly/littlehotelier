@@ -60,9 +60,10 @@ public class AirbnbPaymentReconcileServiceTest {
     }
 
     @Test
-    public void resolveRoomRatePlusVat_fallsBackToChannelPriceWhenFolioEmpty() {
+    public void resolveRoomRatePlusVat_fallsBackToChannelPriceWhenFolioEmptyOnLiveBooking() {
         Reservation res = new Reservation();
         res.setReservationId( "190181178" );
+        res.setStatus( "confirmed" );
         res.setChannelPriceListed( new BigDecimal( "281.00" ) );
         BigDecimal total = AirbnbPaymentReconcileService.resolveRoomRatePlusVat(
                 Collections.emptyList(), res );
@@ -70,8 +71,62 @@ public class AirbnbPaymentReconcileServiceTest {
     }
 
     @Test
+    public void resolveRoomRatePlusVat_doesNotFallBackWhenCanceledOrNoShow() {
+        Reservation canceled = new Reservation();
+        canceled.setStatus( "canceled" );
+        canceled.setChannelPriceListed( new BigDecimal( "187.00" ) );
+        assertThat( AirbnbPaymentReconcileService.resolveRoomRatePlusVat(
+                Collections.emptyList(), canceled ),
+                comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
+
+        Reservation noShow = new Reservation();
+        noShow.setStatus( "no_show" );
+        noShow.setChannelPriceListed( new BigDecimal( "23.00" ) );
+        assertThat( AirbnbPaymentReconcileService.resolveRoomRatePlusVat(
+                Collections.emptyList(), noShow ),
+                comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
+    }
+
+    @Test
+    public void isLiveBookingForRoomRateFallback_onlyConfirmedCheckedInCheckedOut() {
+        assertThat( AirbnbPaymentReconcileService.isLiveBookingForRoomRateFallback(
+                reservationWithStatus( "confirmed" ) ), is( true ) );
+        assertThat( AirbnbPaymentReconcileService.isLiveBookingForRoomRateFallback(
+                reservationWithStatus( "checked_in" ) ), is( true ) );
+        assertThat( AirbnbPaymentReconcileService.isLiveBookingForRoomRateFallback(
+                reservationWithStatus( "checked_out" ) ), is( true ) );
+        assertThat( AirbnbPaymentReconcileService.isLiveBookingForRoomRateFallback(
+                reservationWithStatus( "canceled" ) ), is( false ) );
+        assertThat( AirbnbPaymentReconcileService.isLiveBookingForRoomRateFallback(
+                reservationWithStatus( "no_show" ) ), is( false ) );
+    }
+
+    @Test
+    public void hasServiceFeeAdjust_matchesRonbotNote() {
+        TransactionRecord adjust = folioLine( "adjustment", "Room Revenue - Manual", "-8.68" );
+        adjust.setNotes( CloudbedsScraper.AIRBNB_SERVICE_FEE_ADJUST_NOTE );
+        assertThat( AirbnbPaymentReconcileService.hasServiceFeeAdjust(
+                Collections.singletonList( adjust ) ), is( true ) );
+        assertThat( AirbnbPaymentReconcileService.hasServiceFeeAdjust(
+                Collections.emptyList() ), is( false ) );
+    }
+
+    @Test
+    public void sumFolioRoomRatePlusVat_ignoresServiceFeeAdjust() {
+        TransactionRecord rate = folioLine( "rate", "Room rate", "20.00" );
+        TransactionRecord adjust = folioLine( "adjustment", "Room Revenue - Manual", "-3.57" );
+        adjust.setNotes( CloudbedsScraper.AIRBNB_SERVICE_FEE_ADJUST_NOTE );
+        assertThat( AirbnbPaymentReconcileService.sumFolioRoomRatePlusVat(
+                Arrays.asList( rate, adjust ) ),
+                comparesEqualTo( new BigDecimal( "20.00" ) ) );
+        assertThat( AirbnbPaymentReconcileService.sumFolioRoomRatePlusVat( Collections.emptyList() ),
+                comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
+    }
+
+    @Test
     public void resolveRoomRatePlusVat_staysZeroWithoutFolioOrChannel() {
         Reservation res = new Reservation();
+        res.setStatus( "confirmed" );
         BigDecimal total = AirbnbPaymentReconcileService.resolveRoomRatePlusVat(
                 Collections.emptyList(), res );
         assertThat( total, comparesEqualTo( BigDecimal.ZERO.setScale( 2 ) ) );
@@ -97,6 +152,12 @@ public class AirbnbPaymentReconcileServiceTest {
         cancellation.setHasCancellationFee( "Y" );
         cancellation.setAmount( new BigDecimal( "-37.57" ) );
         assertThat( AirbnbImportTransactionsJob.isKnownPattern( cancellation ), is( true ) );
+    }
+
+    private static Reservation reservationWithStatus( String status ) {
+        Reservation res = new Reservation();
+        res.setStatus( status );
+        return res;
     }
 
     private static TransactionRecord payment( String paymentType, String paid, String notes ) {

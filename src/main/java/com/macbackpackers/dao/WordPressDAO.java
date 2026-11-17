@@ -121,6 +121,14 @@ public interface WordPressDAO {
     boolean hasCalculateEdinburghVisitorLevyJobForReservation( String reservationId );
 
     /**
+     * True if a pending {@code VoidAirbnbServiceFeeOnCancelJob} exists for the reservation
+     * (status {@code submitted}, {@code processing}, or {@code retry}).
+     *
+     * @param reservationId Cloudbeds reservation id
+     */
+    boolean hasPendingVoidAirbnbServiceFeeOnCancelJobForReservation( String reservationId );
+
+    /**
      * Minimum hours between Hostelworld Pay Now / Airbnb prepaid payment job attempts for the
      * same reservation (enqueue + execution cooldown).
      */

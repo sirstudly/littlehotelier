@@ -1129,6 +1129,48 @@ public class CloudbedsScraper {
     public static final String AIRBNB_RESOLUTION_REFUND_DESCRIPTION = "Airbnb resolution adjustment -ronbot";
 
     /**
+     * Voids voidable Manual room-revenue adjustments tagged with
+     * {@link #AIRBNB_SERVICE_FEE_ADJUST_NOTE}.
+     *
+     * @return number of folio lines voided
+     */
+    public int voidAirbnbServiceFeeAdjustments( WebClient webClient, String reservationId ) throws IOException {
+        List<TransactionRecord> voidable = listVoidableAirbnbServiceFeeAdjustments(
+                getTransactionsByReservation( webClient, reservationId ) );
+        int voided = 0;
+        for ( TransactionRecord txn : voidable ) {
+            voidAdjustment( webClient, reservationId, txn.getId() );
+            voided++;
+        }
+        return voided;
+    }
+
+    /**
+     * Voidable adjustment lines whose notes/description contain the Airbnb service-fee ronbot tag.
+     */
+    public static List<TransactionRecord> listVoidableAirbnbServiceFeeAdjustments(
+            List<TransactionRecord> records ) {
+        List<TransactionRecord> out = new ArrayList<>();
+        if ( records == null ) {
+            return out;
+        }
+        for ( TransactionRecord record : records ) {
+            if ( record == null || record.isVoided() || false == record.isVoidable() ) {
+                continue;
+            }
+            if ( false == "adjustment".equalsIgnoreCase( record.getType() ) ) {
+                continue;
+            }
+            if ( StringUtils.containsIgnoreCase( record.getNotes(), AIRBNB_SERVICE_FEE_ADJUST_NOTE )
+                    || StringUtils.containsIgnoreCase( record.getDescription(),
+                            AIRBNB_SERVICE_FEE_ADJUST_NOTE ) ) {
+                out.add( record );
+            }
+        }
+        return out;
+    }
+
+    /**
      * Folio Adjust Charge → Manual room revenue. Pass a positive amount to write down Airbnb
      * commission without changing nightly rates (EVL stays on gross). Cloudbeds only accepts
      * positive values; they post as a negative credit on the folio.

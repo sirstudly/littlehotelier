@@ -49,6 +49,11 @@
     "requiredParams": ["confirmation_code"],
     "description": "Reconcile one Airbnb import payment row (confirmation code) against the Cloudbeds folio; optional action=auto|post_amount|post_gross|void_repost|mark_processed|mark_ignored"
   },
+  "VoidAirbnbServiceFeeOnCancelJob": {
+    "classname": "com.macbackpackers.jobs.VoidAirbnbServiceFeeOnCancelJob",
+    "requiredParams": ["reservation_id"],
+    "description": "Void ronbot Airbnb service-fee room-revenue adjusts on canceled/no-show bookings after Cloudbeds has cleared folio rate+VAT lines"
+  },
   "RunQuarterlyEvl6PlusNightsReportJob": {
     "classname": "com.macbackpackers.jobs.RunQuarterlyEvl6PlusNightsReportJob",
     "requiredParams": ["email"],
