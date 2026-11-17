@@ -749,8 +749,9 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
-     * Folio Adjust Charge → Manual room revenue ({@code roomRevenue_manual}). Amount may be
-     * negative to reduce the balance (e.g. Airbnb host service fee write-down).
+     * Folio Adjust Charge → Manual room revenue ({@code roomRevenue_manual}). Pass a positive
+     * amount to write down revenue / reduce balance due (e.g. Airbnb host service fee). Matches
+     * the UI, which only accepts positive amounts.
      */
     public WebRequest createAddManualRoomRevenueAdjustRequest( Reservation res, String bookingRoomId,
             BigDecimal amount, String notes, String billingPortalId, String frontVersion )

@@ -18,7 +18,7 @@ import com.macbackpackers.dao.WordPressDAO;
 public class CloudbedsJsonRequestFactoryAirbnbManualRoomRevenueTest {
 
     @Test
-    public void createAddManualRoomRevenueAdjustRequest_usesRoomRevenueManualAndNegativeAmount()
+    public void createAddManualRoomRevenueAdjustRequest_usesRoomRevenueManualAndPositiveAmount()
             throws Exception {
         WordPressDAO dao = mock( WordPressDAO.class );
         when( dao.getOption( "hbo_cloudbeds_property_id" ) ).thenReturn( "17363" );
@@ -37,13 +37,14 @@ public class CloudbedsJsonRequestFactoryAirbnbManualRoomRevenueTest {
         res.setIsHotelCollectBooking( "0" );
         res.setIsRootSource( "1" );
 
+        // UI / HAR: positive amount → negative credit (write-down)
         WebRequest req = factory.createAddManualRoomRevenueAdjustRequest(
-                res, "243912807", new BigDecimal( "-3.57" ),
+                res, "243912807", new BigDecimal( "3.57" ),
                 CloudbedsScraper.AIRBNB_SERVICE_FEE_ADJUST_NOTE, "portal-1", "2" );
 
         assertThat( req.getUrl().toString(), containsString( "add_new_adjust" ) );
         assertThat( param( req, "adjust[id]" ), is( "roomRevenue_manual" ) );
-        assertThat( param( req, "adjust[amount]" ), is( "-3.57" ) );
+        assertThat( param( req, "adjust[amount]" ), is( "3.57" ) );
         assertThat( param( req, "adjust[notes]" ), is( CloudbedsScraper.AIRBNB_SERVICE_FEE_ADJUST_NOTE ) );
         assertThat( param( req, "adjust[reservation_id]" ), is( "190514833" ) );
         assertThat( param( req, "adjust[booking_rooms_id]" ), is( "243912807" ) );

@@ -160,7 +160,9 @@ public class AirbnbPaymentReconcileService {
             }
             if ( serviceFee.compareTo( BigDecimal.ZERO ) > 0
                     && false == hasServiceFeeAdjust( webClient, res ) ) {
-                cloudbedsScraper.addManualRoomRevenueAdjust( webClient, res, serviceFee.negate(),
+                // Cloudbeds Adjust Charge → Manual room revenue: positive amount writes down
+                // revenue (negative credit on the folio). UI only accepts positive values.
+                cloudbedsScraper.addManualRoomRevenueAdjust( webClient, res, serviceFee,
                         CloudbedsScraper.AIRBNB_SERVICE_FEE_ADJUST_NOTE );
             }
         }

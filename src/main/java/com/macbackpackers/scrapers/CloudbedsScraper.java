@@ -1129,8 +1129,9 @@ public class CloudbedsScraper {
     public static final String AIRBNB_RESOLUTION_REFUND_DESCRIPTION = "Airbnb resolution adjustment -ronbot";
 
     /**
-     * Folio Adjust Charge → Manual room revenue. Use a negative amount to write down Airbnb
-     * commission without changing nightly rates (EVL stays on gross).
+     * Folio Adjust Charge → Manual room revenue. Pass a positive amount to write down Airbnb
+     * commission without changing nightly rates (EVL stays on gross). Cloudbeds only accepts
+     * positive values; they post as a negative credit on the folio.
      */
     public void addManualRoomRevenueAdjust( WebClient webClient, Reservation res, BigDecimal amount, String notes )
             throws IOException {
