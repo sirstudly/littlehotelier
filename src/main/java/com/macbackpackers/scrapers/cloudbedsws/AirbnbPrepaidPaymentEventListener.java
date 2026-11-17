@@ -119,6 +119,12 @@ public class AirbnbPrepaidPaymentEventListener implements CloudbedsEventListener
                         reservationId, WordPressDAO.CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS );
                 continue;
             }
+            if ( dao.hasActiveAirbnbPaymentImportForReservation( reservationId ) ) {
+                LOGGER.info( "Skipping AirbnbPrepaidPaymentJob for reservation {} "
+                                + "(Airbnb payment import active/processed)",
+                        reservationId );
+                continue;
+            }
             enqueuePrepaidJob( event.getThirdPartyIdentifier(), event.getStatus(),
                     event.getFirstName(), event.getLastName(), reservationId );
         }
@@ -164,6 +170,12 @@ public class AirbnbPrepaidPaymentEventListener implements CloudbedsEventListener
             LOGGER.info( "Skipping AirbnbPrepaidPaymentJob for reservation {} "
                             + "(pending or attempted within last {}h)",
                     reservationId, WordPressDAO.CHANNEL_COLLECT_PREPAID_PAYMENT_COOLDOWN_HOURS );
+            return;
+        }
+        if ( dao.hasActiveAirbnbPaymentImportForReservation( reservationId ) ) {
+            LOGGER.info( "Skipping AirbnbPrepaidPaymentJob for reservation {} "
+                            + "(Airbnb payment import active/processed)",
+                    reservationId );
             return;
         }
         try ( WebClient webClient = context.getBean( "webClientForCloudbeds", WebClient.class ) ) {

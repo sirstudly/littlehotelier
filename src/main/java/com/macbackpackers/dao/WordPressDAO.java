@@ -11,6 +11,8 @@ import java.util.Set;
 
 import jakarta.persistence.NoResultException;
 
+import com.macbackpackers.beans.AirbnbImportBatch;
+import com.macbackpackers.beans.AirbnbPayment;
 import com.macbackpackers.beans.BedLock;
 import com.macbackpackers.beans.BedLockViolation;
 import com.macbackpackers.beans.BlacklistEntry;
@@ -988,4 +990,24 @@ public interface WordPressDAO {
 
     /** Inserts (id 0) or updates a violation. */
     void saveBedLockViolation( BedLockViolation violation );
+
+    // --- Airbnb payments import ---
+
+    AirbnbImportBatch fetchAirbnbImportBatch( long batchId );
+
+    void updateAirbnbImportBatch( AirbnbImportBatch batch );
+
+    AirbnbPayment fetchAirbnbPaymentByConfirmationCode( String confirmationCode );
+
+    AirbnbPayment fetchAirbnbPaymentByReservationId( String reservationId );
+
+    /**
+     * True if an import row for this reservation is processed or currently processing
+     * (used to skip auto {@code AirbnbPrepaidPaymentJob}).
+     */
+    boolean hasActiveAirbnbPaymentImportForReservation( String reservationId );
+
+    void upsertAirbnbPayment( AirbnbPayment payment );
+
+    void updateAirbnbPayment( AirbnbPayment payment );
 }

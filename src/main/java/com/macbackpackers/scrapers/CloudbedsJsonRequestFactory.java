@@ -740,6 +740,47 @@ public class CloudbedsJsonRequestFactory {
     }
 
     /**
+     * Records an AirBnB Prepaid Card refund (note-style) on the next-gen folio.
+     */
+    public WebRequest createAddAirbnbPrepaidRefundRequest( String bookingRoomId, BigDecimal amount,
+            String description ) throws IOException {
+        return createAddFolioPaymentMethodRequest( bookingRoomId, amount, description,
+                "add_airbnb_prepaid_refund_data.json" );
+    }
+
+    /**
+     * Folio Adjust Charge → Manual room revenue ({@code roomRevenue_manual}). Amount may be
+     * negative to reduce the balance (e.g. Airbnb host service fee write-down).
+     */
+    public WebRequest createAddManualRoomRevenueAdjustRequest( Reservation res, String bookingRoomId,
+            BigDecimal amount, String notes, String billingPortalId, String frontVersion )
+            throws IOException {
+        WebRequest webRequest = createBaseJsonRequest( "https://hotels.cloudbeds.com/hotel/add_new_adjust" );
+        String datetime = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm" ).format( java.time.LocalDateTime.now() );
+        webRequest.setRequestParameters( Arrays.asList(
+                new NameValuePair( "property_id", getPropertyId() ),
+                new NameValuePair( "adjust[id]", "roomRevenue_manual" ),
+                new NameValuePair( "adjust[amount]", CURRENCY_FORMAT.format( amount ) ),
+                new NameValuePair( "adjust[notes]", notes ),
+                new NameValuePair( "adjust[auto_date]", "1" ),
+                new NameValuePair( "adjust[datetime]", datetime ),
+                new NameValuePair( "adjust[reservation_id]", res.getReservationId() ),
+                new NameValuePair( "adjust[source]", res.getSource() ),
+                new NameValuePair( "adjust[is_hotel_collect_booking]", res.getIsHotelCollectBooking() ),
+                new NameValuePair( "adjust[is_root_source]", res.getIsRootSource() ),
+                new NameValuePair( "adjust[folio_id]", "0" ),
+                new NameValuePair( "adjust[booking_rooms_id]", bookingRoomId ),
+                new NameValuePair( "suppress_client_errors", "true" ),
+                new NameValuePair( "csrf_accessa", dao.getCsrfToken() ),
+                new NameValuePair( "billing_portal_id", billingPortalId ),
+                new NameValuePair( "is_bp_setup_completed", "1" ),
+                new NameValuePair( "group_id", getPropertyId() ),
+                new NameValuePair( "frontVersion", frontVersion ),
+                new NameValuePair( "version", getVersionForRequest( webRequest ) ) ) );
+        return webRequest;
+    }
+
+    /**
      * Voids a folio payment (e.g. Terceiros / Payment Recorded) via next-gen
      * {@code connect/payment/add} with {@code transaction_type=Void}. Matches the MFD UI void
      * action — not {@code hotel/void_payment}.

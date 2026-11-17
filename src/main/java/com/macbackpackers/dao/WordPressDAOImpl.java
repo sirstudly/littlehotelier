@@ -1,6 +1,8 @@
 
 package com.macbackpackers.dao;
 
+import com.macbackpackers.beans.AirbnbImportBatch;
+import com.macbackpackers.beans.AirbnbPayment;
 import com.macbackpackers.beans.BedLock;
 import com.macbackpackers.beans.BedLockViolation;
 import com.macbackpackers.beans.BlacklistEntry;
@@ -2429,6 +2431,116 @@ public class WordPressDAOImpl implements WordPressDAO {
         else {
             em.merge( violation );
         }
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public AirbnbImportBatch fetchAirbnbImportBatch( long batchId ) {
+        AirbnbImportBatch batch = em.find( AirbnbImportBatch.class, batchId );
+        if ( batch == null ) {
+            throw new EmptyResultDataAccessException( "Airbnb import batch " + batchId + " not found", 1 );
+        }
+        return batch;
+    }
+
+    @Override
+    @Transactional
+    public void updateAirbnbImportBatch( AirbnbImportBatch batch ) {
+        em.merge( batch );
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public AirbnbPayment fetchAirbnbPaymentByConfirmationCode( String confirmationCode ) {
+        List<AirbnbPayment> rows = em.createQuery(
+                "FROM AirbnbPayment p WHERE p.confirmationCode = :code", AirbnbPayment.class )
+                .setParameter( "code", confirmationCode )
+                .setMaxResults( 1 )
+                .getResultList();
+        return rows.isEmpty() ? null : rows.get( 0 );
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public AirbnbPayment fetchAirbnbPaymentByReservationId( String reservationId ) {
+        if ( StringUtils.isBlank( reservationId ) ) {
+            return null;
+        }
+        long id;
+        try {
+            id = Long.parseLong( reservationId );
+        }
+        catch ( NumberFormatException e ) {
+            return null;
+        }
+        List<AirbnbPayment> rows = em.createQuery(
+                "FROM AirbnbPayment p WHERE p.reservationId = :id ORDER BY p.id DESC", AirbnbPayment.class )
+                .setParameter( "id", id )
+                .setMaxResults( 1 )
+                .getResultList();
+        return rows.isEmpty() ? null : rows.get( 0 );
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public boolean hasActiveAirbnbPaymentImportForReservation( String reservationId ) {
+        AirbnbPayment payment = fetchAirbnbPaymentByReservationId( reservationId );
+        if ( payment == null ) {
+            return false;
+        }
+        String status = payment.getProcessingStatus();
+        return AirbnbPayment.STATUS_PROCESSED.equals( status )
+                || AirbnbPayment.STATUS_PROCESSING.equals( status )
+                || AirbnbPayment.STATUS_IMPORTED.equals( status );
+        // needs_review / errored / ignored do not block auto prepaid
+    }
+
+    @Override
+    @Transactional
+    public void upsertAirbnbPayment( AirbnbPayment payment ) {
+        AirbnbPayment existing = fetchAirbnbPaymentByConfirmationCode( payment.getConfirmationCode() );
+        if ( existing == null ) {
+            em.persist( payment );
+            return;
+        }
+        existing.setGuestName( payment.getGuestName() );
+        existing.setStartDate( payment.getStartDate() );
+        existing.setEndDate( payment.getEndDate() );
+        existing.setBookedDate( payment.getBookedDate() );
+        existing.setAmount( payment.getAmount() );
+        existing.setServiceFee( payment.getServiceFee() );
+        existing.setGrossEarnings( payment.getGrossEarnings() );
+        existing.setNetAmount( payment.getNetAmount() );
+        existing.setNetServiceFee( payment.getNetServiceFee() );
+        existing.setNetGrossEarnings( payment.getNetGrossEarnings() );
+        existing.setHasReservation( payment.getHasReservation() );
+        existing.setHasResolutionAdjustment( payment.getHasResolutionAdjustment() );
+        existing.setHasCancellationFee( payment.getHasCancellationFee() );
+        existing.setHasAdjustment( payment.getHasAdjustment() );
+        existing.setLineTypes( payment.getLineTypes() );
+        existing.setPostPaymentField( payment.getPostPaymentField() );
+        existing.setBatchId( payment.getBatchId() );
+        if ( payment.getProcessingStatus() != null ) {
+            existing.setProcessingStatus( payment.getProcessingStatus() );
+        }
+        if ( payment.getStatusReason() != null ) {
+            existing.setStatusReason( payment.getStatusReason() );
+        }
+        if ( payment.getReservationId() != null ) {
+            existing.setReservationId( payment.getReservationId() );
+            existing.setMatchedYn( payment.getMatchedYn() );
+        }
+        if ( payment.getLastJobId() != null ) {
+            existing.setLastJobId( payment.getLastJobId() );
+        }
+        em.merge( existing );
+        payment.setId( existing.getId() );
+    }
+
+    @Override
+    @Transactional
+    public void updateAirbnbPayment( AirbnbPayment payment ) {
+        em.merge( payment );
     }
 
 }

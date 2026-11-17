@@ -1110,6 +1110,43 @@ public class CloudbedsScraper {
     }
 
     /**
+     * Records an AirBnB Prepaid Card refund (note-style) without charging a guest card.
+     */
+    public void addAirbnbPrepaidRefund( WebClient webClient, Reservation res, BigDecimal amount, String description )
+            throws IOException {
+        if ( res.getBookingRooms() == null || res.getBookingRooms().isEmpty() ) {
+            throw new MissingUserDataException( "Unable to find allocation to assign refund to!" );
+        }
+        BookingRoom bookingRoom = res.getBookingRooms().get( 0 );
+        LOGGER.info( "Recording Airbnb prepaid refund of {} on reservation {} ({})",
+                getCurrencyFormat().format( amount ), res.getReservationId(), description );
+        WebRequest requestSettings = jsonRequestFactory.createAddAirbnbPrepaidRefundRequest(
+                bookingRoom.getId(), amount, description );
+        doRequestErrorOnFailure( webClient, requestSettings, CloudbedsJsonResponse.class, null );
+    }
+
+    public static final String AIRBNB_SERVICE_FEE_ADJUST_NOTE = "Airbnb service fee -ronbot";
+    public static final String AIRBNB_RESOLUTION_REFUND_DESCRIPTION = "Airbnb resolution adjustment -ronbot";
+
+    /**
+     * Folio Adjust Charge → Manual room revenue. Use a negative amount to write down Airbnb
+     * commission without changing nightly rates (EVL stays on gross).
+     */
+    public void addManualRoomRevenueAdjust( WebClient webClient, Reservation res, BigDecimal amount, String notes )
+            throws IOException {
+        if ( res.getBookingRooms() == null || res.getBookingRooms().isEmpty() ) {
+            throw new MissingUserDataException( "Unable to find allocation to assign adjustment to!" );
+        }
+        BookingRoom bookingRoom = res.getBookingRooms().get( 0 );
+        LOGGER.info( "Recording manual room revenue adjust of {} on reservation {} ({})",
+                getCurrencyFormat().format( amount ), res.getReservationId(), notes );
+        WebRequest requestSettings = jsonRequestFactory.createAddManualRoomRevenueAdjustRequest(
+                res, bookingRoom.getId(), amount, notes,
+                getBillingPortalId( webClient ), getFrontVersion( webClient ) );
+        doRequest( webClient, requestSettings );
+    }
+
+    /**
      * Voids a folio payment by Cloudbeds {@code payment_id} (MFD UI "Void Payment" for Terceiros /
      * Payment Recorded and similar). Looks up the folio line, checks it is still voidable, then
      * posts {@code connect/payment/add} with {@code transaction_type=Void}.

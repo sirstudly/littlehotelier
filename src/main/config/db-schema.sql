@@ -804,3 +804,53 @@ INSERT INTO `wp_lh_booking_source_lookup` (`source`, `commission_label`, `commis
 
 -- Production migration: src/main/config/migrations/2026-09-25-booking-source-lookup.sql
 
+
+-- Airbnb Payments import / reconcile (migration: 2026-11-17-airbnb-payments.sql)
+CREATE TABLE `wp_lh_airbnb_import_batch` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_by` varchar(255) DEFAULT NULL,
+  `filename` varchar(255) NOT NULL,
+  `post_payment_field` varchar(32) NOT NULL DEFAULT 'amount',
+  `csv_content` mediumtext NOT NULL,
+  `parent_job_id` bigint(20) unsigned DEFAULT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'submitted',
+  PRIMARY KEY (`id`),
+  KEY `lh_aib_parent_job` (`parent_job_id`),
+  KEY `lh_aib_created` (`created_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `wp_lh_airbnb_payment` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `confirmation_code` varchar(32) NOT NULL,
+  `guest_name` varchar(255) DEFAULT NULL,
+  `start_date` date DEFAULT NULL,
+  `end_date` date DEFAULT NULL,
+  `booked_date` date DEFAULT NULL,
+  `amount` decimal(10,2) DEFAULT NULL,
+  `service_fee` decimal(10,2) DEFAULT NULL,
+  `gross_earnings` decimal(10,2) DEFAULT NULL,
+  `net_amount` decimal(10,2) DEFAULT NULL,
+  `net_service_fee` decimal(10,2) DEFAULT NULL,
+  `net_gross_earnings` decimal(10,2) DEFAULT NULL,
+  `has_reservation` char(1) NOT NULL DEFAULT 'N',
+  `has_resolution_adjustment` char(1) NOT NULL DEFAULT 'N',
+  `has_cancellation_fee` char(1) NOT NULL DEFAULT 'N',
+  `has_adjustment` char(1) NOT NULL DEFAULT 'N',
+  `line_types` varchar(255) DEFAULT NULL,
+  `reservation_id` bigint(20) unsigned DEFAULT NULL,
+  `matched_yn` char(1) NOT NULL DEFAULT 'N',
+  `processing_status` varchar(32) NOT NULL DEFAULT 'imported',
+  `status_reason` varchar(512) DEFAULT NULL,
+  `post_payment_field` varchar(32) DEFAULT NULL,
+  `batch_id` bigint(20) unsigned DEFAULT NULL,
+  `last_job_id` bigint(20) unsigned DEFAULT NULL,
+  `created_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_updated_date` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `lh_ap_confirmation` (`confirmation_code`),
+  KEY `lh_ap_reservation` (`reservation_id`),
+  KEY `lh_ap_status` (`processing_status`),
+  KEY `lh_ap_start` (`start_date`),
+  KEY `lh_ap_batch` (`batch_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
