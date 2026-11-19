@@ -60,9 +60,14 @@ public class AirbnbImportTransactionsJob extends AbstractJob {
             row.setBatchId( batchId );
             row.setPostPaymentField( batch.getPostPaymentField() );
 
+            // CSV is truth at import time for this confirmation code — supersede prior email lines.
+            dao.supersedeAirbnbPayoutEmailLines( row.getConfirmationCode() );
+
             if ( isKnownPattern( row ) ) {
                 row.setProcessingStatus( AirbnbPayment.STATUS_PROCESSING );
                 row.setStatusReason( null );
+                // Upsert merges onto any email-poller row (fills service_fee/gross; keeps match).
+                // Always enqueue AUTO so prepaid from payout emails can gain the fee adjust.
                 dao.upsertAirbnbPayment( row );
 
                 AirbnbImportTransactionJob child = new AirbnbImportTransactionJob();

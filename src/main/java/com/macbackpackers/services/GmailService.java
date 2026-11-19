@@ -716,6 +716,20 @@ public class GmailService {
     }
 
     /**
+     * Fetches the full (untruncated) message body for a Gmail message id.
+     *
+     * @param messageId Gmail message id
+     * @return decoded body or null if not found
+     * @throws IOException on Gmail API failure
+     */
+    public String fetchFullMessageBody( String messageId ) throws IOException {
+        if ( StringUtils.isBlank( messageId ) ) {
+            throw new IllegalArgumentException( "messageId is required" );
+        }
+        return fetchMessageBody( connectAsClient(), messageId.trim() );
+    }
+
+    /**
      * Returns the message body for the given message ID.
      * 
      * @param gmail the connected Gmail client

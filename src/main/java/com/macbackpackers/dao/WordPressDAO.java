@@ -13,6 +13,8 @@ import jakarta.persistence.NoResultException;
 
 import com.macbackpackers.beans.AirbnbImportBatch;
 import com.macbackpackers.beans.AirbnbPayment;
+import com.macbackpackers.beans.AirbnbPayoutEmailLine;
+import com.macbackpackers.services.AirbnbPayoutEmailParser;
 import com.macbackpackers.beans.BedLock;
 import com.macbackpackers.beans.BedLockViolation;
 import com.macbackpackers.beans.BlacklistEntry;
@@ -1024,5 +1026,43 @@ public interface WordPressDAO {
 
     void upsertAirbnbPayment( AirbnbPayment payment );
 
+    /**
+     * Upsert from non-superseded payout-email lines for a confirmation code. Updates
+     * amount/net/flags from email totals; never clears CSV {@code service_fee}/gross/dates.
+     */
+    void upsertAirbnbPaymentFromPayoutEmail( String confirmationCode );
+
+    /**
+     * Marks a cancel-notice email: create/update row as {@code needs_review} without inventing
+     * cancellation-fee amounts.
+     */
+    void markAirbnbPaymentNeedsReviewFromCancelEmail( String confirmationCode, String subject );
+
     void updateAirbnbPayment( AirbnbPayment payment );
+
+    /** True if this Gmail message id was already processed by the payout email poller. */
+    boolean isAirbnbPayoutEmailProcessed( String gmailMessageId );
+
+    /**
+     * Persists a processed payout/cancel email and its line items. Returns the new email row id,
+     * or {@code null} if the message id was already present (race).
+     */
+    Long insertAirbnbPayoutEmail( String gmailMessageId, String subject,
+            List<AirbnbPayoutEmailLine> lines );
+
+    /**
+     * Non-superseded email remittance totals for a confirmation code (reservation sum, resolution
+     * sum, guest). Returns null when no active email lines exist.
+     */
+    AirbnbPayoutEmailParser.EmailTotals fetchAirbnbPayoutEmailTotals( String confirmationCode );
+
+    /**
+     * Marks all payout-email lines for the confirmation code as superseded (CSV is now truth).
+     */
+    void supersedeAirbnbPayoutEmailLines( String confirmationCode );
+
+    /**
+     * True if a pending {@code AirbnbImportTransactionJob} exists for the confirmation code.
+     */
+    boolean hasPendingAirbnbImportTransactionJob( String confirmationCode );
 }

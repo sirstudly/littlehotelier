@@ -49,6 +49,11 @@
     "requiredParams": ["confirmation_code"],
     "description": "Reconcile one Airbnb import payment row (confirmation code) against the Cloudbeds folio; optional action=auto|post_amount|post_gross|void_repost|mark_processed|mark_ignored"
   },
+  "PollAirbnbPayoutEmailsJob": {
+    "classname": "com.macbackpackers.jobs.PollAirbnbPayoutEmailsJob",
+    "requiredParams": [],
+    "description": "Poll hostel Gmail for Airbnb bank-payout emails (amount-mode only) and enqueue prepaid folio posts; optional days_back (default 14)"
+  },
   "VoidAirbnbServiceFeeOnCancelJob": {
     "classname": "com.macbackpackers.jobs.VoidAirbnbServiceFeeOnCancelJob",
     "requiredParams": ["reservation_id"],

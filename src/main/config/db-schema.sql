@@ -854,3 +854,27 @@ CREATE TABLE `wp_lh_airbnb_payment` (
   KEY `lh_ap_start` (`start_date`),
   KEY `lh_ap_batch` (`batch_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Airbnb bank-payout email poll (migration: 2026-11-17-airbnb-payout-email-poll.sql)
+CREATE TABLE `wp_lh_airbnb_payout_email` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `gmail_message_id` varchar(64) NOT NULL,
+  `subject` varchar(512) DEFAULT NULL,
+  `processed_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `lh_ape_gmail_id` (`gmail_message_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `wp_lh_airbnb_payout_email_line` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `payout_email_id` bigint(20) unsigned NOT NULL,
+  `confirmation_code` varchar(32) NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `guest_name` varchar(255) DEFAULT NULL,
+  `line_type` varchar(32) NOT NULL DEFAULT 'reservation',
+  `superseded_yn` char(1) NOT NULL DEFAULT 'N',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `lh_apel_email_code_type` (`payout_email_id`, `confirmation_code`, `line_type`),
+  KEY `lh_apel_code` (`confirmation_code`),
+  KEY `lh_apel_code_active` (`confirmation_code`, `superseded_yn`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

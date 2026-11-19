@@ -3,6 +3,8 @@ package com.macbackpackers.dao;
 
 import com.macbackpackers.beans.AirbnbImportBatch;
 import com.macbackpackers.beans.AirbnbPayment;
+import com.macbackpackers.beans.AirbnbPayoutEmail;
+import com.macbackpackers.beans.AirbnbPayoutEmailLine;
 import com.macbackpackers.beans.BedLock;
 import com.macbackpackers.beans.BedLockViolation;
 import com.macbackpackers.beans.BlacklistEntry;
@@ -2527,6 +2529,7 @@ public class WordPressDAOImpl implements WordPressDAO {
             em.persist( payment );
             return;
         }
+        // CSV import: fill money + line-type fields. Keep reservation match if CSV omits it.
         existing.setGuestName( payment.getGuestName() );
         existing.setStartDate( payment.getStartDate() );
         existing.setEndDate( payment.getEndDate() );
@@ -2563,8 +2566,192 @@ public class WordPressDAOImpl implements WordPressDAO {
 
     @Override
     @Transactional
+    public void upsertAirbnbPaymentFromPayoutEmail( String confirmationCode ) {
+        com.macbackpackers.services.AirbnbPayoutEmailParser.EmailTotals totals =
+                fetchAirbnbPayoutEmailTotals( confirmationCode );
+        if ( totals == null ) {
+            return;
+        }
+        AirbnbPayment existing = fetchAirbnbPaymentByConfirmationCode( confirmationCode );
+        String lineTypes = buildEmailLineTypes( totals );
+        if ( existing == null ) {
+            AirbnbPayment created = new AirbnbPayment();
+            created.setConfirmationCode( confirmationCode );
+            created.setGuestName( totals.getGuestName() );
+            applyEmailTotalsToPayment( created, totals, lineTypes );
+            created.setPostPaymentField( AirbnbPayment.FIELD_AMOUNT );
+            created.setProcessingStatus( AirbnbPayment.STATUS_IMPORTED );
+            em.persist( created );
+            return;
+        }
+        // Email is provisional truth for money/flags; never clear CSV fee/gross/dates.
+        applyEmailTotalsToPayment( existing, totals, lineTypes );
+        if ( StringUtils.isBlank( existing.getGuestName() )
+                && StringUtils.isNotBlank( totals.getGuestName() ) ) {
+            existing.setGuestName( totals.getGuestName() );
+        }
+        if ( StringUtils.isBlank( existing.getPostPaymentField() ) ) {
+            existing.setPostPaymentField( AirbnbPayment.FIELD_AMOUNT );
+        }
+        em.merge( existing );
+    }
+
+    private static void applyEmailTotalsToPayment( AirbnbPayment payment,
+            com.macbackpackers.services.AirbnbPayoutEmailParser.EmailTotals totals, String lineTypes ) {
+        payment.setAmount( totals.hasReservation() ? totals.getReservationSum() : null );
+        payment.setNetAmount( totals.getNetAmount() );
+        payment.setHasReservation( totals.hasReservation() ? "Y" : "N" );
+        payment.setHasResolutionAdjustment( totals.hasResolution() ? "Y" : "N" );
+        payment.setLineTypes( lineTypes );
+    }
+
+    private static String buildEmailLineTypes(
+            com.macbackpackers.services.AirbnbPayoutEmailParser.EmailTotals totals ) {
+        java.util.List<String> types = new java.util.ArrayList<>();
+        if ( totals.hasReservation() ) {
+            types.add( "Reservation" );
+        }
+        if ( totals.hasResolution() ) {
+            types.add( "Resolution Adjustment" );
+        }
+        return String.join( ",", types );
+    }
+
+    @Override
+    @Transactional
+    public void markAirbnbPaymentNeedsReviewFromCancelEmail( String confirmationCode, String subject ) {
+        if ( StringUtils.isBlank( confirmationCode ) ) {
+            return;
+        }
+        AirbnbPayment existing = fetchAirbnbPaymentByConfirmationCode( confirmationCode );
+        String reason = StringUtils.abbreviate( "Airbnb cancel email: " + StringUtils.defaultString( subject ), 500 );
+        if ( existing == null ) {
+            AirbnbPayment created = new AirbnbPayment();
+            created.setConfirmationCode( confirmationCode );
+            created.setPostPaymentField( AirbnbPayment.FIELD_AMOUNT );
+            created.setProcessingStatus( AirbnbPayment.STATUS_NEEDS_REVIEW );
+            created.setStatusReason( reason );
+            em.persist( created );
+            return;
+        }
+        if ( AirbnbPayment.STATUS_IGNORED.equals( existing.getProcessingStatus() ) ) {
+            return;
+        }
+        existing.setProcessingStatus( AirbnbPayment.STATUS_NEEDS_REVIEW );
+        existing.setStatusReason( reason );
+        em.merge( existing );
+    }
+
+    @Override
+    @Transactional
     public void updateAirbnbPayment( AirbnbPayment payment ) {
         em.merge( payment );
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public boolean isAirbnbPayoutEmailProcessed( String gmailMessageId ) {
+        if ( StringUtils.isBlank( gmailMessageId ) ) {
+            return false;
+        }
+        Long count = em.createQuery(
+                "SELECT COUNT(e) FROM AirbnbPayoutEmail e WHERE e.gmailMessageId = :id", Long.class )
+                .setParameter( "id", gmailMessageId )
+                .getSingleResult();
+        return count != null && count.longValue() > 0;
+    }
+
+    @Override
+    @Transactional
+    public Long insertAirbnbPayoutEmail( String gmailMessageId, String subject,
+            List<AirbnbPayoutEmailLine> lines ) {
+        if ( isAirbnbPayoutEmailProcessed( gmailMessageId ) ) {
+            return null;
+        }
+        AirbnbPayoutEmail email = new AirbnbPayoutEmail();
+        email.setGmailMessageId( gmailMessageId );
+        email.setSubject( StringUtils.abbreviate( subject, 512 ) );
+        em.persist( email );
+        em.flush();
+        if ( lines != null ) {
+            for ( AirbnbPayoutEmailLine line : lines ) {
+                line.setPayoutEmailId( email.getId() );
+                if ( StringUtils.isBlank( line.getLineType() ) ) {
+                    line.setLineType( AirbnbPayoutEmailLine.TYPE_RESERVATION );
+                }
+                if ( StringUtils.isBlank( line.getSupersededYn() ) ) {
+                    line.setSupersededYn( "N" );
+                }
+                em.persist( line );
+            }
+        }
+        return Long.valueOf( email.getId() );
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public com.macbackpackers.services.AirbnbPayoutEmailParser.EmailTotals fetchAirbnbPayoutEmailTotals(
+            String confirmationCode ) {
+        if ( StringUtils.isBlank( confirmationCode ) ) {
+            return null;
+        }
+        List<AirbnbPayoutEmailLine> lines = em.createQuery(
+                "FROM AirbnbPayoutEmailLine l WHERE l.confirmationCode = :code AND l.supersededYn = 'N'",
+                AirbnbPayoutEmailLine.class )
+                .setParameter( "code", confirmationCode )
+                .getResultList();
+        if ( lines.isEmpty() ) {
+            return null;
+        }
+        BigDecimal reservationSum = BigDecimal.ZERO.setScale( 2 );
+        BigDecimal resolutionSum = BigDecimal.ZERO.setScale( 2 );
+        String guest = null;
+        for ( AirbnbPayoutEmailLine line : lines ) {
+            BigDecimal amt = line.getAmount() == null ? BigDecimal.ZERO : line.getAmount();
+            if ( AirbnbPayoutEmailLine.TYPE_RESOLUTION.equalsIgnoreCase( line.getLineType() ) ) {
+                resolutionSum = resolutionSum.add( amt );
+            }
+            else {
+                reservationSum = reservationSum.add( amt );
+            }
+            if ( guest == null && StringUtils.isNotBlank( line.getGuestName() ) ) {
+                guest = line.getGuestName();
+            }
+        }
+        return new com.macbackpackers.services.AirbnbPayoutEmailParser.EmailTotals(
+                reservationSum.setScale( 2, java.math.RoundingMode.HALF_UP ),
+                resolutionSum.setScale( 2, java.math.RoundingMode.HALF_UP ),
+                guest );
+    }
+
+    @Override
+    @Transactional
+    public void supersedeAirbnbPayoutEmailLines( String confirmationCode ) {
+        if ( StringUtils.isBlank( confirmationCode ) ) {
+            return;
+        }
+        em.createQuery(
+                "UPDATE AirbnbPayoutEmailLine l SET l.supersededYn = 'Y' "
+                        + "WHERE l.confirmationCode = :code AND l.supersededYn = 'N'" )
+                .setParameter( "code", confirmationCode )
+                .executeUpdate();
+    }
+
+    @Override
+    @Transactional( readOnly = true )
+    public boolean hasPendingAirbnbImportTransactionJob( String confirmationCode ) {
+        if ( StringUtils.isBlank( confirmationCode ) ) {
+            return false;
+        }
+        Number count = (Number) em.createNativeQuery(
+                "SELECT COUNT(*) FROM wp_lh_jobs j "
+                        + " INNER JOIN wp_lh_job_param p ON p.job_id = j.job_id "
+                        + " WHERE j.classname = 'com.macbackpackers.jobs.AirbnbImportTransactionJob' "
+                        + "   AND j.status IN ('submitted', 'processing', 'retry') "
+                        + "   AND p.name = 'confirmation_code' AND p.value = :code" )
+                .setParameter( "code", confirmationCode )
+                .getSingleResult();
+        return count != null && count.intValue() > 0;
     }
 
 }
