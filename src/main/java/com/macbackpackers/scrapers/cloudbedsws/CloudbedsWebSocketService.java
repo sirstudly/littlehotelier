@@ -56,7 +56,7 @@ public class CloudbedsWebSocketService {
     private static final long BACKOFF_MIN_MS = 5_000L;
     private static final long BACKOFF_MAX_MS = 300_000L; // 5 minutes
     /** How long lock/unlock jobs wait for the matching {@code on_room_*} confirmation. */
-    private static final long ROOM_LOCK_CONFIRM_TIMEOUT_SEC = 30;
+    private static final long ROOM_LOCK_CONFIRM_TIMEOUT_SEC = 60;
 
     @Autowired
     private WordPressDAO dao;
