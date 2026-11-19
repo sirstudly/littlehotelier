@@ -42,7 +42,7 @@
   "CloudbedsLockBedJob": {
     "classname": "com.macbackpackers.jobs.CloudbedsLockBedJob",
     "requiredParams": ["reservation_id", "lock"],
-    "description": "Lock or unlock a Cloudbeds calendar assignment (native Classic calendar); lock=true|false; optional room_id or booking_rooms_id"
+    "description": "Lock or unlock a Cloudbeds calendar assignment (native Classic calendar); lock=true|false; optional room_id or booking_rooms_id; optional skip_confirm=true for fire-and-forget (bulk/migration)"
   },
   "CreateAirbnbPrepaidPaymentJob": {
     "classname": "com.macbackpackers.jobs.CreateAirbnbPrepaidPaymentJob",

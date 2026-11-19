@@ -22,11 +22,11 @@ import com.macbackpackers.scrapers.cloudbedsws.CloudbedsWebSocketService;
 /**
  * Locks or unlocks a Cloudbeds calendar assignment (native Classic calendar Lock / Unlock).
  * Sends {@code room_lock} / {@code room_unlock} over the processor's calendar WebSocket and waits
- * for confirmation.
+ * for confirmation unless {@code skip_confirm=true}.
  * <p>
  * Params: {@code reservation_id} (required); {@code lock} ({@code true}/{@code false}, required);
  * optionally {@code room_id}, {@code booking_rooms_id}, or {@code room_identifier} (skips REST
- * lookup when set).
+ * lookup when set); optionally {@code skip_confirm} (default {@code false}; fire-and-forget send).
  */
 @Entity
 @DiscriminatorValue( value = "com.macbackpackers.jobs.CloudbedsLockBedJob" )
@@ -74,22 +74,31 @@ public class CloudbedsLockBedJob extends AbstractJob {
             }
         }
 
-        LOGGER.info( "{} bed for reservation_id={} room_identifier={} room_id={} booking_rooms_id={}",
+        boolean skipConfirm = isSkipConfirm();
+        LOGGER.info( "{} bed for reservation_id={} room_identifier={} room_id={} booking_rooms_id={} skip_confirm={}",
                 lock ? "Locking" : "Unlocking",
                 reservationId,
                 roomIdentifier,
                 room != null ? room.getRoomId() : getRoomId(),
-                room != null ? room.getId() : getBookingRoomsId() );
+                room != null ? room.getId() : getBookingRoomsId(),
+                skipConfirm );
 
+        boolean awaitConfirm = !skipConfirm;
         CloudbedsCalendarEvent confirmed = lock
-                ? cloudbedsWebSocketService.lockBed( roomIdentifier )
-                : cloudbedsWebSocketService.unlockBed( roomIdentifier );
+                ? cloudbedsWebSocketService.lockBed( roomIdentifier, awaitConfirm )
+                : cloudbedsWebSocketService.unlockBed( roomIdentifier, awaitConfirm );
 
-        LOGGER.info( "Cloudbeds {} confirmed for room_identifier={} is_room_locked={} event_id={}",
-                lock ? "room_lock" : "room_unlock",
-                roomIdentifier,
-                confirmed.getIsRoomLocked(),
-                confirmed.getId() );
+        if ( skipConfirm ) {
+            LOGGER.info( "Cloudbeds {} sent (skip_confirm) for room_identifier={}",
+                    lock ? "room_lock" : "room_unlock", roomIdentifier );
+        }
+        else {
+            LOGGER.info( "Cloudbeds {} confirmed for room_identifier={} is_room_locked={} event_id={}",
+                    lock ? "room_lock" : "room_unlock",
+                    roomIdentifier,
+                    confirmed.getIsRoomLocked(),
+                    confirmed.getId() );
+        }
     }
 
     private BookingRoom resolveBookingRoom( Reservation reservation ) {
@@ -169,6 +178,28 @@ public class CloudbedsLockBedJob extends AbstractJob {
 
     public void setLock( boolean lock ) {
         setParameter( "lock", Boolean.toString( lock ) );
+    }
+
+    /**
+     * When {@code true}, send lock/unlock and complete without waiting for Cloudbeds confirmation.
+     * Missing param defaults to {@code false}.
+     */
+    public boolean isSkipConfirm() {
+        String value = StringUtils.trimToNull( getParameter( "skip_confirm" ) );
+        if ( value == null ) {
+            return false;
+        }
+        if ( "true".equalsIgnoreCase( value ) || "1".equals( value ) ) {
+            return true;
+        }
+        if ( "false".equalsIgnoreCase( value ) || "0".equals( value ) ) {
+            return false;
+        }
+        throw new MissingUserDataException( "skip_confirm must be true or false, got: " + value );
+    }
+
+    public void setSkipConfirm( boolean skipConfirm ) {
+        setParameter( "skip_confirm", Boolean.toString( skipConfirm ) );
     }
 
     public String getReservationId() {

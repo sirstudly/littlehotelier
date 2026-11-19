@@ -147,7 +147,20 @@ public class CloudbedsWebSocketService {
      * @throws Exception if the monitor is disconnected, the send fails, or confirmation times out
      */
     public CloudbedsCalendarEvent lockBed( String roomIdentifier ) throws Exception {
-        return setRoomLocked( roomIdentifier, true );
+        return lockBed( roomIdentifier, true );
+    }
+
+    /**
+     * Locks a bed assignment on the live calendar WebSocket.
+     *
+     * @param roomIdentifier Cloudbeds {@code booking_rooms[].room_identifier}
+     * @param awaitConfirm when {@code true}, wait for {@code on_room_lock}; when {@code false},
+     *            fire-and-forget after a successful send (returns {@code null})
+     * @return confirmation event, or {@code null} when {@code awaitConfirm} is false
+     * @throws Exception if the monitor is disconnected, the send fails, or confirmation times out
+     */
+    public CloudbedsCalendarEvent lockBed( String roomIdentifier, boolean awaitConfirm ) throws Exception {
+        return setRoomLocked( roomIdentifier, true, awaitConfirm );
     }
 
     /**
@@ -158,10 +171,24 @@ public class CloudbedsWebSocketService {
      * @throws Exception if the monitor is disconnected, the send fails, or confirmation times out
      */
     public CloudbedsCalendarEvent unlockBed( String roomIdentifier ) throws Exception {
-        return setRoomLocked( roomIdentifier, false );
+        return unlockBed( roomIdentifier, true );
     }
 
-    private CloudbedsCalendarEvent setRoomLocked( String roomIdentifier, boolean lock ) throws Exception {
+    /**
+     * Unlocks a bed assignment on the live calendar WebSocket.
+     *
+     * @param roomIdentifier Cloudbeds {@code booking_rooms[].room_identifier}
+     * @param awaitConfirm when {@code true}, wait for {@code on_room_unlock}; when {@code false},
+     *            fire-and-forget after a successful send (returns {@code null})
+     * @return confirmation event, or {@code null} when {@code awaitConfirm} is false
+     * @throws Exception if the monitor is disconnected, the send fails, or confirmation times out
+     */
+    public CloudbedsCalendarEvent unlockBed( String roomIdentifier, boolean awaitConfirm ) throws Exception {
+        return setRoomLocked( roomIdentifier, false, awaitConfirm );
+    }
+
+    private CloudbedsCalendarEvent setRoomLocked( String roomIdentifier, boolean lock, boolean awaitConfirm )
+            throws Exception {
         if ( roomIdentifier == null || roomIdentifier.isBlank() ) {
             throw new IllegalArgumentException( "roomIdentifier is required" );
         }
@@ -169,6 +196,16 @@ public class CloudbedsWebSocketService {
         if ( client == null || !client.isOpen() ) {
             throw new IllegalStateException(
                     "Cloudbeds calendar WebSocket is not connected; lock/unlock requires the processor monitor" );
+        }
+
+        if ( !awaitConfirm ) {
+            if ( lock ) {
+                client.sendRoomLock( roomIdentifier );
+            }
+            else {
+                client.sendRoomUnlock( roomIdentifier );
+            }
+            return null;
         }
 
         CompletableFuture<CloudbedsCalendarEvent> future = new CompletableFuture<>();
