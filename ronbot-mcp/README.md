@@ -27,6 +27,7 @@ Cloudbeds mutations are never done from MCP. DB writes are limited to allowliste
 | `list_transactions` | Live folio lines (read-api; unique match required; includes `paymentId` for voids) |
 | `get_booking_timeline` | Live booking + transactions + job history (name queries: calendar first) |
 | `void_transaction` | Enqueue void of a folio payment (`VoidFolioPaymentJob`; staff must ask explicitly) |
+| `lock_bed` / `unlock_bed` | Enqueue native Cloudbeds calendar bed lock/unlock (`CloudbedsLockBedJob` with `lock=true|false`) |
 | `check_stay_continuation` | Cleaning / extension: staying on past checkout? (same reservation or linked follow-on in same beds) |
 | `get_availability` | Live sellable beds/rooms by room type (read-api; single property, subset, or all hostels in one call) |
 | `get_channel_production` | Live Channel Production numbers by source for one month (read-api; single property, subset, or all hostels in one call) |
@@ -52,8 +53,16 @@ Cloudbeds mutations are never done from MCP. DB writes are limited to allowliste
 | `PollAirbnbPayoutEmailsJob` | optional `days_back` (default 14; amount-mode hostels only) |
 | `VoidAirbnbServiceFeeOnCancelJob` | `reservation_id` |
 | `VoidFolioPaymentJob` | `reservation_id` plus `payment_id` or `transaction_id` (prefer `void_transaction`) |
+| `CloudbedsLockBedJob` | `reservation_id`, `lock` (`true`\|`false`; optional `room_id` / `booking_rooms_id`; prefer `lock_bed` / `unlock_bed`) |
 | `RunQuarterlyEvl6PlusNightsReportJob` | `email` (or alias accounts/hannah/jay/ron) |
 | `RunChannelProductionReportJob` | `year_month` (YYYY-MM), `to_emails` (comma-delimited; each entry may be an alias) |
+
+### `lock_bed` / `unlock_bed`
+
+- Required: `property`, `reservation_id`; for multi-room bookings also `room_id` (e.g. `112210-6`) or `booking_rooms_id`
+- Prefetches the booking via read-api (`get_booking_timeline`); refuses unassigned rooms and already locked/unlocked when `rooms[].isRoomLocked` is present
+- Enqueues `CloudbedsLockBedJob` with `lock=true` / `lock=false` (processor sends calendar WebSocket `room_lock` / `room_unlock` and waits for confirmation)
+- Requires the hostel processor WebSocket monitor to be connected
 
 ### `void_transaction`
 

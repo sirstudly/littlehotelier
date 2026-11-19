@@ -824,6 +824,193 @@ export function createServer(): McpServer {
     },
   );
 
+  type BookingRoomLine = {
+    id?: string;
+    roomId?: string;
+    roomIdentifier?: string;
+    roomNumber?: string;
+    roomTypeName?: string;
+    isRoomLocked?: string | null;
+  };
+
+  function pickBookingRoom(
+    rooms: BookingRoomLine[],
+    opts: { room_id?: string; booking_rooms_id?: string },
+  ): BookingRoomLine {
+    if (!rooms.length) {
+      throw new Error("Reservation has no booking rooms");
+    }
+    const bookingRoomsId = opts.booking_rooms_id?.trim() || "";
+    const roomId = opts.room_id?.trim() || "";
+    if (bookingRoomsId) {
+      const match = rooms.find((r) => String(r.id ?? "") === bookingRoomsId);
+      if (!match) {
+        throw new Error(`No booking_rooms_id=${bookingRoomsId} on this reservation`);
+      }
+      return match;
+    }
+    if (roomId) {
+      const matches = rooms.filter((r) => String(r.roomId ?? "") === roomId);
+      if (!matches.length) {
+        throw new Error(`No room_id=${roomId} on this reservation`);
+      }
+      if (matches.length > 1) {
+        throw new Error(
+          `Multiple booking rooms with room_id=${roomId}; pass booking_rooms_id instead`,
+        );
+      }
+      return matches[0];
+    }
+    if (rooms.length === 1) {
+      return rooms[0];
+    }
+    throw new Error(
+      `Reservation has ${rooms.length} booking rooms; pass room_id or booking_rooms_id`,
+    );
+  }
+
+  async function enqueueBedLockJob(opts: {
+    property: PropertyId;
+    reservation_id: string;
+    room_id?: string;
+    booking_rooms_id?: string;
+    lock: boolean;
+    requested_by?: string;
+  }) {
+    const { property, reservation_id, lock, requested_by } = opts;
+    assertProperty(property);
+    const allowlist = loadJobAllowlist();
+    const jobType = "CloudbedsLockBedJob";
+    const entry = allowlist[jobType];
+    if (!entry) {
+      throw new Error(`${jobType} is not allowlisted`);
+    }
+
+    const timelineRaw = await readApi.getBookingTimeline(property, reservation_id);
+    const timeline = timelineRaw as {
+      booking?: { reservationId?: string; rooms?: BookingRoomLine[] };
+    };
+    const rooms = Array.isArray(timeline.booking?.rooms) ? timeline.booking!.rooms! : [];
+    const room = pickBookingRoom(rooms, {
+      room_id: opts.room_id,
+      booking_rooms_id: opts.booking_rooms_id,
+    });
+    if (!String(room.roomId ?? "").trim()) {
+      throw new Error(
+        `Booking room ${room.id ?? "(unknown)"} is unassigned (no roomId); assign a bed before locking`,
+      );
+    }
+    if (!String(room.roomIdentifier ?? "").trim()) {
+      throw new Error(
+        `Booking room ${room.id ?? room.roomId} has no roomIdentifier — cannot lock/unlock`,
+      );
+    }
+    const alreadyLocked = room.isRoomLocked === "1" || room.isRoomLocked === "true";
+    if (lock && alreadyLocked) {
+      throw new Error(
+        `Bed ${room.roomId} is already locked (roomIdentifier=${room.roomIdentifier})`,
+      );
+    }
+    if (!lock && room.isRoomLocked != null && room.isRoomLocked !== "" && !alreadyLocked) {
+      throw new Error(
+        `Bed ${room.roomId} is already unlocked (roomIdentifier=${room.roomIdentifier})`,
+      );
+    }
+
+    const parameters: Record<string, string> = {
+      reservation_id: String(timeline.booking?.reservationId ?? reservation_id),
+      lock: lock ? "true" : "false",
+      room_identifier: String(room.roomIdentifier),
+    };
+    if (room.roomId) parameters.room_id = String(room.roomId);
+    if (room.id) parameters.booking_rooms_id = String(room.id);
+
+    const jobId = await jobsDb.insertJob(property, entry.classname, parameters);
+    const toolName = lock ? "lock_bed" : "unlock_bed";
+    audit(toolName, {
+      property,
+      job_id: jobId,
+      reservation_id: parameters.reservation_id,
+      lock: parameters.lock,
+      room_id: parameters.room_id ?? null,
+      booking_rooms_id: parameters.booking_rooms_id ?? null,
+      room_identifier: parameters.room_identifier,
+      requested_by: requested_by ?? null,
+    });
+    return {
+      jobId,
+      property,
+      jobType,
+      classname: entry.classname,
+      status: "submitted",
+      parameters,
+      room: {
+        id: room.id ?? null,
+        roomId: room.roomId ?? null,
+        roomIdentifier: room.roomIdentifier ?? null,
+        roomNumber: room.roomNumber ?? null,
+        roomTypeName: room.roomTypeName ?? null,
+        isRoomLocked: room.isRoomLocked ?? null,
+      },
+    };
+  }
+
+  server.tool(
+    "lock_bed",
+    "Enqueue CloudbedsLockBedJob (lock=true) to lock a Cloudbeds calendar assignment to its current bed (native Classic calendar Lock / Unlock assignments). Pass property + reservation_id; for multi-room bookings also pass room_id (e.g. 112210-6) or booking_rooms_id. Confirm with staff first. Requires the processor WebSocket monitor. After enqueue, confirm job id; re-check with get_booking_timeline (rooms[].isRoomLocked).",
+    {
+      property: propertySchema,
+      reservation_id: z.string().min(1),
+      room_id: z.string().min(1).optional(),
+      booking_rooms_id: z.string().min(1).optional(),
+      requested_by: z.string().optional(),
+    },
+    async ({ property, reservation_id, room_id, booking_rooms_id, requested_by }) => {
+      try {
+        return ok(
+          await enqueueBedLockJob({
+            property,
+            reservation_id,
+            room_id,
+            booking_rooms_id,
+            lock: true,
+            requested_by,
+          }),
+        );
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "unlock_bed",
+    "Enqueue CloudbedsLockBedJob (lock=false) to unlock a Cloudbeds calendar assignment (native Classic calendar Unlock). Pass property + reservation_id; for multi-room bookings also pass room_id or booking_rooms_id. Confirm with staff first. Requires the processor WebSocket monitor. After enqueue, confirm job id; re-check with get_booking_timeline (rooms[].isRoomLocked).",
+    {
+      property: propertySchema,
+      reservation_id: z.string().min(1),
+      room_id: z.string().min(1).optional(),
+      booking_rooms_id: z.string().min(1).optional(),
+      requested_by: z.string().optional(),
+    },
+    async ({ property, reservation_id, room_id, booking_rooms_id, requested_by }) => {
+      try {
+        return ok(
+          await enqueueBedLockJob({
+            property,
+            reservation_id,
+            room_id,
+            booking_rooms_id,
+            lock: false,
+            requested_by,
+          }),
+        );
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
   server.tool(
     "void_transaction",
     "Enqueue VoidFolioPaymentJob to void a Cloudbeds folio payment (MFD Void Payment). Prefer payment_id from get_booking_timeline / list_transactions; otherwise pass folio transaction_id. Only when staff explicitly ask to void a payment. Confirm property + which line first. Does not void gateway charges (those need refunds). After enqueue, confirm job id; re-check folio with get_booking_timeline.",

@@ -87,6 +87,50 @@ public class CloudbedsWebSocketClient extends WebSocketClient {
         return authRejected;
     }
 
+    /**
+     * Sends a native calendar {@code room_lock} (isLocked=1) for the given assignment identifier.
+     *
+     * @param roomIdentifier Cloudbeds {@code booking_rooms[].room_identifier}
+     */
+    public void sendRoomLock( String roomIdentifier ) {
+        sendRoomLockState( roomIdentifier, true );
+    }
+
+    /**
+     * Sends a native calendar {@code room_unlock} (isLocked=0) for the given assignment identifier.
+     *
+     * @param roomIdentifier Cloudbeds {@code booking_rooms[].room_identifier}
+     */
+    public void sendRoomUnlock( String roomIdentifier ) {
+        sendRoomLockState( roomIdentifier, false );
+    }
+
+    private void sendRoomLockState( String roomIdentifier, boolean lock ) {
+        if ( roomIdentifier == null || roomIdentifier.isBlank() ) {
+            throw new IllegalArgumentException( "roomIdentifier is required" );
+        }
+        if ( !isOpen() ) {
+            throw new IllegalStateException( "Cloudbeds calendar WebSocket is not open" );
+        }
+        JsonObject o = new JsonObject();
+        o.addProperty( "action", lock ? "room_lock" : "room_unlock" );
+        o.addProperty( "roomIdentifier", roomIdentifier );
+        o.addProperty( "isLocked", lock ? 1 : 0 );
+        o.addProperty( "id", newClientMessageId() );
+        o.addProperty( "property_id", propertyId );
+        o.addProperty( "version", version );
+        o.addProperty( "frontVersion", frontVersion );
+        o.addProperty( "csrf_accessa", csrf );
+        send( GSON.toJson( o ) );
+        LOGGER.info( "Sent Cloudbeds {} for roomIdentifier={}", lock ? "room_lock" : "room_unlock",
+                roomIdentifier );
+    }
+
+    private static String newClientMessageId() {
+        return System.currentTimeMillis()
+                + String.format( "%06d", java.util.concurrent.ThreadLocalRandom.current().nextInt( 1_000_000 ) );
+    }
+
     @Override
     public void onOpen( ServerHandshake handshake ) {
         LOGGER.info( "Cloudbeds calendar WebSocket open: {} (status {} {})",

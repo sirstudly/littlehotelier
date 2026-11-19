@@ -28,6 +28,9 @@ public class BookingRoom {
     /** Cloudbeds per-room flag: {@code "1"} = in-house, {@code "-1"} = not. */
     @SerializedName( "in_house" )
     private String inHouse;
+    /** Native calendar lock: {@code "1"} locked, {@code "0"} unlocked (when present). */
+    @SerializedName( "is_room_locked" )
+    private String isRoomLocked;
     @SerializedName( "guest_first_name" )
     private String guestFirstName;
     @SerializedName( "guest_last_name" )
@@ -152,6 +155,19 @@ public class BookingRoom {
     /** {@code true} when Cloudbeds marks this room/bed as in-house ({@code in_house=1}). */
     public boolean isInHouse() {
         return "1".equals( inHouse );
+    }
+
+    public String getIsRoomLocked() {
+        return isRoomLocked;
+    }
+
+    public void setIsRoomLocked( String isRoomLocked ) {
+        this.isRoomLocked = isRoomLocked;
+    }
+
+    /** {@code true} when Cloudbeds has locked this assignment ({@code is_room_locked=1}). */
+    public boolean isRoomLocked() {
+        return "1".equals( isRoomLocked );
     }
 
     public String getGuestFirstName() {

@@ -5,10 +5,14 @@ import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -51,6 +55,8 @@ public class CloudbedsWebSocketService {
     private static final int CONNECT_TIMEOUT_SEC = 30;
     private static final long BACKOFF_MIN_MS = 5_000L;
     private static final long BACKOFF_MAX_MS = 300_000L; // 5 minutes
+    /** How long lock/unlock jobs wait for the matching {@code on_room_*} confirmation. */
+    private static final long ROOM_LOCK_CONFIRM_TIMEOUT_SEC = 30;
 
     @Autowired
     private WordPressDAO dao;
@@ -86,6 +92,13 @@ public class CloudbedsWebSocketService {
     private final AtomicLong latestSnapshotSeq = new AtomicLong();
 
     /**
+     * Pending lock/unlock confirmations keyed by {@code roomIdentifier}. Completed when the matching
+     * {@code on_room_lock} / {@code on_room_unlock} update arrives (or failed on disconnect / timeout).
+     */
+    private final ConcurrentHashMap<String, CompletableFuture<CloudbedsCalendarEvent>> pendingRoomLocks =
+            new ConcurrentHashMap<>();
+
+    /**
      * Starts the WebSocket monitor on a background daemon thread. Safe to call once; subsequent calls
      * while already running are ignored.
      */
@@ -119,9 +132,82 @@ public class CloudbedsWebSocketService {
                 LOGGER.warn( "Error closing Cloudbeds WebSocket client: {}", e.getMessage() );
             }
         }
+        failPendingRoomLocks( "Cloudbeds calendar WebSocket monitor stopped" );
         Thread t = monitorThread;
         if ( t != null ) {
             t.interrupt();
+        }
+    }
+
+    /**
+     * Locks a bed assignment on the live calendar WebSocket and waits for {@code on_room_lock}.
+     *
+     * @param roomIdentifier Cloudbeds {@code booking_rooms[].room_identifier}
+     * @return the patched calendar event from the confirmation
+     * @throws Exception if the monitor is disconnected, the send fails, or confirmation times out
+     */
+    public CloudbedsCalendarEvent lockBed( String roomIdentifier ) throws Exception {
+        return setRoomLocked( roomIdentifier, true );
+    }
+
+    /**
+     * Unlocks a bed assignment on the live calendar WebSocket and waits for {@code on_room_unlock}.
+     *
+     * @param roomIdentifier Cloudbeds {@code booking_rooms[].room_identifier}
+     * @return the patched calendar event from the confirmation
+     * @throws Exception if the monitor is disconnected, the send fails, or confirmation times out
+     */
+    public CloudbedsCalendarEvent unlockBed( String roomIdentifier ) throws Exception {
+        return setRoomLocked( roomIdentifier, false );
+    }
+
+    private CloudbedsCalendarEvent setRoomLocked( String roomIdentifier, boolean lock ) throws Exception {
+        if ( roomIdentifier == null || roomIdentifier.isBlank() ) {
+            throw new IllegalArgumentException( "roomIdentifier is required" );
+        }
+        CloudbedsWebSocketClient client = currentClient;
+        if ( client == null || !client.isOpen() ) {
+            throw new IllegalStateException(
+                    "Cloudbeds calendar WebSocket is not connected; lock/unlock requires the processor monitor" );
+        }
+
+        CompletableFuture<CloudbedsCalendarEvent> future = new CompletableFuture<>();
+        CompletableFuture<CloudbedsCalendarEvent> prior = pendingRoomLocks.putIfAbsent( roomIdentifier, future );
+        if ( prior != null ) {
+            throw new IllegalStateException(
+                    "Another lock/unlock is already in flight for roomIdentifier=" + roomIdentifier );
+        }
+        try {
+            if ( lock ) {
+                client.sendRoomLock( roomIdentifier );
+            }
+            else {
+                client.sendRoomUnlock( roomIdentifier );
+            }
+            CloudbedsCalendarEvent confirmed = future.get( ROOM_LOCK_CONFIRM_TIMEOUT_SEC, TimeUnit.SECONDS );
+            if ( confirmed.isRoomLocked() != lock ) {
+                throw new IllegalStateException(
+                        "Cloudbeds confirmed " + ( lock ? "room_lock" : "room_unlock" )
+                                + " but is_room_locked=" + confirmed.getIsRoomLocked()
+                                + " for roomIdentifier=" + roomIdentifier );
+            }
+            return confirmed;
+        }
+        catch ( TimeoutException e ) {
+            future.completeExceptionally( e );
+            throw new TimeoutException(
+                    "Timed out waiting for Cloudbeds " + ( lock ? "on_room_lock" : "on_room_unlock" )
+                            + " for roomIdentifier=" + roomIdentifier );
+        }
+        catch ( ExecutionException e ) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            if ( cause instanceof Exception ) {
+                throw (Exception) cause;
+            }
+            throw e;
+        }
+        finally {
+            pendingRoomLocks.remove( roomIdentifier, future );
         }
     }
 
@@ -209,6 +295,31 @@ public class CloudbedsWebSocketService {
         }
         finally {
             currentClient = null;
+            failPendingRoomLocks( "Cloudbeds calendar WebSocket disconnected" );
+        }
+    }
+
+    private void failPendingRoomLocks( String reason ) {
+        for ( Map.Entry<String, CompletableFuture<CloudbedsCalendarEvent>> e : pendingRoomLocks.entrySet() ) {
+            e.getValue().completeExceptionally( new IllegalStateException( reason ) );
+        }
+        pendingRoomLocks.clear();
+    }
+
+    private void completePendingRoomLocks( CloudbedsCalendarUpdate update ) {
+        String action = update.getPayloadAction();
+        if ( false == "on_room_lock".equals( action ) && false == "on_room_unlock".equals( action ) ) {
+            return;
+        }
+        for ( CloudbedsCalendarEvent event : update.getEvents() ) {
+            String roomIdentifier = event.getRoomIdentifier();
+            if ( roomIdentifier == null || roomIdentifier.isBlank() ) {
+                continue;
+            }
+            CompletableFuture<CloudbedsCalendarEvent> future = pendingRoomLocks.get( roomIdentifier );
+            if ( future != null ) {
+                future.complete( event );
+            }
         }
     }
 
@@ -265,6 +376,7 @@ public class CloudbedsWebSocketService {
         }
         finally {
             eventRegistry.commitUpdate( propertyId, update );
+            completePendingRoomLocks( update );
         }
     }
 

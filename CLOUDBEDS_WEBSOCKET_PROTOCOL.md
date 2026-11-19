@@ -288,6 +288,34 @@ Bulk auto-assignment cleanup. Often carries `extras=update` and deletes one or m
 }
 ```
 
+#### on_room_lock / on_room_unlock
+
+Native Cloudbeds **Lock / Unlock assignment** (Classic calendar). The browser sends a client→server command (see [Room lock / unlock](#room-lock--unlock-client--server)); the server confirms inside a guarantee envelope. **Unlike `changes` / `room_assign`, the patched events live under `update.Events`, not `data.Events`.**
+
+```json
+{
+  "success": true,
+  "action": "on_room_lock",
+  "update": {
+    "Events": [
+      {
+        "id": "17920106729533671",
+        "booking_id": "185718173",
+        "room_id": "112210-6",
+        "identifier": "2462339135565",
+        "room_identifier": "2462339135565",
+        "booking_rooms_id": "239404533",
+        "is_room_locked": "1",
+        "updated_at": "2026-11-19 06:15:04.444995"
+      }
+    ]
+  },
+  "time": 1795068904
+}
+```
+
+`on_room_unlock` is the same shape with `"is_room_locked": "0"`. `is_room_locked` is a **string** (`"1"` / `"0"`), not a boolean.
+
 #### Payload fields used by this app
 
 | Payload `action` | Meaning | Key fields |
@@ -297,6 +325,7 @@ Bulk auto-assignment cleanup. Often carries `extras=update` and deletes one or m
 | `event_change` | In-place edit / bed move on assigned row | `data.Events` |
 | `auto_assign` | Bulk auto-assign cleanup | `delete.NonAssignedReservations`, optional `extras` |
 | `room_free` | Remove (or add) grid cells by id | `data` (id array), `add` |
+| `on_room_lock` / `on_room_unlock` | Lock / unlock confirmation | `update.Events` (note: **not** `data.Events`), `is_room_locked` |
 
 **Removing calendar rows (cancellations / bed management):**
 
@@ -383,17 +412,57 @@ The `on_migrate` snapshot ships these **49 columns** (in `Events.keys`); the `ch
 | `third_party_identifier` | | OTA reference |
 | `group_profile_id`, `group_profile_name` | | Group booking profile |
 | `allotment_block_id` | | Allotment/block id |
-| `is_room_locked` | | Room lock flag |
+| `is_room_locked` | `"0"` / `"1"` | Native calendar lock flag (string). Toggled by `room_lock` / `room_unlock` |
 
 > `room_id` (`112564-8`) and `res_rt_id` (`112564`) tie each event back to the room type / rate ids used by the REST calendar calls (`/connect/availability/get` with `rate_ids[]=0-112564`).
+
+---
+
+## Room lock / unlock (client → server)
+
+Requires the Cloudbeds permission **Lock / Unlock assignments** (Classic calendar). There is **no REST** lock endpoint — mutations go over the same calendar WebSocket.
+
+```json
+{
+  "action": "room_lock",
+  "roomIdentifier": "2462339135565",
+  "isLocked": 1,
+  "id": "179506890423001245",
+  "property_id": "18265",
+  "version": "https://front.cloudbeds.com/mfd-root/app.js",
+  "frontVersion": "18.278.0",
+  "csrf_accessa": "<csrf_accessa cookie value>"
+}
+```
+
+Unlock uses `"action":"room_unlock"` and `"isLocked":0`. `isLocked` is a JSON **integer** (1/0).
+
+| Field | Notes |
+|-------|--------|
+| `roomIdentifier` | Same as REST `get_reservation` → `booking_rooms[].room_identifier` (and event `identifier` / `room_identifier`). **Not** `booking_id`, `booking_rooms.id`, or calendar event `id`. |
+| `id` | Client correlation id (same style as `migrate.id`) |
+| Response | Guarantee envelope → `on_room_lock` / `on_room_unlock` with `update.Events` (see above); client must ACK `guarantee` |
+
+Verified Nov 2026 after a subscription-tier upgrade with property-scoped login on `https://hotels.cloudbeds.com/connect/{propertyId}` (`Origin: https://hotels.cloudbeds.com`). Core `migrate` / `on_migrate` / `get_changes` / `guarantee` shapes were unchanged (`frontVersion` observed as `18.278.0`).
+
+### Browser-only calendar actions (not required for the monitor)
+
+The Classic calendar UI also sends (we do **not** need these for passive monitoring or lock jobs):
+
+| Action | Direction | Purpose |
+|--------|-----------|---------|
+| `load` / `on_load` | → / ← | Fetch a scrolled date window (compressed `data`) |
+| `get_allotment_blocks` / `on_allotment_blocks` | → / ← | Allotment block overlay for a date range |
+
+`on_migrate` may also include sidecar fields (`allotment_blocks`, `house_keeping_conditions`, `firstDate` / `lastDate`, …) that the monitor ignores.
 
 ---
 
 ## How to get WebSocket URL and migrate parameters
 
 1. Open Chrome DevTools → **Network** → filter **WS**.
-2. Log in to https://hotels.cloudbeds.com/ and open the calendar/allocation view.
-3. Select the WebSocket connection and copy its **Request URL** (e.g. `wss://...`).
+2. Log in to https://hotels.cloudbeds.com/ (property-scoped connect URL, e.g. `/connect/18265`) and open the calendar/allocation view. Handshake `Origin` is `https://hotels.cloudbeds.com`.
+3. Select the WebSocket connection and copy its **Request URL** (e.g. `wss://websocket.cloudbeds.com/calendar/{propertyId}`).
 4. From the same session you can copy the first **>>> migrate** and **>>> guarantee** messages (e.g. from your `ws_messages.txt`) to get `property_id`, `version`, `frontVersion`, `csrf_accessa`, and the shape of `id`/`__created` and `guarantee`.
 
 The test client in this repo expects a WebSocket URL and, optionally, a JSON file or env vars for the migrate payload so it can connect and print incoming `room_assign` / `changes` events.
@@ -431,7 +500,8 @@ The test client in this repo expects a WebSocket URL and, optionally, a JSON fil
 3. Send **>>> migrate** with session/version/csrf from the same browser session.
 4. **Decode <<< on_migrate** for the full snapshot: base64-decode `data` → **raw-DEFLATE** decompress (`-zlib.MAX_WBITS` / `Inflater(nowrap=true)`) → JSON → rebuild objects with `dict(zip(Events.keys, row))`. This one frame contains the entire calendar (all reservations + blocked/OOS dates).
 5. Send **>>> get_changes** with `last` = the `time` from `on_migrate`, then **>>> guarantee** periodically (e.g. every 15–30 s) with a stable or random token.
-6. On each **<<<** message that has `guarantee` and `payload`, parse `payload` as JSON; handle `action` values `changes`, `room_assign`, `event_change`, `room_free`, and `auto_assign` — iterate `data.Events` (a plain array of objects here) and apply them as incremental updates.
+6. On each **<<<** message that has `guarantee` and `payload`, parse `payload` as JSON; handle `action` values `changes`, `room_assign`, `event_change`, `room_free`, `auto_assign`, `on_room_lock`, and `on_room_unlock` — iterate `data.Events` when present, or `update.Events` for lock/unlock confirmations, and apply them as incremental updates.
+7. To lock/unlock a bed assignment: send **>>> room_lock** / **>>> room_unlock** with `roomIdentifier` from `get_reservation` → `booking_rooms[].room_identifier`, then wait for the matching `on_room_*` guarantee payload.
 
 This avoids calling `get_reservation` hundreds of times: take the bulk state from `on_migrate`, then keep it current with the incremental `changes` payloads.
 

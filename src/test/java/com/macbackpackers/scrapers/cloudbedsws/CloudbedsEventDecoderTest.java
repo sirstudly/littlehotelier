@@ -91,4 +91,58 @@ public class CloudbedsEventDecoderTest {
         assertTrue( update.getDeleteSection().containsKey( "NonAssignedReservations" ) );
         assertEquals( "229722818", update.getDeleteSection().get( "NonAssignedReservations" ).get( 0 ) );
     }
+
+    @Test
+    public void decodePayload_onRoomLock_parsesUpdateEvents() {
+        // Classic calendar lock confirmation uses update.Events (not data.Events)
+        String json = "{"
+                + "\"success\":true,"
+                + "\"action\":\"on_room_lock\","
+                + "\"update\":{\"Events\":[{"
+                + "\"id\":\"17920106729533671\","
+                + "\"booking_id\":\"185718173\","
+                + "\"room_id\":\"112210-6\","
+                + "\"identifier\":\"2462339135565\","
+                + "\"room_identifier\":\"2462339135565\","
+                + "\"booking_rooms_id\":\"239404533\","
+                + "\"is_room_locked\":\"1\""
+                + "}]},"
+                + "\"time\":1795068904"
+                + "}";
+        CloudbedsCalendarUpdate update = CloudbedsEventDecoder.decodePayload(
+                JsonParser.parseString( json ).getAsJsonObject() );
+
+        assertEquals( "on_room_lock", update.getPayloadAction() );
+        assertEquals( "1795068904", update.getPayloadTime() );
+        assertEquals( 1, update.getEvents().size() );
+        CloudbedsCalendarEvent event = update.getEvents().get( 0 );
+        assertEquals( "185718173", event.getBookingId() );
+        assertEquals( "2462339135565", event.getRoomIdentifier() );
+        assertEquals( "1", event.getIsRoomLocked() );
+        assertTrue( event.isRoomLocked() );
+        assertFalse( update.getExtraPayloadKeys().contains( "update" ) );
+        assertFalse( update.getExtraPayloadKeys().contains( "success" ) );
+    }
+
+    @Test
+    public void decodePayload_onRoomUnlock_parsesUpdateEvents() {
+        String json = "{"
+                + "\"success\":true,"
+                + "\"action\":\"on_room_unlock\","
+                + "\"update\":{\"Events\":[{"
+                + "\"id\":\"17920106729533671\","
+                + "\"booking_id\":\"185718173\","
+                + "\"room_identifier\":\"2462339135565\","
+                + "\"is_room_locked\":\"0\""
+                + "}]},"
+                + "\"time\":1795068908"
+                + "}";
+        CloudbedsCalendarUpdate update = CloudbedsEventDecoder.decodePayload(
+                JsonParser.parseString( json ).getAsJsonObject() );
+
+        assertEquals( "on_room_unlock", update.getPayloadAction() );
+        assertEquals( 1, update.getEvents().size() );
+        assertEquals( "0", update.getEvents().get( 0 ).getIsRoomLocked() );
+        assertFalse( update.getEvents().get( 0 ).isRoomLocked() );
+    }
 }

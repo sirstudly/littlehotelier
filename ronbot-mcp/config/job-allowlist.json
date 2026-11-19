@@ -39,6 +39,11 @@
     "requiredParams": ["reservation_id"],
     "description": "Void a Cloudbeds folio payment (Terceiros/Payment Recorded etc.) by payment_id or transaction_id"
   },
+  "CloudbedsLockBedJob": {
+    "classname": "com.macbackpackers.jobs.CloudbedsLockBedJob",
+    "requiredParams": ["reservation_id", "lock"],
+    "description": "Lock or unlock a Cloudbeds calendar assignment (native Classic calendar); lock=true|false; optional room_id or booking_rooms_id"
+  },
   "CreateAirbnbPrepaidPaymentJob": {
     "classname": "com.macbackpackers.jobs.CreateAirbnbPrepaidPaymentJob",
     "requiredParams": ["days_back"],

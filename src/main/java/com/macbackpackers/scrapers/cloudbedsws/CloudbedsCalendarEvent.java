@@ -97,6 +97,25 @@ public class CloudbedsCalendarEvent {
         return get( "room_id" );
     }
 
+    /**
+     * Assignment identifier used by {@code room_lock} / {@code room_unlock}
+     * ({@code room_identifier}, falling back to {@code identifier}).
+     */
+    public String getRoomIdentifier() {
+        String roomIdentifier = get( "room_identifier" );
+        return StringUtils.isNotBlank( roomIdentifier ) ? roomIdentifier : get( "identifier" );
+    }
+
+    /** Native calendar lock flag as shipped by Cloudbeds ({@code "1"} / {@code "0"}). */
+    public String getIsRoomLocked() {
+        return get( "is_room_locked" );
+    }
+
+    /** {@code true} when {@code is_room_locked} is {@code "1"}. */
+    public boolean isRoomLocked() {
+        return "1".equals( getIsRoomLocked() );
+    }
+
     /** Room type id (matches the {@code rate_ids} {@code 0-<id>} used by /connect/availability/get). */
     public String getResRtId() {
         return get( "res_rt_id" );

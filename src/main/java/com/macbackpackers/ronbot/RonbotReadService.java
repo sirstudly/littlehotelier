@@ -1011,13 +1011,16 @@ public class RonbotReadService {
             List<Map<String, Object>> rooms = new ArrayList<>();
             for ( BookingRoom room : r.getBookingRooms() ) {
                 Map<String, Object> rm = new LinkedHashMap<>();
+                rm.put( "id", room.getId() );
                 rm.put( "roomId", room.getRoomId() );
+                rm.put( "roomIdentifier", room.getRoomIdentifier() );
                 rm.put( "roomNumber", room.getRoomNumber() );
                 rm.put( "roomTypeName", room.getRoomTypeName() );
                 rm.put( "roomTypeId", room.getRoomTypeId() );
                 rm.put( "startDate", room.getStartDate() );
                 rm.put( "endDate", room.getEndDate() );
                 rm.put( "guestCount", room.getGuestCount() );
+                rm.put( "isRoomLocked", room.getIsRoomLocked() );
                 rooms.add( rm );
             }
             dto.setRooms( rooms );

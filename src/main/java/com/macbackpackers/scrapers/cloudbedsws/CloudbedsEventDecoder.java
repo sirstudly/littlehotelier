@@ -103,6 +103,15 @@ public final class CloudbedsEventDecoder {
             update.setRemovedEventIds( decodeIdList( dataEl ) );
         }
 
+        // on_room_lock / on_room_unlock (and possibly others) put patched Events under "update"
+        // rather than "data" — decode those when data.Events was absent
+        if ( update.getEvents().isEmpty() ) {
+            JsonElement updateEl = payload.get( "update" );
+            if ( updateEl != null && updateEl.isJsonObject() ) {
+                update.setEvents( decodeChanges( updateEl.getAsJsonObject() ) );
+            }
+        }
+
         Map<String, List<String>> deleteSection = decodeDeleteSection( payload.get( "delete" ) );
         update.setDeleteSection( deleteSection );
         if ( update.getRemovedEventIds().isEmpty() ) {
@@ -205,10 +214,12 @@ public final class CloudbedsEventDecoder {
         switch ( key ) {
             case "action":
             case "data":
+            case "update":
             case "delete":
             case "time":
             case "id":
             case "add":
+            case "success":
             case "house_keeping_conditions":
                 return true;
             default:
